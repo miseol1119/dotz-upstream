@@ -131,6 +131,22 @@ describe("publicPostDeny", () => {
 		expect(publicPostDeny(`cat > ${missing} <<EOF\n998877\nEOF\ngh issue create -R ddotz/dotz --body-file ${missing}`, dir, dir)).toContain("config discord");
 	});
 
+	test("each body file the check cannot read gets its own reason, and all stay refused", () => {
+		const dir = install();
+		const later = join(dir, "later.md");
+		const post = "gh issue comment 5 -R ddotz/dotz --body-file";
+		for (const command of [`${post} ${later}`, `printf 998877 | tee ${later}\n${post} ${later}`, `${post} $HOME/not-written-yet.md`]) {
+			const refusal = publicPostDeny(command, dir, dir);
+			expect(refusal).toContain("does not exist yet");
+			expect(refusal).toContain("separate call");
+		}
+		expect(publicPostDeny(`${post} $SOMEWHERE/x.md`, dir, dir)).toContain("variable");
+		expect(publicPostDeny(`${post} "\${SOMEWHERE}/x.md"`, dir, dir)).toContain("variable");
+		const big = join(dir, "big.md");
+		writeFileSync(big, "x".repeat(3 * 1024 * 1024));
+		expect(publicPostDeny(`${post} ${big}`, dir, dir)).toContain("too big");
+	});
+
 	test("each form of body file is read", () => {
 		const dir = install();
 		const file = join(dir, "leak.md");

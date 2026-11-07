@@ -411,10 +411,10 @@ export function publicPostDeny(command: string, dataDir: string, cwd: string): s
 		const raw = m[1] ?? m[2];
 		if (raw === "-" || raw.includes("=")) continue;
 		const file = shellPath(raw, dir);
-		const unread = `this post to ${PUBLIC_REPO} names a body file this check cannot read. Put the body at a plain path and post again; do not work around this check`;
-		if (existsSync(file) && statSync(file).size > MAX_NOTES_BYTES) return unread;
+		const refused = (why: string) => `this post to ${PUBLIC_REPO} names a body file ${why}; do not work around this check`;
+		if (existsSync(file) && statSync(file).size > MAX_NOTES_BYTES) return refused(`this check cannot read: it is too big, over ${MAX_NOTES_BYTES / 1024 / 1024} MB. Shorten it and post again`);
 		if (existsSync(file)) bodies.push({ raw, file });
-		else if (m[1] && !redirects.includes(`>${raw}`)) return unread;
+		else if (m[1] && !redirects.includes(`>${raw}`)) return refused(/[$\x60]/.test(file) ? "this check cannot read: its path holds a shell variable or command, which is not expanded yet when the check runs. Write the path out in full and post again" : "that does not exist yet: this check runs before the command does. Save the file first, then post in a separate call");
 	}
 	let shell = flat.replace(NOT_THE_POST, " ");
 	for (const { raw } of bodies) shell = shell.replaceAll(raw, " ");
