@@ -377,7 +377,7 @@ function cmDraftCard(d) {
     to: ["댓글", who || ""], body: { text: d.text, cls: "kk-dt" },
     // A comment reply is text only (a file goes with the mail that rides along, shown below): say so before 보내기.
     attach: { attachmentsNone: true, cannotAttach: [] },
-    extra: [draftMailNode(d.mail), d.mail ? el("div", { class: "kk-note", role: "status", text: "보내기를 누르면 답글을 올린 뒤 메일을 보내요" }) : null, d.notes && d.notes.length ? el("div", { class: "kk-note", role: "status", text: d.notes.join(" / ") }) : null],
+    extra: [draftMailNode(d.mail), d.mail ? el("div", { class: "kk-note", role: "status", text: (d.mail.notes || []).join(" / ") || "보내기를 누르면 답글을 올린 뒤 메일을 보내요" }) : null, d.notes && d.notes.length ? el("div", { class: "kk-note", role: "status", text: d.notes.join(" / ") }) : null],
     // What he types is kept per draft (CM.note): the thread repaints on its own while he types (the timer, a live event), and a new field must not start empty.
     ...(edit ? { revise: rqReviseNode({ pick: part, value: CM.note[d.code] || "", onInput: t => { CM.note[d.code] = t; }, cancel: () => { CM.revising = ""; delete CM.note[d.code]; cmPaintChat(false); },
       go: change => run($(".rq-edit [data-k=revise-go]", wrap) || el("button"), async () => { await cmApi(`/api/comments/drafts/${enc(d.code)}/revise`, "POST", { change, ...(part ? { part: part.value } : {}) }); CM.revising = ""; delete CM.note[d.code]; await cmReload(); }) }) }

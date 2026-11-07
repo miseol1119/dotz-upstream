@@ -13,6 +13,7 @@ import { parseDraftApproval } from "../../../hub/draft-approval.ts";
 import { runMailCli } from "../../../hub/mail-cli.ts";
 import { runDraft } from "../bin/draft.ts";
 import { paths } from "../lib/settings.ts";
+import { ACCOUNT_HELD } from "../lib/flow.ts";
 import { getDraft, listDrafts } from "../lib/store.ts";
 import { enable, pick, setupEnv } from "./helpers.ts";
 
@@ -87,6 +88,41 @@ describe("compose --with-comment", () => {
 		// A second mail for the same comment is a mail of its own: the reply already carries one.
 		const again = await runMailCli(["compose", "--app", "mail", "--to", "fan@example.com", "--subject", "하나 더", "--origin", `comment:${t.id}`], BODY, t.deps);
 		expect(parseDraftApproval(again.lines.join("\n"))).toMatchObject({ toLabel: "받는이", to: "fan@example.com" });
+	});
+
+	test("a mail with no account among several: the card says so and 보내기 is refused before the reply is posted; 답글만 still goes", async () => {
+		const t = setup();
+		t.deps.run = async (argv: string[]) => (argv[1] === "whoami" ? { code: 0, stdout: "a@example.com\nb@example.com\n", stderr: "" } : (t.argvs.push(argv), { code: 0, stdout: "", stderr: "" }));
+		const code = await draftReply(t);
+		const out = await compose(t, code);
+		expect(out.lines.join("\n")).toContain(ACCOUNT_HELD);
+		pick(env, code, 1);
+		const sent = await runComments(["send", code], t.engine, paths.inbox());
+		expect(sent.code).toBe(1);
+		expect(sent.lines.join("\n")).toContain(ACCOUNT_HELD);
+		expect(t.posted).toEqual([]);
+		expect(t.argvs).toEqual([]);
+		expect((await runComments(["send", code, "--only", "reply"], t.engine, paths.inbox())).code).toBe(0);
+		expect(t.posted).toHaveLength(1);
+		expect(t.argvs).toEqual([]);
+	});
+
+	test("the link the engine builds settles the account itself: a mail it composes is held the same way", async () => {
+		const t = setup();
+		const bin = join(files, "bin");
+		mkdirSync(bin, { recursive: true });
+		writeFileSync(join(bin, "zele"), "#!/bin/sh\necho a@example.com\necho b@example.com\n", { mode: 0o755 });
+		const PATH = process.env.PATH;
+		process.env.PATH = `${bin}:${PATH}`;
+		try {
+			const made = await realMailLink().compose({ app: "mail", to: "fan@example.com", subject: "문서 보내드립니다", body: BODY });
+			if (!made.ok) throw new Error(made.reason);
+			expect(realMailLink().lint!(made.id).join("\n")).toContain(ACCOUNT_HELD);
+			expect(realMailLink().view(made.id)?.notes?.join("\n")).toContain(ACCOUNT_HELD);
+			expect(t.argvs).toEqual([]);
+		} finally {
+			process.env.PATH = PATH;
+		}
 	});
 
 	test("the mail cannot be sent on its own, and a missing or handled comment draft is refused before a mail is recorded", async () => {

@@ -205,7 +205,6 @@ export function draftAttachIssues(rec: DraftRec): string[] {
 // The send-time lint of a draft as the owner reads it. The comment engine runs it before a combined card's reply is posted (hub/comments/engine.ts), so a hit never leaves a posted reply beside an unsent mail.
 export const draftLintFailures = (d: DraftRec): string[] => lintReply({ to: d.to, subject: d.subject, body: d.body }, d.item, loadStyle(toneKey(d)), { anyRecipient: d.ownerRecipients === true }).map(ownerWarning);
 
-export const ACCOUNT_HELD = "보낼 메일 계정을 메일 앱 설정에서 정하기 전에는 보내지 않아요";
 
 // The account of a new draft that goes out through zele (senders.ts sendsThroughZele), settled before its card is shown: the owner hears here, not after he pressed 보내기, that it cannot go out as it is.
 // sendWith settles again and refuses without touching the mail, so a run that fails here (logged) loses nothing. No `run`: left to the send.
@@ -221,13 +220,17 @@ export async function settleDraft(rec: DraftRec, run: Runner | undefined): Promi
 	}
 }
 
+export const ACCOUNT_HELD = "보낼 메일 계정을 메일 앱 설정에서 정하기 전에는 보내지 않아요";
+/** Why this draft cannot go out yet: several accounts were logged in when it was made and none has been set since. */
+export const accountHold = (rec: DraftRec): string | undefined => (rec.accounts && !zeleAccountOf(rec) ? `메일 계정이 ${rec.accounts.join(", ")} 여러 개인데 이 메일이 어느 계정 것인지 알 수 없어요. ${ACCOUNT_HELD}` : undefined);
+
 // The [ask] message of one draft; the notes line carries lint warnings, the card's question what only the user can decide.
 export function askText(draft: DraftRec, warnings: string[], headline = draft.compose ? "새 메일 초안을 만들었어요" : "답장 초안을 만들었어요"): string {
 	const rec = withRecipient(draft);
 	if (rec !== draft) warnings = warnings.filter(w => w !== NO_RECIPIENT);
 	// An account set in the meantime answers it: the send finds that one.
-	const several = !zeleAccountOf(rec) && rec.accounts;
-	if (several) warnings = [...warnings, `메일 계정이 ${several.join(", ")} 여러 개인데 이 메일이 어느 계정 것인지 알 수 없어요. ${ACCOUNT_HELD}`];
+	const hold = accountHold(rec);
+	if (hold) warnings = [...warnings, hold];
 	const notes = warnings.map(w => `확인: ${ownerWarning(w)}`.replace(/\s+/g, " ")).join(" / ");
 	const staged = stagedFiles(rec.id).map(f => ({ name: f.name, size: f.size }));
 	// A webmail site sends text only (senders.ts canAttach): its files are listed as the ones that stay behind, and a send that holds them is refused.
@@ -235,7 +238,7 @@ export function askText(draft: DraftRec, warnings: string[], headline = draft.co
 	const attachments = noFiles ? [] : staged;
 	const issues = draftAttachIssues(rec);
 	const keptBack = noFiles && staged.length ? { sendResult: "파일이 붙어 있어 보내지 않아요. 파일을 빼면 본문만 보내요" } : {};
-	const block = draftApprovalBlock({ to: rec.to, toLabel: "받는이", ...(rec.cc?.length ? { cc: rec.cc } : {}), ...(rec.subject ? { subject: rec.subject } : {}), body: rec.body, ref: rec.id, question: rec.compose ? "이 메일 보낼까요?" : "이 답장 보낼까요?", decide: withoutNoFileClaims(rec), ...(rec.compose ? { sendResult: `${rec.to}에게 이 메일을 보내요` } : {}), ...keptBack, ...(several ? { sendResult: ACCOUNT_HELD } : {}), ...(noFiles ? { cannotAttach: staged.map(f => f.name) } : {}), ...(rec.origin ? { origin: { text: rec.origin.text, ...(rec.origin.link ? { link: rec.origin.link } : {}) } } : {}), ...(attachments.length ? { attachments } : {}), ...((rec.origAttachments ?? 0) > 0 ? { attachmentsNone: true } : {}), ...(rec.asksFile ? { asksFile: true } : {}), ...(rec.libraryMiss ? { libraryMiss: true } : {}), ...(rec.rule ? { rule: rec.rule.name } : {}), ...(issues.length ? { attachIssues: issues } : {}) });
+	const block = draftApprovalBlock({ to: rec.to, toLabel: "받는이", ...(rec.cc?.length ? { cc: rec.cc } : {}), ...(rec.subject ? { subject: rec.subject } : {}), body: rec.body, ref: rec.id, question: rec.compose ? "이 메일 보낼까요?" : "이 답장 보낼까요?", decide: withoutNoFileClaims(rec), ...(rec.compose ? { sendResult: `${rec.to}에게 이 메일을 보내요` } : {}), ...keptBack, ...(hold ? { sendResult: ACCOUNT_HELD } : {}), ...(noFiles ? { cannotAttach: staged.map(f => f.name) } : {}), ...(rec.origin ? { origin: { text: rec.origin.text, ...(rec.origin.link ? { link: rec.origin.link } : {}) } } : {}), ...(attachments.length ? { attachments } : {}), ...((rec.origAttachments ?? 0) > 0 ? { attachmentsNone: true } : {}), ...(rec.asksFile ? { asksFile: true } : {}), ...(rec.libraryMiss ? { libraryMiss: true } : {}), ...(rec.rule ? { rule: rec.rule.name } : {}), ...(issues.length ? { attachIssues: issues } : {}) });
 	return [`[ask] ${headline}`, ...briefLines(rec.brief), ...(notes ? [`-# ${notes}`] : []), block].join("\n");
 }
 

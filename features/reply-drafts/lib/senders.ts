@@ -4,7 +4,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { MailSearch } from "../../../hub/comments/mail-match.ts";
-import { readAppsFile } from "../../../hub/integrations.ts";
+import { type AppRaw, readAppsFile } from "../../../hub/integrations.ts";
 import { loadPlugins, pluginNeedsAccount, pluginReply, pluginRepliesWithFiles, pluginsLoaded } from "../../../hub/plugins.ts";
 import { dataDir } from "./settings.ts";
 import { recipientList } from "./recipients.ts";
@@ -30,14 +30,20 @@ export const replyArgv = (mailId: string, to: string, body: string, files: strin
 // The zele account a mail belongs to: the one the draft recorded, else the one the stored mail came to (mail-conversations.json, read as plain
 // data so the CLI process needs no gateway), else the account of the app instance (custom/apps.json filter.account). A new mail takes the account
 // of the mail it follows. Never guessed: settleAccount goes on from here with what zele itself can tell.
-function storedMail(ref: string): { key?: string; account?: string; to?: string } | undefined {
+type StoredMail = { key?: string; source?: string; account?: string; to?: string };
+// undefined: the file is there but unreadable, so it can say nothing either way.
+function storedMails(): StoredMail[] | undefined {
 	try {
-		const all = JSON.parse(readFileSync(join(dataDir(), "mail-conversations.json"), "utf8")) as { key?: string; account?: string; to?: string }[];
-		return all.find(r => r.key === ref);
-	} catch {
+		const all: unknown = JSON.parse(readFileSync(join(dataDir(), "mail-conversations.json"), "utf8"));
+		if (!Array.isArray(all)) throw new Error("not a list");
+		return all as StoredMail[];
+	} catch (e) {
+		if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
+		console.error(`reply draft: stored mails not read: ${(e as Error).message}`);
 		return undefined;
 	}
 }
+const storedMail = (ref: string): StoredMail | undefined => storedMails()?.find(r => r.key === ref);
 export const mailAccountOf = (ref: string): string | undefined => storedMail(ref)?.account || undefined;
 // A draft's `app` is its tone profile (`mail`), so a category mail (source orders = instance mail-orders) finds its instance by the source. `zele` is the
 // whole mailbox, not a category: an instance with that source says nothing about which account one mail came to.
@@ -50,7 +56,22 @@ export function appAccountOf(app: string, source?: string): string | undefined {
 }
 type AccountRec = Pick<DraftRec, "account" | "compose" | "ref" | "app"> & Partial<Pick<DraftRec, "source" | "origin">>;
 const originAccount = (rec: AccountRec) => (rec.origin?.kind === "mail" ? mailAccountOf(rec.origin.id) : undefined);
-export const zeleAccountOf = (rec: AccountRec): string | undefined => rec.account || (rec.compose ? originAccount(rec) : mailAccountOf(rec.ref)) || appAccountOf(rec.app, rec.source);
+// A new mail of a category instance with no account of its own: the one account its stored mails came to, else the account of the one whole mailbox
+// instance (no category, no narrowing; the built-in mail counts until it is deleted). Anything less settles nothing. Only for a new mail: a received one
+// has better evidence (the thread opens on its account).
+function categoryAccountOf(app: string): string | undefined {
+	const apps = readAppsFile(dataDir());
+	const category = apps[app]?.filter?.source?.trim().toLowerCase();
+	if (!category || category === "zele") return undefined;
+	const mails = storedMails();
+	if (!mails) return undefined;
+	const came = new Set(mails.flatMap(r => (r.source?.toLowerCase() === category && r.account ? [r.account] : [])));
+	if (came.size) return came.size === 1 ? [...came][0] : undefined;
+	const whole = (id: string, a: AppRaw) => !a.deleted && (id === "mail" || a.app === "mail") && [undefined, "", "zele"].includes(a.filter?.source?.trim().toLowerCase()) && !a.filter?.conv && !a.filter?.text && !a.filter?.data && !a.filter?.watches && !a.watches;
+	const boxes = Object.entries<AppRaw>({ mail: {}, ...apps }).filter(([id, a]) => whole(id, a));
+	return boxes.length === 1 ? boxes[0]![1].filter?.account?.trim() || undefined : undefined;
+}
+export const zeleAccountOf = (rec: AccountRec): string | undefined => rec.account || (rec.compose ? originAccount(rec) : mailAccountOf(rec.ref)) || appAccountOf(rec.app, rec.source) || (rec.compose ? categoryAccountOf(rec.app) : undefined);
 
 // The one logged-in account the stored mail was addressed to: all an older stored mail, with no account of its own, can tell.
 function addressedLogin(rec: Pick<DraftRec, "ref">, logins: string[]): string | undefined {
@@ -60,7 +81,7 @@ function addressedLogin(rec: Pick<DraftRec, "ref">, logins: string[]): string | 
 }
 
 const ADDRESS = /[\w.+-]+@[\w-]+\.[\w.-]+/g;
-const zeleLogins = async (run: Runner): Promise<string[]> => {
+export const zeleLogins = async (run: Runner): Promise<string[]> => {
 	// No zele at all reads as no accounts.
 	const r = await run(["zele", "whoami"]).catch(e => ({ code: 1, stdout: "", stderr: String(e) }));
 	return r.code === 0 ? [...new Set(r.stdout.match(ADDRESS) ?? [])] : [];

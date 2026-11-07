@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { realMailLink } from "../../../hub/comments/mail-link.ts";
 import { parseDraftApproval } from "../../../hub/draft-approval.ts";
 import { saveUpload } from "../../../hub/files.ts";
-import { composeMail } from "../../../hub/mail-cli.ts";
+import { composeMail, runMailCli } from "../../../hub/mail-cli.ts";
 import { loadPlugins } from "../../../hub/plugins.ts";
 import { runDraft } from "../bin/draft.ts";
 import { ACCOUNT_HELD, askText, reviseDraft, sendDraft } from "../lib/flow.ts";
@@ -167,6 +167,67 @@ describe("zele argv with several accounts", () => {
 		const f = fake();
 		await sendWith(made, f.run);
 		expect(f.calls[0]!.slice(0, 5)).toEqual(["zele", "mail", "send", "--account", A1]);
+	});
+
+	describe("a new mail of a category instance that names no account", () => {
+		const apps = (more: object = {}) => {
+			mkdirSync(join(env.dir, "custom"), { recursive: true });
+			writeFileSync(join(env.dir, "custom", "apps.json"), JSON.stringify({ "mail-orders": { app: "mail", label: "문서 요청", filter: { source: "orders" } }, ...more }));
+			enable(env, {});
+		};
+		const compose = async () => {
+			const r = await composeMail({ app: "mail-orders", to: ["kim@example.com"], subject: "문서 보내드려요", body: "안녕하세요. 문서 보내드립니다.", notify: false }, { run: twoAccounts().run });
+			if (!r.ok) throw new Error(r.error);
+			return r.rec;
+		};
+
+		test("takes the one account its stored mails came to, over the mailbox app", async () => {
+			apps({ mail: { filter: { account: A1 } } });
+			stored([{ key: "orders-a", source: "orders", account: A2 }, { key: "other-b", source: "zele", account: A1 }]);
+			expect(await compose()).toMatchObject({ account: A2 });
+		});
+
+		test("takes the account of the one mailbox it was split from", async () => {
+			apps({ mail: { filter: { account: A1 } }, "mail-other": { app: "mail", filter: { source: "other", account: A2 } } });
+			expect(await compose()).toMatchObject({ account: A1 });
+		});
+
+		test("never guesses: stored mails on two accounts, or two mailboxes, stay undecided", async () => {
+			apps({ mail: { filter: { account: A1 } } });
+			stored([{ key: "orders-a", source: "orders", account: A1 }, { key: "orders-b", source: "orders", account: A2 }]);
+			expect(await compose()).toMatchObject({ accounts: [A1, A2] });
+			rmSync(join(env.dir, "mail-conversations.json"));
+			apps({ mail: { filter: { account: A1 } }, "mail-2": { app: "mail", filter: { account: A2 } } });
+			const held = await compose();
+			expect(held.account).toBeUndefined();
+			expect(held.accounts).toEqual([A1, A2]);
+			apps({ "mail-work": { app: "mail", filter: { account: A1 } } });
+			const covered = await compose();
+			expect(covered.account).toBeUndefined();
+			expect(covered.accounts).toEqual([A1, A2]);
+			apps({ mail: { filter: { account: A1 } } });
+			writeFileSync(join(env.dir, "mail-conversations.json"), "{ not json");
+			expect((await compose()).account).toBeUndefined();
+			writeFileSync(join(env.dir, "mail-conversations.json"), "{}");
+			expect((await compose()).account).toBeUndefined();
+			rmSync(join(env.dir, "mail-conversations.json"));
+		});
+
+		test("a received mail of the category is not settled from the mailbox app", () => {
+			apps({ mail: { filter: { account: A1 } } });
+			expect(zeleAccountOf(rec({ app: "mail-orders", source: "orders", ref: "orders-a" }))).toBeUndefined();
+		});
+
+		test("compose --account records a logged-in account and refuses any other", async () => {
+			apps();
+			const args = ["compose", "--app", "mail-orders", "--to", "kim@example.com", "--subject", "문서 보내드려요"];
+			const deps = { run: twoAccounts().run, hub: { post: async () => ({ status: 200 }) } };
+			expect((await runMailCli([...args, "--account", A2], "안녕하세요. 문서 보내드립니다.", deps)).code).toBe(0);
+			expect(listDrafts().at(-1)).toMatchObject({ account: A2 });
+			const before = listDrafts().length;
+			expect((await runMailCli([...args, "--account", "nobody@example.com"], "안녕하세요. 문서 보내드립니다.", deps)).code).toBe(2);
+			expect(listDrafts()).toHaveLength(before);
+		});
 	});
 
 	test("the body read at offer time uses the mail's account", async () => {

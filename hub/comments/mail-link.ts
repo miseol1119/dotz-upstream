@@ -1,7 +1,7 @@
 // The real MailLink of the comment engine (engine.ts): the mail that rides on a comment reply is a compose draft of hub/mail-cli.ts, sent and
 // revised through the same reply-drafts flow, so its lint, files and sender are the ones of every other mail. It is not listed in the web mail
 // app on its own (the card of the comment reply is the one place to approve it).
-import { draftAttachIssues, draftLintFailures, dropDraft, withRecipient, mailStyleOf, reviseDraft, sendDraft, type FlowDeps } from "../../features/reply-drafts/lib/flow.ts";
+import { accountHold, draftAttachIssues, draftLintFailures, dropDraft, withRecipient, mailStyleOf, realRunner, reviseDraft, sendDraft, type FlowDeps } from "../../features/reply-drafts/lib/flow.ts";
 import { getDraft } from "../../features/reply-drafts/lib/store.ts";
 import { addressesOf, generateReply } from "../reply-draft.ts";
 import { callReplyModel } from "../reply-model.ts";
@@ -11,9 +11,7 @@ import { mailViewOf } from "./linked.ts";
 
 /** What composing the mail said beyond its id: `notes` are the owner-facing warnings (composeMail's), `libraryMiss` = the 첨부 파일 폴더 held no file that fits. The comment card shows them. */
 export type MailComposed = { ok: true; id: string; notes: string[]; libraryMiss?: boolean } | { ok: false; reason: string };
-/** The mail part of a comment card, with the same notes (a missing file is a warning the owner reads before approving). */
-export type MailViewNotes = MailView & { notes?: string[] };
-export type RealMailLink = Omit<MailLink, "compose" | "view"> & { compose: (spec: MailSpec) => Promise<MailComposed>; view: (id: string) => MailViewNotes | undefined };
+export type RealMailLink = Omit<MailLink, "compose" | "view"> & { compose: (spec: MailSpec) => Promise<MailComposed>; view: (id: string) => MailView | undefined };
 const LIBRARY_MISS_NOTE = "확인: 첨부 파일 폴더에서 맞는 파일을 찾지 못했어요";
 const INSTRUCTION = "This message is a request for material. The requested material goes by this mail: write the mail that sends it (the files ride on it), not a reply that asks anything back.";
 
@@ -26,7 +24,7 @@ export async function writeMail(spec: MailWrite): Promise<string | undefined> {
 	return r.action === "draft" ? r.draft.body.trim() || undefined : undefined;
 }
 
-export function realMailLink(deps: FlowDeps = {}): RealMailLink {
+export function realMailLink(deps: FlowDeps = { run: realRunner }): RealMailLink {
 	return {
 		write: writeMail,
 		async compose(spec) {
@@ -47,7 +45,8 @@ export function realMailLink(deps: FlowDeps = {}): RealMailLink {
 		},
 		lint: id => {
 			const rec = getDraft(id);
-			return rec ? draftLintFailures(withRecipient(rec)) : [];
+			const hold = rec && accountHold(rec);
+			return rec ? [...draftLintFailures(withRecipient(rec)), ...(hold ? [hold] : [])] : [];
 		},
 		drop: id => void dropDraft(id),
 		async revise(id, change) {
@@ -57,7 +56,9 @@ export function realMailLink(deps: FlowDeps = {}): RealMailLink {
 		view: id => {
 			const v = mailViewOf(id), rec = v && getDraft(id), issues = rec ? draftAttachIssues(rec) : [];
 			const shown = v && (issues.length ? { ...v, attachIssues: issues } : v);
-			return shown && (shown.libraryMiss ? { ...shown, notes: [LIBRARY_MISS_NOTE] } : shown);
+			const hold = rec && accountHold(rec);
+			const notes = [...(shown?.libraryMiss ? [LIBRARY_MISS_NOTE] : []), ...(hold ? [`확인: ${hold}`] : [])];
+			return shown && (notes.length ? { ...shown, notes } : shown);
 		},
 	};
 }
