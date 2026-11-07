@@ -1,10 +1,12 @@
 // What leaves an install for public GitHub (MODE.md, Confirmation gates): one pattern table and the install's own values, shared by the
 // shell deny (publicPostDeny, run before an agent's gh call) and the release note (hub/release-note.ts). No personal term lives here: the
-// values come from this install's config and secrets at check time. Results carry labels only, so a refusal never repeats a value.
+// values come from this install's config and secrets at check time. Scrub results carry labels only, so that refusal never repeats a value.
+// A post to the public repo is also refused for the owner's work (a file name outside the repo, a word only this install's notes use, naming
+// the token and a neutral form so the agent can rewrite it) and, for a new issue, for a missing section of the nine a fix needs.
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir, hostname, userInfo } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 // `except`: ordinary words holding the value (a short name inside a common word), never masked.
 export type Term = { value: string; label: string; except?: readonly string[] };
@@ -51,6 +53,7 @@ export function scrub(input: string, terms: readonly Term[] = []): { text: strin
 const MIN_SECRET = 8;
 const MIN_CONFIG = 4;
 const MAX_SECRET_BYTES = 64 * 1024;
+const MAX_NOTES_BYTES = 2 * 1024 * 1024; // memory and repo text outgrow a secret's size
 const IDENTIFYING_KEY = /owner|guild|app_id|user_id|chat_id|(?:^|[._])id$|email|phone|host|domain|login|url|address|token|secret/i;
 const NUMERIC_ID = /^\d{9,}$/; // a channel or chat id, under whatever key it is filed
 const GENERIC_MACHINE = /^(?:admin|root|user|ubuntu|runner|localhost|127\.0\.0\.1|0\.0\.0\.0|macbook|macbook-pro|macbook-air|mac-mini|imac)$/i;
@@ -71,9 +74,9 @@ function secretValues(text: string): string[] {
 	}
 }
 
-function fileText(file: string): string {
+function fileText(file: string, max = MAX_SECRET_BYTES): string {
 	try {
-		return statSync(file).isFile() && statSync(file).size <= MAX_SECRET_BYTES ? readFileSync(file, "utf8") : "";
+		return statSync(file).isFile() && statSync(file).size <= max ? readFileSync(file, "utf8") : "";
 	} catch {
 		return ""; // unreadable or gone: that file has nothing to compare against
 	}
@@ -120,9 +123,9 @@ const FLAGS = String.raw`(?:-\S+(?:[ =]\S+)?\s+)*`;
 const START = String.raw`(?:^|[;&|(]|[:(=,$\[]\s*["'\x60]|\s-c\s+["'\x60])\s*(?:sudo\s+)?(?:(?:timeout\s+\S+|env|command|then|do|else|xargs(?:\s+-\S+)*|nohup|time|exec)\s+)*(?:[A-Za-z_]+=\S*\s+)*(?:[\w.~/-]*/)?`;
 const MAYBE_POST = /\bgh\s+(?:issue|pr|release|api)\b|\bgh\s+-|api\.github\.com/;
 const GH_POST = new RegExp(`${START}gh\\s+${FLAGS}(?:(?:issue|pr)\\s+${FLAGS}(?:create|comment|edit|review|close|merge)|release\\s+${FLAGS}(?:create|edit))\\b`, "m");
-const GH_API = new RegExp(`${START}gh\\s+api\\b(?:[^\\n]*\\b(?:issues|pulls|releases)\\b|[^\\n]*\\bgraphql\\b[\\s\\S]*?\\bmutation\\b)`, "m");
+const GH_API = new RegExp(`${START}gh\\s+api\\b(?:[^\\n]*\\b(?:issues|pulls|releases|comments)\\b|[^\\n]*\\bgraphql\\b[\\s\\S]*?\\bmutation\\b)`, "m");
 const GH_API_WRITE = /\s-[fF]\s*\S|\s--(?:field|raw-field|input)\b|(?:\s-X\s*|\s--method[ =])(?:POST|PUT|PATCH)\b/i;
-const CURL_POST = new RegExp(`${START}curl\\b[^\\n]*api\\.github\\.com/(?:repos/\\S*(?:issues|pulls|releases)|graphql)`, "m");
+const CURL_POST = new RegExp(`${START}curl\\b[^\\n]*api\\.github\\.com/(?:repos/\\S*(?:issues|pulls|releases|comments)|graphql)`, "m");
 const CURL_WRITE = /\s(?:-d|--data\S*|--json|-X\s*(?:POST|PUT|PATCH))\b/;
 const OTHER_REPO = /(?:^|\s)(?:-R|--repo)[ =]|\brepos\/[\w.-]+\/[\w.-]+/;
 const VALUE = String.raw`("[^"]+"|'[^']+'|\x60[^\x60]+\x60|[^\s;&|)"'\x60]+)`;
@@ -135,9 +138,9 @@ const API_ARGS = /\s(?:-[HfF]|--header|--field|--raw-field)[ =]?(?:"[^"]*"|'[^']
 const GH_POSTS = new RegExp(GH_POST, "gm");
 // Quoted strings and heredocs: a body can quote a command, so verbs and flags are read outside them.
 const QUOTED = /"(?:\\[\s\S]|[^"\\])*"|'[^']*'|<<-?\s*["']?(\w+)["']?\n[\s\S]*?\n\s*\1\b/g;
-const API_FILE = /^repos\/[^/]+\/[^/]+\/(?:issues|pulls)\/?$/;
+const API_FILE = /^repos\/[^/]+\/[^/]+\/(issues|pulls)\/?$/;
 const API_MERGE = /\/pulls\/\d+\/merge\/?$/;
-const GQL_FILE = /\bmutation\b[^{]*\{\s*create(?:Issue|PullRequest)\s*\(/;
+const GQL_FILE = /\bmutation\b[^{]*\{\s*create(Issue|PullRequest)\s*\(/;
 const GQL_MERGE = /\bmutation\b[^{]*\{\s*(?:mergePullRequest|enablePullRequestAutoMerge)\s*\(/;
 // A line of its own: the start of a line or of the body's own value (--body, -b, a body field or variable, a JSON body, what echo, printf or <<< feeds stdin), up to the line's end.
 const CLASS_LINE = /(?:^|\\n|(?:--body[ =]|\s-b[ =]|\b\w*body=|\\?"body\\?":\s*|\bbody:\s*|\b(?:echo|printf)\s+(?:-\w+\s+)*|<<<\s*)\$?\\?["'\x60]?)[ \t]*분류:[ \t]*(소스 오류|보편 개선|개인 설정)[ \t\r]*(?=$|\\+[nr"']|["'\x60])/gim;
@@ -146,13 +149,14 @@ const NEEDS_CLASS = `this post to ${PUBLIC_REPO} needs one line in its body: 분
 const PERSONAL_POST = "this is a personal setting: it belongs in this install's custom layer (docs/customization.md) and nothing goes upstream";
 const MERGE_POST = `a PR lands on ${PUBLIC_REPO} only through dotz_merge (action=review with scope, then action=merge), which records that it is right for every install`;
 
-function postKind(post: string): "file" | "merge" | undefined {
+function postKind(post: string): "issue" | "pr" | "merge" | undefined {
 	const code = post.slice(Math.max(0, post.search(/\b(?:gh|curl)\s/))).replace(QUOTED, " ");
 	const verbs = [...code.matchAll(GH_POSTS)].map(m => m[0]);
-	if (verbs.length) return verbs.some(v => /\b(?:issue|pr)\b[\s\S]*\bcreate$/.test(v)) ? "file" : verbs.some(v => /\bpr\b[\s\S]*\bmerge$/.test(v)) ? "merge" : undefined;
+	if (verbs.length) return verbs.some(v => /\bissue\b[\s\S]*\bcreate$/.test(v)) ? "issue" : verbs.some(v => /\bpr\b[\s\S]*\bcreate$/.test(v)) ? "pr" : verbs.some(v => /\bpr\b[\s\S]*\bmerge$/.test(v)) ? "merge" : undefined;
 	if (API_READ.test(code)) return undefined;
 	const path = API_PATH.exec(post.replace(API_ARGS, " "))?.[1] ?? "";
-	if (API_FILE.test(path) || GQL_FILE.test(post)) return "file";
+	const filed = API_FILE.exec(path)?.[1] ?? GQL_FILE.exec(post)?.[1]?.toLowerCase();
+	if (filed) return filed === "issue" || filed === "issues" ? "issue" : "pr";
 	return API_MERGE.test(path) || GQL_MERGE.test(post) ? "merge" : undefined;
 }
 
@@ -160,10 +164,206 @@ function postKind(post: string): "file" | "merge" | undefined {
 function upstreamDeny(post: string, text: string): string | undefined {
 	const kind = postKind(post);
 	if (kind === "merge") return MERGE_POST;
-	if (kind !== "file") return undefined;
+	if (kind !== "issue" && kind !== "pr") return undefined;
 	const classes = [...text.matchAll(CLASS_LINE)].map(m => m[1]);
 	if (classes.includes(PERSONAL_SETTING)) return PERSONAL_POST;
-	return classes.length ? undefined : NEEDS_CLASS;
+	if (!classes.length) return NEEDS_CLASS;
+	const missing = kind === "issue" ? missingSections(text) : [];
+	return missing.length ? `this new issue to ${PUBLIC_REPO} cannot be fixed from its text alone. Missing or empty: ${missing.join(", ")}. Write each as a "## " heading with content, every one required: ${ISSUE_SECTIONS.map(s => s.name).join(", ")}. 관련 코드 위치 needs at least one file:line. If a section truly has nothing, say why in it. A body this check cannot see counts as empty` : undefined;
+}
+
+// What a maintainer needs to fix an issue from its text alone. Each is a heading whose section holds content; `shape` is what that content must show.
+const ISSUE_SECTIONS: readonly { name: string; shape?: RegExp }[] = [{ name: "증상" }, { name: "재현 순서" }, { name: "기대 결과" }, { name: "실제 결과" }, { name: "버전" }, { name: "관련 코드 위치", shape: /[\w.-]+\.\w+:\d+/ }, { name: "로그 일부" }, { name: "원인 추정" }, { name: "시도한 것" }];
+const HEADING = /(?:^|["'\x60\n])[ \t]*#{1,6}[ \t]+([^\n]*)/g;
+const HEREDOC = /<<-?\s*["']?(\w+)/;
+const COMMAND_TAIL = /["'\x60]\s*(?:(?:-{1,2}\w|&&|\||;|\})[\s\S]*)?$/; // what follows the last section when the body is an inline argument
+const BARE_MARKER = /^[ \t]*(?:\d+[.)]|[-*])[ \t]*$/gm; // the template's empty list line
+
+function missingSections(text: string): string[] {
+	let body = text.replace(/\\n/g, "\n").replace(/<!--[\s\S]*?-->/g, " ");
+	const tag = HEREDOC.exec(body);
+	const close = tag ? body.slice(tag.index).search(new RegExp(`\\n[ \\t]*${tag[1]}\\b`)) : -1;
+	if (tag && close >= 0) body = body.slice(0, tag.index + close);
+	const heads = [...body.matchAll(HEADING)].filter(h => ISSUE_SECTIONS.some(s => h[1].trim().startsWith(s.name))); // a "# comment" in a log is no section
+	return ISSUE_SECTIONS.flatMap(({ name, shape }) => {
+		const at = heads.findIndex(h => h[1].trim().startsWith(name));
+		if (at < 0) return [name];
+		const end = heads[at + 1]?.index ?? body.length;
+		const section = body.slice(heads[at].index + heads[at][0].length, end);
+		const content = (at === heads.length - 1 ? section.replace(COMMAND_TAIL, "") : section).replace(BARE_MARKER, "");
+		return /[\p{L}\p{N}]/u.test(content) && (!shape || shape.test(content)) ? [] : [name];
+	});
+}
+
+// What this install knows is its owner's work, for the post check below: no word lives here, each comes from this install's own files at check time.
+// A word the shipped repo also uses is ordinary (filtered in workTextDeny), so only what is this install's alone is refused.
+const HANGUL = /[\uac00-\ud7a3]/;
+const WORD = /[\p{L}\p{N}][\p{L}\p{N}_-]*/gu;
+const PARTICLE = /(?:으로써|으로서|에게서|에서는|으로|에서|에게|까지|부터|처럼|보다|이나|이랑|라고|하고|들이|들은|들을|와|과|을|를|은|는|이|가|의|에|도|만|로|나|랑)$/;
+const nfc = (text: string) => text.normalize("NFC"); // macOS folder names arrive decomposed
+const stem = (word: string) => { const cut = word.replace(PARTICLE, ""); return HANGUL.test(word.at(-1) ?? "") && cut.length >= 2 ? cut : word; };
+const parts = (word: string) => [word, ...(/[-_]/.test(word) ? word.split(/[-_]+/) : [])];
+const wordWorthy = (w: string) => /\p{L}/u.test(w) && w.length >= (HANGUL.test(w) ? 2 : 3);
+const INFLECTED = /(?:다|요|며|면|도록|해서|지만|는데|려고)$/; // a Korean verb form, in prose
+const PROSE_REPEATS = 2; // a word of the owner's field recurs in their notes; a one-off word is just how a sentence went
+
+function addWords(into: Map<string, string>, text: string, neutral: string): void {
+	for (const raw of text.toLowerCase().match(WORD) ?? []) for (const part of parts(raw)) {
+		const word = stem(part);
+		if (wordWorthy(word) && !into.has(word)) into.set(word, neutral);
+	}
+}
+
+function addProse(into: Map<string, string>, text: string, neutral: string): void {
+	const seen = new Map<string, number>();
+	for (const raw of text.toLowerCase().match(WORD) ?? []) for (const part of parts(raw)) {
+		const word = stem(part);
+		if (wordWorthy(word) && !INFLECTED.test(word) && !(word.length === 2 && PARTICLE.test(word))) seen.set(word, (seen.get(word) ?? 0) + 1);
+	}
+	for (const [word, count] of seen) if (count >= PROSE_REPEATS && !into.has(word)) into.set(word, neutral);
+}
+
+function jsonText(file: string): string {
+	try {
+		const leaves: { path: string; value: string }[] = [];
+		jsonLeaves(JSON.parse(fileText(file) || "null"), "", leaves);
+		return leaves.map(l => l.value).join("\n");
+	} catch {
+		return ""; // a broken file is reported by whatever owns it; the other sources still apply
+	}
+}
+
+function folderNames(dir: string): string[] {
+	try {
+		return readdirSync(dir).filter(name => !name.startsWith(".")).map(nfc);
+	} catch {
+		return []; // not on this install
+	}
+}
+
+// word -> the neutral form to suggest. The first source to name a word sets its form, so the precise ones come first.
+export function installVocabulary(dataDir: string): Map<string, string> {
+	const words = new Map<string, string>();
+	const config = fileText(join(dataDir, "config.json"));
+	let identity: unknown;
+	try {
+		identity = JSON.parse(config || "{}").identity;
+	} catch {
+		identity = undefined; // a broken config is reported by the gateway
+	}
+	const named = identity as { name?: unknown; address?: unknown } | undefined;
+	addWords(words, [named?.name, named?.address].filter(v => typeof v === "string").join("\n"), "주인");
+	addWords(words, folderNames(join(dataDir, "projects")).join("\n"), "프로젝트A");
+	let lanes: Record<string, unknown> = {};
+	try {
+		lanes = JSON.parse(fileText(join(dataDir, "channels.json")) || "{}").lanes ?? {};
+	} catch {
+		lanes = {}; // same as the config above
+	}
+	addWords(words, Object.keys(lanes).join("\n"), "작업 채널");
+	const custom = join(dataDir, "custom");
+	addWords(words, [jsonText(join(custom, "apps.json")), jsonText(join(custom, "mailboxes.json")), jsonText(join(custom, "projects.json"))].join("\n"), "메일 앱 A");
+	addWords(words, [...folderNames(join(custom, "apps")), ...folderNames(join(custom, "plugins")).map(f => f.split(".")[0])].join("\n"), "앱 A");
+	addProse(words, [jsonText(join(dataDir, "channel-setups.json")), fileText(join(dataDir, "identity", "IDENTITY.md")), ...["owner.md", "boundaries.md", "observations.md"].map(f => fileText(join(dataDir, "memory", f), MAX_NOTES_BYTES)), fileText(join(dataDir, "RULES.md")), fileText(join(dataDir, "LESSONS.md"))].join("\n"), "일반 표현");
+	return words;
+}
+
+// Any file-shaped name, a space-holding name by its last word. A call (res.json()) or a longer domain (x.ts.net) is not a file.
+const FILE_EXT = "pdf|docx?|docm|xls[xmb]?|pptx?|pptm|odt|ods|odp|hwpx?|dwg|psd|epub|txt|rtf|csv|tsv|md|json|ya?ml|toml|xml|html?|css|log|sql|sqlite|zip|tar|gz|tgz|7z|rar|png|jpe?g|gif|webp|svg|bmp|heic|mp3|wav|m4a|flac|ogg|aac|mp4|mov|avi|mkv|webm|tsx?|jsx?|mjs|cjs|py|rb|java|sh|ipynb|eml|ics|vcf";
+const FILE_TOKEN = new RegExp(String.raw`(?<![\p{L}\p{N}_/.…$%{}-])(?:~/|\.{0,2}/|\$\{?\w+\}?/)?(?:\([^\s()]{1,40}\))?(?:[\p{L}\p{N}_…]|(?<![*>}])-)[\p{L}\p{N}_….~/-]*\)?\.(${FILE_EXT})(?![A-Za-z0-9(-]|_[\p{L}\p{N}]|\.[A-Za-z0-9])`, "giu");
+const DOCUMENT = /^(?:pdf|docx?|docm|xls[xmb]?|pptx?|pptm|odt|ods|odp|hwpx?|epub|txt|rtf|csv|tsv)$/i;
+const PLACEHOLDER_FILE = /^(?:(?:dotz[-_])?(?:문서|파일|자료|첨부|사진|그림|영상|음원|file|doc|document|attachment|image|photo|audio|video|sample|example|test|foo|bar|baz)[-_]?[a-z0-9]{0,2}|[a-z]+[-_](?:before|after)|[a-z0-9])\.\w+$/i;
+const LIBRARY_NAME = /^[A-Z][a-z]+\.js$/; // Node.js, Next.js
+// Names every project of a kind has, which say nothing about anyone's work.
+const COMMON_FILE = /^(?:(?:vite|vitest|webpack|next|tailwind|jest|eslint|rollup|postcss|babel)\.config\.\w+|tsconfig\.json|cargo\.(?:toml|lock)|pyproject\.toml|requirements\.txt|setup\.py|(?:main|index|app|config|settings)\.\w+|(?:readme|license|changelog)\.\w+)$/i;
+// How the body gets here, never what it says: the file a command writes it to, posts it from or removes after. A scratch path and a body-file flag can sit
+// inside the string of an eval call, so they count anywhere; `cat > name`, tee, rm and a release's own files right after its tag read as prose in quotes and heredocs, so only the shell's own text counts.
+const SCRATCH = String.raw`(?=(?:/private)?/tmp/|\$\{?TMPDIR\}?/|/var/folders/)`;
+const BODY_ROUTE = new RegExp(String.raw`(?:--(?:body|notes)-file[ =]|--input[ =]|(?:>>?\s*|\brm\s+(?:-\w+\s+)*)["']?${SCRATCH})["']?[^\s"']+`, "g");
+const SHELL_ROUTE = /\bcat\s+>>?\s*["']?[^\s"']+|\btee\s+["']?[^\s"']+|(?:^|[;&]\s*)rm\s+(?:-\w+\s+)*["']?[^\s"']+|\brelease[ \t]+create[ \t]+\S+(?:[ \t]+[^\s"';&|<>-][^\s"';&|<>]*)+/;
+const SHELL_ROUTES = new RegExp(`${QUOTED.source}|${SHELL_ROUTE.source}`, "gm");
+const withoutRoutes = (command: string) => command.replace(BODY_ROUTE, " ").replace(SHELL_ROUTES, quoted => (SHELL_ROUTE.test(quoted) && !/^["'<]/.test(quoted) ? " " : quoted));
+const DOTZ_URL = /https?:\/\/(?:(?:api|raw|www)\.)?github(?:usercontent)?\.com\/(?:repos\/)?ddotz\/dotz(?!\/files\/)(?:[/?#]\S*)?/gi;
+const ATTACHMENT_PATH = /https?:\/\/\S*\/(?=[^\s/]+\.\w+)/g; // an attachment's URL shows its file name: only that stays
+const NOT_REPO_TEXT = /(?:\.test\.[jt]sx?|\.(?:png|jpe?g|gif|webp|ico|woff2?|ttf|mp3|mp4|pdf|lock))$/i;
+const REPO = join(import.meta.dir, "..");
+const MAX_REPORTED = 12;
+
+function repoFiles(root: string, into: string[] = []): string[] {
+	for (const entry of readdirSync(root, { withFileTypes: true })) {
+		if (entry.name === "node_modules" || entry.name === ".git" || entry.name === ".omo") continue;
+		const path = join(root, entry.name);
+		if (entry.isDirectory()) repoFiles(path, into);
+		else into.push(path);
+	}
+	return into;
+}
+
+// The branch being posted from can hold files the installed code does not have yet (a PR's new file). Only a dotz checkout is listed.
+function branchFiles(dir: string): string[] {
+	try {
+		if (!execFileSync("git", ["remote", "-v"], { cwd: dir, encoding: "utf8", timeout: 2000, stdio: ["ignore", "pipe", "ignore"] }).includes(PUBLIC_REPO)) return [];
+		return execFileSync("git", ["ls-files", "-co", "--exclude-standard"], { cwd: dir, encoding: "utf8", timeout: 2000, maxBuffer: 16 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] }).split("\n");
+	} catch {
+		return []; // not a checkout: the installed tree alone decides
+	}
+}
+
+// A Korean word takes its particles after it, so only its start is a boundary.
+const wholeWord = (word: string) => new RegExp(`(?<![\\p{L}\\p{N}])${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}${HANGUL.test(word.at(-1) ?? "") ? "" : "(?![\\p{L}\\p{N}])"}`, "u");
+
+// Which words the shipped repo itself uses, tests aside (their fixtures name what this check must refuse). Runs only for a word a post actually holds, so a clean post reads nothing.
+function usedByRepo(words: readonly string[], files: readonly string[]): Set<string> {
+	const left = new Set(words);
+	const found = new Set<string>();
+	for (const file of files) {
+		if (!left.size) break;
+		if (NOT_REPO_TEXT.test(file)) continue;
+		const text = fileText(file, MAX_NOTES_BYTES).toLowerCase();
+		for (const word of left) if (wholeWord(word).test(text)) { found.add(word); left.delete(word); }
+	}
+	return found;
+}
+
+const INNER_MIN = 3; // a two-syllable run inside a longer word is mostly chance
+// Longest prefix first (the word and its particles), then a known word inside a compound.
+function koreanHit(word: string, vocabulary: Map<string, string>): string | undefined {
+	for (let end = word.length; end >= 2; end--) if (vocabulary.has(word.slice(0, end))) return word.slice(0, end);
+	for (let start = 1; start + INNER_MIN <= word.length; start++) for (let end = word.length; end >= start + INNER_MIN; end--) if (vocabulary.has(word.slice(start, end))) return word.slice(start, end);
+	return undefined;
+}
+
+// Refuses a post naming the owner's own work, however public-looking the words: file names outside the repo and this install's own vocabulary.
+// The reply names each token and a neutral form: this check runs on the owner's machine and the refusal goes only to the owner's agent, so the value stays local.
+function workTextHits(raw: string, dataDir: string, dir: string): string[] {
+	const text = nfc(raw).replace(/\\n/g, "\n").replace(DOTZ_URL, " ").replace(ATTACHMENT_PATH, " ");
+	const files = repoFiles(REPO);
+	const names = new Set([...files, ...branchFiles(dir)].map(f => basename(f).toLowerCase()));
+	const tops = new Set(readdirSync(REPO).map(name => name.toLowerCase()));
+	const allow = new Set(listLines(join(dataDir, "secrets", PRIVACY_ALLOW)).map(w => w.toLowerCase()));
+	const fileHits = new Map<string, string>();
+	for (const m of text.matchAll(FILE_TOKEN)) {
+		const name = basename(m[0]);
+		if (names.has(name.toLowerCase()) || allow.has(name.toLowerCase()) || PLACEHOLDER_FILE.test(name) || LIBRARY_NAME.test(name) || COMMON_FILE.test(name) || tops.has(m[0].split("/")[0].toLowerCase()) && m[0].includes("/")) continue;
+		if (!fileHits.has(m[0])) fileHits.set(m[0], `${DOCUMENT.test(m[1]) ? "문서" : "파일"}${fileHits.size + 1}.${m[1].toLowerCase()}`);
+	}
+	const vocabulary = installVocabulary(dataDir);
+	const wordHits = new Map<string, string>();
+	let rest = text;
+	for (const token of fileHits.keys()) rest = rest.replaceAll(token, " ");
+	for (const raw of rest.toLowerCase().match(WORD) ?? []) for (const part of parts(raw)) {
+		const hit = HANGUL.test(part) ? koreanHit(part, vocabulary) : vocabulary.has(part) ? part : undefined;
+		if (hit && !allow.has(hit)) wordHits.set(hit, vocabulary.get(hit) as string);
+	}
+	const ordinary = usedByRepo([...new Set([...fileHits.keys()].map(t => basename(t).toLowerCase()).concat([...wordHits.keys()]))], files);
+	return [...[...fileHits].filter(([token]) => !ordinary.has(basename(token).toLowerCase())), ...[...wordHits].filter(([word]) => !ordinary.has(word))].map(([token, form]) => `"${token}" -> ${form}`);
+}
+
+function workTextDeny(raw: string, dataDir: string, dir: string): string | undefined {
+	const hits = workTextHits(raw, dataDir, dir);
+	if (!hits.length) return undefined;
+	const more = hits.length > MAX_REPORTED ? ` and ${hits.length - MAX_REPORTED} more` : "";
+	return `this post to ${PUBLIC_REPO} shows this install's own work, which tells readers what field its user is in. Generalise each: ${hits.slice(0, MAX_REPORTED).join(", ")}${more}. Keep the behaviour, flow, counts, logs and code locations; a file name that is not a repo path becomes a placeholder like 문서A.pdf or 파일1.xlsx. The whole command counts as the post, so move unrelated work out of it. An ordinary word refused by mistake goes in ${PRIVACY_ALLOW} in this install's secrets folder; do not work around this check`;
 }
 
 function postStart(flat: string): number {
@@ -211,12 +411,20 @@ export function publicPostDeny(command: string, dataDir: string, cwd: string): s
 		const raw = m[1] ?? m[2];
 		if (raw === "-" || raw.includes("=")) continue;
 		const file = shellPath(raw, dir);
+		const unread = `this post to ${PUBLIC_REPO} names a body file this check cannot read. Put the body at a plain path and post again; do not work around this check`;
+		if (existsSync(file) && statSync(file).size > MAX_NOTES_BYTES) return unread;
 		if (existsSync(file)) bodies.push({ raw, file });
-		else if (m[1] && !redirects.includes(`>${raw}`)) return `this post to ${PUBLIC_REPO} names a body file this check cannot read. Put the body at a plain path and post again; do not work around this check`;
+		else if (m[1] && !redirects.includes(`>${raw}`)) return unread;
 	}
-	let text = flat.replace(NOT_THE_POST, " ");
-	for (const { raw, file } of bodies) text = `${text.replaceAll(raw, " ")}\n${fileText(file)}`;
+	let shell = flat.replace(NOT_THE_POST, " ");
+	for (const { raw } of bodies) shell = shell.replaceAll(raw, " ");
+	const files = bodies.map(({ file }) => fileText(file, MAX_NOTES_BYTES));
+	const text = [shell, ...files].join("\n");
 	const { hits } = scrub(text, installTerms(dataDir));
-	if (!hits.length) return upstreamDeny(flat.slice(start), text);
+	if (!hits.length) {
+		const upstream = upstreamDeny(flat.slice(start), text);
+		if (upstream === MERGE_POST || upstream === PERSONAL_POST) return upstream;
+		return workTextDeny([withoutRoutes(shell), ...files].join("\n"), dataDir, dir) ?? upstream;
+	}
 	return `this post to ${PUBLIC_REPO} still carries personal or sensitive content (${hits.join(", ")}). Remove every such value, de-identify and generalise it, keep the detail (symptom, steps, expected, actual, version, generalised logs), and post again; do not work around this check`;
 }

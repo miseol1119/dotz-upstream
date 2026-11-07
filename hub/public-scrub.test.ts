@@ -120,7 +120,7 @@ describe("publicPostDeny", () => {
 			"grep -rn 'gh issue create --repo ddotz/dotz' . # 998877",
 			"git commit -m 'gh pr create on ddotz/dotz 998877'",
 			"curl -s https://api.github.com/repos/ddotz/dotz/issues # 998877",
-			"export PATH=/Users/somebody/bin:$PATH; gh issue create --repo ddotz/dotz --body '분류: 소스 오류'",
+			"export PATH=/Users/somebody/bin:$PATH; gh pr create --repo ddotz/dotz --body '분류: 소스 오류'",
 		]) expect(publicPostDeny(command, dir, dir)).toBeUndefined();
 	});
 
@@ -163,6 +163,7 @@ describe("publicPostDeny", () => {
 
 describe("filing classification", () => {
 	const FILE = "gh issue create -R ddotz/dotz --title t";
+	const PR = "gh pr create -R ddotz/dotz --title t";
 
 	test("an issue or PR with no classification line is refused, with the accepted forms", () => {
 		const dir = install();
@@ -181,16 +182,16 @@ describe("filing classification", () => {
 		const file = join(dir, "body.md");
 		writeFileSync(file, "# 제목\r\n\r\n분류: 보편 개선\r\n\r\n본문\r\n");
 		for (const command of [
-			`${FILE} --body '분류: 소스 오류'`,
-			`${FILE} --body "분류: 보편 개선\\n\\n재현 순서"`,
-			`${FILE} --body "증상\n\n분류: 소스 오류\n"`,
+			`${PR} --body '분류: 소스 오류'`,
+			`${PR} --body "분류: 보편 개선\\n\\n재현 순서"`,
+			`${PR} --body "증상\n\n분류: 소스 오류\n"`,
 			"gh pr create -R ddotz/dotz --title t --body '분류: 보편 개선'",
-			`${FILE} --body-file ${file}`,
-			`${FILE} --body-file - < ${file}`,
-			`cat ${file} | ${FILE} --body-file -`,
-			`${FILE} --body-file - <<EOF\n분류: 소스 오류\n증상\nEOF`,
-			"gh api repos/ddotz/dotz/issues -f title=t -f body='분류: 소스 오류'",
-			`curl -s -X POST https://api.github.com/repos/ddotz/dotz/issues -d '{"body":"분류: 소스 오류\\n증상"}'`,
+			`${PR} --body-file ${file}`,
+			`${PR} --body-file - < ${file}`,
+			`cat ${file} | ${PR} --body-file -`,
+			`${PR} --body-file - <<EOF\n분류: 소스 오류\n증상\nEOF`,
+			"gh api repos/ddotz/dotz/pulls -f title=t -f body='분류: 소스 오류'",
+			`curl -s -X POST https://api.github.com/repos/ddotz/dotz/pulls -d '{"body":"분류: 소스 오류\\n증상"}'`,
 		]) expect(publicPostDeny(command, dir, dir)).toBeUndefined();
 	});
 
@@ -218,13 +219,13 @@ describe("filing classification", () => {
 	test("a valid body may mention the personal form, and a JSON body in double quotes passes", () => {
 		const dir = install();
 		for (const command of [
-			`${FILE} --body "분류: 소스 오류\n\n\`분류: 개인 설정\` 이 거부돼요"`,
-			"curl -X POST https://api.github.com/repos/ddotz/dotz/issues -d \"{\\\"body\\\":\\\"분류: 소스 오류\\\"}\"",
-			"BODY='분류: 보편 개선'; gh issue create -R ddotz/dotz --body \"$BODY\"",
-			`echo '분류: 소스 오류' | ${FILE} --body-file -`,
-			`printf '분류: 보편 개선\\n본문' | ${FILE} --body-file -`,
-			`${FILE} --body-file - <<< '분류: 소스 오류'`,
-			"gh api graphql -f query='mutation { createIssue(input: {repositoryId: \"x\", title: \"t\", body: \"분류: 소스 오류\"}) { clientMutationId } }' # ddotz/dotz",
+			`${PR} --body "분류: 소스 오류\n\n\`분류: 개인 설정\` 이 거부돼요"`,
+			"curl -X POST https://api.github.com/repos/ddotz/dotz/pulls -d \"{\\\"body\\\":\\\"분류: 소스 오류\\\"}\"",
+			"BODY='분류: 보편 개선'; gh pr create -R ddotz/dotz --body \"$BODY\"",
+			`echo '분류: 소스 오류' | ${PR} --body-file -`,
+			`printf '분류: 보편 개선\\n본문' | ${PR} --body-file -`,
+			`${PR} --body-file - <<< '분류: 소스 오류'`,
+			"gh api graphql -f query='mutation { createPullRequest(input: {repositoryId: \"x\", title: \"t\", body: \"분류: 소스 오류\"}) { clientMutationId } }' # ddotz/dotz",
 		]) expect(publicPostDeny(command, dir, dir)).toBeUndefined();
 	});
 
@@ -274,6 +275,197 @@ test("every command of a chain counts, inside a shell string too", () => {
 	expect(publicPostDeny("gh issue comment 5 -R ddotz/dotz --body x && gh issue create -R ddotz/dotz --body x", dir, dir)).toContain("분류: 소스 오류");
 	expect(publicPostDeny("gh pr comment 5 -R ddotz/dotz --body x && gh pr merge 5 -R ddotz/dotz", dir, dir)).toContain("dotz_merge");
 	expect(publicPostDeny("await tool.bash({ command: \"gh api -X GET repos/ddotz/dotz/issues -f state=open\" })", dir, dir)).toBeUndefined();
+});
+
+const FULL_ISSUE = "분류: 소스 오류\n\n## 증상\n카드가 두 번 떠요\n\n## 재현 순서(기본 설정에서)\n1. 메일 앱을 열어요\n\n## 기대 결과\n한 번 떠요\n\n## 실제 결과\n두 번 떠요\n\n## 버전(dotz 버전, OS)\n261108.1, macOS\n\n## 관련 코드 위치(파일:줄, 함수)\nhub/public-scrub.ts:10 scrub\n\n## 로그 일부\n없음: 화면 동작이라 로그가 남지 않아요\n\n## 원인 추정\n같은 알림을 두 번 받아요\n\n## 시도한 것\n재시작해도 같아요\n";
+
+describe("the owner's work stays out of public posts", () => {
+	const COMMENT = "gh issue comment 5 -R ddotz/dotz --body";
+	function workInstall(): string {
+		const dir = install();
+		mkdirSync(join(dir, "projects", "가상공방-정산"), { recursive: true });
+		mkdirSync(join(dir, "memory"));
+		writeFileSync(join(dir, "memory", "owner.md"), "주인은 물레반죽 일을 해요. 물레반죽 일정이 많아요. 낯선한번낱말도 적혀 있어요.\n");
+		writeFileSync(join(dir, "channels.json"), JSON.stringify({ lanes: { "lunar-glaze": "1" } }));
+		mkdirSync(join(dir, "custom"));
+		writeFileSync(join(dir, "custom", "mailboxes.json"), JSON.stringify({ boxes: [{ name: "유약주문", rules: [{ subject: "가마예약" }] }] }));
+		return dir;
+	}
+
+	test("a file name outside the repo is refused on every text path, naming it and a neutral form", () => {
+		const dir = install();
+		const name = "주간회의록-최종.docx";
+		for (const command of [
+			`${COMMENT} '첨부 ${name}를 못 붙여요'`,
+			`gh issue edit 5 -R ddotz/dotz --body '이름 앞이 같은 \`… - ${name}\`'`,
+			`gh pr comment 5 -R ddotz/dotz --body '${name}'`,
+			`gh pr edit 5 -R ddotz/dotz --body '${name}'`,
+			`gh pr review 5 -R ddotz/dotz --comment --body '${name}'`,
+			`gh api repos/ddotz/dotz/issues/5/comments -f body='${name}'`,
+			`gh api repos/ddotz/dotz/commits/abc/comments -f body='${name}'`,
+			`curl -X POST https://api.github.com/repos/ddotz/dotz/issues/5/comments -d '{"body":"${name}"}'`,
+		]) {
+			const reason = publicPostDeny(command, dir, dir);
+			expect(reason).toContain(name);
+			expect(reason).toContain("문서1.docx");
+		}
+		expect(publicPostDeny(`${COMMENT} '본문의 \`… 녹음 ….mp3\`'`, dir, dir)).toContain("파일1.mp3");
+		expect(publicPostDeny(`${COMMENT} '(마감본)계약.pdf'`, dir, dir)).toContain("(마감본)계약.pdf");
+	});
+
+	test("emphasis, angle brackets, a glob, a scratch folder or an attachment URL does not hide a file name", () => {
+		const dir = install();
+		for (const text of ["**분기실적.pdf**", "<분기실적.pdf>", "**/분기실적.pdf", "/tmp/분기실적.pdf", "https://github.com/user-attachments/files/1/분기실적.pdf", "https://github.com/someone/private/blob/main/분기실적.pdf", "분기실적.xlsm", "__분기실적.pdf__", "~~분기실적.pdf~~", "$HOME/문서/분기실적.pdf", "--분기실적.pdf", "cat > 분기실적.pdf", "tee 분기실적.pdf"]) expect(publicPostDeny(`${COMMENT} '${text} 봐요'`, dir, dir)).toContain("분기실적");
+	});
+
+	test("a body file over the secret size is still read, and one too big to read is refused", () => {
+		const dir = install();
+		const file = join(dir, "long.md");
+		writeFileSync(file, `${"긴 로그\n".repeat(20000)}명단정리표.xlsx`);
+		expect(publicPostDeny(`gh issue comment 5 -R ddotz/dotz --body-file ${file}`, dir, dir)).toContain("명단정리표.xlsx");
+		writeFileSync(file, "x".repeat(3 * 1024 * 1024));
+		expect(publicPostDeny(`gh issue comment 5 -R ddotz/dotz --body-file ${file}`, dir, dir)).toContain("cannot read");
+	});
+
+	test("a name every project has, a body file made in the command and a release's assets pass", () => {
+		const dir = install();
+		for (const name of ["vite.config.ts", "Cargo.toml", "requirements.txt", "main.py"]) expect(publicPostDeny(`${COMMENT} '${name} 를 봤어요'`, dir, dir)).toBeUndefined();
+		expect(publicPostDeny("cat > pr-body.md <<EOF\n고쳤어요\nEOF\ngh issue comment 5 -R ddotz/dotz --body-file pr-body.md", dir, dir)).toBeUndefined();
+		expect(publicPostDeny("await tool.bash({ command: \"cat > /tmp/note-7.md <<EOF\n고쳤어요\nEOF\ngh issue comment 5 -R ddotz/dotz --body-file /tmp/note-7.md && rm /tmp/note-7.md\" })", dir, dir)).toBeUndefined();
+		expect(publicPostDeny("gh release create v1 dotz-v1.tar.gz -R ddotz/dotz --notes '고친 점을 적어요'", dir, dir)).toBeUndefined();
+	});
+
+	test("a release's own text still counts, and a chain with another post counts whole", () => {
+		const dir = install();
+		expect(publicPostDeny(`${"gh issue comment 5 -R ddotz/dotz"} --body "ran gh release create v1 x-plan.pdf today"`, dir, dir)).toContain("x-plan.pdf");
+		expect(publicPostDeny("gh release create v1 a.zip -R ddotz/dotz; echo x-plan.pdf | gh issue comment 1 -R ddotz/dotz -F -", dir, dir)).toContain("x-plan.pdf");
+		for (const flag of ["--notes '분기실적.pdf'", "--notes 분기실적.pdf", "--title 분기실적.pdf"]) expect(publicPostDeny(`gh release create v1 dotz-v1.tar.gz -R ddotz/dotz ${flag}`, dir, dir)).toContain("분기실적.pdf");
+		expect(publicPostDeny("gh release create v1 -R ddotz/dotz && gh api repos/ddotz/dotz/issues/5/comments -f body=분기실적.pdf", dir, dir)).toContain("분기실적.pdf");
+		expect(publicPostDeny("gh release create v1 -R ddotz/dotz && gh issue comment 5 -R ddotz/dotz --body '분기실적.pdf'", dir, dir)).toContain("분기실적.pdf");
+	});
+
+	test("a merge or a personal setting keeps its own refusal even when the text names a file", () => {
+		const dir = install();
+		expect(publicPostDeny("gh pr merge 3 -R ddotz/dotz --body '분기실적.pdf'", dir, dir)).toContain("dotz_merge");
+		expect(publicPostDeny("gh issue create -R ddotz/dotz --body '분류: 개인 설정\n분기실적.pdf'", dir, dir)).toContain("docs/customization.md");
+	});
+
+	test("a body file counts, and another repo's post is not this check's", () => {
+		const dir = install();
+		const file = join(dir, "body.md");
+		writeFileSync(file, "명단정리표.xlsx 가 안 열려요");
+		expect(publicPostDeny(`gh issue comment 5 -R ddotz/dotz --body-file ${file}`, dir, dir)).toContain("명단정리표.xlsx");
+		expect(publicPostDeny("gh issue comment 5 -R me/private --body '명단정리표.xlsx'", dir, dir)).toBeUndefined();
+	});
+
+	test("a word this install's own files know is refused with a neutral form", () => {
+		const dir = workInstall();
+		for (const [word, form] of [["가상공방", "프로젝트A"], ["lunar-glaze", "작업 채널"], ["유약주문", "메일 앱 A"], ["가마예약", "메일 앱 A"], ["물레반죽", "일반 표현"]]) {
+			const reason = publicPostDeny(`${COMMENT} '오늘 ${word}에서 카드가 멈췄어요'`, dir, dir);
+			expect(reason).toContain(`"${word}" -> ${form}`);
+		}
+	});
+
+	test("a decomposed folder name, a known word inside a compound and a word only inside a longer repo word are still refused", () => {
+		const dir = workInstall();
+		mkdirSync(join(dir, "projects", "달빛도예".normalize("NFD")));
+		expect(publicPostDeny(`${COMMENT} '달빛도예 흐름이 멈춰요'`, dir, dir)).toContain('"달빛도예"');
+		expect(publicPostDeny(`${COMMENT} '우리가상공방에서 멈춰요'`, dir, dir)).toContain('"가상공방"');
+		writeFileSync(join(dir, "channels.json"), JSON.stringify({ lanes: { plac: "1" } }));
+		expect(publicPostDeny(`${COMMENT} 'plac 흐름이 멈춰요'`, dir, dir)).toContain('"plac"');
+	});
+
+	test("a word the repo uses, a one-off word of the notes and an allowed word pass", () => {
+		const dir = workInstall();
+		writeFileSync(join(dir, "channels.json"), JSON.stringify({ lanes: { "mail-card": "1" } }));
+		for (const word of ["mail", "card", "낯선한번낱말"]) expect(publicPostDeny(`${COMMENT} '${word} 흐름이 멈춰요'`, dir, dir)).toBeUndefined();
+		writeFileSync(join(dir, "secrets", "privacy-terms-allow.txt"), "물레반죽\n명단정리표.xlsx\n");
+		expect(publicPostDeny(`${COMMENT} '물레반죽 명단정리표.xlsx'`, dir, dir)).toBeUndefined();
+	});
+
+	test("a neutral post passes: placeholders, behaviour, counts, code locations", () => {
+		const dir = workInstall();
+		expect(publicPostDeny(`${COMMENT} '가상공방의 발주내역.pdf 가 실패해요'`, dir, dir)).toBeDefined();
+		const body = "첨부 문서A.pdf 와 파일1.xlsx, 파일 2개, attachment-2.png 중 1개가 실패해요. hub/draft-approval.ts:88 textVerdict, res.json() 뒤에요. .mp3와 *.wav는 오디오예요. 설정은 config.json, Node.js 기준이에요";
+		expect(publicPostDeny(`${COMMENT} '${body}'`, dir, dir)).toBeUndefined();
+	});
+
+	test("repo paths are not refused, nor a planned file under a repo folder, nor a file only the posting branch has", () => {
+		const dir = install();
+		for (const path of ["hub/public-scrub.ts", "web/css/15-reply-card.css", "package.json", "./MODE.ko.md", "public-scrub.test.ts", "hub/not-written-yet.ts"]) expect(publicPostDeny(`${COMMENT} '${path} 를 봤어요'`, dir, dir)).toBeUndefined();
+		const repo = temp();
+		execFileSync("git", ["init", "-q"], { cwd: repo });
+		execFileSync("git", ["remote", "add", "origin", "https://github.com/ddotz/dotz.git"], { cwd: repo });
+		writeFileSync(join(repo, "only-on-this-branch.md"), "x");
+		expect(publicPostDeny("gh pr comment 5 --body 'only-on-this-branch.md 를 더해요'", dir, repo)).toBeUndefined();
+		expect(publicPostDeny(`${COMMENT} 'only-on-this-branch.md'`, dir, dir)).toContain("only-on-this-branch.md");
+	});
+
+	test("a scratch path that carries the body is no name of the post", () => {
+		const dir = install();
+		expect(publicPostDeny("cat > /tmp/note-66.md <<EOF\n고쳤어요\nEOF\ngh issue comment 5 -R ddotz/dotz --body-file /tmp/note-66.md && rm /tmp/note-66.md", dir, dir)).toBeUndefined();
+	});
+});
+
+describe("a new issue carries what a fix needs", () => {
+	const ISSUE = "gh issue create -R ddotz/dotz --title t";
+	const NAMES = ["증상", "재현 순서", "기대 결과", "실제 결과", "버전", "관련 코드 위치", "로그 일부", "원인 추정", "시도한 것"];
+
+	test("a bare issue is refused naming every missing section", () => {
+		const dir = install();
+		const reason = publicPostDeny(`${ISSUE} --body '분류: 소스 오류'`, dir, dir);
+		for (const name of NAMES) expect(reason).toContain(name);
+		expect(reason).toContain("Missing or empty: 증상, 재현 순서");
+	});
+
+	test("a missing section, an empty one and a code location without a line are each named", () => {
+		const dir = install();
+		const file = join(dir, "body.md");
+		const missing = (body: string) => {
+			writeFileSync(file, body);
+			return /Missing or empty: ([^.]*)\./.exec(publicPostDeny(`${ISSUE} --body-file ${file}`, dir, dir) ?? "")?.[1];
+		};
+		expect(missing(FULL_ISSUE.replace("## 원인 추정\n같은 알림을 두 번 받아요\n", ""))).toBe("원인 추정");
+		expect(missing(FULL_ISSUE.replace("재시작해도 같아요", "<!-- 여기에 써요 -->"))).toBe("시도한 것");
+		expect(missing(FULL_ISSUE.replace("hub/public-scrub.ts:10 scrub", "scrub 근처"))).toBe("관련 코드 위치");
+	});
+
+	test("a template's empty list line and a last section left empty before a command's tail are empty", () => {
+		const dir = install();
+		const noTry = FULL_ISSUE.replace("재시작해도 같아요\n", "");
+		for (const command of [`${ISSUE} --body "${noTry}" && echo posted`, `${ISSUE} --body-file - <<EOF\n${noTry}EOF\necho posted`, `printf '${noTry}' | ${ISSUE} --body-file -`]) expect(publicPostDeny(command, dir, dir)).toContain("Missing or empty: 시도한 것");
+		expect(publicPostDeny(`${ISSUE} --body "${FULL_ISSUE.replace("1. 메일 앱을 열어요", "1.")}"`, dir, dir)).toContain("Missing or empty: 재현 순서");
+	});
+
+	test("a comment line or an issue number in a section is no heading", () => {
+		const dir = install();
+		const body = FULL_ISSUE.replace("없음: 화면 동작이라 로그가 남지 않아요", "# 재시작 뒤 로그\n#123 과 같아요");
+		expect(publicPostDeny(`${ISSUE} --body "${body}"`, dir, dir)).toBeUndefined();
+	});
+
+	test("a complete issue passes however its body arrives, and a PR or comment needs no sections", () => {
+		const dir = install();
+		const file = join(dir, "body.md");
+		writeFileSync(file, FULL_ISSUE);
+		const escaped = FULL_ISSUE.replaceAll("\n", "\\n");
+		for (const command of [
+			`${ISSUE} --body-file ${file}`,
+			`${ISSUE} --body-file - <<EOF\n${FULL_ISSUE}EOF`,
+			`${ISSUE} --body "${FULL_ISSUE}" --label bug`,
+			`gh api repos/ddotz/dotz/issues -f title=t -f body="${FULL_ISSUE}"`,
+			`curl -s -X POST https://api.github.com/repos/ddotz/dotz/issues -d '{"body":"${escaped}"}'`,
+			`gh api graphql -f query='mutation { createIssue(input: {repositoryId: "x", title: "t", body: "${escaped}"}) { clientMutationId } }' # ddotz/dotz`,
+			"gh pr create -R ddotz/dotz --title t --body '분류: 소스 오류'",
+			"gh issue comment 5 -R ddotz/dotz --body '고쳤어요'",
+		]) expect(publicPostDeny(command, dir, dir)).toBeUndefined();
+		expect(publicPostDeny("gh api repos/ddotz/dotz/issues -f title=t -f body='분류: 소스 오류'", dir, dir)).toContain("Missing or empty");
+	});
+
+	test("a section heading quoted in a shell string with flags after it still needs content", () => {
+		const dir = install();
+		const reason = publicPostDeny(`${ISSUE} --body "${FULL_ISSUE.replace("재시작해도 같아요\n", "")}" --label bug`, dir, dir);
+		expect(reason).toContain("Missing or empty: 시도한 것");
+	});
 });
 
 test("a direct merge into ddotz/dotz is refused toward dotz_merge; other repos are not", () => {
