@@ -4,11 +4,12 @@
 import { existsSync } from "node:fs";
 import { basename, isAbsolute } from "node:path";
 import { replyChoiceBlock } from "../../../hub/choices.ts";
+import { loadPlugins } from "../../../hub/plugins.ts";
 import { type HubLike, mailInstance, notifyGateway, reportSendFailed } from "../../../hub/followup.ts";
 import { addressesOf, type ReplyItem } from "../../../hub/reply-draft.ts";
 import { ensureKakaoRoom, defaultKakaoReader, KAKAO_APP, type OwnerReader } from "../lib/kakao-tone.ts";
 import { askText, attachFolder, buildDraft, candidatesFor, chosenFrom, defaultCall, dropDraft, kindOf, mailAsksFile, realRunner, refineAfterCorrection, reviseDraft, sendDraft, settleDraft, stageForReply, type FlowDeps } from "../lib/flow.ts";
-import { INSTALL, loadSettings, recordCorrection, validApp } from "../lib/settings.ts";
+import { dataDir, INSTALL, loadSettings, recordCorrection, validApp } from "../lib/settings.ts";
 import { addDraft, type DraftRec, getDraft, listDrafts, patchDraft } from "../lib/store.ts";
 import { listLibrary } from "../lib/library.ts";
 import { canAttach } from "../lib/senders.ts";
@@ -175,6 +176,8 @@ if (import.meta.main) {
 	const args = process.argv.slice(2);
 	const stdin = args[0] === "new" ? await Bun.stdin.text() : "";
 	try {
+		// This process is not the gateway: a plugin source says here whether it sends files (senders.ts canAttach) for every command, the send's file check too.
+		await loadPlugins(dataDir());
 		const out = await runDraft(args, stdin, { analyze: defaultCall(loadSettings().model), run: realRunner });
 		// stdout is only ever something to post or pipe on: on a non-zero exit the lines are explanations and go to stderr.
 		for (const l of out.lines) (out.code === 0 || out.code === ASK_EXIT ? console.log : console.error)(l);

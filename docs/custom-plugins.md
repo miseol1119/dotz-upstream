@@ -23,7 +23,7 @@ export default {
 - `thread({ thread, text })`: runs for each owner message in a thread; may do side effects and return `{ note, parentName }`: `note` is appended to the orchestrator's inbox turn for that message, `parentName` replaces the parent's name.
 - `deny(command, dataDir)`: return a reason to block the command (agent sessions and Claude), `undefined` to let it pass. A call refused again for the same reason before the owner's next message is answered with an "end this turn" line (extension/refusals.ts). The agent only learns a rule before its call from the turn's `note` (`thread` hook) or MODE.md, so put the exact accepted form of a gated command in that `note` (for example: the command names the mail id literally, never through a variable, loop or list).
 
-Claim and thread hooks can run before `start`; keep what they need at module level. The extension and the Claude hook run in separate processes and call only `deny`. `reply` also runs in the reply-drafts CLI (`features/reply-drafts/bin/draft.ts send`), which loads the plugins itself.
+Claim and thread hooks can run before `start`; keep what they need at module level. The extension and the Claude hook run in separate processes and call only `deny`. `reply` and `repliesWithFiles` also run in the reply-drafts CLI (`features/reply-drafts/bin/draft.ts`), which loads the plugins itself when it starts.
 
 A plugin that fails to load, whose `start` throws (it is dropped for the run), or whose hook throws is logged (`plugin <name>: ...`) and skipped; the hub keeps running. With no plugin installed the hooks return at once, and nothing is added to prompts.
 

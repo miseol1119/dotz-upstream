@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync,
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { draftAttachRoute } from "../../../hub/draft-attach.ts";
-import { asksForFile, claimsAttachment, LIBRARY_MISS, NO_ATTACHMENT_WARNING, parseDraftApproval } from "../../../hub/draft-approval.ts";
+import { ATTACH_REFUSED, asksForFile, claimsAttachment, LIBRARY_MISS, NO_ATTACHMENT_WARNING, parseDraftApproval } from "../../../hub/draft-approval.ts";
 import { loadPlugins } from "../../../hub/plugins.ts";
 import { reviseDraft } from "../lib/flow.ts";
 import { matchLibrary } from "../lib/library.ts";
@@ -234,6 +234,37 @@ export default { name: "work", reply: (d: any) => { if (d.source !== "work") ret
 			await loadPlugins(join(env.dir, "none"));
 		}
 		expect(canAttach("work")).toBe(false);
+	});
+	describe("the draft CLI in its own process knows a plugin source that sends files", () => {
+		const cli = async (...args: string[]) => {
+			const proc = Bun.spawn([process.execPath, join(import.meta.dir, "..", "bin", "draft.ts"), ...args], { env: { ...process.env, DOTZ_DIR: env.dir }, stdout: "pipe", stderr: "pipe" });
+			const [code, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()]);
+			return { code, stderr };
+		};
+		const pluginDraft = async (key: string) => {
+			const plugins = join(env.dir, "custom", "plugins"), got = join(env.dir, "plugin-sent.json");
+			mkdirSync(plugins, { recursive: true });
+			writeFileSync(join(plugins, "work.ts"), `import { writeFileSync } from "node:fs";
+export default { name: "work", reply: () => { writeFileSync(${JSON.stringify(got)}, "sent"); return { ok: true, message: "plugin sent" }; }, repliesWithFiles: (s: string) => s === "work" };`);
+			enable(env);
+			await offerMailDraft({ ...teacherMail, key, source: "work" }, { send: sink().send, call: fakeModel([j(teacherReply)]).call });
+			return { rec: listDrafts()[0]!, got };
+		};
+		test("attach and detach change the draft's files", async () => {
+			const { rec } = await pluginDraft("c-2");
+			expect(await cli("attach", rec.id, join(lib, "견적서 양식.xlsx"))).toMatchObject({ code: 0 });
+			expect(stagedFiles(rec.id).map(f => f.name)).toEqual(["견적서 양식.xlsx"]);
+			expect(await cli("detach", rec.id, "견적서 양식.xlsx")).toMatchObject({ code: 0 });
+			expect(stagedFiles(rec.id)).toEqual([]);
+		}, 30_000);
+		test("send refuses a draft that promises a file it does not carry, as the gateway's check does", async () => {
+			const { rec, got } = await pluginDraft("c-3");
+			writeFileSync(paths.inbox(), `${JSON.stringify({ ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: "1) 보내기", picks: [{ q: `이 답장 보낼까요? (${rec.id})`, n: 1, label: "보내기" }] })}\n`);
+			const out = await cli("send", rec.id);
+			expect(out.stderr).toContain(ATTACH_REFUSED);
+			expect(out.code).toBe(1);
+			expect(existsSync(got)).toBe(false);
+		}, 30_000);
 	});
 });
 

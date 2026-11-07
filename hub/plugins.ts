@@ -1,5 +1,5 @@
 // Custom plugins: <DATA_DIR>/custom/plugins/*.ts|*.js (docs/custom-plugins.md), per-install code that is not part of the
-// product. Loaded when a process starts (the hub, the agent extension, the Claude deny hook) and reloaded before a hook
+// product. Loaded when a process starts (the hub, the agent extension, the Claude deny hook, the reply-drafts CLI) and reloaded before a hook
 // runs when a plugin file was edited, added or removed (`refresh`); a plugin that fails to
 // load, to start or inside a hook is logged and skipped, never fatal. Six hook points, nothing else: `start` (hub only),
 // `claim` (Discord channels outside the bot's categories), `thread` (an owner message in a thread), `deny` (shell
