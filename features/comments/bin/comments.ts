@@ -1,4 +1,4 @@
-// Commands the orchestrator runs for a comment ask: `draft <comment id>` (on request), `send <code>`, `revise <code> --change <text> [--part reply|mail]`,
+// Commands the orchestrator runs for a comment ask: `draft <comment id>` (on request), `send <code>`, `revise <code> --change <text> [--part reply|mail] [--no-mail]`,
 // `drop <code>`, `status`. A reply draft can carry a mail (hub/mail-cli.ts compose --with-comment <code>, or the draft API): the one card shows
 // both, `send` posts the reply and then sends the mail, `revise --part mail` changes only the mail, `drop` drops both. `send` goes out only when the owner's latest pick for exactly that draft code, made after the draft was
 // created, is 1) 보내기 (hub/draft-approval.ts draftVerdict); the engine's gate (hub/comments/contract.ts) then posts it once.
@@ -35,7 +35,9 @@ export async function run(args: string[], engine: Engine = realEngine(dataDir())
 			if (!id) return fail("초안 id가 필요해요");
 			const part = flag(args, "--part") ?? "reply";
 			if (part !== "reply" && part !== "mail") return fail("--part는 reply 또는 mail이에요");
-			const step = await engine.revise(id, flag(args, "--change") ?? "", part);
+			const noMail = args.includes("--no-mail");
+			if (noMail && part === "mail") return fail("--no-mail은 --part mail과 함께 쓸 수 없어요");
+			const step = await engine.revise(id, flag(args, "--change") ?? "", part, noMail);
 			return step.ok ? { lines: [askOf(step.draft.code, part === "mail" ? "함께 보낼 메일 초안을 고쳤어요" : "댓글 답글 초안을 고쳤어요") ?? "초안을 고쳤어요"], code: 0 } : fail(step.reason);
 		}
 		case "drop": {
@@ -79,7 +81,7 @@ export async function run(args: string[], engine: Engine = realEngine(dataDir())
 			return { lines: [cfg.enabled ? "댓글 연동: 켜짐" : "댓글 연동: 꺼짐", ...rows, `초안 ${t.drafts}건, 초안 한 건당 평균 입력 ${t.avgIn} / 출력 ${t.avgOut} 토큰`], code: 0 };
 		}
 		default:
-			return { lines: ["usage: comments.ts draft <comment id> | send <code> [--only reply|mail] [--as-is] [--retry] | revise <code> --change <text> [--part reply|mail] | drop <code> | status"], code: 2 };
+			return { lines: ["usage: comments.ts draft <comment id> | send <code> [--only reply|mail] [--as-is] [--retry] | revise <code> --change <text> [--part reply|mail] [--no-mail] | drop <code> | status"], code: 2 };
 	}
 }
 

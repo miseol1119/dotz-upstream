@@ -16,7 +16,7 @@ import { createPastRefresh, type PastDeps, storedPairs } from "./past-refresh.ts
 // after the reply is posted, revised or dropped with it.
 // `request`: the writer's own words, for the install's narrow rule (hub/auto-attach.ts; see hub/mail-cli.ts composeMail).
 export type MailSpec = { app: string; to: string; subject: string; body: string; attach?: string[]; fromLibrary?: string; request?: string };
-export type MailView = { id: string; to: string; subject?: string; body: string; attachments: { name: string; size?: number }[]; asksFile?: boolean; libraryMiss?: boolean; /** Where the mail's words and files disagree (flow.ts draftAttachIssues): the card's `첨부 확인` line. */ attachIssues?: string[] };
+export type MailView = { id: string; to: string; subject?: string; body: string; attachments: { name: string; size?: number }[]; asksFile?: boolean; libraryMiss?: boolean; /** Warnings the owner reads before approving, shown with the mail. */ notes?: string[]; /** Where the mail's words and files disagree (flow.ts draftAttachIssues): the card's `첨부 확인` line. */ attachIssues?: string[] };
 /** What the mail text is written from: the comment, its author and post, the mail app of the source and the address the mail goes to. */
 export type MailWrite = { app: string; to: string; author: string; text: string; postTitle: string };
 export type MailLink = {
@@ -70,6 +70,12 @@ function mailRefusal(mail: MailLink | undefined, mailId: string): GateResult | u
 function mailLintRefusal(mail: MailLink | undefined, mailId: string): GateResult | undefined {
 	const found = mail?.lint?.(mailId) ?? [];
 	return found.length ? { ok: false, reason: `${LINT_REFUSED} ${found.join(" · ")}. 답글도 올리지 않았어요.` } : undefined;
+}
+// Approved with a mail that has since gone: nothing goes, and the card without it needs a pick of its own (`mailAt`).
+function mailGoneRefusal(store: { putDraft: (d: Draft) => void }, d: Draft, now: number): GateResult {
+	const { mail: _gone, ...rest } = d;
+	store.putDraft({ ...rest, mailAt: now });
+	return { ok: false, reason: "이 답글에 붙어 있던 메일 초안이 더 이상 없어요. 답글도 올리지 않았어요. 답글만 올리려면 다시 승인해 주세요." };
 }
 export const OFF_REASON = "댓글 답글이 꺼져 있어요. 앱 설정에서 켜 주세요";
 const MAX_AUTO_PER_RUN = 5;
@@ -205,7 +211,9 @@ export function createEngine(deps: EngineDeps) {
 		const body = seed ? seed.reply : r.action === "draft" ? r.draft.body : "";
 		if (previous && change !== undefined && r.action === "draft" && lessonOf(r, change)) deps.learn?.(src, lessonOf(r, change));
 		for (const d of store.drafts()) if (d.commentId === c.id && d.status === "pending") store.setDraftStatus(d.code, "stale");
-		const draft: Draft = { code: code(), commentId: c.id, source: src.key, thread: c.thread, text: body, status: "pending", created: deps.now(), changes: previous ? [...previous.changes, change ?? ""] : [], clean: !notes.length && !previous?.mail, notes, tokens: measured, ...(previous?.mail ? { mail: previous.mail, ...(previous.mailAt ? { mailAt: previous.mailAt } : {}) } : {}) };
+		// Only a mail that still waits moves to the revised draft: one already stale or dropped could only fail after the reply is posted.
+		const mail = previous && mailView(previous) ? previous.mail : undefined;
+		const draft: Draft = { code: code(), commentId: c.id, source: src.key, thread: c.thread, text: body, status: "pending", created: deps.now(), changes: previous ? [...previous.changes, change ?? ""] : [], clean: !notes.length && !mail, notes, tokens: measured, ...(mail ? { mail, ...(previous?.mailAt ? { mailAt: previous.mailAt } : {}) } : {}) };
 		store.putDraft(draft);
 		emit({ kind: "comment_draft", source: src.key, thread: c.thread });
 		return { ok: true, draft };
@@ -308,7 +316,9 @@ export function createEngine(deps: EngineDeps) {
 	// `only: "reply"` posts the reply and leaves the mail draft on its own (no longer linked once the reply draft is sent, so it is asked and sent
 	// by itself: hub/mail-cli.ts ask/send).
 	function send(codeOrId: string, opts: { text?: string; by: "owner" | "rule"; only?: "reply"; asIs?: true; resend?: true }): GateResult {
-		const mailId = opts.by === "owner" && opts.only !== "reply" ? store.drafts().find(d => d.code === codeOrId)?.mail : undefined;
+		const linked = opts.by === "owner" && opts.only !== "reply" ? store.drafts().find(d => d.code === codeOrId) : undefined;
+		if (linked?.status === "pending" && linked.mail && !mailView(linked)) return mailGoneRefusal(store, linked, deps.now());
+		const mailId = linked?.mail;
 		const r = (mailId ? mailLintRefusal(deps.mail, mailId) : undefined) ?? (mailId && !opts.asIs ? mailRefusal(deps.mail, mailId) : undefined) ?? dispatchReply({ code: codeOrId, approval: { by: opts.by }, ...(opts.text !== undefined ? { text: opts.text } : {}), ...(opts.resend ? { resend: true as const } : {}) }, gate);
 		if (!r.ok) return r;
 		const done = mailId ? r.done.then(rep => sendMail(rep, mailId, opts.asIs)) : r.done;
@@ -589,8 +599,9 @@ export function createEngine(deps: EngineDeps) {
 		});
 	}
 
-	// `part` "mail" changes only the mail of the card (the reply stays, same code); "reply" (default) rewrites the reply and the mail stays attached.
-	async function revise(draftCode: string, change: string, part: "reply" | "mail" = "reply"): Promise<Step> {
+	// `part` "mail" changes only the mail of the card (the reply stays, same code); "reply" (default) rewrites the reply and the mail stays attached,
+	// or with `noMail` is dropped once the new reply draft exists, so the card is the reply alone.
+	async function revise(draftCode: string, change: string, part: "reply" | "mail" = "reply", noMail = false): Promise<Step> {
 		const d = store.drafts().find(x => x.code === draftCode);
 		const c = d && find(d.commentId);
 		const src = d && sourceOf(d.source);
@@ -607,7 +618,13 @@ export function createEngine(deps: EngineDeps) {
 			emit({ kind: "comment_draft", source: d.source, thread: d.thread });
 			return { ok: true, draft: next };
 		}
-		return run(c, src, d, change.trim()).catch(e => ({ ok: false as const, reason: e instanceof Error && e.message ? clip(e.message, 160) : "고친 초안을 만들지 못했어요" }));
+		const { mail: _mail, mailAt: _mailAt, ...replyOnly } = d;
+		return run(c, src, noMail ? replyOnly : d, change.trim())
+			.then(step => {
+				if (step.ok && noMail && d.mail) deps.mail?.drop(d.mail);
+				return step;
+			})
+			.catch(e => ({ ok: false as const, reason: e instanceof Error && e.message ? clip(e.message, 160) : "고친 초안을 만들지 못했어요" }));
 	}
 
 	function update(key: string, patch: { watch?: string[]; autoDraft?: boolean; autoSend?: SourceConfig["autoSend"]; autoMail?: boolean; mailApp?: string }): SourceConfig | undefined {
@@ -671,9 +688,9 @@ export function createEngine(deps: EngineDeps) {
 	}
 
 	// The mail of a draft as the web sheet shows it (sizes as text, like the files of a mail card).
-	function mailJson(d: Draft): { mail?: { id: string; to: string; subject?: string; body: string; attachments: { name: string; size?: string }[] } } {
+	function mailJson(d: Draft): { mail?: { id: string; to: string; subject?: string; body: string; attachments: { name: string; size?: string }[]; notes?: string[] } } {
 		const m = mailView(d);
-		return m ? { mail: { id: m.id, to: m.to, ...(m.subject ? { subject: m.subject } : {}), body: m.body, attachments: m.attachments.map(f => ({ name: f.name, ...(f.size !== undefined ? { size: fileSizeText(f.size) } : {}) })) } } : {};
+		return m ? { mail: { id: m.id, to: m.to, ...(m.subject ? { subject: m.subject } : {}), body: m.body, attachments: m.attachments.map(f => ({ name: f.name, ...(f.size !== undefined ? { size: fileSizeText(f.size) } : {}) })), ...(m.notes?.length ? { notes: m.notes } : {}) } } : {};
 	}
 
 	function markRead(source: string, thread: string): void {

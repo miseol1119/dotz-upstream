@@ -38,7 +38,7 @@ function fakeMail(log: string[], o: { failSend?: string; issues?: string[]; lint
 		issues: () => o.issues ?? [],
 		lint: () => o.lint ?? [],
 		send: async (id, opts) => (log.push(`send ${id}${opts?.asIs ? " as-is" : ""}${opts?.retry ? " retry" : ""}`), o.failSend ? { ok: false, text: o.failSend } : { ok: true, text: "메일을 보냈어요" }),
-		drop: id => void log.push(`drop ${id}`),
+		drop: id => void (drafts.delete(id), log.push(`drop ${id}`)),
 		revise: async (id, change) => {
 			const v = drafts.get(id)!;
 			const next = `M${++n}`;
@@ -67,18 +67,20 @@ function setup(o: { failSend?: string; issues?: string[]; lint?: string[]; noMai
 	};
 	const events: Record<string, unknown>[] = [];
 	const woke: string[] = [];
+	const mail = o.noMail ? undefined : fakeMail(log, o);
+	const clock = { now: NOW };
 	const engine = createEngine({
 		dir: root,
-		now: () => NOW,
+		now: () => clock.now,
 		collector: "mac-a",
 		adapters: { youtube: adapter },
 		model: async () => ({ text: reply("고쳐 쓴 답글이에요.") }),
 		broadcast: e => events.push(e),
 		sent: (app, r) => woke.push(`${app}:${r.id}`),
-		...(o.noMail ? {} : { mail: fakeMail(log, o) }),
+		...(mail ? { mail } : {}),
 	});
 	const id = commentId("youtube", "c1");
-	return { engine, log, events, woke, id, inbox: join(root, "inbox.jsonl") };
+	return { engine, log, events, woke, id, mail, clock, inbox: join(root, "inbox.jsonl") };
 }
 type T = ReturnType<typeof setup>;
 
@@ -239,6 +241,60 @@ describe("the combined card", () => {
 		expect(out.code).toBe(0);
 		expect(parseDraftApproval(out.lines[0]!)?.mail?.body).toContain("(인사말을 줄여 줘)");
 		expect((await runComments(["revise", d.code, "--change", "x", "--part", "both"], t.engine, t.inbox)).code).toBe(1);
+	});
+
+	test("a reply revise leaves a mail that is no longer pending behind: the card and the send are the reply alone", async () => {
+		const t = setup();
+		const d = await withMail(t);
+		t.mail!.drop("M1");
+		const out = await runComments(["revise", d.code, "--change", "더 짧게"], t.engine, t.inbox);
+		expect(out.code).toBe(0);
+		expect(parseDraftApproval(out.lines[0]!)?.mail).toBeUndefined();
+		const next = t.engine.store.drafts().find(x => x.status === "pending")!;
+		expect(next.mail).toBeUndefined();
+		pick(t, next.code, 1);
+		expect((await runComments(["send", next.code], t.engine, t.inbox)).code).toBe(0);
+		expect(t.log).toEqual(["compose M1", "drop M1", "reply"]);
+	});
+
+	test("a mail gone after the pick: nothing is posted, and only a pick made on the card without it posts the reply", async () => {
+		const t = setup();
+		const d = await withMail(t);
+		pick(t, d.code, 1);
+		t.mail!.drop("M1");
+		t.clock.now = NOW + 9000;
+		const out = await runComments(["send", d.code], t.engine, t.inbox);
+		expect(out.code).toBe(1);
+		expect(out.lines.join("\n")).toContain("답글도 올리지 않았어요");
+		expect(t.log).toEqual(["compose M1", "drop M1"]);
+		expect(t.engine.store.drafts().find(x => x.code === d.code)!.mail).toBeUndefined();
+		expect((await runComments(["send", d.code], t.engine, t.inbox)).code).toBe(1);
+		expect(t.log).toEqual(["compose M1", "drop M1"]);
+		pick(t, d.code, 1, NOW + 10000);
+		expect((await runComments(["send", d.code], t.engine, t.inbox)).code).toBe(0);
+		expect(t.log).toEqual(["compose M1", "drop M1", "reply"]);
+	});
+
+	test("sending a draft already sent again leaves its record alone", async () => {
+		const t = setup();
+		const d = await withMail(t);
+		pick(t, d.code, 1);
+		expect((await runComments(["send", d.code], t.engine, t.inbox)).code).toBe(0);
+		t.mail!.drop("M1");
+		expect((await runComments(["send", d.code], t.engine, t.inbox)).lines.join("\n")).not.toContain("메일 초안이 더 이상 없어요");
+		expect(t.engine.store.drafts().find(x => x.code === d.code)!.mail).toBe("M1");
+	});
+
+	test("revise --no-mail keeps the reply alone and drops its mail; it does not go with --part mail", async () => {
+		const t = setup();
+		const d = await withMail(t);
+		expect((await runComments(["revise", d.code, "--change", "메일은 빼고", "--part", "mail", "--no-mail"], t.engine, t.inbox)).code).toBe(1);
+		expect(t.log).not.toContain("drop M1");
+		const out = await runComments(["revise", d.code, "--change", "메일은 빼고", "--no-mail"], t.engine, t.inbox);
+		expect(out.code).toBe(0);
+		expect(parseDraftApproval(out.lines[0]!)?.mail).toBeUndefined();
+		expect(t.engine.store.drafts().find(x => x.status === "pending")!.mail).toBeUndefined();
+		expect(t.log).toContain("drop M1");
 	});
 
 	test("보내지 않기 drops the reply and the mail, and neither can be sent afterwards", async () => {
