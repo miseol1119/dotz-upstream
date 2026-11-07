@@ -480,7 +480,7 @@ function rqSheetPaint(found) {
   const said = r.x && r.x.d && (r.x.d.notes || []).some(n => rqNorm(n) === r.why);
   const body = el("div", { class: "rq-sb" }, r.why && r.state !== "sent" && !said ? el("div", { class: "note rq-why", role: "note", text: r.why }) : null, card), old = h.box.querySelector(".rq-sb");
   if (!h.box.querySelector(".fs-hd")) h.box.append(fsHead([el("div", { class: "fs-t", text: "답장 확인" })], { close: () => h.close() }));
-  if (old) old.replaceWith(body); else h.box.append(body);
+  if (old) { const top = old.scrollTop; old.replaceWith(body); body.scrollTop = top; } else h.box.append(body);   // a redraw keeps the place in a long draft
 }
 // What a row shows beyond its text: a draft's own state (redrawn when it changes; typing in 고치기 changes none of it).
 const rqXSig = r => (r.x ? (r.x.kind === "notice" ? [r.x.n.decision.state, r.x.n.decision.draft, dcSending.has(r.x.n.id)] : r.x.kind === "held" ? [r.x.tr.draft, r.x.tr.sendable] : r.x.d) : r.f || r.s);
