@@ -6,7 +6,7 @@
 // choice. A yes / no question counts only under a "결정 필요" heading, in an [ask], or when an option carries a recommendation.
 import { askedDraft } from "./ask-options.ts";
 import { D_CLOSE, DECISION_HEAD, D_OPT, DETAIL_DESC, DETAIL_MARK, parseDecisions, stripRecommendMark } from "./choices.ts";
-import { parseQuotedDraft } from "./draft-approval.ts";
+import { parseDraftApproval, parseQuotedDraft } from "./draft-approval.ts";
 import { orchestratorOnlyAsk } from "./forline.ts";
 import { parseTone, splitTone } from "./tone.ts";
 
@@ -147,7 +147,15 @@ function rowToHead(text: string): string {
 }
 
 /** The text with every option list as the contract's choice block and a status marker the surfaces read; unchanged when it asks nothing but for an old recommendation mark. Idempotent. */
-export const normalizeAsk = (text: string): string => stripRecommendMark(toChoiceBlock(canonHeaded(rowToHead(text))));
+// A session may show the card a command printed in a code block (hub/mail-cli.ts ask): the one fence of the message, around a whole send-approval card, comes off, or the
+// card has no buttons and no ref (issue #69). A fenced text with anything else in it stays code.
+function unfencedCard(text: string): string {
+	if (!text.includes("```")) return text;
+	const parts = text.split(/^\s*```.*$/m);
+	if (parts.length !== 3 || !parseDraftApproval(parts[1]!.trim())?.ref) return text;
+	return parts.map(p => p.trim()).filter(Boolean).join("\n");
+}
+export const normalizeAsk = (text: string): string => stripRecommendMark(toChoiceBlock(canonHeaded(rowToHead(unfencedCard(text)))));
 /** Only the blocks a "결정:" line opened: for text the gateway wrote itself, where a question over a list is no guess about a model's meaning. */
 export const normalizeHeaded = (text: string): string => stripRecommendMark(canonHeaded(text, false));
 

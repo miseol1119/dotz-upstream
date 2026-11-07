@@ -557,6 +557,19 @@ export function isRetryable(error: unknown): boolean {
 	return !m || Number(m[1]) >= 500;
 }
 
+// An [ask] with a choice block carries one button per option on its last part (hub/askbuttons.ts).
+// Only a decision or an alert also carries a link button to its web conversation; an ordinary message carries none. The link holds no token.
+// The address comes from the same rule as hub/messenger.ts: the kind of the target, then convPath; a lane or any target the web has no chat route for gets no button.
+// Several decisions have no one answer to click: the link is their button.
+function messageButtons(target: string, bare: string, shown: string): unknown[] {
+	const components = askComponentsFor(target, bare, shown);
+	const kind = components.length || target === "alert" || hasDecisionHead(parseDecisions(bare).blocks) ? kindOf(target) : undefined;
+	const path = kind ? convPath(kind, target) : undefined;
+	const link = path ? webLink(path) : undefined;
+	if (link && components.length < 5) components.push({ type: 1, components: [{ type: 2, style: 5, label: "웹에서 보기", url: link }] });
+	return components;
+}
+
 // `opts` (sendlog.ts): parts below `skip` were already accepted, and each part carries nonce+index with enforce_nonce, so
 // Discord returns the earlier message instead of posting a part twice.
 export async function send(
@@ -588,15 +601,7 @@ export async function send(
 	// The files go with the last part, planned only when that part is still to be sent (a retry may have sent it already).
 	const last = bodies.length - 1;
 	if (last >= 0) {
-		// An [ask] with a choice block carries one button per option on its last part (hub/askbuttons.ts).
-		const components = askComponentsFor(target, bare, bodies[last]!.content);
-		// Only a decision or an alert also carries a link button to its web conversation; an ordinary message carries none. The link holds no token.
-		// The address comes from the same rule as hub/messenger.ts: the kind of the target, then convPath; a lane or any target the web has no chat route for gets no button.
-		// Several decisions have no one answer to click: the link is their button.
-		const kind = components.length || target === "alert" || hasDecisionHead(parseDecisions(bare).blocks) ? kindOf(target) : undefined;
-		const path = kind ? convPath(kind, target) : undefined;
-		const link = path ? webLink(path) : undefined;
-		if (link && components.length < 5) components.push({ type: 1, components: [{ type: 2, style: 5, label: "웹에서 보기", url: link }] });
+		const components = messageButtons(target, bare, bodies[last]!.content);
 		if (components.length) bodies[last] = { ...bodies[last]!, components };
 	}
 	const plan = paths.length && last >= (opts?.skip ?? 0) ? planFiles(paths) : undefined;
@@ -608,12 +613,14 @@ export async function send(
 	return { delivered: true, ids };
 }
 
-export async function edit(target: string, messageId: string, text: string, opts?: { clearComponents?: boolean }): Promise<{ delivered: boolean; reason?: string; ids?: string[] }> {
+export async function edit(target: string, messageId: string, text: string, opts?: { clearComponents?: boolean; buttons?: boolean }): Promise<{ delivered: boolean; reason?: string; ids?: string[] }> {
 	text = ownerText(text);
 	const id = resolve(target);
 	if (!status.enabled || !id) return { delivered: false, reason: `unknown target ${target}` };
 	// `embeds: []` clears the embed of a legacy message (sent before messages became plain text) when it is edited in place.
-	await rest("PATCH", `/channels/${id}/messages/${messageId}`, { ...buildSingle(text), embeds: [], ...(opts?.clearComponents ? { components: [] } : {}) });
+	// `buttons`: the card's options may have changed; a text too long to hold them keeps the buttons it has.
+	const body = buildSingle(text), buttons = opts?.buttons && askComponentsFor(target, text, body.content).length ? messageButtons(target, text, body.content) : [];
+	await rest("PATCH", `/channels/${id}/messages/${messageId}`, { ...body, embeds: [], ...(opts?.clearComponents ? { components: [] } : buttons.length ? { components: buttons } : {}) });
 	return { delivered: true, ids: [messageId] };
 }
 

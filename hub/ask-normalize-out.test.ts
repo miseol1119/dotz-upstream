@@ -8,7 +8,9 @@ import { type HubEvent, onEmit } from "./events.ts";
 import { dir, hooks, type Lane } from "./lanestate.ts";
 import { report } from "./lanereport.ts";
 import { normalizeAsk } from "./ask-normalize.ts";
-import { ignoreNotice, listNotices } from "./notices.ts";
+import { cardRef } from "./approval-queue.ts";
+import { draftApprovalBlock } from "./draft-approval.ts";
+import { ignoreNotice, listNotices, onDraftCardRefreshed, syncDraftFiles } from "./notices.ts";
 import { out } from "./outbound.ts";
 
 const openFor = (to: string) => listNotices(500).items.filter((n: any) => n.decision?.state === "open" && n.decision.to === to);
@@ -87,6 +89,29 @@ test("a bold heading over a numbered question and indented options is a card; th
 	expect(text).toContain("지금 상태는 이래요.");
 	expect(normalizeAsk(text)).toBe(text);
 	ignoreNotice(open[0].id);
+});
+
+const draftCard = (ref: string) => `[ask] 새 메일 초안을 만들었어요\n${draftApprovalBlock({ to: "a@b.c", toLabel: "받는이", subject: "제목", body: "안녕하세요", ref, question: "이 메일 보낼까요?" })}`;
+test("a card shown in a code block is a card: buttons and its ref; other code stays code", () => {
+	const card = draftCard("RFENCE1");
+	for (const text of [`\`\`\`\n${card}\n\`\`\``, `초안 올려요.\n\n\`\`\`text\n${card}\n\`\`\``]) {
+		const shown = normalizeAsk(text);
+		expect(cardRef(shown.includes("초안 올려요") ? shown.slice(shown.indexOf("[ask]")) : shown)).toBe("RFENCE1");
+		expect(askComponentsFor("ch:123", shown)).toHaveLength(1);
+		expect(shown).not.toContain("```");
+	}
+	const code = "```\n결정: 예시 (RFENCE2)\n1) 하나\n```";
+	expect(normalizeAsk(code)).toBe(code);
+});
+
+test("a card whose findings changed is handed over for its Discord message, with the words it shows now", async () => {
+	const seen: string[] = [];
+	onDraftCardRefreshed(n => void seen.push(n.text));
+	await out("ch:124", draftCard("RSYNC01"), undefined, { source: "orchestrator" });
+	expect(syncDraftFiles(() => undefined, id => (id === "RSYNC01" ? ["파일이 달라요"] : undefined))).toBe(1);
+	expect(seen).toHaveLength(1);
+	expect(seen[0]).toContain("**4) 이대로 보내기**");
+	ignoreNotice(listNotices().items.find((n: any) => n.decision?.draft?.ref === "RSYNC01")!.id);
 });
 
 test("options written on one line of an [ask] are a card, and what follows them stays", async () => {

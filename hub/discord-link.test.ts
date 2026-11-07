@@ -48,6 +48,22 @@ test("a decision and an alert carry the link button, an ordinary message does no
 	expect(await linkOf("ch:222", "[done] 끝났어요")).toBeUndefined();
 });
 
+test("an edit asked to refresh buttons carries the card's options now; a plain edit and a closed card leave them alone", async () => {
+	const card = `${ASK}\n**3) 이대로 보내기**\n그대로 보내요`;
+	const edited = async (opts?: { buttons?: boolean; clearComponents?: boolean }) => {
+		requests.length = 0;
+		await discord.edit("ch:222", "m1", card, opts);
+		return requests.at(-1)!.payload.components?.flatMap(r => r.components).map(b => b.label);
+	};
+	expect(await edited({ buttons: true })).toEqual(["지금 고치기", "그대로 두기", "이대로 보내기", "웹에서 보기"]);
+	expect(await edited()).toBeUndefined();
+	expect(await edited({ clearComponents: true })).toEqual([]);
+	// Too long to show the options: the buttons it has stay; a lone link button must not replace them.
+	requests.length = 0;
+	await discord.edit("ch:222", "m1", `${"긴 본문 ".repeat(800)}\n${card}`, { buttons: true });
+	expect(requests.at(-1)!.payload.components).toBeUndefined();
+});
+
 test("a lane has no web chat route, so its decision gets no button", async () => {
 	expect(await linkOf("lane:no-such-lane", ASK)).toBeUndefined();
 });

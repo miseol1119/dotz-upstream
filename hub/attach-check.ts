@@ -67,10 +67,12 @@ export function wordVariants(word: string): string[] {
 // A short word several of the files share (an author's name) tells none of them apart; a longer shared one is the title they have in common.
 const SHARED_TITLE_MIN = 4;
 const LATIN_TITLE = /^[a-z]{4,}$/;
-function offTopic(files: readonly string[], text: string): string[] {
+function offTopic(files: readonly string[], text: string, raw: string): string[] {
 	const words = files.map(f => [...new Set(nameWords(f).map(norm))]);
 	const seen = words.flat();
-	const telling = (w: string) => w.length >= SHARED_TITLE_MIN || seen.indexOf(w) === seen.lastIndexOf(w);
+	// A short shared abbreviation the draft says on its own ("MR") is the thing it sends, not a name that happens to match.
+	const said = (w: string) => /^[a-z]{2,3}$/.test(w) && new RegExp(`(?:^|[^A-Za-z0-9])${w.toUpperCase()}(?:[^A-Za-z0-9]|$)`).test(raw);
+	const telling = (w: string) => w.length >= SHARED_TITLE_MIN || seen.indexOf(w) === seen.lastIndexOf(w) || said(w);
 	const onTopic = (i: number) => words[i]!.some(w => telling(w) && wordVariants(w).some(v => v.length >= 2 && text.includes(v)));
 	// A title in another script ("Comet" for "혜성") is known from a file of that work that carries both.
 	const titles = new Set(words.flatMap((w, i) => (onTopic(i) ? w.filter(x => LATIN_TITLE.test(x)) : [])));
@@ -82,13 +84,19 @@ function offTopic(files: readonly string[], text: string): string[] {
 const fileWords = (name: string) => [...new Set(nameWords(name).map(norm))].filter(w => !/^\d+$/.test(w));
 const letters = (words: string[]) => words.join("").length;
 const numberedOnly = (a: string[], b: string[]) => a.some(w => /\d/.test(w) && !b.includes(w));
+// "곡 - 파트A.pdf" and "곡 - 파트B.pdf": what follows the last " - " names the file; no word of it in common is two files of one title.
+const tailWords = (name: string) => fileWords(name.replace(/\.[^.]+$/, "").split(/\s[-–—]\s/).slice(1).at(-1) ?? "");
+const otherTail = (a: string, b: string) => {
+	const x = tailWords(a), y = tailWords(b);
+	return x.length > 0 && y.length > 0 && !x.some(w => y.includes(w));
+};
 const VARIANT_MIN = 4, VARIANT_SHARE = 0.6;
 function cutsOfOneFile(files: readonly string[]): string[] {
 	const out = new Set<string>();
 	files.forEach((a, i) => files.slice(i + 1).forEach(b => {
 		if (kindOf(a) !== kindOf(b)) return;
 		const x = fileWords(a), y = fileWords(b), both = letters(x.filter(w => y.includes(w)));
-		if (numberedOnly(x, y) || numberedOnly(y, x)) return;
+		if (numberedOnly(x, y) || numberedOnly(y, x) || otherTail(a, b)) return;
 		if (both >= VARIANT_MIN && both >= VARIANT_SHARE * Math.min(letters(x), letters(y))) out.add(a).add(b);
 	}));
 	return [...out];
@@ -115,8 +123,8 @@ export function attachIssues(d: AttachCheck): AttachIssue[] {
 		const over = [...has].filter(k => !promised.has(k) && !asked.has(k));
 		if (over.length) out.push({ kind: "extra", text: `본문에도 받은 메일에도 없는 ${labels(over)} 파일이 붙었어요` });
 	}
-	const text = norm(`${d.subject ?? ""}\n${d.body}`);
-	const off = offTopic(d.files, text);
+	const draftWords = `${d.subject ?? ""}\n${d.body}`;
+	const off = offTopic(d.files, norm(draftWords), draftWords);
 	if (off.length && off.length < d.files.length) out.push({ kind: "unrelated", text: `본문과 상관없어 보이는 파일이 있어요: ${off.join(", ")}` });
 	const cuts = cutsOfOneFile(d.files);
 	if (cuts.length) out.push({ kind: "variants", text: `같은 파일의 다른 판이 함께 붙었어요: ${cuts.join(", ")}` });

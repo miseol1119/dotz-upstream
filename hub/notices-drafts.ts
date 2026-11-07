@@ -40,9 +40,13 @@ export function refreshDraftFiles(list: Notice[], filesOf: (id: string) => Draft
 	}
 	return hit;
 }
+// A card whose words changed this way is out on Discord as it was: outbound.ts edits it there, buttons included.
+const refreshedHooks: ((n: Notice) => void)[] = [];
+export const onDraftCardRefreshed = (fn: (n: Notice) => void): void => void refreshedHooks.push(fn);
 export function syncDraftFiles(filesOf: (id: string) => DraftFileIn[] | undefined, issuesOf?: (id: string) => string[] | undefined): number {
 	const hit = refreshDraftFiles(items, filesOf, issuesOf);
 	if (hit.length) announce(hit, now());
+	for (const n of hit) for (const fn of refreshedHooks) fn(n);
 	return hit.length;
 }
 /** The newest open card of draft `ref` in `to` went to Discord as these messages. */

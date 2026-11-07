@@ -34,7 +34,7 @@ import { inOrder, localize } from "./outlang.ts";
 import { dropClaim, splitTone, stripHandoff, stripLater, stripProjectInfo } from "./tone.ts";
 import { isLate, isSnowflake, lateQuote, lateRequestId, replyRef, snowflakeTime, withQuote } from "./threads.ts";
 import { keepBrief } from "./draft-approval.ts";
-import { markDraftPosted, onDecisionClosed, openDraftCards, openDraftRefs, openDraftText, orchestratorAnswered, rewriteOpenDraft } from "./notices.ts";
+import { markDraftPosted, onDecisionClosed, onDraftCardRefreshed, openDraftCards, openDraftRefs, openDraftText, orchestratorAnswered, rewriteOpenDraft } from "./notices.ts";
 import { cardPointer, cardRef, cardTitle, CARDS_LEAD, closedCardText, createApprovalQueue, loadHeld, pendingCardsNote, splitDraftCards } from "./approval-queue.ts";
 import { mailItemKey, mailKeyOfRef } from "./draft-handled.ts";
 import { draftHeads, listDrafts as listMailDrafts } from "../features/reply-drafts/lib/store.ts";
@@ -54,6 +54,11 @@ try {
 // Messages the owner must get go through the send ledger: kept on disk until Discord accepts them, retried through
 // network outages, sent again after a restart; an answer marks its message answered only once it was delivered.
 const UNSENT = join(DATA_DIR, "unsent.json");
+// A card that went to Discord as one message is edited there too, its buttons with its options (a [file] line would show raw in an edit, so such a card keeps its first text).
+function editCard(target: string, ids: string[] | undefined, ref: string, text: string): void {
+	const id = ids?.length === 1 ? ids[0] : undefined;
+	if (id && !isLocal(target) && route({ target }).messengers.discord && !/^\s*\[file\]\s/m.test(text)) void discord.edit(target, id, text, { buttons: true }).catch(e => log(`approval card ${ref} not edited on Discord: ${e}`));
+}
 export const sends = createSendLedger({
 	file: UNSENT,
 	send: (target, text, ref, opts) => discord.send(target, text, ref, opts),
@@ -297,13 +302,11 @@ export const approvals = createApprovalQueue({
 	itemOf: (conv, ref) => mailItemKey(ref, conv, draftHeads),
 	handled: (ref, conv) => refHandled(ref, conv),
 	post: (target, text, extra) => void out(target, text, undefined, { ...extra, queued: true }).catch(e => log(`held approval card to ${target} failed: ${e}`)),
-	// A card that went to Discord as one message is edited there too (a [file] line would show raw in an edit, so such a card keeps its first text).
 	rewrite: (conv, card, next) => {
 		// A card that replaces the open one keeps what only that one showed (hub/draft-approval.ts keepBrief).
 		const text = keepBrief(openDraftText(conv, card.ref) ?? "", next);
 		rewriteOpenDraft(conv, card.ref, text);
-		const id = card.ids?.length === 1 ? card.ids[0] : undefined;
-		if (id && !isLocal(card.target) && route({ target: card.target }).messengers.discord && !/^\s*\[file\]\s/m.test(text)) void discord.edit(card.target, id, text).catch(e => log(`approval card ${card.ref} not edited on Discord: ${e}`));
+		editCard(card.target, card.ids, card.ref, text);
 	},
 	// The web's 빠른 처리 banner counts held cards too (web/js/30-triage.js): it refetches on this.
 	persist: held => {
@@ -351,6 +354,10 @@ function closeDiscordCard(to: string, ref: string | undefined, c: { text: string
 	if (/^\s*\[file\]\s/m.test(text)) return;
 	ids.forEach((id, i) => void discord.edit(target, id, i === 0 ? text : text.split("\n").slice(1).join("\n"), { clearComponents: true }).catch(e => log(`approval card ${ref} not closed on Discord: ${e}`)));
 }
+onDraftCardRefreshed(n => {
+	const d = n.decision;
+	if (d?.card && d.draft?.ref) editCard(d.card.target, d.card.ids, d.draft.ref, `[ask] ${n.text}`);
+});
 onDecisionClosed((to, ref, card) => {
 	if (card) closeDiscordCard(to, ref, card);
 	approvals.closed(to, ref);

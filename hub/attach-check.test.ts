@@ -81,6 +81,19 @@ test("a title in another script is known from a file of the same work that carri
 	expect(kinds({ ...on, files: ["노을빛바다 음원.mp3", "노을빛바다.pdf", "Sunset 회의.pdf"] })).toEqual(["unrelated"]);
 });
 
+test("parts of one title named after a dash are different files; the same name cut twice still is not", () => {
+	const on = { subject: "Re: 노을빛바다의 긴 노래", body: "노을빛바다의 긴 노래 문서 보내드립니다." };
+	expect(kinds({ ...on, files: ["노을빛바다의 긴 노래 - Alto.pdf", "노을빛바다의 긴 노래 - Tenor.pdf"] })).toEqual([]);
+	expect(kinds({ ...on, files: ["노을빛바다의 긴 노래 - Alto.pdf", "노을빛바다의 긴 노래 - Alto (1).pdf"] })).toEqual(["variants"]);
+});
+
+test("a short word the draft says on its own ties the files that share it, a word it only contains does not", () => {
+	const files = ["alpha-song.pdf", "리듬 MR 1절.mp3", "멜로디 MR 2절.mp3"];
+	expect(kinds({ subject: "Re: alpha-song", body: "alpha-song 문서와 MR 음원 보내드립니다.", files })).toEqual([]);
+	expect(kinds({ subject: "Re: alpha-song", body: "alpha-song 문서와 MRI 음원 보내드립니다.", files })).toEqual(["unrelated"]);
+	expect(kinds({ subject: "Re: alpha-song", body: "alpha-song 문서와 the 음원 보내드립니다.", files: ["alpha-song.pdf", "the 리듬 1절.mp3", "the 멜로디 2절.mp3"] })).toEqual(["unrelated"]);
+});
+
 test("a draft whose words and files agree has no issue", () => {
 	expect(kinds({ subject: "Re: alpha-song 문서", body: "alpha-song 문서 보내드립니다.", files: ["alpha-song.pdf"] })).toEqual([]);
 	expect(kinds({ subject: "Re: 일정", body: "확인해 보고 말씀드릴게요.", files: [] })).toEqual([]);

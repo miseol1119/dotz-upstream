@@ -22,7 +22,7 @@ afterAll(() => {
 writeFileSync(join(lib, "alpha-song.pdf"), "pdf bytes");
 writeFileSync(join(lib, "beta-other.pdf"), "pdf bytes");
 beforeEach(() => {
-	for (const p of [paths.config(), paths.drafts(), paths.inbox(), join(env.dir, "draft-files"), join(env.dir, "custom", "reply-drafts", "sending")]) rmSync(p, { force: true, recursive: true });
+	for (const p of [paths.config(), paths.drafts(), paths.inbox(), join(env.dir, "outbox.jsonl"), join(env.dir, "draft-files"), join(env.dir, "custom", "reply-drafts", "sending")]) rmSync(p, { force: true, recursive: true });
 	enable(env, { attachFolders: { mail: lib } });
 });
 
@@ -40,6 +40,31 @@ function fakeSend() {
 	return { sent, send: async (r: DraftRec) => (sent.push(r.id), { ok: true, message: "보냈어요" }) };
 }
 const PROMISE = "alpha-song 문서 보내드립니다.";
+
+describe("sendDraft with a card posted in a work channel", () => {
+	const at = "ch:700000000000000009";
+	const log = (file: string, e: Record<string, unknown>, ms: number) => appendFileSync(join(env.dir, file), `${JSON.stringify({ ts: new Date(Date.now() + ms).toISOString(), ...e })}\n`);
+	const posted = (rec: DraftRec) => log("outbox.jsonl", { kind: "out", source: "orchestrator", target: at, text: askText(rec, []) }, 1000);
+	test("the card alone sends nothing; his typed answer under it sends once", async () => {
+		const rec = draft("확인했습니다.");
+		posted(rec);
+		const f = fakeSend();
+		expect((await sendDraft(rec.id, f)).ok).toBe(false);
+		expect(f.sent).toEqual([]);
+		log("inbox.jsonl", { kind: "message", source: "discord", channel: at, text: "1) 보내기" }, 2000);
+		expect((await sendDraft(rec.id, f)).ok).toBe(true);
+		expect(f.sent).toEqual([rec.id]);
+	});
+	test("a question under the card, or a typed send in another channel, sends nothing", async () => {
+		const rec = draft("확인했습니다.");
+		posted(rec);
+		log("inbox.jsonl", { kind: "message", source: "discord", channel: at, text: "보내?" }, 2000);
+		log("inbox.jsonl", { kind: "message", source: "discord", channel: "ch:700000000000000008", text: "보내" }, 3000);
+		const f = fakeSend();
+		expect((await sendDraft(rec.id, f)).ok).toBe(false);
+		expect(f.sent).toEqual([]);
+	});
+});
 
 describe("sendDraft with a mail whose files disagree with its words", () => {
 	test("1) 보내기 is refused with the reasons, nothing is sent, and the draft stays pending", async () => {
