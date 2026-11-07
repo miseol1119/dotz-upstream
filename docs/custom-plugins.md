@@ -15,6 +15,7 @@ export default {
 	deny(command, dataDir) {},           // shell command about to run
 	reply(draft) {},                     // an approved mail reply of a source this plugin posts (files included)
 	repliesWithFiles(source) {},         // true when reply sends draft.attachments for that source
+	mailThread(mail) {},                 // a mail's real thread, to see a reply sent outside dotz
 } satisfies Plugin;
 ```
 
@@ -104,6 +105,25 @@ mailActions(source) { return source === "work" ? ["read", "unread", "trash"] : u
 - Without `mailActions` the source counts as read-only toward its mailbox: every action still works in dotz and the action's toast says the mailbox did not follow.
 - `"trash"` runs only when the owner deletes a mail in the web app with the app's 삭제하면 원본도 삭제 switch on (off by default, shown disabled for a source that does not list it). Move only the mail `id` names to the mailbox's trash, never a permanent delete; a mail stays in dotz unless the hook returns true.
 - The other way, post what the mailbox shows on every poll: `POST /api/mail/state` items may carry `read`/`unread`, `archived`, `starred` and `trashed` besides `replied`. Only a change from the last report is applied, so a poll that has not seen a dotz action yet never undoes it; `trashed` removes the mail from dotz.
+
+## Seeing a reply sent outside dotz
+
+zele's mail that waits for an answer is checked against its real thread, and a mail the owner answered from another app or script becomes 답장함 (`POST /api/mail/reconcile`, and every 10 minutes at most 20 threads). For a plugin's source that needs `mailThread`:
+
+```ts
+async mailThread(mail) { // mail: { source, id, account? }, the id the mail was posted with
+	if (mail.source !== "work") return undefined; // not mine
+	return [ // the whole thread, oldest first
+		{ from: "Kim <kim@example.com>", date: "2026-10-24T11:00:00+09:00" },
+		{ from: "me@example.com", date: "2026-10-24T13:20:00+09:00" },
+	];
+},
+```
+
+- An owner's message after the newest incoming one (no newer than the mail dotz holds) closes the mail and its waiting reply draft. dotz never reopens a mail this way and reads a closed mail no more.
+- The owner is an address in `mail.own_addresses` or `zele.aliases` in config.json, a logged-in zele account, or the sender of an outgoing mail this source posted. With none of them known the mail counts as `notChecked`.
+- Read-only, no model call: it runs only for mail that waits, inside the same limit as zele mail, one at a time. `undefined` from every plugin puts the source in the answer's `skipped` for that round and costs one question per source per round. A throw or 15 seconds without an answer is logged, and that source's other waiting mail counts as `notChecked` for the round without another question; the next round tries again, the failed mail last.
+- A poster that reads the sent folder can do without the hook: an outgoing mail posted to `/api/mail` marks the mail it answers, and `/api/mail/state` takes `replied`.
 
 ## Feeding the sent folder to the reply examples
 

@@ -60,9 +60,14 @@ export type Plugin = {
 	mailActions?(source: string): string[] | undefined;
 	/** The owner's own sent mail of this plugin's mailbox, newest first, at most `opts.limit`; `undefined` = none. Read-only; it feeds the examples of reply drafts for this plugin's source. */
 	sentMail?(opts: { limit: number }): Promise<PluginSentMail | undefined> | PluginSentMail | undefined;
+	/** The messages of this mail's thread in the real mailbox, oldest first, so dotz can see a reply sent outside it (hub/mail-reconcile.ts). Read-only; `undefined` = not this plugin's source; a throw = could not read it now. */
+	mailThread?(mail: MailThreadRequest): Promise<MailThreadMessage[] | undefined> | MailThreadMessage[] | undefined;
 };
 /** The owner's sent folder of one source, newest first (`items` at most `limit`), for the reply examples (reply-drafts tone.ts sentPairs); `source` tags the pairs so only drafts of that source see them. */
 export type PluginSentMail = { source: string; items: SentMail[] };
+export type MailThreadRequest = { source: string; id: string; /** the account recorded on the mail, when there is one */ account?: string };
+/** `from` is the sender (an address, or `Name <address>`), `date` ISO 8601 with a zone. */
+export type MailThreadMessage = { from: string; date: string };
 export type MailActionRequest = { source: string; id: string; action: "read" | "unread" | "archive" | "unarchive" | "trash" | "star" | "unstar" };
 
 type Loaded = { name: string; plugin: Plugin; file: string };
@@ -237,6 +242,31 @@ export async function pluginSentMail(limit: number | ((plugin: string) => number
 		}
 	}
 	return out;
+}
+
+// One mail's thread: a mailbox that stops answering must not hold the reconcile round (one at a time) forever.
+const MAIL_THREAD_MS = 15_000;
+
+/** The first plugin that takes the source reads the thread; a throw or no answer in time is a failure (rethrown to hub/mail-reconcile.ts). `undefined` = no plugin reads it. */
+export async function pluginMailThread(mail: MailThreadRequest): Promise<MailThreadMessage[] | undefined> {
+	refresh();
+	for (const l of loaded) {
+		if (!l.plugin.mailThread) continue;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		try {
+			const late = new Promise<never>((_, reject) => {
+				timer = setTimeout(() => reject(new Error(`no answer in ${MAIL_THREAD_MS / 1000}s`)), MAIL_THREAD_MS);
+			});
+			const messages = await Promise.race([l.plugin.mailThread(mail), late]);
+			if (messages) return messages;
+		} catch (error) {
+			note(`plugin ${l.name}: mailThread failed: ${error}`);
+			throw error;
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+	return undefined;
 }
 
 /** What the plugin of a source can do in its mailbox (the `can` of the mail card). */

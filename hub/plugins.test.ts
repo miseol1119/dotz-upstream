@@ -3,8 +3,9 @@ import { afterAll, beforeAll, beforeEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { loadPlugins, pluginClaim, pluginDeny, pluginThread, startPlugins, type PluginContext } from "./plugins.ts";
+import { loadPlugins, pluginClaim, pluginDeny, pluginMailThread, pluginThread, startPlugins, type PluginContext } from "./plugins.ts";
 import { inboxText } from "./intake.ts";
+import { advance } from "./runtime/test-clock.ts";
 
 const data = mkdtempSync(join(tmpdir(), "dotz-plugins-"));
 const dir = join(data, "custom", "plugins");
@@ -161,4 +162,26 @@ test("start runs once with the context; a plugin whose start throws is dropped, 
 	logs.length = 0;
 	expect(pluginClaim("topic-2")).toBeDefined();
 	expect(logs).toEqual([]);
+});
+
+test("mailThread: the plugin of the source answers, no plugin = undefined; a throw or a mailbox that never answers fails and is logged", async () => {
+	const file = join(dir, "zz-threads.ts");
+	writeFileSync(file, `export default { name: "threads", mailThread(m) {
+		if (m.source !== "work") return undefined;
+		if (m.id === "boom") throw new Error("mailbox down");
+		if (m.id === "hang") return new Promise(() => {});
+		return [{ from: "kim@example.com", date: "2026-10-30T00:00:00Z" }];
+	} };\n`);
+	try {
+		expect(await pluginMailThread({ source: "work", id: "1" })).toEqual([{ from: "kim@example.com", date: "2026-10-30T00:00:00Z" }]);
+		expect(await pluginMailThread({ source: "other", id: "1" })).toBeUndefined();
+		logs.length = 0;
+		await expect(pluginMailThread({ source: "work", id: "boom" })).rejects.toThrow("mailbox down");
+		const hung = pluginMailThread({ source: "work", id: "hang" }).catch(String);
+		await advance(15_000);
+		expect(await hung).toContain("no answer");
+		expect(logs.filter(l => l.includes("plugin threads: mailThread failed"))).toHaveLength(2);
+	} finally {
+		rmSync(file);
+	}
 });

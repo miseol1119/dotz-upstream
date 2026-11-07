@@ -69,7 +69,7 @@ import { clearTrackedTimers, runShutdown } from "./shutdown.ts";
 import { addWatch, allWatches, approveWatch, isWatchIssue, setWatchGate, startWatches, stopWatches, type Watch, watchChoice } from "./watch.ts";
 import { watchOwner } from "./app-features.ts";
 import { blockedByOff, newsMuted, watchOff } from "./app-off.ts";
-import { loadPlugins, pluginClaim, pluginThread, startPlugins } from "./plugins.ts";
+import { loadPlugins, pluginClaim, pluginMailThread, pluginThread, startPlugins } from "./plugins.ts";
 import { startTokenAudit } from "./token-audit.ts";
 import { startZele, zeleAccounts, zeleRead } from "./zele.ts";
 import { createReconciler } from "./mail-reconcile.ts";
@@ -172,7 +172,7 @@ setAppLabelResolver(key => appEntries(DATA_DIR).find(e => e.key === key)?.label 
 const refHandled = (ref: string, conv: string) => draftHandled(ref, { mail: { drafts: draftHeads, record: mailByKey }, comment: commentDraftFacts, kakao: kakaoDraftFacts }, conv);
 setDraftHandled((d, _n, ref) => refHandled(ref, d.to));
 setRefHandled(refHandled);
-// Mails that wait are checked against their real thread (zele, read-only): an answer sent from Gmail or another script makes the mail 답장함 and closes its cards
+// Mails that wait are checked against their real thread (zele or a plugin's mailThread, read-only): an answer sent from Gmail or another script makes the mail 답장함 and closes its cards
 // and drafts. At most MAIL_RECONCILE_PER_RUN threads per 10 minutes on the sweep timer below; a larger pass at start.
 const MAIL_RECONCILE_PER_RUN = 20, MAIL_RECONCILE_EVERY_MS = 10 * 60_000, MAIL_RECONCILE_AT_START = 100;
 const mailReconciler = createReconciler({
@@ -181,6 +181,8 @@ const mailReconciler = createReconciler({
 	accounts: zeleAccounts,
 	read: zeleRead,
 	own: accounts => ownAddresses(accounts),
+	pluginThread: pluginMailThread,
+	ownOf: ownAddressesFor,
 	markReplied: (key, at) => {
 		const ok = setMailReply(key, "sent", at);
 		if (ok) broadcast({ kind: "mail_unreplied", target: mailTarget(key) });

@@ -281,7 +281,7 @@ const lastTurnStart = (items: ReturnType<typeof activityItems>): string | undefi
 const runningChildren = (source: string) =>
 	(subagentLists()[source] || []).filter(s => s.status === "running").map(s => ({ name: s.id, description: s.description || s.agent }));
 
-type RestartHooks = { busyNow: () => string[]; restartGateway: () => string; restartGatewayNow: () => string; mailDeps?: () => MailDeps; /** One mail reconcile round of at most `limit` mails (hub/mail-reconcile.ts); absent = not wired in this process. */ mailReconcile?: (limit: number) => Promise<{ checked: number; replied: number; notChecked: number }> };
+type RestartHooks = { busyNow: () => string[]; restartGateway: () => string; restartGatewayNow: () => string; mailDeps?: () => MailDeps; /** One mail reconcile round of at most `limit` mails (hub/mail-reconcile.ts); absent = not wired in this process. */ mailReconcile?: (limit: number) => Promise<{ checked: number; replied: number; notChecked: number; skipped: number }> };
 const isMailTarget = (t: string) => /^mail:[a-z0-9._-]+$/.test(t);
 // Where a forwarded action came from (a machine name), as one short line; the event it makes carries it as `via`.
 const viaOf = (v: unknown): string | undefined => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, 40) || undefined : undefined);
@@ -759,7 +759,7 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 				return json({ error: (error as Error).message }, error instanceof MailError ? error.status : 500);
 			}
 		}
-		// Mails that still wait are checked against their real thread; the ones the owner answered elsewhere become 답장함 (idempotent, read-only in zele).
+		// Mails that still wait are checked against their real thread; the ones the owner answered elsewhere become 답장함 (idempotent, read-only in the mailbox). `skipped` counts mails of a source no plugin can read.
 		if (req.method === "POST" && url.pathname === "/api/mail/reconcile") {
 			if (!mailReconcile) return json({ error: "mail is not wired in this process" }, 503);
 			const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 200));
