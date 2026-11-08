@@ -491,3 +491,69 @@ test("the same text pressed earlier is confirmed from its first press time and i
 	expect(since).toEqual([T0 - 90_000]);
 	expect(readsLeft()["100"]).toMatchObject({ text: "안녕", at: T0 - 90_000, pressed: true });
 });
+
+// A sender that dies at the press (a gateway restart, a killed CLI) leaves the drafts file as it was at that moment and its claim behind.
+// The fake screen snapshots the file at the press; the test puts it back and writes the dead sender's claim, then the owner's 다시 보내기 runs.
+function diedAtPress() {
+	let atPress = "";
+	const screen = fakeScreen([row("가나")], { axSend: () => ((atPress = readFileSync(paths.drafts, "utf8")), { ok: true }) });
+	const crash = (code: string) => {
+		writeFileSync(paths.drafts, atPress);
+		mkdirSync(join(dir, "kakao", "sending"), { recursive: true });
+		writeFileSync(join(dir, "kakao", "sending", code), `${process.pid} Mon Jan  1 00:00:00 2001`);
+	};
+	return { screen, crash };
+}
+const retrySend = (code: string, screen: ReturnType<typeof fakeScreen>, confirm: () => Promise<boolean | undefined>) =>
+	sendDraft(code, { ...sender({ calls: screen.sends, focus: screen.focus, runner: screen.runner }), roomNames: names, ownerApproved: true, retry: true, confirm });
+
+test("a send whose sender died at the press is not pressed again on 다시 보내기 when the database shows it went out", async () => {
+	const d = await make({ roomName: "가나", text: "한 번만" });
+	const { screen, crash } = diedAtPress();
+	expect((await retrySend(d.code, screen, async () => true)).ok).toBe(true);
+	crash(d.code);
+	const asked: { text: string; once?: boolean }[] = [];
+	const r = await sendDraft(d.code, { ...sender({ calls: screen.sends, focus: screen.focus, runner: screen.runner }), roomNames: names, ownerApproved: true, retry: true, confirm: async q => (asked.push({ text: q.text, once: q.once }), true) });
+	expect(r.ok).toBe(true);
+	expect(screen.sends).toHaveLength(1);
+	expect(asked).toEqual([{ text: "한 번만", once: true }]);
+	expect((await listDrafts({ paths, runner: screen.runner }))[0]).toMatchObject({ status: "sent", sentParts: 1 });
+});
+
+test("a send whose sender died at the press, not found or not answered in the database, ends unconfirmed and is never pressed again", async () => {
+	for (const answer of [undefined, false]) {
+		const d = await make({ roomName: "가나", text: "한 번만" });
+		const { screen, crash } = diedAtPress();
+		await retrySend(d.code, screen, async () => true);
+		crash(d.code);
+		const later = { ...sender({ calls: screen.sends, focus: screen.focus, runner: screen.runner }), now: () => T0 + 10 * 60_000 };
+		for (let i = 0; i < 2; i++) {
+			const r = await sendDraft(d.code, { ...later, roomNames: names, ownerApproved: true, retry: true, confirm: async () => answer });
+			expect(r.ok).toBe(false);
+			expect(r.reason).toContain("다시 보내지 않");
+		}
+		expect(screen.sends).toHaveLength(1);
+		expect((await listDrafts({ paths, runner: screen.runner })).find(x => x.code === d.code)).toMatchObject({ status: "sent", unconfirmed: true, sentParts: 1 });
+	}
+});
+
+test("a press whose answer is lost (the script timed out) is asked in the database and never pressed again, even on 다시 보내기", async () => {
+	const d = await make({ roomName: "가나", text: "한 번만" });
+	const screen = fakeScreen([row("가나")], { axSend: () => ({}) });
+	const deps = { ...sender({ calls: screen.sends, focus: screen.focus, runner: screen.runner }), roomNames: names, ownerApproved: true, confirm: async () => false, sleep: async () => {} };
+	const r = await sendDraft(d.code, deps);
+	expect(r).toMatchObject({ ok: false, unconfirmed: true });
+	expect(screen.sends).toHaveLength(1);
+	for (const retry of [false, true]) expect((await sendDraft(d.code, { ...deps, retry })).ok).toBe(false);
+	expect(screen.sends).toHaveLength(1);
+});
+
+test("two sends of the same draft at once (a double click, two surfaces) make one press", async () => {
+	const d = await make({ roomName: "가나", text: "한 번만" });
+	const screen = fakeScreen([row("가나")]);
+	const deps = { ...sender({ calls: screen.sends, focus: screen.focus, runner: screen.runner }), roomNames: names, ownerApproved: true, confirm: async () => true };
+	const rs = await Promise.all([sendDraft(d.code, deps), sendDraft(d.code, deps)]);
+	expect(rs.filter(r => r.ok)).toHaveLength(1);
+	expect(rs.find(r => !r.ok)?.reason).toBe("이미 보내는 중이에요");
+	expect(screen.sends).toHaveLength(1);
+});

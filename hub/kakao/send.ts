@@ -21,7 +21,10 @@ export type DraftTokens = { in: number; out: number; estimated?: true };
 // unconfirmed: the 전송 button was pressed but the send was not confirmed; the draft counts as sent so it is never sent again.
 // sentParts: how many parts of the text (draft.ts draftParts) are already in the room; a retry sends only the rest, so no part goes twice.
 // intent: a message the owner asked for himself ("내일 7시로 미루자고 정중하게"), not a reply to the room's last message.
-export type Draft = { code: string; chatId: string; roomName: string; text: string; basisLogId: string; created: string; status: DraftStatus; sentAt?: string; tokens?: DraftTokens; unconfirmed?: true; sentParts?: number; intent?: string };
+// pressing: written before a part is typed and cleared once its outcome is known. Still there on the next send means the sender died at the
+// press: the database decides whether that part went out, and it is never pressed again on a guess.
+export type Pressing = { part: number; text: string; at: number };
+export type Draft = { code: string; chatId: string; roomName: string; text: string; basisLogId: string; created: string; status: DraftStatus; sentAt?: string; tokens?: DraftTokens; unconfirmed?: true; sentParts?: number; intent?: string; pressing?: Pressing };
 // `later`: how the idle close of a kept window is scheduled (tests pass their own; the default is an unref'd timer). `sleep`: how a
 // confirmation poll waits (tests pass the fake clock). `confirm`: whether a pressed text reached the database; without it an install's own
 // database is asked through confirm.ts, and when there is none the press result stands.
@@ -539,9 +542,38 @@ async function sendDraftNow(code: string, deps: SendDeps & { latestIncoming: (ch
 	}
 }
 
+const PRESS_UNKNOWN = "지난번 전송 중에 멈춰서 보내졌는지 카카오톡 기록으로 확인하지 못했어요. 다시 보내지 않았어요. 카카오톡방을 확인해 주세요";
+
+// A part whose sender died at the press: one database read decides. In the database: the part counts as sent (the draft ends as sent when
+// it was the last part, else the rest goes on). Not found or no answer: the draft ends as sent but unconfirmed, like a press whose answer
+// was lost, because the read covers only the room's newest messages and "not found" cannot prove the press never happened.
+async function resolvePressing(d: Draft, p: Pressing, deps: SendDeps): Promise<"partial" | "done" | "unknown"> {
+	const parts = draftParts(p.text);
+	const sentAt = new Date(nowMs(deps)).toISOString();
+	let sent: boolean | undefined;
+	try {
+		sent = await confirmerOf(deps)({ chatId: d.chatId, text: parts[p.part] ?? "", since: p.at, once: true });
+	} catch {
+		// An unreadable database is no answer: handled below as unknown, never as "not sent".
+	}
+	if (sent !== true) {
+		setStatus(deps.paths, d.code, "sent", { text: p.text, sentParts: p.part + 1, sentAt, unconfirmed: true as const, pressing: undefined });
+		return "unknown";
+	}
+	const done = p.part + 1, last = done >= parts.length;
+	setStatus(deps.paths, d.code, last ? "sent" : "pending", { text: p.text, sentParts: done, pressing: undefined, ...(last ? { sentAt } : {}) });
+	return last ? "done" : "partial";
+}
+
 async function sendClaimed(code: string, deps: SendDeps & { latestIncoming: (chatId: string) => Promise<string | undefined>; roomNames?: RoomNames; ownerApproved?: boolean; text?: string; retry?: boolean }): Promise<SendResult> {
-	const d = readDrafts(deps.paths).find(x => x.code === code);
+	let d = readDrafts(deps.paths).find(x => x.code === code);
 	if (!d) return refuse("그 초안을 찾지 못했어요");
+	if (d.status === "pending" && d.pressing) {
+		const was = await resolvePressing(d, d.pressing, deps);
+		if (was !== "partial") return was === "done" ? { ok: true } : { ...refuse(PRESS_UNKNOWN), unconfirmed: true };
+		d = readDrafts(deps.paths).find(x => x.code === code);
+		if (!d) return refuse("그 초안을 찾지 못했어요");
+	}
 	if (d.status === "sent") return refuse(d.unconfirmed ? `전송 버튼을 이미 눌렀던 초안이라 다시 보내지 않아요. 카카오톡에서 확인해 주세요` : "이미 보낸 초안이에요");
 	if (d.status !== "pending") return refuse("더 이상 보낼 수 없는 초안이에요");
 	// After a part already went out the text is fixed: an edit then could not be told apart from what is in the room.
@@ -572,14 +604,18 @@ async function sendClaimed(code: string, deps: SendDeps & { latestIncoming: (cha
 	let done = d.sentParts ?? 0;
 	let r: SendResult = { ok: true };
 	while (done < parts.length) {
+		setStatus(deps.paths, code, "pending", { pressing: { part: done, text, at: nowMs(deps) } });
 		r = await sendTextNow({ chatId: d.chatId, roomName: d.roomName, text: parts[done]!, parts }, deps);
-		if (!r.ok && !r.unconfirmed) break;
+		if (!r.ok && !r.unconfirmed) {
+			setStatus(deps.paths, code, "pending", { pressing: undefined });
+			break;
+		}
 		done++;
 		if (r.unconfirmed) break;
-		if (done < parts.length) setStatus(deps.paths, code, "pending", { text, sentParts: done });
+		if (done < parts.length) setStatus(deps.paths, code, "pending", { text, sentParts: done, pressing: undefined });
 	}
-	if (r.ok && done >= parts.length) setStatus(deps.paths, code, "sent", { text, sentParts: done, sentAt: new Date(nowMs(deps)).toISOString() });
-	else if (r.unconfirmed) setStatus(deps.paths, code, "sent", { text, sentParts: done, sentAt: new Date(nowMs(deps)).toISOString(), unconfirmed: true as const });
+	if (r.ok && done >= parts.length) setStatus(deps.paths, code, "sent", { text, sentParts: done, sentAt: new Date(nowMs(deps)).toISOString(), pressing: undefined });
+	else if (r.unconfirmed) setStatus(deps.paths, code, "sent", { text, sentParts: done, sentAt: new Date(nowMs(deps)).toISOString(), unconfirmed: true as const, pressing: undefined });
 	else if (done > 0) return { ...r, reason: `${parts.length}개 중 ${done}개를 보냈어요. 다시 보내면 나머지만 보내요: ${r.reason ?? "보내지 못했어요"}` };
 	return r;
 }
