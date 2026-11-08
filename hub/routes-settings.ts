@@ -8,7 +8,7 @@ import { checkNow as checkAccountNow } from "./account-rules.ts";
 import { accountsRoute } from "./accounts-api.ts";
 import { cancelByOwner, orch, restart as restartOrchestrator, resumeNow } from "./orchestrator.ts";
 import { convs } from "./convsessions.ts";
-import { cancelLogin, completeLogin, loginStatus, logoutProvider, quota, refreshQuota, saveProviderKey, startLogin } from "./providers.ts";
+import { cancelLogin, completeLogin, LoginBusy, loginStatus, logoutProvider, quota, refreshQuota, saveProviderKey, startLogin } from "./providers.ts";
 import { featureCatalog } from "./features.ts";
 import { mailboxRoute } from "./routes-mailbox.ts";
 import { harnessGraph, readHarnessFile } from "./harness.ts";
@@ -37,6 +37,8 @@ export async function routeSettings(req: Request, url: URL, parts: string[]): Pr
 	const fail = (error: unknown) =>
 		error instanceof ForceRequired
 			? json({ error: error.message, requires_force: true, context_tokens: error.contextTokens }, error.status)
+			: error instanceof LoginBusy
+			? json({ error: error.message, pending: error.pending }, error.status)
 			: json({ error: (error as Error).message }, error instanceof ControlError ? error.status : 400);
 	if (req.method === "GET" && parts[0] === "api" && parts[1] === "harness") {
 		try {
@@ -214,7 +216,10 @@ export async function routeSettings(req: Request, url: URL, parts: string[]): Pr
 			}
 			if (parts.length >= 4 && parts[3] === "login") {
 				const provider = decodeURIComponent(parts[2]);
-				if (req.method === "POST" && parts.length === 4) return json({ ok: true, ...(await startLogin(provider)) });
+				if (req.method === "POST" && parts.length === 4) {
+					const b = await body(req);
+					return json({ ok: true, ...(await startLogin(provider, b.pending === "resume" || b.pending === "restart" ? b.pending : undefined)) });
+				}
 				if (req.method === "POST" && parts.length === 5 && parts[4] === "complete") {
 					const b = await body(req);
 					return json({ ok: true, ...(await completeLogin(provider, String(b.login_id ?? ""), String(b.code ?? ""))) });

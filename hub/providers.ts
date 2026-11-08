@@ -358,7 +358,7 @@ type OmoLogin = {
 	rpcId: string;
 	rpc: OmoRpc;
 	url: string;
-	ask?: { id: string; title?: string; options?: string[]; url?: string };
+	ask?: { id: string; title?: string; options?: string[]; url?: string; placeholder?: string };
 	exited: boolean;
 	status: "waiting" | "done" | "failed";
 	error?: string;
@@ -373,7 +373,14 @@ let login: Login | OmoLogin | undefined;
 // What a finished login did to the provider's pool. No result: a first sign-in, or a runtime that keeps one login.
 export type LoginResult = { outcome: "added" | "refreshed"; account: string };
 type PoolState = { pinned?: string; accounts: { name: string; email?: string; signedInAt?: unknown }[] };
-type LoginView = { url: string; needs_code: boolean; prompt?: string; instructions?: string; options?: string[] };
+type LoginView = { url: string; needs_code: boolean; prompt?: string; instructions?: string; options?: string[]; placeholder?: string };
+
+// A start while a login is still open (a closed tab, chat /login) names it, so the web can offer resume or restart before LOGIN_TTL_MS.
+export class LoginBusy extends ControlError {
+	constructor(readonly pending: { provider: string; same: boolean }) {
+		super(`이미 진행 중인 로그인이 있어요 (${pending.provider}). 먼저 취소해 주세요`, 409);
+	}
+}
 
 // Pure: what the owner has to do next, read off the login process output (an unterminated last line is a pending prompt).
 function parseLoginOutput(out: string): LoginView {
@@ -439,9 +446,15 @@ function loginOf(provider: string, loginId: string): Login | OmoLogin {
 	return login;
 }
 
-export async function startLogin(provider: string): Promise<{ login_id: string } & LoginView> {
+// `pending`: what to do with a login still open. resume hands back that login (same provider only) at its current step, restart cancels it first.
+export async function startLogin(provider: string, pending?: "resume" | "restart"): Promise<{ login_id: string } & LoginView> {
 	if (!PROVIDER_ID.test(provider) || !(await loginProviders()).some(p => p.id === provider)) throw new ControlError(`"${provider}"은(는) 로그인할 수 없는 공급자예요`, 404);
-	if (login && !login.exited) throw new ControlError(`이미 진행 중인 로그인이 있어요 (${login.provider}). 먼저 취소해 주세요`, 409);
+	if (login && !login.exited) {
+		const l = login;
+		if (pending === "resume" && l.provider === provider) return { login_id: l.id, ...(l.via === "omo" ? omoView(l) : parseLoginOutput(l.out)) };
+		if (pending !== "restart") throw new LoginBusy({ provider: l.provider, same: l.provider === provider });
+		await cancelLogin(l.provider);
+	}
 	// `omp login` writes omp's store, which OmO never reads: on OmO the login goes through OmO's own RPC.
 	if (loginVia() === "omo") return startOmoLogin(provider);
 	const proc = Bun.spawn([OMP, "login", provider], { stdin: "pipe", stdout: "pipe", stderr: "pipe", env: { ...process.env, BROWSER: "true" } });
@@ -578,8 +591,10 @@ function onOmoFrame(l: OmoLogin, f: RpcFrame): void {
 		const options = Array.isArray(f.options) ? f.options.filter((o): o is string => typeof o === "string") : undefined;
 		// The Claude sign-in asks for an account name and a method before its URL, and its paste prompt carries the manual sign-in URL
 		// (the code page) as the placeholder: that URL works from any device, unlike the browser-mode URL that calls back to the hub's localhost.
-		const url = typeof f.placeholder === "string" && /^https?:\/\/\S+$/.test(f.placeholder) ? f.placeholder : undefined;
-		l.ask = { id: f.id, ...(typeof f.title === "string" ? { title: f.title } : {}), ...(options?.length ? { options } : {}), ...(url ? { url } : {}) };
+		// Any other placeholder is the answer Enter takes (the account name's default), which the web fills in.
+		const hint = typeof f.placeholder === "string" ? f.placeholder.trim() : "";
+		const url = /^https?:\/\/\S+$/.test(hint) ? hint : undefined;
+		l.ask = { id: f.id, ...(typeof f.title === "string" ? { title: f.title } : {}), ...(options?.length ? { options } : {}), ...(url ? { url } : hint ? { placeholder: hint } : {}) };
 	} else if (f.type === "response" && f.command === "login_start" && f.success === false) finishOmo(l, false, `로그인을 시작하지 못했어요 (${String(f.error ?? "알 수 없는 오류")})`);
 	else if (f.type === "auth_login_end" && f.provider === l.rpcId) finishOmo(l, f.success === true, `로그인에 실패했어요 (${String(f.error ?? "알 수 없는 오류")})`);
 	for (const w of l.waiters) w();
@@ -602,7 +617,7 @@ function settleOmo(l: OmoLogin, done: () => boolean, maxMs: number): Promise<voi
 	return promise;
 }
 
-const omoView = (l: OmoLogin): LoginView => ({ url: l.ask?.url || l.url, needs_code: Boolean(l.ask), ...(l.ask?.title ? { prompt: l.ask.title } : {}), ...(l.ask?.options ? { options: l.ask.options } : {}) });
+const omoView = (l: OmoLogin): LoginView => ({ url: l.ask?.url || l.url, needs_code: Boolean(l.ask), ...(l.ask?.title ? { prompt: l.ask.title } : {}), ...(l.ask?.options ? { options: l.ask.options } : {}), ...(l.ask?.placeholder ? { placeholder: l.ask.placeholder } : {}) });
 
 async function startOmoLogin(provider: string): Promise<{ login_id: string } & LoginView> {
 	const rpcId = provider === "anthropic" ? SUBSCRIPTION : provider;

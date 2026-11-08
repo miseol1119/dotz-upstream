@@ -15,6 +15,10 @@ let onAccounts: (() => void) | undefined;
 const PROMPT = "Complete login in your browser, or paste the authorization code / redirect URL here:";
 // OmO's Claude sign-in asks questions first and names the page in a later step (stepped = true)
 let stepped = false, step = 0, sameAccount = false;
+// a login still open elsewhere (a closed tab, /login in the chat): a plain start answers 409 with it, `pending` picks resume or restart
+let openLogin = false;
+const METHODS = ["Browser login (default)", "Copy code login (headless)"];
+const NAME_Q = "Name for this account (existing: default, work; press Enter to add account-3, or type an existing name to refresh it)";
 const MANUAL = "https://claude.ai/oauth/authorize?redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&state=stub";
 const providers = () => ({
 	providers: [
@@ -68,15 +72,18 @@ const server = Bun.serve({
 			return json(accountsBody());
 		}
 		if (p === "/api/providers/anthropic/login" && req.method === "POST") {
-			calls.push("POST login");
+			const b = (await req.json().catch(() => ({}))) as { pending?: string };
+			calls.push(b.pending ? `POST login ${b.pending}` : "POST login");
+			if (openLogin && !b.pending) return json({ error: "이미 진행 중인 로그인이 있어요 (anthropic). 먼저 취소해 주세요", pending: { provider: "anthropic", same: true } }, 409);
 			step = 0;
-			if (stepped) return json({ ok: true, login_id: "L1", url: "", needs_code: true, prompt: "Name for this account (press Enter to add account-3)" });
+			if (stepped) return json({ ok: true, login_id: "L1", url: "", needs_code: true, prompt: NAME_Q, placeholder: "account-3" });
 			return json({ ok: true, login_id: "L1", url: "https://claude.ai/oauth/authorize?state=stub", needs_code: true, prompt: PROMPT });
 		}
 		if (p === "/api/providers/anthropic/login/complete" && req.method === "POST") {
 			const b = (await req.json()) as { login_id: string; code: string };
 			calls.push(`complete ${b.login_id} ${b.code}`);
-			if (stepped && step++ === 0) return json({ ok: true, provider: "anthropic", status: "waiting", url: MANUAL, needs_code: true, prompt: "Paste the code Anthropic shows after you sign in:" });
+			if (stepped && step === 0) { step++; return json({ ok: true, provider: "anthropic", status: "waiting", url: "", needs_code: true, prompt: "Select Anthropic login method:", options: METHODS }); }
+			if (stepped && step === 1) { step++; return json({ ok: true, provider: "anthropic", status: "waiting", url: MANUAL, needs_code: true, prompt: "Paste the code Anthropic shows after you sign in:" }); }
 			if (sameAccount) return json({ ok: true, provider: "anthropic", status: "done", outcome: "refreshed", account: "work" });
 			accounts = [...accounts, `login-${accounts.length + 1}`];
 			return json({ ok: true, provider: "anthropic", status: "done" });
@@ -103,6 +110,14 @@ const shot = async (v: View, name: string) => {
 	if (!SHOTS) return;
 	await waitFor(v, `document.getAnimations().every(a => a.playState !== "running")`);
 	await Bun.write(join(SHOTS, name), await v.screenshot());
+};
+// the same view in both themes; the page is back in light afterwards
+const shotThemes = async (v: View, name: string) => {
+	if (!SHOTS) return;
+	await shot(v, `${name}-light.png`);
+	await run(v, `dotzTheme.toggle()`);
+	await shot(v, `${name}-dark.png`);
+	await run(v, `dotzTheme.toggle()`);
 };
 const boot = async (v: View) => {
 	const opened = new Promise<void>(r => streamWaiters.push(r));
@@ -152,26 +167,65 @@ for (const [label, w, h] of [["phone", 390, 844], ["desktop", 1280, 860]] as con
 		await shot(v, `provider-accounts-${w}.png`);
 	}, 20_000);
 
-	test(`${label} ${w}px: a Claude sign-in that asks its questions first shows 로그인 페이지 열기 once the page is known`, async () => {
+	test(`${label} ${w}px: a Claude sign-in that asks its questions first shows each step: the name as the field, the method as rows, then the page and code`, async () => {
 		accounts = ["default", "work"];
 		stepped = true;
+		calls.length = 0;
 		try {
 			const v = open(w, h);
 			await boot(v);
 			const link = `[...document.querySelectorAll("dialog[open] a.btn")].find(a => a.textContent.includes("로그인 페이지 열기"))`;
 			const state = `const a = ${link}; return a ? [a.getAttribute("href"), a.offsetParent !== null] : null`;
+			// what the open dialog shows: the visible field's label and value, the visible choice rows, and its buttons
+			const seen = `const d = document.querySelector("dialog[open]"); const f = [...d.querySelectorAll(".tf")].find(x => x.offsetParent);
+				return { label: f ? f.querySelector("label").textContent : null, value: f ? f.querySelector("input").value : null,
+					rows: [...d.querySelectorAll(".list .li")].filter(x => x.offsetParent).map(x => x.textContent.trim()), acts: [...d.querySelectorAll(".dact button")].map(b => b.textContent.trim()) }`;
 			await run(v, `document.querySelector("#accounts [data-acc-add]").click()`);
-			await waitFor(v, `[...document.querySelectorAll("dialog[open] .sup")].some(s => s.textContent.includes("Name for this account"))`);
+			await waitFor(v, `document.querySelector("dialog[open] .tf label")?.textContent.includes("Name for this account")`);
+			expect(await q(v, seen)).toEqual({ label: NAME_Q, value: "account-3", rows: [], acts: ["취소", "완료"] });
 			expect(await q(v, state)).toEqual([null, false]);
-			await run(v, `const i = [...document.querySelectorAll("input")].find(x => x.type === "text" && x.offsetParent); i.value = "account-3"; ${button("document.querySelector('dialog[open]')", "완료")}.click()`);
+			await shotThemes(v, `login-name-${w}`);
+			await run(v, `${button("document.querySelector('dialog[open]')", "완료")}.click()`);
+			await waitFor(v, `[...document.querySelectorAll("dialog[open] .list .li")].some(x => x.offsetParent)`);
+			expect(await q(v, seen)).toEqual({ label: null, value: null, rows: METHODS, acts: ["취소"] });
+			expect(await q(v, `return document.querySelector("dialog[open]").textContent.includes("Select Anthropic login method:")`)).toBe(true);
+			expect(await q(v, state)).toEqual([null, false]);
+			await shotThemes(v, `login-method-${w}`);
+			await run(v, `[...document.querySelectorAll("dialog[open] .list .li")].find(x => x.textContent.includes("Copy code")).click()`);
 			await waitFor(v, `[...document.querySelectorAll("dialog[open] .sup")].some(s => s.textContent.includes("Paste the code"))`);
 			expect(await q(v, state)).toEqual([MANUAL, true]);
+			expect(await q(v, seen)).toEqual({ label: "코드 또는 주소", value: "", rows: [], acts: ["취소", "완료"] });
+			expect(calls.filter(c => c.startsWith("complete"))).toEqual(["complete L1 account-3", "complete L1 Copy code login (headless)"]);
 			const o = await overflow(v);
 			expect(o.doc).toBeLessThanOrEqual(o.vw);
 			await shot(v, `providers-login-stepped-${w}.png`);
 			await run(v, `const i = [...document.querySelectorAll("input")].find(x => x.type === "text" && x.offsetParent); i.value = "code-xyz"; ${button("document.querySelector('dialog[open]')", "완료")}.click()`);
 			await waitFor(v, `document.querySelectorAll("#accounts .li.acc").length === 3`);
 		} finally {
+			stepped = false;
+		}
+	}, 20_000);
+
+	test(`${label} ${w}px: a login still open offers to pick it up or start over instead of only a toast`, async () => {
+		accounts = ["default", "work"];
+		openLogin = true;
+		stepped = true;
+		try {
+			for (const [choice, sent] of [["이어서 하기", "resume"], ["새로 시작", "restart"]] as const) {
+				calls.length = 0;
+				const v = open(w, h);
+				await boot(v);
+				await run(v, `document.querySelector("#accounts [data-acc-add]").click()`);
+				await waitFor(v, `document.querySelector("dialog[open] .dtitle")?.textContent === "끝나지 않은 로그인이 있어요"`);
+				expect(await q(v, `return [...document.querySelectorAll("dialog[open] .dact button")].map(b => b.textContent.trim())`)).toEqual(["닫기", "새로 시작", "이어서 하기"]);
+				if (choice === "이어서 하기") await shot(v, `login-open-${w}.png`);
+				await run(v, `${button("document.querySelector('dialog[open]')", choice)}.click()`);
+				await waitFor(v, `document.querySelector("dialog[open] .tf label")?.textContent.includes("Name for this account")`);
+				expect(calls.filter(c => c.startsWith("POST login"))).toEqual(["POST login", `POST login ${sent}`]);
+				await run(v, `document.querySelector("dialog[open]").close()`);
+			}
+		} finally {
+			openLogin = false;
 			stepped = false;
 		}
 	}, 20_000);

@@ -123,6 +123,22 @@ test("Claude's name and method questions come first; the page to open is the cod
 	expect(sub().accounts.map((x: { name: string }) => x.name)).toEqual(["default", "work", "login-2"]);
 });
 
+test("a start while a login is open names it; resume hands back that login at its step, restart starts a fresh one", async () => {
+	process.env.FAKE_OMO_MODE = "claude";
+	const first = await startLogin("anthropic");
+	expect(first.placeholder).toBe("account-3");
+	await expect(startLogin("anthropic")).rejects.toMatchObject({ status: 409, pending: { provider: "anthropic", same: true } });
+	await expect(startLogin("github-copilot", "resume")).rejects.toMatchObject({ status: 409, pending: { provider: "anthropic", same: false } });
+	const resumed = await startLogin("anthropic", "resume");
+	expect(resumed).toMatchObject({ login_id: first.login_id, url: "", needs_code: true, placeholder: "account-3" });
+	expect(resumed.prompt).toContain("Name for this account");
+	const fresh = await startLogin("anthropic", "restart");
+	expect(fresh.login_id).not.toBe(first.login_id);
+	expect(fresh.prompt).toContain("Name for this account");
+	expect(pendingLogin()?.id).toBe(fresh.login_id);
+	await expect(completeLogin("anthropic", first.login_id, "account-3")).rejects.toThrow("진행 중인 로그인이 없어요");
+});
+
 const loginWith = async (code: string) => {
 	const { login_id } = await startLogin("anthropic");
 	return { login_id, done: await completeLogin("anthropic", login_id, code) };

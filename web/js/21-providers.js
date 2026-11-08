@@ -99,29 +99,54 @@ function addProviderDialog() {
   if (addable && !addable.length) dlg.setActions([{ label: "닫기", onclick: c => c() }]);
   else paintKey();
 }
-async function startLogin(p) {
+// A login still open (a closed tab, /login in the chat) blocks a new one: pick it up where it stopped, or drop it and start over.
+function pendingLoginAsk(p, pending) {
+  const same = pending.provider === p.id;
+  const go = mode => c => { c(); startLogin(p, mode); };
+  dialog({ confirm: true, title: "끝나지 않은 로그인이 있어요",
+    body: el("p", { text: same ? "전에 시작한 로그인을 이어서 하거나, 취소하고 처음부터 다시 할 수 있어요." : `${providerName(pending.provider)} 로그인을 취소하고 ${p.name || p.id} 로그인을 새로 시작할까요?` }),
+    actions: [{ label: "닫기", onclick: c => c() }, ...(same
+      ? [{ label: "새로 시작", onclick: go("restart") }, { label: "이어서 하기", kind: "pri", onclick: go("resume") }]
+      : [{ label: "새로 시작", kind: "pri", onclick: go("restart") }])] });
+}
+async function startLogin(p, pending) {
   let r;
-  try { r = await api(`/api/providers/${enc(p.id)}/login`, "POST", {}); }
-  catch (e) { toast(e.message, true); return; }
+  try { r = await api(`/api/providers/${enc(p.id)}/login`, "POST", pending ? { pending } : {}); }
+  catch (e) {
+    if (!pending && e.data && e.data.pending) pendingLoginAsk(p, e.data.pending);
+    else toast(e.message, true);
+    return;
+  }
   const name = p.name || p.id;
   let finished = false, timer, dlg;
   const code = input({ type: "text" });
   const msg = el("p", { class: "err-t", hidden: true });
-  // what the sign-in asks for right now (its own words), and the choices when it asks to pick one
-  const ask = el("div", { class: "sup" });
-  const picks = el("div", { class: "row", style: "flex-wrap:wrap" });
-  const paintAsk = v => {
-    ask.textContent = v.prompt || ""; ask.hidden = !v.prompt;
-    clear(picks); picks.hidden = !(v.options && v.options.length);
-    for (const o of v.options || []) picks.append(el("button", { class: "chip", type: "button", text: o, onclick: ev => { code.value = o; submit(ev.currentTarget); } }));
-  };
-  // a sign-in can ask its questions first (Claude: account name, method) and name the page only in a later step
+  // A sign-in can ask its questions first (Claude: account name, then method) and name the page only in a later step, so the
+  // dialog shows the step it is on: a question is the field's label with its default filled in, a choice is a list of rows,
+  // and the page link and the code field come with the URL.
+  const label = el("label", { for: code.id });
+  const field = el("div", { class: "tf" }, label, code);
+  const intro = el("p", { hidden: true });
+  const picks = el("div", { class: "list", hidden: true });
+  const ask = el("div", { class: "sup", hidden: true });
   const open = el("a", { class: "btn tonal", target: "_blank", rel: "noopener noreferrer" }, icon("open"), "로그인 페이지 열기");
   const openBox = el("div", {}, open);
-  const paintUrl = url => {
-    const ok = /^https?:\/\//.test(url || "");
-    if (ok) open.href = url; else open.removeAttribute("href");
-    openBox.hidden = !ok;
+  let lastUrl = "";
+  const paintStep = v => {
+    if (/^https?:\/\//.test(v.url || "")) lastUrl = v.url;
+    const choose = !!(v.options && v.options.length), url = !choose && !!lastUrl, question = !choose && !url && !!v.prompt;
+    intro.textContent = choose ? v.prompt || "" : ""; intro.hidden = !choose || !v.prompt;
+    clear(picks); picks.hidden = !choose;
+    for (const o of choose ? v.options : []) picks.append(el("button", { type: "button", class: "li tap", onclick: ev => { code.value = o; submit(ev.currentTarget); } },
+      el("span", { class: "tx" }, el("div", { class: "hd", text: o })), icon("chev", "lead")));
+    field.hidden = choose;
+    label.textContent = question ? v.prompt : "코드 또는 주소";
+    code.value = question && v.placeholder ? v.placeholder : "";
+    code.placeholder = question && v.placeholder ? v.placeholder : "";
+    ask.textContent = url ? v.prompt || "" : ""; ask.hidden = !url || !v.prompt;
+    if (url) open.href = lastUrl; else open.removeAttribute("href");
+    openBox.hidden = !url;
+    dlg.setActions([{ label: "취소", onclick: c => c() }, ...(choose ? [] : [{ label: "완료", kind: "pri", onclick: (c, btn) => submit(btn) }])]);
   };
   const stop = () => { clearTimeout(timer); };
   // the hub says what the login did to the pool: a new account, or one it already held and refreshed (hub/providers.ts loginResult)
@@ -145,25 +170,24 @@ async function startLogin(p) {
     if (!finished) timer = setTimeout(poll, 2000);
   };
   const submit = btn => busy(btn, async () => {
-    const v = code.value.trim();
+    const v = code.value.trim() || code.placeholder;
     if (!v) { fail("코드나 주소를 붙여 넣어 주세요"); return; }
     msg.hidden = true;
     stop();
     try {
       const s = await api(`/api/providers/${enc(p.id)}/login/complete`, "POST", { login_id: r.login_id, code: v });
       // a sign-in with more than one step answers with the next question instead of finishing
-      if (s.status === "waiting") { code.value = ""; paintAsk(s); if (s.url) paintUrl(s.url); code.focus(); timer = setTimeout(poll, 2000); return; }
+      if (s.status === "waiting") { paintStep(s); code.focus(); timer = setTimeout(poll, 2000); return; }
       await success(s);
     }
     catch (e) { fail(e.message); if (!finished) timer = setTimeout(poll, 2000); }
   });
   dlg = dialog({
     title: p.can_add_account || p.add_account ? `${name} 계정 추가` : `${name} 로그인`,
-    body: [openBox, textField("코드 또는 주소", code), ask, picks, msg],
+    body: [intro, openBox, field, ask, picks, msg],
     onclose: () => { stop(); if (!finished) api(`/api/providers/${enc(p.id)}/login`, "DELETE").catch(() => {}); },
-    actions: [{ label: "취소", onclick: c => c() }, { label: "완료", kind: "pri", onclick: (c, btn) => submit(btn) }],
   });
-  paintAsk(r); paintUrl(r.url);
+  paintStep(r);
   code.addEventListener("keydown", ev => { if (ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); const b = dlg.node.querySelector(".dact .btn:last-child"); if (b) b.click(); } });
   timer = setTimeout(poll, 2000);
 }

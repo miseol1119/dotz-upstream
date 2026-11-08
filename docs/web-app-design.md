@@ -1890,12 +1890,13 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 로그인 대화창 (`startLogin`)
 - 목적: 공급자 로그인을 대화창에서 끝내요(주소 열기, 코드 붙여 넣기, 선택지 응답).
-- 구성: 대화창 `{이름} 로그인` 또는 `{이름} 계정 추가`: `로그인 페이지 열기` 링크 버튼(주소가 http(s)일 때만), `코드 또는 주소` 입력, 로그인이 묻는 문구, 선택지 칩들, 오류 줄. 버튼 `취소` / `완료`.
+- 구성: 대화창 `{이름} 로그인` 또는 `{이름} 계정 추가`. 로그인이 지금 묻는 단계만 보여요. 질문(Claude 계정 이름): 질문 문구가 입력 칸 이름이고 기본값(`account-N`)이 미리 채워져요. 선택(로그인 방식): 질문 문구 아래 선택지마다 누를 수 있는 행, 버튼은 `취소`만. 주소 단계: `로그인 페이지 열기` 링크 버튼, `코드 또는 주소` 입력, 로그인이 묻는 문구. 오류 줄. 버튼 `취소` / `완료`.
+- 이미 열린 로그인(닫은 탭, 대화의 `/login`): 시작이 409로 돌아오면 `끝나지 않은 로그인이 있어요` 확인 창에서 `닫기` / `새로 시작` / `이어서 하기`(같은 공급자일 때만)를 골라요. 각각 `{pending: "restart"}`, `{pending: "resume"}`로 다시 시작해요.
 - 기능: 시작 `POST /api/providers/{id}/login`, 2초마다 `GET .../login?login_id=`, 완료 `POST .../login/complete` `{login_id, code}`(여러 단계이면 다음 질문을 받아 계속), 닫으면 `DELETE .../login`. 입력 칸에서 Enter = `완료`.
 - 상태: 성공 토스트 `계정을 추가했어요` 또는 `{이름} 로그인했어요`. 실패 오류 줄 `로그인에 실패했어요`(서버 오류 문구가 있으면 그것), 입력 없음 `코드나 주소를 붙여 넣어 주세요`. 시작 자체가 실패하면 토스트로 오류.
 - 데이터: `POST|GET|DELETE /api/providers/{id}/login`, `POST /api/providers/{id}/login/complete`.
-- 근거: web/js/21-providers.js:113 `startLogin`.
-- css: 14-overlay.css(대화창), 02-cards-lists-tags.css(`.chip`는 코드에서 클래스만 확인).
+- 근거: web/js/21-providers.js `startLogin`, `pendingLoginAsk`.
+- css: 14-overlay.css(대화창), 02-cards-lists-tags.css(선택지 행 `.list .li`).
 
 ### 사용량 (`#v-usage`, `loadQuota`)
 - 목적: 공급자별 사용 한도 소진율, 사용 중인 Claude 계정과 전환 기록을 봐요.
