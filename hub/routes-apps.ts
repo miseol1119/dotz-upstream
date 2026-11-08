@@ -71,8 +71,8 @@ export async function routeApps(req: Request, url: URL, unrepliedMailList: () =>
 		setUserAppOff(DATA_DIR, userAppRoute[1]!, (await body(req)).off !== false);
 		return json({ ok: true });
 	}
-	// The 새로 추가하기 prompts (hub/app-templates.ts): shipped ones, replaced or extended by custom/app-templates.json.
-	if (req.method === "GET" && url.pathname === "/api/app-templates") return json({ items: readAppTemplates(DATA_DIR) });
+	// The 새로 추가하기 prompts (hub/app-templates.ts): shipped ones, replaced or extended by custom/app-templates.json; ?key= also finds an unlisted one.
+	if (req.method === "GET" && url.pathname === "/api/app-templates") return json({ items: readAppTemplates(DATA_DIR, undefined, url.searchParams.get("key") || undefined) });
 	// 제거 / 앱 추가 on this install only (hub/app-off.ts): GET remove = what will be removed, POST remove = do it ({deleteData}), POST add = switch it back on.
 	const appLife = /^\/api\/integrations\/([a-z0-9-]+)\/(remove|add)$/.exec(url.pathname);
 	if (appLife) {

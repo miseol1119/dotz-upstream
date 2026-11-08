@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readAppTemplates } from "./app-templates.ts";
+import { readAppTemplates, SHIPPED_DIR } from "./app-templates.ts";
 import { integrationAvailable, integrationContext } from "./integrations.ts";
 
 const dirs: string[] = [];
@@ -27,6 +27,30 @@ describe("새로 추가하기 templates", () => {
 		expect(t.map(x => x.key)).toEqual(["mail", "kakao", "youtube", "instagram", "comments", "custom", "mine"]);
 		expect(t[0]).toEqual({ key: "mail", label: "메일", text: "내 메일 {{주소}}\n\n끝" });
 		expect(t.at(-1)).toEqual({ key: "mine", label: "내 앱", text: "내 앱\n\n끝" });
+	});
+
+	test("a `listed: false` request stays off the list and is found only by its key", () => {
+		const dir = fresh();
+		writeFileSync(join(dir, "_rule.md"), "규칙");
+		writeFileSync(join(dir, "mail.md"), "---\nlabel: 메일\norder: 1\n---\n메일 {{주소}}\n");
+		writeFileSync(join(dir, "shop.md"), "---\nlabel: 가게\nlisted: false\n---\n가게 {{아이디}}\n");
+		const d = fresh();
+		expect(readAppTemplates(d, dir).map(x => x.key)).toEqual(["mail"]);
+		expect(readAppTemplates(d, dir, "shop")).toEqual([{ key: "shop", label: "가게", text: "가게 {{아이디}}\n\n규칙" }]);
+		expect(readAppTemplates(d, dir, "none")).toEqual([]);
+		put(d, "custom/app-templates.json", { templates: [{ key: "shop", text: "내 가게" }] });
+		expect(readAppTemplates(d, dir).map(x => x.key)).toEqual(["mail"]);
+		expect(readAppTemplates(d, dir, "shop")[0]?.text).toBe("내 가게\n\n규칙");
+	});
+
+	test("every shipped `listed: false` request stays off the list and is found by its key", () => {
+		const d = fresh(), listed = readAppTemplates(d).map(x => x.key);
+		const hidden = readdirSync(SHIPPED_DIR).filter(n => /^[a-z0-9-]+\.md$/.test(n) && /\nlisted: false\n/.test(readFileSync(join(SHIPPED_DIR, n), "utf8"))).map(n => n.slice(0, -3));
+		expect(hidden.length).toBeGreaterThan(0);
+		for (const k of hidden) {
+			expect(listed).not.toContain(k);
+			expect(readAppTemplates(d, undefined, k).map(x => x.key)).toEqual([k]);
+		}
 	});
 
 	test("an unreadable override file leaves the shipped set", () => {
