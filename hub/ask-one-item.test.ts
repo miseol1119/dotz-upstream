@@ -6,7 +6,7 @@ import { answerDecision, ignoreNotice, listNotices, needsAnswer, type Notice, re
 // One lane question is one item on every list (owner 2026-11-05: "2개가 사실상 같은 질문지인데 따로 생성되고 있음"): the lists of the 알림 screen, 답변 필요
 // and the push all read the notices, so these count them after the real event path.
 beforeEach(resetNoticesForTest);
-const T0 = Date.UTC(2026, 10, 5, 0, 0);
+const T0 = Date.now() - 3_600_000;
 let tick = 0;
 const at = () => new Date(T0 + ++tick * 1000).toISOString();
 const ASK = "[ask] 디자인 문서를 다 썼어요.\n\n결정: 자기 주소가 있는 컴퓨터를 고르면 어떻게 열까요?\n**1) 그 주소의 웹앱으로 이동**\n화면과 기능이 그대로예요.\n**2) 평소 채팅 화면에서 중계**\n앱 안에 머물러요.";
