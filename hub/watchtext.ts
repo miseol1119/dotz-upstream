@@ -147,7 +147,33 @@ const plainLine = (l: string): boolean => {
 	return /[가-힣A-Za-z]{2,}/.test(l) && letters >= l.length * 0.6;
 };
 const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-const items = (list: string[]) => `${list.slice(0, 3).join(" · ")}${list.length > 3 ? ` 외 ${list.length - 3}건` : ""}`;
+const rows = (list: string[]) => [...list.slice(0, 3), ...(list.length > 3 ? [`외 ${list.length - 3}건`] : [])].map(l => `- ${l}`);
+// A changed line shaped "<kind>: <rest>" ("새 이슈: owner/repo#12 ..."), and the item it names: an "owner/repo#n" reference, else the text after the kind.
+const KIND = /^([^:\n]{1,20}?):\s+(\S.*)$/;
+const ITEM_REF = /(?:^|\s)([\w.-]+\/[\w.-]+#\d+)(?=\s|$)/;
+// The text after the kind names an item only when it is more than one word ("서버 A: 정상" and "서버 B: 정상" are two servers).
+const itemKey = (l: string): string => ITEM_REF.exec(l)?.[1] ?? KIND.exec(l)?.[2]?.match(/^\S+\s+\S.*$/)?.[0] ?? l;
+const kindOf = (l: string): string => KIND.exec(l)?.[1]?.split(" → ").pop() ?? "";
+// A removed line whose item is still among the added ones changed, it did not go (새 이슈 -> 이슈 갱신): it leaves the removed list, and the added
+// line names the kind it had ("새 이슈 → 이슈 갱신: ...").
+function keepMoved(added: string[], removed: string[]): { added: string[]; removed: string[] } {
+	const gone = new Map(removed.map(l => [itemKey(l), l] as const)), moved = new Set<string>();
+	const now = added.map(l => {
+		const old = gone.get(itemKey(l));
+		if (old === undefined) return l;
+		moved.add(old);
+		const was = KIND.exec(old)?.[1], is = KIND.exec(l)?.[1];
+		return was && is && was !== is ? `${was} → ${l}` : l;
+	});
+	return { added: now, removed: removed.filter(l => !moved.has(l)) };
+}
+// "이슈 갱신 4건" when the added lines share one or two short kinds, else "새 항목 N건"; then "사라진 항목 M건".
+function changeTitle(added: string[], removed: string[]): string {
+	const kinds = [...new Set(added.map(kindOf))];
+	const named = kinds.length <= 2 && kinds.every(k => k && k.length <= 12);
+	const a = !added.length ? [] : named ? kinds.map(k => `${k} ${added.filter(l => kindOf(l) === k).length}건`) : [`새 항목 ${added.length}건`];
+	return [...a, ...(removed.length ? [`사라진 항목 ${removed.length}건`] : [])].join(" · ");
+}
 
 function flatJson(v: unknown, key: string, out: string[], now?: number, tz?: string): void {
 	if (out.length >= 8) return;
@@ -160,11 +186,12 @@ function flatJson(v: unknown, key: string, out: string[], now?: number, tz?: str
 	if (shown) out.push(`${key || "값"}: ${cut(shown, 80)}`);
 }
 
-export type Described = { text: string; readable: boolean };
+export type Described = { text: string; title?: string; readable: boolean };
 export type DescribeOpts = { prev?: string; issue?: boolean; now?: number; tz?: string };
 
 // The output of a check as a person reads it, by rules alone: a DOTZ_FAIL kind as a phrase, JSON as key: value lines, the lines that were added or
-// removed against the last output (or marked +/-), key=value counts and times, plain Korean as it is. `readable: false` = none of these fit.
+// removed against the last output (or marked +/-) one per row under a counted `title`, key=value counts and times, plain Korean as it is.
+// `readable: false` = none of these fit.
 // Ids, ANSI colours and ISO times never reach the text.
 export function describeOutput(output: string, opts: DescribeOpts = {}): Described {
 	const out = output.replace(ANSI, "").trim();
@@ -202,8 +229,11 @@ export function describeOutput(output: string, opts: DescribeOpts = {}): Describ
 	}
 	if (added) {
 		if (![...added, ...removed].every(plainLine)) return { text: "", readable: false };
-		const said = [added.length ? `새로 생겼어요: ${items(added)}` : "", removed.length ? `사라졌어요: ${items(removed)}` : ""].filter(Boolean);
-		return { text: said.join("\n") || WATCH_UNCHANGED_KO, readable: true };
+		if (!added.length && !removed.length) return { text: WATCH_UNCHANGED_KO, readable: true };
+		({ added, removed } = keepMoved(added, removed));
+		const head = added.length && removed.length && !added.every(kindOf) ? ["새로 생겼어요"] : [];
+		const text = [...head, ...rows(added), ...(removed.length ? ["사라졌어요", ...rows(removed)] : [])].join("\n");
+		return { text, title: changeTitle(added, removed), readable: true };
 	}
 	if (HANGUL.test(out)) return { text: out.split("\n").filter(l => !SENTINEL.test(l.trim())).join("\n"), readable: true };
 	if (cur.length <= 3 && cur.every(plainLine)) return { text: cur.join("\n"), readable: true };
@@ -212,14 +242,17 @@ export function describeOutput(output: string, opts: DescribeOpts = {}): Describ
 
 export type LineOpts = { raw?: boolean; now?: number; tz?: string; note?: string; prev?: string; summary?: string };
 
-// "<감시 이름>: 결과가 바뀌었어요", then the output in words (describeOutput; `summary` is a cached model sentence for output the rules could not read),
+// "<감시 이름>: 결과가 바뀌었어요" (or the counted title of a change, "이슈 갱신 4건"), then the output in words (describeOutput; `summary` is a cached model sentence for output the rules could not read),
 // then the raw text folded (raw: false leaves it out, for the bell). A plain Korean output is its own words and is not folded again.
 // `note` is added after the first line's phrase.
 export function watchLine(label: string, reason: string, output = "", opts: LineOpts = {}): string {
 	const out = output.trim();
-	const lines = [`${humanLabel(label)}: ${watchReasonKo(reason)}${opts.note ? ` ${opts.note}` : ""}`];
-	if (!out || sentinelMatch(reason, out)) return lines[0]!;
+	const first = (said: string) => `${humanLabel(label)}: ${said}${opts.note ? ` ${opts.note}` : ""}`;
+	if (!out || sentinelMatch(reason, out)) return first(watchReasonKo(reason));
 	const d = describeOutput(out, { prev: opts.prev, issue: isIssue(reason), now: opts.now, tz: opts.tz });
+	// Only a change or a match is said by its count; "다시 정상이에요" and other reasons stay (notices-store reads them).
+	const counted = /^(output changed|change|match|matched \/)/.test(reason.trim());
+	const lines = [first((counted && d.readable && d.title) || watchReasonKo(reason))];
 	const text = d.readable ? d.text : opts.summary ?? "";
 	if (text && text === out) return `${lines[0]}\n${out}`;
 	if (text) lines.push(text);

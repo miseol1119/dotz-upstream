@@ -66,7 +66,28 @@ const wtPlain = l => {
   return /[가-힣A-Za-z]{2,}/.test(l) && letters >= l.length * 0.6;
 };
 const wtCut = (s, n) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
-const wtItems = list => list.slice(0, 3).join(" · ") + (list.length > 3 ? " 외 " + (list.length - 3) + "건" : "");
+const wtRows = list => [...list.slice(0, 3), ...(list.length > 3 ? ["외 " + (list.length - 3) + "건"] : [])].map(l => "- " + l);
+// hub/watchtext.ts keepMoved / changeTitle: a removed item still among the added ones changed kind, it did not go; the title counts the change.
+const WT_KIND = /^([^:\n]{1,20}?):\s+(\S.*)$/;
+const WT_REF = /(?:^|\s)([\w.-]+\/[\w.-]+#\d+)(?=\s|$)/;
+const wtKey = l => (WT_REF.exec(l) || [])[1] ?? ((WT_KIND.exec(l) || [])[2] || "").match(/^\S+\s+\S.*$/)?.[0] ?? l;
+const wtKind = l => { const m = WT_KIND.exec(l); return m ? m[1].split(" → ").pop() : ""; };
+function wtKeepMoved(added, removed) {
+  const gone = new Map(removed.map(l => [wtKey(l), l])), moved = new Set();
+  const now = added.map(l => {
+    const old = gone.get(wtKey(l));
+    if (old === undefined) return l;
+    moved.add(old);
+    const was = (WT_KIND.exec(old) || [])[1], is = (WT_KIND.exec(l) || [])[1];
+    return was && is && was !== is ? was + " → " + l : l;
+  });
+  return { added: now, removed: removed.filter(l => !moved.has(l)) };
+}
+function wtChangeTitle(added, removed) {
+  const kinds = [...new Set(added.map(wtKind))], named = kinds.length <= 2 && kinds.every(k => k && k.length <= 12);
+  const a = !added.length ? [] : named ? kinds.map(k => k + " " + added.filter(l => wtKind(l) === k).length + "건") : ["새 항목 " + added.length + "건"];
+  return [...a, ...(removed.length ? ["사라진 항목 " + removed.length + "건"] : [])].join(" · ");
+}
 function wtFlat(v, key, out, now, tz) {
   if (out.length >= 8) return;
   if (v && typeof v === "object" && !Array.isArray(v)) {
@@ -109,17 +130,20 @@ function describeOutput(output, opts = {}) {
   }
   if (added) {
     if (![...added, ...removed].every(wtPlain)) return { text: "", readable: false };
-    const said = [added.length ? "새로 생겼어요: " + wtItems(added) : "", removed.length ? "사라졌어요: " + wtItems(removed) : ""].filter(Boolean);
-    return { text: said.join("\n") || "내용은 그대로이고 시각 같은 값만 바뀌었어요", readable: true };
+    if (!added.length && !removed.length) return { text: "내용은 그대로이고 시각 같은 값만 바뀌었어요", readable: true };
+    ({ added, removed } = wtKeepMoved(added, removed));
+    const head = added.length && removed.length && !added.every(wtKind) ? ["새로 생겼어요"] : [];
+    return { text: [...head, ...wtRows(added), ...(removed.length ? ["사라졌어요", ...wtRows(removed)] : [])].join("\n"), title: wtChangeTitle(added, removed), readable: true };
   }
   if (WT_HANGUL.test(out)) return { text: out.split("\n").filter(l => !WT_SENTINEL.test(l.trim())).join("\n"), readable: true };
   if (cur.length <= 3 && cur.every(wtPlain)) return { text: cur.join("\n"), readable: true };
   return { text: "", readable: false };
 }
 function watchLine(label, reason, output = "", opts = {}) {
-  const out = String(output || "").trim(), first = humanLabel(label) + ": " + watchReasonKo(reason) + (opts.note ? " " + opts.note : "");
-  if (!out || wtSentinelMatch(reason, out)) return first;
+  const out = String(output || "").trim(), head = said => humanLabel(label) + ": " + said + (opts.note ? " " + opts.note : "");
+  if (!out || wtSentinelMatch(reason, out)) return head(watchReasonKo(reason));
   const d = describeOutput(out, { prev: opts.prev, issue: wtIssue(reason), now: opts.now, tz: opts.tz });
+  const first = head((/^(output changed|change|match|matched \/)/.test(String(reason).trim()) && d.readable && d.title) || watchReasonKo(reason));
   const text = d.readable ? d.text : opts.summary || "";
   if (text && text === out) return first + "\n" + out;
   const lines = [first];

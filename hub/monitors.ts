@@ -47,7 +47,7 @@ const everyKo = (m: number): string => (m % 1440 === 0 ? `${m / 1440}일마다` 
 const iso = (ms: number) => new Date(ms).toISOString();
 
 export function watchFacts(w: Watch): Pick<Monitor, "fails" | "last_ok" | "last_output" | "keeper"> {
-	const said = describeOutput(w.state.last ?? "", { issue: w.state.fails > 0 }).text.replace(/\s+/g, " ").trim();
+	const d = describeOutput(w.state.last ?? "", { issue: w.state.fails > 0 }), said = (d.title || d.text).replace(/\s+/g, " ").trim();
 	const output = (w.state.fails > 0 && !said && w.state.kind ? failKindKo(w.state.kind) : said).slice(0, 200);
 	return { fails: w.state.fails, ...(w.state.lastOk ? { last_ok: w.state.lastOk } : {}), ...(output ? { last_output: output } : {}), ...(w.session ? { keeper: true } : {}) };
 }

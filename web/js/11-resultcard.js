@@ -59,11 +59,17 @@ function rcRawFold(raw, opts = {}) {
 // A section that is a list of "<key> <what> · <detail>" lines (a time, 답장, 가격 ...) is the prototype's key-column rows: the key muted, what it is
 // in 500, the detail muted after it, a price change as the old value struck and the new one in the accent. Any other list stays a list.
 const RC_KEY = /^(\d{1,2}:\d{2}|답장|가격|재고|새 글|확인|변경)\s+(\S.*)$/;
+// A changed item a watch reports (hub/watchtext.ts): "[<old kind> → ]<kind>: <owner/repo>#<n> <author> <title>". It is a row of its own: the kind as a
+// small tag, the number and title in front, the repository, author and old kind muted. The other lines of such a list are plain rows.
+const RC_ITEM = /^(?:([^:\n]{1,20}?) → )?([^:\n]{1,20}?):\s+([\w.-]+\/[\w.-]+)#(\d+)\s+(\S+)\s+(\S.*)$/;
+const rcItemHtml = m => `<div class="rc-row rc-it"><span class="rc-w"><span class="tag">${esc(m[2])}</span> <b>#${esc(m[4])} ${inline(m[6])}</b> <span class="rc-d">${esc([m[3], m[5], m[1] ? `${m[1]}에서 바뀜` : ""].filter(Boolean).join(" · "))}</span></span></div>`;
 function rcRowsNode(text) {
   const lines = String(text ?? "").split("\n").map(l => l.trim()).filter(Boolean), out = [];
+  const items = lines.some(l => RC_ITEM.test(l.replace(/^[-*\u2022]\s+/, "")));
   let n = 0;
   for (const l of lines) {
-    const m = /^[-*\u2022]\s+(.*)$/.exec(l), k = m && RC_KEY.exec(m[1]);
+    const m = /^[-*\u2022]\s+(.*)$/.exec(l), k = m && RC_KEY.exec(m[1]), it = items && m && RC_ITEM.exec(m[1]);
+    if (items && m && !k) { out.push(it ? rcItemHtml(it) : `<div class="rc-row"><span class="rc-w${/^외 \d+건$/.test(m[1]) ? " rc-d" : ""}">${inline(m[1])}</span></div>`); n++; continue; }
     if (!m) {   // a short line without punctuation is a small heading over the rows below it (오늘 일정 / 메일 / 감시)
       if (l.length > 16 || /[.!?,]/.test(l)) return null;
       out.push(`<div class="rc-sh">${esc(l)}</div>`);
@@ -74,7 +80,7 @@ function rcRowsNode(text) {
     out.push(chg ? rcRowHtml(k[1], chg[1].trim(), `<span class="rc-d nw-chg"><s>${esc(chg[2])}</s> → <em>${esc(chg[3])}</em></span>`) : rcRowHtml(k[1], k[2]));
     n++;
   }
-  return n >= 2 ? el("div", { class: "rc-rows", safeHtml: out.join("") }) : null;
+  return n >= (items ? 1 : 2) ? el("div", { class: "rc-rows", safeHtml: out.join("") }) : null;
 }
 // opts: src (sender or source), at (ISO), title (else the first line of text), text (summary; may carry the original), raw (else taken
 // from text), tag (a node), actions (buttons), rawNode (raw -> node: draws the original itself, as a mail does), rawOpen (the original starts open).

@@ -73,7 +73,7 @@ test("web/js/11-watchtext.js words the same posts as this module", () => {
 	const src = readFileSync(join(import.meta.dir, "../web/js/11-watchtext.js"), "utf8");
 	const web = new Function(`${src}; return { watchLine, scheduleLine, humanLabel };`)() as Record<string, (...a: any[]) => string>;
 	const opts = { now: NOW, tz: TZ };
-	const cases: [string, string, string, string?][] = [["kakao-new", "matched /./", KAKAO], ["재고", "output changed", "새 메일이 1통 왔어요"], ["저장소 감시", "matched /gone/", "sample-repo-gone"], ["저장소 감시", "matched /gone/", "READY\n재고가 들어왔어요"], ["저장소 감시", "output changed", "sample-repo-gone", "sample-repo-here"], ["api-health", "failed 3 times in a row (exit 7)", "curl: (7) boom"], ["x", "recovered", ""], ["재고", "output changed", "Item A\nItem C", "Item A\nItem B"], ["재고", "fail", "DOTZ_FAIL login\nx"], ["상태", "output changed", '{"version":"8.2.36","id":"q"}'], ["상태", "output changed", "+ Build 9.1.0\n- Build 9.0.9"]];
+	const cases: [string, string, string, string?][] = [["kakao-new", "matched /./", KAKAO], ["재고", "output changed", "새 메일이 1통 왔어요"], ["저장소 감시", "matched /gone/", "sample-repo-gone"], ["저장소 감시", "matched /gone/", "READY\n재고가 들어왔어요"], ["저장소 감시", "output changed", "sample-repo-gone", "sample-repo-here"], ["api-health", "failed 3 times in a row (exit 7)", "curl: (7) boom"], ["x", "recovered", ""], ["재고", "output changed", "Item A\nItem C", "Item A\nItem B"], ["재고", "fail", "DOTZ_FAIL login\nx"], ["상태", "output changed", '{"version":"8.2.36","id":"q"}'], ["상태", "output changed", "+ Build 9.1.0\n- Build 9.0.9"], ["sample-items", "match", ITEMS_NOW, ITEMS_PREV]];
 	for (const [l, r, o, prev] of cases) expect(web.watchLine!(l, r, o, { ...opts, prev })).toBe(watchLine(l, r, o, { ...opts, prev }));
 	for (const t of ["ch:7 morning brief: summarize", "주간 보고 정리"]) expect(web.scheduleLine!(t)).toBe(scheduleLine(t));
 	expect(web.humanLabel!("kakao-new")).toBe(humanLabel("kakao-new"));
@@ -98,10 +98,34 @@ test("an unlabeled watch gets a readable Korean name, never its key", () => {
 test("a changed output becomes a sentence of what was added or gone, with the raw folded", () => {
 	const prev = "Item A\nItem B";
 	const now = "Item A\nItem C\nItem D";
-	expect(describeOutput(now, { prev })).toEqual({ text: "새로 생겼어요: Item C · Item D\n사라졌어요: Item B", readable: true });
-	expect(watchLine("샘플 감시", "output changed", now, { prev })).toBe("샘플 감시: 결과가 바뀌었어요\n새로 생겼어요: Item C · Item D\n사라졌어요: Item B\n" + rawFence(now));
-	expect(describeOutput("+ Build 9.1.0\n- Build 9.0.9").text).toBe("새로 생겼어요: Build 9.1.0\n사라졌어요: Build 9.0.9");
-	expect(describeOutput("\x1b[32mItem A\x1b[0m\nItem E 3900000000000000002", { prev: "Item A" }).text).toBe("새로 생겼어요: Item E");
+	expect(describeOutput(now, { prev })).toEqual({ text: "새로 생겼어요\n- Item C\n- Item D\n사라졌어요\n- Item B", title: "새 항목 2건 · 사라진 항목 1건", readable: true });
+	expect(watchLine("샘플 감시", "output changed", now, { prev })).toBe("샘플 감시: 새 항목 2건 · 사라진 항목 1건\n새로 생겼어요\n- Item C\n- Item D\n사라졌어요\n- Item B\n" + rawFence(now));
+	expect(describeOutput("+ Build 9.1.0\n- Build 9.0.9").text).toBe("새로 생겼어요\n- Build 9.1.0\n사라졌어요\n- Build 9.0.9");
+	expect(describeOutput("\x1b[32mItem A\x1b[0m\nItem E 3900000000000000002", { prev: "Item A" }).text).toBe("- Item E");
+});
+
+// A check that prints one "<kind>: <owner/repo>#<n> <author> <title>" line per item (neutral fixture text).
+const ITEMS_PREV = ["새 이슈: sample/repo#67 user-c 셋째 제목", "새 이슈: sample/repo#68 user-d 넷째 제목", "새 이슈: sample/repo#69 user-e 다섯째 제목"].join("\n");
+const ITEMS_NOW = ["이슈 갱신: sample/repo#65 user-a 첫째 제목", "이슈 갱신: sample/repo#66 user-b 둘째 제목", "이슈 갱신: sample/repo#67 user-c 셋째 제목", "이슈 갱신: sample/repo#69 user-e 다섯째 제목"].join("\n");
+
+test("changed items read one per row, an item that only changed kind is not gone, and the title counts them", () => {
+	const d = describeOutput(ITEMS_NOW, { prev: ITEMS_PREV });
+	expect(d.title).toBe("이슈 갱신 4건 · 사라진 항목 1건");
+	expect(d.text.split("\n")).toEqual([
+		"- 이슈 갱신: sample/repo#65 user-a 첫째 제목",
+		"- 이슈 갱신: sample/repo#66 user-b 둘째 제목",
+		"- 새 이슈 → 이슈 갱신: sample/repo#67 user-c 셋째 제목",
+		"- 외 1건",
+		"사라졌어요",
+		"- 새 이슈: sample/repo#68 user-d 넷째 제목",
+	]);
+	expect(watchLine("sample-items", "match", ITEMS_NOW, { prev: ITEMS_PREV }).split("\n")[0]).toBe("sample items: 이슈 갱신 4건 · 사라진 항목 1건");
+	// the same text after the leading label is the same item when there is no reference
+	expect(describeOutput("상태 바뀜: 샘플 항목", { prev: "새 항목: 샘플 항목" })).toEqual({ text: "- 새 항목 → 상태 바뀜: 샘플 항목", title: "상태 바뀜 1건", readable: true });
+	expect(describeOutput("Item A\nItem C", { prev: "Item A\nItem B" }).title).toBe("새 항목 1건 · 사라진 항목 1건");
+	expect(describeOutput("Item A", { prev: "Item A x=1" }).title).toBeUndefined();
+	expect(describeOutput("서버 B: 정상", { prev: "서버 A: 정상" }).text).toBe("- 서버 B: 정상\n사라졌어요\n- 서버 A: 정상");
+	expect(watchLine("sample-items", "recovered", "+ Item B").split("\n")[0]).toBe("sample items: 다시 정상이에요");
 });
 
 test("a DOTZ_FAIL kind reads as a Korean phrase", () => {
