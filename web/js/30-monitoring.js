@@ -447,7 +447,7 @@ const MON_FOLD_MIN = 3;    // a run of this many same results in a row folds int
 // A row's summary: the report's first two lines (the monitor's name and the original dropped), 140 characters at most.
 const monLines = (n, names) => monStrip(choiceFree(String(n.text || "").split(/\n(?:```원문|원문[ \t]*\n)/)[0]), [...names, ntPlain(n.title)]).split("\n").map(l => monClean(l)).filter(Boolean);
 function monSummary(n, names) {
-  const lines = monLines(n, names);
+  const lines = monLines(n, names).filter(l => !/^(?:새로 생겼어요|사라졌어요)$/.test(l));   // a section heading of the card, not news
   const s = lines.slice(0, 2).join(" · ");
   return (s.length > 140 ? `${s.slice(0, 139)}…` : s) || ntPlain(n.title) || "알림";
 }

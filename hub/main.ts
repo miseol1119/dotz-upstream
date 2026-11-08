@@ -618,7 +618,7 @@ startWatches((w, reason, output, prev) => {
 	// A failing, stopped or unapproved check is an issue: it goes to alert with a choice block, whatever `to` the watch has.
 	const issue = isWatchIssue(reason);
 	const label = watchLabel(w.name);
-	void out(issue ? "alert" : w.to, watchLine(label, reason, output, { prev }).slice(0, issue ? 1500 : 1900) + (issue ? `\n${watchChoice(label)}` : ""), undefined, { source: "gateway", news: true, ...(issue ? {} : watchRoute(w)) }).catch(e => log(`watch ${w.name} send failed: ${e}`));
+	void out(issue ? "alert" : w.to, watchLine(label, reason, output, { prev }).slice(0, issue ? 1500 : 1900) + (issue ? `\n${watchChoice(label, reason)}` : ""), undefined, { source: "gateway", news: true, ...(issue ? {} : watchRoute(w)) }).catch(e => log(`watch ${w.name} send failed: ${e}`));
 });
 setInterval(() => lapseStandings(s => void out(`ch:${s.channel}`, `이 채널의 자동 처리 기한이 끝났어요: ${s.standing}\n모니터링은 계속 돌아요. 앞으로 깨어나면 먼저 여쭤볼게요.`, undefined, { source: "gateway", news: true }).catch(e => log(`standing notice failed: ${e}`))), 60_000);
 syncFeatureWatches();

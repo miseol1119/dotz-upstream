@@ -17,10 +17,11 @@ import { dirname, join } from "node:path";
 import { blockedBy } from "../extension/index.ts";
 import { ensureAside, replInTab } from "./aside.ts";
 import { type Relogin, relogin } from "./autologin.ts";
+import { josa } from "./account-rules.ts";
 import { issueBlock } from "./choices.ts";
 import { DATA_DIR, log, now, paths, writeAtomic } from "./config.ts";
 import { blockedByFeatures } from "./featuredirs.ts";
-import { deriveLabel, isKeyLabel, plainLabel } from "./watchtext.ts";
+import { deriveLabel, isKeyLabel, plainLabel, watchReasonKo } from "./watchtext.ts";
 
 export type WatchOwner = { app?: string; project?: string; internal?: true };
 export type Watch = {
@@ -72,8 +73,9 @@ const toldDown = (s: Watch["state"]) => s.failAlertAt !== undefined && !(s.recov
 // A notify reason that is an issue the owner decides on: repeated failures, a stopped watch, one waiting for approval. Output changes,
 // matches and "recovered" are not.
 export const isWatchIssue = (reason: string): boolean => /^(?:failed \d+ times|stopped after|needs the owner)/.test(reason);
-export const watchChoice = (name: string): string =>
-	issueBlock(`모니터링 ${name}을(를) 어떻게 할까요?`, [{ name: "원인 확인", result: "출력을 보고 원인과 고칠 방법을 알려드려요." }, { name: "모니터링 끄기", result: "고칠 때까지 이 모니터링을 멈춰 둬요." }]);
+// The question says what happened when the reason is given (가격 확인: 2번 연속 실패했어요), so the 알림 row reads without opening it.
+export const watchChoice = (name: string, reason = ""): string =>
+	issueBlock(reason ? `${name}: ${watchReasonKo(reason).split(". ")[0]}. 어떻게 할까요?` : `모니터링 ${name}${/[가-힣]$/.test(name) ? josa(name, "을", "를") : "을(를)"} 어떻게 할까요?`, [{ name: "원인 확인", result: "출력을 보고 원인과 고칠 방법을 알려드려요." }, { name: "모니터링 끄기", result: "고칠 때까지 이 모니터링을 멈춰 둬요." }]);
 const loadItems = (): Watch[] => (existsSync(paths.watches) ? JSON.parse(readFileSync(paths.watches, "utf8")) : []);
 const items: Watch[] = loadItems();
 // A kept login signs itself in again (sessionRun), so it has the gate for the one human step: a second factor waits for the owner's yes

@@ -69,11 +69,22 @@ test("a schedule fire says a job started; the instruction folds, and the bell ge
 	expect(scheduleLine("주간 보고 정리")).toBe("예약한 일이 시작됐어요\n주간 보고 정리");
 });
 
+test("a JSON report reads in Korean key words, a long log says its lines and last time, a recovery drops its status word", () => {
+	const opts = { now: NOW, tz: TZ };
+	expect(watchLine("상태", "output changed", JSON.stringify({ status: "ok", count: 3, latest: { title: "샘플 항목" }, build: true }), opts)).toBe(
+		'상태: 결과가 바뀌었어요\n상태: 정상\n개수: 3\n최근 제목: 샘플 항목\nbuild: 예\n```원문\n{"status":"ok","count":3,"latest":{"title":"샘플 항목"},"build":true}\n```');
+	const log = ["2025-01-02T01:10:00Z INFO job=sync step=1", "2025-01-02T01:11:00Z INFO job=sync step=2", "2025-01-02T01:12:00Z INFO job=sync step=3"].join("\n");
+	expect(watchSummary(log, NOW, TZ)).toBe("기록 3줄 · 마지막 1월 2일 오전 10:12");
+	expect(watchSummary("new=3 checked_at=2025-01-02T01:02:03Z", NOW, TZ)).toBe("새 소식 3건 · 1월 2일 오전 10:02");
+	expect(watchLine("사이트", "recovered", "ok", opts)).toBe("사이트: 다시 정상이에요\n점검이 다시 통과했어요");
+	expect(watchLine("사이트", "recovered", "응답 200, 지연 30ms", opts)).toBe("사이트: 다시 정상이에요\n응답 200, 지연 30ms");
+});
+
 test("web/js/11-watchtext.js words the same posts as this module", () => {
 	const src = readFileSync(join(import.meta.dir, "../web/js/11-watchtext.js"), "utf8");
 	const web = new Function(`${src}; return { watchLine, scheduleLine, humanLabel };`)() as Record<string, (...a: any[]) => string>;
 	const opts = { now: NOW, tz: TZ };
-	const cases: [string, string, string, string?][] = [["kakao-new", "matched /./", KAKAO], ["재고", "output changed", "새 메일이 1통 왔어요"], ["저장소 감시", "matched /gone/", "sample-repo-gone"], ["저장소 감시", "matched /gone/", "READY\n재고가 들어왔어요"], ["저장소 감시", "output changed", "sample-repo-gone", "sample-repo-here"], ["api-health", "failed 3 times in a row (exit 7)", "curl: (7) boom"], ["x", "recovered", ""], ["재고", "output changed", "Item A\nItem C", "Item A\nItem B"], ["재고", "fail", "DOTZ_FAIL login\nx"], ["상태", "output changed", '{"version":"8.2.36","id":"q"}'], ["상태", "output changed", "+ Build 9.1.0\n- Build 9.0.9"], ["sample-items", "match", ITEMS_NOW, ITEMS_PREV]];
+	const cases: [string, string, string, string?][] = [["kakao-new", "matched /./", KAKAO], ["재고", "output changed", "새 메일이 1통 왔어요"], ["저장소 감시", "matched /gone/", "sample-repo-gone"], ["저장소 감시", "matched /gone/", "READY\n재고가 들어왔어요"], ["저장소 감시", "output changed", "sample-repo-gone", "sample-repo-here"], ["api-health", "failed 3 times in a row (exit 7)", "curl: (7) boom"], ["x", "recovered", ""], ["x", "recovered", "ok"], ["상태", "output changed", '{"status":"ok","latest":{"at":"2025-01-02T01:00:00Z"}}'], ["로그", "output changed", "2025-01-02T01:10:00Z a=1 b=2\n2025-01-02T01:11:00Z a=1 b=3\n2025-01-02T01:12:00Z a=1 b=4"], ["재고", "output changed", "Item A\nItem C", "Item A\nItem B"], ["재고", "fail", "DOTZ_FAIL login\nx"], ["상태", "output changed", '{"version":"8.2.36","id":"q"}'], ["상태", "output changed", "+ Build 9.1.0\n- Build 9.0.9"], ["sample-items", "match", ITEMS_NOW, ITEMS_PREV]];
 	for (const [l, r, o, prev] of cases) expect(web.watchLine!(l, r, o, { ...opts, prev })).toBe(watchLine(l, r, o, { ...opts, prev }));
 	for (const t of ["ch:7 morning brief: summarize", "주간 보고 정리"]) expect(web.scheduleLine!(t)).toBe(scheduleLine(t));
 	expect(web.humanLabel!("kakao-new")).toBe(humanLabel("kakao-new"));
@@ -138,7 +149,7 @@ test("a DOTZ_FAIL kind reads as a Korean phrase", () => {
 test("JSON output is drawn as key: value lines without ids", () => {
 	const d = describeOutput('{"id":"abc","version":"8.2.36","status":{"state":"ready","at":"2026-10-22T13:18:18Z"},"tags":["a","b"]}');
 	expect(d.readable).toBe(true);
-	expect(d.text.split("\n")).toEqual(["version: 8.2.36", "status.state: ready", "status.at: " + clockKo("2026-10-22T13:18:18Z"), "tags: a, b"]);
+	expect(d.text.split("\n")).toEqual(["버전: 8.2.36", "상태: ready", "상태 시각: " + clockKo("2026-10-22T13:18:18Z"), "tags: a, b"]);
 });
 
 test("output the rules cannot read stays raw until a cached model sentence is given", () => {

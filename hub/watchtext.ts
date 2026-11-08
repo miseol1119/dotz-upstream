@@ -71,11 +71,13 @@ export function clockKo(iso: string, now = Date.now(), tz = TZ): string {
 	return `${new Intl.DateTimeFormat("ko-KR", { timeZone: tz, month: "long", day: "numeric" }).format(ms)} ${time}`;
 }
 
-// The one-line summary of a machine output, only from what is generic: new=<n> means n new items, an ISO time is when. "" when neither is there.
+// The one-line summary of a machine output, only from what is generic: new=<n> means n new items, an ISO time is when. A log of three lines or more
+// says how many and when its last line was. "" when none of it is there.
 export function watchSummary(output: string, now = Date.now(), tz = TZ): string {
 	const count = Number(/(?:^|\s)new=(\d+)(?:\s|$)/.exec(output)?.[1] ?? 0);
-	const at = ISO.exec(output)?.[0];
-	return [count > 0 ? `새 소식 ${count}건` : "", at ? clockKo(at, now, tz) : ""].filter(Boolean).join(" · ");
+	const lines = output.split("\n").filter(l => l.trim()).length, log = !count && lines > 2;
+	const at = (log ? output.match(ISO_ALL)?.at(-1) : undefined) ?? ISO.exec(output)?.[0];
+	return [count > 0 ? `새 소식 ${count}건` : "", log ? `기록 ${lines}줄` : "", at ? `${log ? "마지막 " : ""}${clockKo(at, now, tz)}` : ""].filter(Boolean).join(" · ");
 }
 
 // The raw text kept short: a few lines, each cut, in one fence the web folds.
@@ -183,8 +185,15 @@ function flatJson(v: unknown, key: string, out: string[], now?: number, tz?: str
 	}
 	const val = Array.isArray(v) ? v.map(x => (x && typeof x === "object" ? JSON.stringify(x) : String(x))).join(", ") : String(v);
 	const shown = tidy(val, now, tz);
-	if (shown) out.push(`${key || "값"}: ${cut(shown, 80)}`);
+	if (shown) out.push(`${key ? jsonKeyKo(key) : "값"}: ${cut(JSON_VALUE_KO[shown.toLowerCase()] ?? shown, 80)}`);
 }
+// The usual words of a status JSON in Korean; a key or value outside them (a product, a site) stays as printed.
+const JSON_KEY_KO: Record<string, string> = {
+	status: "상태", state: "상태", count: "개수", total: "전체", title: "제목", name: "이름", at: "시각", time: "시각", date: "날짜", updated_at: "갱신 시각",
+	created_at: "만든 시각", checked_at: "확인 시각", latest: "최근", last: "마지막", price: "가격", message: "메시지", error: "오류", version: "버전", items: "항목", url: "주소",
+};
+const JSON_VALUE_KO: Record<string, string> = { ok: "정상", true: "예", false: "아니요", error: "오류", fail: "실패", failed: "실패" };
+const jsonKeyKo = (key: string): string => key.split(".").map(k => JSON_KEY_KO[k.toLowerCase()] ?? k).filter((w, i, a) => w !== a[i - 1]).join(" ");
 
 export type Described = { text: string; title?: string; readable: boolean };
 export type DescribeOpts = { prev?: string; issue?: boolean; now?: number; tz?: string };
@@ -249,6 +258,8 @@ export function watchLine(label: string, reason: string, output = "", opts: Line
 	const out = output.trim();
 	const first = (said: string) => `${humanLabel(label)}: ${said}${opts.note ? ` ${opts.note}` : ""}`;
 	if (!out || sentinelMatch(reason, out)) return first(watchReasonKo(reason));
+	// A recovery's output that is one status word ("ok", "200") is the check passing, not news: said in words.
+	if (reason.trim() === "recovered" && /^[\w.-]{1,12}$/.test(out)) return `${first(watchReasonKo(reason))}\n점검이 다시 통과했어요`;
 	const d = describeOutput(out, { prev: opts.prev, issue: isIssue(reason), now: opts.now, tz: opts.tz });
 	// Only a change or a match is said by its count; "다시 정상이에요" and other reasons stay (notices-store reads them).
 	const counted = /^(output changed|change|match|matched \/)/.test(reason.trim());

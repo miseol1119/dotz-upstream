@@ -17,7 +17,7 @@ const nscTone = n => ntNeeds(n) || n.waits === "login" || n.tone === "warn" ? "w
 // The tag word of the prototype's D.notices, from the notice's own kind, tone and app: the app is the integration key (mail, kakao, instagram/youtube/site = 댓글)
 // or the prefix of the conversation it lives in. A word the data does not give is not made up: the rest is 감시 / 경고 / the app's name / 새 소식.
 const NSC_APP_TAG = { mail: "메일", kakao: "카카오톡", instagram: "댓글", youtube: "댓글", site: "댓글" };
-const nscApp = n => String(n.app || n.src || n.open || "").split(/[-:]/)[0];
+const nscApp = n => String(n.app || (n.item && n.item.app) || n.src || n.open || "").split(/[-:]/)[0];
 function nscTag(n) {
   const app = nscApp(n);
   if (ntIsDec(n)) return n.decision.draft ? (app === "kakao" ? "카카오톡" : "답장 대기") : "결정";
@@ -30,6 +30,7 @@ function nscTag(n) {
   if (n.kind === "watch" && n.title === "예약") return "일정";
   if (/아침/.test(n.title || "")) return "아침 점검";
   if (n.kind === "watch") return "감시";
+  if (n.cls === "alert" && /^[^\n]*: 다시 정상이에요/.test(n.text || "")) return "복구";
   if (n.cls === "alert") return "경고";
   return ntPlain(n.app || "") || "새 소식";
 }
@@ -38,6 +39,8 @@ function nscSummary(n, text = n.text) {
   const chg = NW_CHANGE.exec(nwChangeLine(text));
   if (chg) return el("span", {}, el("s", { text: chg[2] }), " → ", chg[3]);
   if (n.decision) return n.decision.draft ? ntPlain(n.decision.draft.body.split("\n").find(l => l.trim()) || "") : `${ntDecCtx(n)} · 답을 기다리고 있어요`;
+  if (n.kind === "watch" && n.item) return (n.item.card && n.item.card.subject) || ntPlain(hcLine(n));   // a mail report says the mail
+  if (n.kind === "watch") return monSummary({ ...n, text }, []);   // the feed's own summary: the name is not said twice
   const title = ntPlain(hcLine(n)), src = n.src || n.open;
   return String(text || "").split("\n").map(ntPlain).find(l => l && l !== title) || ntLaneNote(n) || (src ? pcTargetName(src, n.pc) : "알림");
 }
