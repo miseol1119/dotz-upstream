@@ -44,15 +44,33 @@ describe("buildReleaseNote", () => {
 		expect(text).toContain("~/work/a.txt");
 	});
 
+	test("a commit with 왜:/어떻게: is one or two plain sentences, from its body or inlined in its subject", () => {
+		const body = "왜: 재시작하면 보내던 답이 대기열과 함께 없어졌어요. 사용자가 다시 물어야 했어요.\n어떻게: 대기열을 hub/queue.ts에 남겨요.";
+		const items = note([
+			{ subject: "재시작 뒤에도 보내던 답이 사라지지 않아요", body, files: ["hub/discord.ts"] },
+			{ subject: "다음 메일 템플릿 제거 왜: 커스텀 메일 연결로 충분해요. 어떻게: 템플릿 파일을 지웠어요. (#12)", files: ["docs/a.md"] },
+			{ subject: "버튼 폭을 고쳐요", body: "왜: 글자가 잘렸어요\n\nCo-Authored-By: someone", files: ["web/a.js"] },
+		]).split("\n").filter(l => l.startsWith("- "));
+		expect(items).toEqual([
+			"- 재시작 뒤에도 보내던 답이 사라지지 않아요. 재시작하면 보내던 답이 대기열과 함께 없어졌어요.",
+			"- 버튼 폭을 고쳐요. 글자가 잘렸어요.",
+			"- 다음 메일 템플릿 제거. 커스텀 메일 연결로 충분해요.",
+		]);
+		for (const item of items) {
+			expect(item).not.toMatch(/왜:|어떻게:/);
+			expect(item.match(/[.!?](?=\s|$)/g)?.length ?? 0).toBeLessThanOrEqual(2);
+		}
+	});
+
 	test("nothing to report still gives a note", () => {
 		expect(note(FIXTURE.slice(0, 2))).toContain("이번 버전에는 바뀐 기능이 없어요.");
 	});
 });
 
 test("parseNoteCommits reads the git log records and files", () => {
-	const raw = "\x1e제목 하나\x1f\n\nhub/a.ts\nweb/b.js\n\x1e제목 둘\x1f\n\ndocs/c.md\n";
+	const raw = "\x1e제목 하나\x1d왜: 이유예요.\n어떻게: 이렇게요.\n\x1f\n\nhub/a.ts\nweb/b.js\n\x1e제목 둘\x1d\x1f\n\ndocs/c.md\n";
 	expect(parseNoteCommits(raw)).toEqual([
-		{ subject: "제목 하나", files: ["hub/a.ts", "web/b.js"] },
-		{ subject: "제목 둘", files: ["docs/c.md"] },
+		{ subject: "제목 하나", body: "왜: 이유예요.\n어떻게: 이렇게요.", files: ["hub/a.ts", "web/b.js"] },
+		{ subject: "제목 둘", body: "", files: ["docs/c.md"] },
 	]);
 });

@@ -38,8 +38,9 @@ This code only reaches an install through a release, so ship it and let installs
 the old history at the same version until the next release, then treats the whole old history as local commits.
 
 Every release is also a GitHub Release whose body is the note `hub/release-note.ts` builds from the commits since the previous tag, with
-no model call. It reads like a patch note: each commit's subject is one line under a plain Korean topic (by the files it touches), and bodies
-are not used. Release and merge commits are left out, and test-only commits and subjects starting `내부 정리:` collapse into one closing count.
+no model call. It reads like a patch note: each commit is one line under a plain Korean topic (by the files it touches), its subject then
+the first sentence of its `왜:` (or else `어떻게:`) with the label dropped, and the rest of the body is not used. A reason that quotes,
+names a file or runs past 160 characters is skipped. Release and merge commits are left out, and test-only commits and subjects starting `내부 정리:` collapse into one closing count.
 The note goes through
 `hub/public-scrub.ts`, the same scrub as GitHub posts: the pattern list, this machine's config and secrets when it has a data folder, and
 the `PRIVACY_TERMS` repo secret (one term per line) in Actions, where no data folder exists. It covers `<previous tag>..<tag>`, so commits
