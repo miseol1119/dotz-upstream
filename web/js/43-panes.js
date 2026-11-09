@@ -1,8 +1,9 @@
 /* ---------- 분할 창 (docs/split-panes.md): the model ----------
    Panes are leaves {id, kind: "chat"|"project"|"app", t, at, stick, dot} (an app pane is 모니터링: t is "list", an item key, or an item key and
-   "#kk:<room>" / "#cm:<source>:<thread>:<title>" / "#dm:<id>:<peer>" for a room, thread or DM of an in-app app, owner 78c482b1) of a tree whose branches are {dir: "row"|"col", a, b, r} (r = a's share, 0.2..0.8);
+   "#kk:<room>" / "#cm:<source>:<thread>:<title>" / "#dm:<id>:<peer>" for a room, thread or DM of an in-app app, owner 78c482b1) of a tree: one pane, or two side by side as {dir: "row", a, b, r} (r = a's share, 0.2..0.8;
+   at most two, left and right only, owner 950d715f);
    one is active and holds the real section. The screen is 43-panes-view.js, the inactive panes are 43-panes-mirror.js. With one pane (or none) nothing here touches the page. */
-const PANE_KEY = "dotz-panes", PANE_MAX = 4;
+const PANE_KEY = "dotz-panes", PANE_MAX = 2;
 let PN = { root: null, active: "", seq: 0 };
 const paneLeaf = n => !n.dir;
 function paneLeaves(n = PN.root) { return !n ? [] : paneLeaf(n) ? [n] : [...paneLeaves(n.a), ...paneLeaves(n.b)]; }
@@ -57,7 +58,7 @@ function panePersist() {
   } catch { /* storage blocked: the layout only lasts until reload */ }
 }
 
-// Opens t next to the active pane, or next to pane atId (side: right | left | top | bottom). A target already open in a pane is not opened twice: that pane becomes active.
+// Opens t next to the active pane, or next to pane atId (side: right | left). A target already open in a pane is not opened twice: that pane becomes active.
 function paneSplit(t, kind, side, atId = "") {
   if (paneCount() < 2) {
     const h = paneHere();
@@ -66,8 +67,8 @@ function paneSplit(t, kind, side, atId = "") {
   const dup = paneOpenIn(kind, t);
   if (dup) { paneFocus(dup.id); return dup.id; }
   if (paneCount() >= PANE_MAX) return "";
-  const at = paneFind(atId) || paneFind(PN.active), np = paneNew(kind, t), first = side === "left" || side === "top";
-  paneSwap(at, { dir: side === "left" || side === "right" ? "row" : "col", a: first ? np : at, b: first ? at : np, r: 0.5 });
+  const at = paneFind(atId) || paneFind(PN.active), np = paneNew(kind, t), first = side === "left";
+  paneSwap(at, { dir: "row", a: first ? np : at, b: first ? at : np, r: 0.5 });
   paneFocus(np.id);
   return np.id;
 }
@@ -103,9 +104,9 @@ function paneMove(id, dst, side) {
       if (py.a === y) py.a = x; else py.b = x;
     }
   } else {
-    const par = paneParent(PN.root, x), first = side === "left" || side === "top";
+    const par = paneParent(PN.root, x), first = side === "left";
     paneSwap(par, par.a === x ? par.b : par.a);
-    paneSwap(y, { dir: side === "left" || side === "right" ? "row" : "col", a: first ? x : y, b: first ? y : x, r: 0.5 });
+    paneSwap(y, { dir: "row", a: first ? x : y, b: first ? y : x, r: 0.5 });
   }
   paneSync();
   panePersist();
@@ -126,7 +127,8 @@ function paneClose(id) {
   return true;
 }
 
-// A saved layout {root, active, seq} as a live tree: panes whose target is gone or already shown are dropped, at most PANE_MAX stay. null when nothing is left.
+// A saved layout {root, active, seq} as a live tree: panes whose target is gone or already shown are dropped, the first PANE_MAX stay, side by side
+// (a layout saved with three or four panes, or one above another, before 950d715f). null when nothing is left.
 function panePrune(d) {
   if (!d || !d.root) return null;
   const ok = p => p && (p.kind === "chat" ? validTarget(p.t) : p.kind === "app" ? typeof p.t === "string" && !!p.t : p.kind === "project" && typeof p.t === "string" && (p.t.startsWith("builtin:") || !PRJ || PRJ.projects.some(x => x.key === p.t)));
@@ -143,9 +145,9 @@ function panePrune(d) {
     seen.add(key); left--;
     return { id: String(n.id), kind: n.kind, t: n.t, at: n.at && n.at.ts ? { ts: String(n.at.ts), off: Number(n.at.off) || 0 } : null, stick: n.stick !== false, dot: "" };
   };
-  const root = prune(d.root);
-  if (!root) return null;
-  const lv = paneLeaves(root);
+  const tree = prune(d.root);
+  if (!tree) return null;
+  const lv = paneLeaves(tree), root = lv.length < 2 ? lv[0] : { dir: "row", a: lv[0], b: lv[1], r: tree.dir === "row" && tree.a === lv[0] ? tree.r : 0.5 };
   return { root, active: (lv.find(p => p.id === d.active) || lv[0]).id, seq: Math.max(Number(d.seq) || 0, ...lv.map(p => Number(p.id.slice(1)) || 0)) };
 }
 // The saved layout, after the first go(): the page keeps what it shows (the active pane takes it over, paneSync).

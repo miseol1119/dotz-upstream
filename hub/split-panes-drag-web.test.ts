@@ -75,17 +75,28 @@ test("the middle of a pane replaces it; a target that is already open only takes
 	expect(await ids(v)).toEqual(["lane:다라", "lane:가나"]);
 });
 
-test("a full set takes no fifth pane: an edge drop is a middle drop", async () => {
+test("two panes are the most: a third dropped on a pane's edge replaces the pane it lands on, and the ghost says so", async () => {
 	const v = await open();
 	await split(v, "lane:가나");
-	await split(v, "lane:다라", "bottom");
-	await split(v, "lane:마바");
-	expect(await ev(v, `paneCount()`)).toBe(4);
-	await drag(v, ROW("lane:사아"), PANE("main"), 0.97, 0.5, false);
-	await waitFor(v, `PD && PD.hit && PD.hit.side === "center"`);
+	await drag(v, ROW("lane:다라"), PANE("main"), 0.97, 0.5, false);
+	await waitFor(v, `PD && PD.hit && PD.hit.side === "center" && PD.hit.full`);
+	expect(await ev(v, `$(".pn-ghost .pn-gh").textContent`)).toBe("칸은 2개까지라 이 칸을 바꿔요");
 	await run(v, `{ const r = PD.hit.r; document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.left + r.width * 0.97, clientY: r.top + r.height / 2, pointerId: 1, button: 0 })); }`);
-	await waitFor(v, `paneList().some(p => p.t === "lane:사아")`);
-	expect(await ev(v, `paneCount()`)).toBe(4);
+	await waitFor(v, `paneList().some(p => p.t === "lane:다라")`);
+	expect(await ids(v)).toEqual(["lane:다라", "lane:가나"]);
+	expect(await ev(v, `[paneSplit("lane:마바", "chat", "right"), paneCount()]`)).toEqual(["", 2]);
+});
+
+test("nothing splits up or down: the bottom edge of a pane is its middle, and a split asked for below goes to the right", async () => {
+	const v = await open();
+	await drag(v, ROW("lane:가나"), ONE, 0.5, 0.97, false);
+	await waitFor(v, `PD && PD.hit`);
+	expect(await ev(v, `[PD.hit.side, $(".pn-ghost .pn-gh").textContent]`)).toEqual(["center", "여기서 열기"]);
+	await run(v, `document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, button: 0 }))`);
+	await waitFor(v, `!document.querySelector(".pn-ghost, .pn-zone")`);
+	await split(v, "lane:가나", "bottom");
+	expect(await ev(v, `[PN.root.dir, !!$("#split .pane-col"), !!$("#split .pane-row")]`)).toEqual(["row", false, true]);
+	expect(await ids(v)).toEqual(["main", "lane:가나"]);
 });
 
 test("a menu tab is only pressed, never dragged; `앱 관리` says a pane cannot hold it; the 모니터링 screen is an app pane with a head", async () => {
@@ -105,10 +116,9 @@ test("a menu tab is only pressed, never dragged; `앱 관리` says a pane cannot
 	await waitFor(v, `!document.querySelector(".pn-ghost")`);
 	expect(await ev(v, `[paneCount(), current]`)).toEqual([0, "chat"]);
 
-	await split(v, "main");
-	await run(v, `paneSplit("list", "app", "bottom")`);
-	await waitFor(v, `paneCount() === 3 && current === "monitoring" && !!$("#split .pane.on > .pane-hd") && $("#split .pane.on").contains($("#v-monitoring")) && $("#split .pane-side").contains(convSide)`);
-	expect(await ev(v, `[paneList().map(p => p.kind + ":" + p.t), $("#split .pane.on > .pane-hd .cv-hd-t").textContent]`)).toEqual([["chat:lane:가나", "chat:main", "app:list"], "모니터링"]);
+	await run(v, `paneSplit("list", "app", "right")`);
+	await waitFor(v, `paneCount() === 2 && current === "monitoring" && !!$("#split .pane.on > .pane-hd") && $("#split .pane.on").contains($("#v-monitoring")) && $("#split .pane-side").contains(convSide)`);
+	expect(await ev(v, `[paneList().map(p => p.kind + ":" + p.t), $("#split .pane.on > .pane-hd .cv-hd-t").textContent]`)).toEqual([["chat:lane:가나", "app:list"], "모니터링"]);
 	await run(v, `paneFocus(paneList()[0].id)`);
 	await waitFor(v, `current === "chat" && $("#v-monitoring").parentNode === $("#views") && !!$("#split .pane[data-kind='app'] .pane-mir")`);
 	await run(v, `go("monitoring")`);
@@ -128,10 +138,9 @@ test("a KakaoTalk room of the chat list drops as an in-app pane: 모니터링 op
 
 test("a drop opens the new pane by growing it from nothing and a cancel sends the ghost back; with reduced motion both are instant", async () => {
 	const v = await open();
-	await split(v, "lane:가나");
-	await drag(v, ROW("lane:다라"), PANE("lane:가나"), 0.5, 0.97, false);
-	await waitFor(v, `PD && PD.hit && PD.hit.side === "bottom"`);
-	await run(v, `{ const r = PD.hit.r; document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.left + r.width / 2, clientY: r.bottom - 4, pointerId: 1, button: 0 })); }`);
+	await drag(v, ROW("lane:다라"), ONE, 0.97, 0.5, false);
+	await waitFor(v, `PD && PD.hit && PD.hit.side === "right"`);
+	await run(v, `{ const r = PD.hit.r; document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.right - 4, clientY: r.top + r.height / 2, pointerId: 1, button: 0 })); }`);
 	expect(await ev(v, `(() => { const n = $("#split .pane[data-id='" + paneList().find(p => p.t === "lane:다라").id + "']"); return n.getAnimations().map(a => a.effect.getKeyframes()[0].flexGrow); })()`)).toEqual(["0"]);
 	await waitFor(v, `!document.querySelector(".pn-ghost") && ${SETTLED}`);
 	await drag(v, ROW("lane:마바"), PANE("main"), 0.5, 0.5, false);
@@ -142,37 +151,24 @@ test("a drop opens the new pane by growing it from nothing and a cancel sends th
 	await waitFor(v, `!document.querySelector(".pn-ghost, .pn-zone")`);
 
 	await run(v, `{ const real = window.matchMedia.bind(window); window.matchMedia = q => q.includes("reduced-motion") ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : real(q); }`);
-	await drag(v, ROW("lane:마바"), PANE("main"), 0.5, 0.97, false);
-	await waitFor(v, `PD && PD.hit && PD.hit.side === "bottom"`);
+	await drag(v, ROW("lane:마바"), PANE("main"), 0.5, 0.5, false);
+	await waitFor(v, `PD && PD.hit && PD.hit.side === "center"`);
 	expect(await ev(v, `document.querySelector(".pn-ghost").getAnimations().length + document.querySelector(".pn-zone").getAnimations().length`)).toBe(0);
-	await run(v, `{ const r = PD.hit.r; document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.left + r.width / 2, clientY: r.bottom - 4, pointerId: 1, button: 0 })); }`);
-	expect(await ev(v, `[paneCount(), [...document.querySelectorAll("#split .pane, #split .pane-row, #split .pane-col")].flatMap(n => n.getAnimations()).length, !!document.querySelector(".pn-ghost, .pn-zone")]`)).toEqual([4, 0, false]);
+	await run(v, `{ const r = PD.hit.r; document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2, pointerId: 1, button: 0 })); }`);
+	expect(await ev(v, `[paneCount(), paneList().map(p => p.t).join(), [...document.querySelectorAll("#split .pane, #split .pane-row")].flatMap(n => n.getAnimations()).length, !!document.querySelector(".pn-ghost, .pn-zone")]`)).toEqual([2, "lane:마바,lane:다라", 0, false]);
 });
 
-test("with four panes an edge is no split: the ghost says the drop replaces the pane", async () => {
-	const v = await open();
-	await split(v, "lane:가나");
-	await split(v, "lane:다라", "bottom");
-	await split(v, "lane:마바", "bottom");
-	await drag(v, ROW("lane:사아"), PANE("main"), 0.97, 0.5, false);
-	await waitFor(v, `PD && PD.hit && PD.hit.side === "center" && PD.hit.full`);
-	expect(await ev(v, `$(".pn-ghost .pn-gh").textContent`)).toBe("칸은 4개까지라 이 칸을 바꿔요");
-	await run(v, `document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, button: 0 }))`);
-	expect(await ids(v)).toEqual(["main", "lane:가나", "lane:다라", "lane:마바"]);
-});
-
-test("a pane head dragged onto the middle of another swaps the two; onto an edge it moves next to it", async () => {
+test("a pane head dragged onto another swaps the two, even at its bottom edge, and a third pane is refused", async () => {
 	const v = await open();
 	await split(v, "lane:가나");
 	await drag(v, "#split .pane:not(.on) .pane-hd .cv-hd-t", PANE("lane:가나"), 0.5, 0.5);
 	await waitFor(v, `paneList().map(p => p.t).join() === "lane:가나,main"`);
-	await split(v, "lane:다라");
-	expect(await ids(v)).toEqual(["lane:가나", "main", "lane:다라"]);
-	await run(v, `paneFocus(paneList().find(p => p.t === "lane:다라").id)`);
-	await waitFor(v, `target === "lane:다라" && CV.placed`);
-	await drag(v, "#split .pane:not(.on) .pane-hd .cv-hd-t", PANE("lane:다라"), 0.5, 0.97);
-	await waitFor(v, `!!$("#split .pane-col")`);
-	expect(await ev(v, `paneCount()`)).toBe(3);
+	expect(await ev(v, `paneSplit("lane:다라", "chat", "right")`)).toBe("");
+	// the dragged head's pane became the active one: now the other (lane:가나) goes onto the bottom edge of main
+	await waitFor(v, SETTLED);
+	await drag(v, "#split .pane:not(.on) .pane-hd .cv-hd-t", PANE("main"), 0.5, 0.97);
+	await waitFor(v, `paneList().map(p => p.t).join() === "main,lane:가나"`);
+	expect(await ev(v, `[paneCount(), !!$("#split .pane-col")]`)).toEqual([2, false]);
 });
 
 test("⌥⌘\\ splits, ⌥⌘1 and ⌥⌘W work the panes, and ⌘\\ alone still folds the sidebar", async () => {
@@ -180,6 +176,8 @@ test("⌥⌘\\ splits, ⌥⌘1 and ⌥⌘W work the panes, and ⌘\\ alone still
 	await key(v, "Backslash", "altKey: true,");
 	await waitFor(v, `paneCount() === 2 && document.querySelectorAll("#split .pane").length === 2`);
 	expect(await ids(v)).toEqual(["main", "worklog"]);
+	await key(v, "Backslash", "altKey: true,");
+	expect(await ev(v, `paneCount()`)).toBe(2);
 	await key(v, "Digit1", "altKey: true,");
 	await waitFor(v, `paneList()[0].active`);
 	await key(v, "KeyW", "altKey: true,");
@@ -205,7 +203,6 @@ test("a saved layout comes back by name after the panes are closed, and the pale
 	const v = await open();
 	expect(await ev(v, `paneLayoutItems("").map(i => i.label)`)).toEqual([]);
 	await split(v, "lane:가나");
-	await split(v, "lane:다라", "bottom");
 	expect(await ev(v, `paneLayoutItems("").map(i => i.label)`)).toEqual(["배치 저장"]);
 	await run(v, `paneLayoutSave("셋")`);
 	expect(await ev(v, `Object.keys(JSON.parse(localStorage.getItem("dotz-pane-layouts")))`)).toEqual(["셋"]);
@@ -214,8 +211,17 @@ test("a saved layout comes back by name after the panes are closed, and the pale
 
 	expect(await ev(v, `paneLayoutItems("").map(i => i.label)`)).toEqual(["배치: 셋", "배치 지우기: 셋"]);
 	await run(v, `paneLayoutItems("").find(i => i.label === "배치: 셋").act()`);
-	await waitFor(v, `paneCount() === 3 && document.querySelectorAll("#split .pane").length === 3 && CV.placed`);
-	expect(await ids(v)).toHaveLength(3);
+	await waitFor(v, `paneCount() === 2 && document.querySelectorAll("#split .pane").length === 2 && CV.placed`);
+	expect(await ids(v)).toEqual(["main", "lane:가나"]);
 	await run(v, `paneLayoutItems("").find(i => i.label === "배치 지우기: 셋").act()`);
 	expect(await ev(v, `Object.keys(paneLayouts())`)).toEqual([]);
+});
+
+test("a layout saved with four panes, two above two, opens as its first two side by side", async () => {
+	const v = await open();
+	const leaf = (id: string, t: string) => ({ id, kind: "chat", t });
+	const four = { root: { dir: "col", a: { dir: "row", a: leaf("p1", "main"), b: leaf("p2", "lane:가나"), r: 0.3 }, b: { dir: "row", a: leaf("p3", "lane:다라"), b: leaf("p4", "lane:마바"), r: 0.5 }, r: 0.5 }, active: "p3" };
+	await run(v, `localStorage.setItem("dotz-pane-layouts", ${JSON.stringify(JSON.stringify({ 넷: four }))}); paneLayoutItems("").find(i => i.label === "배치: 넷").act()`);
+	await waitFor(v, `paneCount() === 2 && document.querySelectorAll("#split .pane").length === 2 && CV.placed`);
+	expect(await ev(v, `[paneList().map(p => p.t + (p.active ? "*" : "")), PN.root.dir, PN.root.r, !!$("#split .pane-col")]`)).toEqual([["main*", "lane:가나"], "row", 0.3, false]);
 });

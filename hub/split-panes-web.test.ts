@@ -31,7 +31,7 @@ const split = async (v: Awaited<ReturnType<typeof open>>, t: string, side = "rig
 	await waitFor(v, `document.querySelectorAll("#split .pane").length === paneCount() && document.querySelector("#split .pane.on") && CV.placed`);
 };
 
-test("the second pane builds #split, the third splits the active one, a full set refuses a fifth", async () => {
+test("the second pane builds #split side by side, and two are the most", async () => {
 	const v = await open();
 	expect(await ev(v, `paneCount()`)).toBe(0);
 	expect(await ev(v, `!document.querySelector("#split")`)).toBe(true);
@@ -43,13 +43,11 @@ test("the second pane builds #split, the third splits the active one, a full set
 	expect(await ev(v, `$("#split .pane:not(.on) .pane-hd .cv-hd-t").textContent.trim()`)).toBe(await ev(v, `targetName("main")`));
 	expect(await ev(v, `$("#split .pane:not(.on) .pane-tl").textContent.includes("main 답변 5")`)).toBe(true);
 
-	await split(v, "lane:다라", "bottom");
-	expect(await ev(v, `paneCount()`)).toBe(3);
-	expect(await ev(v, `!!$("#split .pane-col")`)).toBe(true);
-	expect(await ev(v, `paneSplit("alert", "chat", "right")`)).toBe("p4");
+	expect(await ev(v, `[PN.root.dir, !!$("#split .pane-col")]`)).toEqual(["row", false]);
+	expect(await ev(v, `paneSplit("lane:다라", "chat", "bottom")`)).toBe("");
 	expect(await ev(v, `paneSplit("worklog", "chat", "right")`)).toBe("");
-	expect(await ev(v, `paneCount()`)).toBe(4);
-	expect(SPLIT_SHOTS.map(s => s.name)).toEqual(["drag", "two", "three", "four"]);
+	expect(await ev(v, `paneCount()`)).toBe(2);
+	expect(SPLIT_SHOTS.map(s => s.name)).toEqual(["drag", "two"]);
 });
 
 test("a pane that is already open takes the focus instead of a second copy", async () => {

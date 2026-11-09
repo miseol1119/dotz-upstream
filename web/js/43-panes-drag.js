@@ -59,22 +59,21 @@ function paneDragBoxes() {
   const a = $("#cv-head").getBoundingClientRect(), b = $("#composer").getBoundingClientRect();
   return [{ id: "", r: new DOMRect(a.left, a.top, a.width, b.bottom - a.top) }];
 }
-// The nearest edge when the pointer is in the outer quarter of that side, else the middle; edges are off when they cannot add a pane, and a side whose
-// two halves would be narrower than a pane may be (280px wide, 240px high, the divider's limits in 43-panes-view.js) is no edge either.
+// The left or right edge when the pointer is in the outer quarter of that side, else the middle (panes sit side by side only, owner 950d715f);
+// edges are off when they cannot add a pane, and so are they when the two halves would be narrower than a pane may be (280px, 43-panes-view.js).
 function paneDragZone(r, x, y, edges) {
-  const gap = 16, wide = (r.width - gap) / 2 >= 280, tall = (r.height - gap) / 2 >= 240;
-  const near = [["left", (x - r.left) / r.width, wide], ["right", (r.right - x) / r.width, wide], ["top", (y - r.top) / r.height, tall], ["bottom", (r.bottom - y) / r.height, tall]]
-    .filter(e => e[2] && e[1] < 0.25).sort((a, b) => a[1] - b[1])[0];
-  return edges && near ? near[0] : "center";
+  if (!edges || (r.width - 16) / 2 < 280) return "center";
+  const l = (x - r.left) / r.width, rt = (r.right - x) / r.width;
+  return l < 0.25 && l <= rt ? "left" : rt < 0.25 ? "right" : "center";
 }
-// With four panes a row has no edge to split at: the whole pane is the zone and the drop replaces it (full: true says why).
+// With two panes there is no edge to split at: the whole pane is the zone and the drop replaces it (full: true says why).
 function paneDragAim(x, y) {
   const boxes = PD.src.no ? [] : paneDragBoxes(), box = boxes.find(b => b.id !== PD.src.pane && x >= b.r.left && x < b.r.right && y >= b.r.top && y < b.r.bottom);
   const edges = !!PD.src.pane || paneCount() < PANE_MAX;
   PD.hit = box ? { id: box.id, r: box.r, side: paneDragZone(box.r, x, y, edges), full: !edges } : null;
   paneDragPaint();
 }
-const PD_SIDE = { left: "왼쪽", right: "오른쪽", top: "위", bottom: "아래" };
+const PD_SIDE = { left: "왼쪽", right: "오른쪽" };
 // The ghost's second line says what letting go does.
 function paneDragHint() {
   const { src, hit } = PD;
@@ -83,16 +82,16 @@ function paneDragHint() {
   if (src.pane) return hit.side === "center" ? "자리 바꾸기" : `${PD_SIDE[hit.side]}으로 옮기기`;
   if (paneCount() > 1 && paneOpenIn(src.kind, src.t)) return "열려 있는 칸으로 가요";
   if (hit.side !== "center") return `${PD_SIDE[hit.side]}에 새 칸`;
-  return hit.full ? "칸은 4개까지라 이 칸을 바꿔요" : paneCount() > 1 ? "이 칸을 바꿔요" : "여기서 열기";
+  return hit.full ? "칸은 2개까지라 이 칸을 바꿔요" : paneCount() > 1 ? "이 칸을 바꿔요" : "여기서 열기";
 }
 function paneDragPaint() {
   const h = PD.hit, hint = PD.ghost && PD.ghost.querySelector(".pn-gh");
   if (hint) { const s = paneDragHint(); hint.textContent = s; hint.hidden = !s; }
   if (!h) { if (PD.zone) paneZoneOut(PD.zone); PD.zone = null; return; }
-  const { r, side } = h, w = side === "left" || side === "right" ? r.width / 4 : r.width, ht = side === "top" || side === "bottom" ? r.height / 4 : r.height;
+  const { r, side } = h, w = side === "center" ? r.width : r.width / 4, ht = r.height;
   const fresh = !PD.zone;
   if (fresh) { PD.zone = el("div", { class: "pn-zone" }); document.body.append(PD.zone); }
-  Object.assign(PD.zone.style, { left: `${side === "right" ? r.right - w : r.left}px`, top: `${side === "bottom" ? r.bottom - ht : r.top}px`, width: `${w}px`, height: `${ht}px` });
+  Object.assign(PD.zone.style, { left: `${side === "right" ? r.right - w : r.left}px`, top: `${r.top}px`, width: `${w}px`, height: `${ht}px` });
   if (fresh) motionIn(PD.zone, "fade", M_MS.fast);
 }
 
