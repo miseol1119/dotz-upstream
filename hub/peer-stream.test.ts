@@ -56,17 +56,28 @@ const until = async (pred: () => boolean) => {
 	}
 };
 const ofKind = (k: string) => heard.filter(f => f.kind === k);
-// A's stream is ordered: once this notice's frame and its counts are heard here, everything sent before it has been handled.
+// Every debounce that fired reads A once and is heard as one peer_counts frame (no reconnect happens before the last test). One tick
+// runs every debounce already armed, so after it the counts are settled once each fired read is heard: no read is left in flight to
+// answer a later wait (a read still in flight from an earlier frame let the next test's wait end one frame early).
+const settled = async () => {
+	await tick();
+	await until(() => ofKind("peer_counts").length === fired);
+};
+// A's stream is ordered: once this notice's frame is handled and the counts are settled, everything sent before it has been handled.
 const handled = async (id: string) => {
-	const counts = ofKind("peer_counts").length;
 	sendA({ kind: "notice", item: { id, kind: "worklog", tone: "run", title: "표시", read: false }, unread: 0 });
-	await until(() => ofKind("peer_notice_done").some(f => f.ids[0] === id) && ofKind("peer_counts").length > counts);
+	await until(() => ofKind("peer_notice_done").some(f => f.ids[0] === id));
+	await settled();
 };
 // Counts every arming of the debounce: a frame that reads A again is seen here even when a later frame's debounce replaces it.
 const DEBOUNCE_MS = 17;
 const clockSetTimeout = globalThis.setTimeout;
-let armed = 0;
-globalThis.setTimeout = ((fn: () => void, ms?: number) => { if (ms === DEBOUNCE_MS) armed++; return clockSetTimeout(fn, ms); }) as typeof setTimeout;
+let armed = 0, fired = 0;
+globalThis.setTimeout = ((fn: () => void, ms?: number) => {
+	if (ms !== DEBOUNCE_MS) return clockSetTimeout(fn, ms);
+	armed++;
+	return clockSetTimeout(() => { fired++; fn(); }, ms);
+}) as typeof setTimeout;
 
 // The idle timeout is off: the manual clock runs far ahead of the real sockets here.
 const stop = startPeerStreams({ computers: async () => [A, { name: "나", url: "http://127.0.0.1:1", self: true }], countsDebounceMs: DEBOUNCE_MS, scanMs: 60_000, backoffMs: [20], idleMs: 2 ** 50 });
@@ -121,9 +132,11 @@ test("a new notice on A reaches B's stream once, named for A, then A's counts fo
 test("a state change on A (a mail answered, a draft sent, a room read) makes B read A again: its counts and the merged monitoring follow at once", async () => {
 	await until(() => aStreams.size === 1);
 	for (const kind of ["mail_unreplied", "comment_send", "kakao_draft", "read"]) {
-		const before = ofKind("peer_counts").length;
+		const before = ofKind("peer_counts").length, arms = armed;
 		sendA({ kind, target: "mail:k1" });
-		await until(() => ofKind("peer_counts").length > before);
+		await until(() => armed > arms);
+		await settled();
+		expect(ofKind("peer_counts").length).toBeGreaterThan(before);
 	}
 	const before = armed;
 	sendA({ kind: "activity", source: "orchestrator", type: "tool" });

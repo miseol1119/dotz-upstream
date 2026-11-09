@@ -15,8 +15,15 @@ const FAR = Date.now() + 365 * 86400e3;
 const accounts = [{ name: "default", access: "tok-default", expires: FAR }, { name: "teammate-shared", access: "tok-teammate", expires: FAR }];
 const body = (five: number, week: number) => ({ five_hour: { utilization: five, resets_at: "2030-01-01T05:00:00Z" }, seven_day: { utilization: week, resets_at: "2030-01-07T00:00:00Z" }, seven_day_opus: null });
 const realFetch = globalThis.fetch;
+// A Claude CLI account with no credentials file falls back to the machine's keychain (a real `security` process); readQuota waits
+// for that read, which under a full parallel run can take seconds. Every test reads an empty keychain unless it sets its own.
+const noKeychain = () => {
+	resetCliTokensForTest();
+	setKeychainReaderForTest(async () => undefined);
+};
 // A read held from an earlier test (or the sticky pick it left) would answer from cache instead of the fake fetch.
 beforeEach(() => {
+	noKeychain();
 	resetStickyForTest();
 	resetQuotaForTest();
 	for (const a of accounts) forgetAccountUsage(a.name);
@@ -131,7 +138,7 @@ test("the account's plan rides on its usage report and /api/quota: OmO's signed-
 	const dir = join(agentDir, "anthropic-subscription-claude", dirId);
 	mkdirSync(dir, { recursive: true });
 	writeFileSync(join(dir, ".credentials.json"), JSON.stringify({ claudeAiOauth: { accessToken: "tok-cli", expiresAt: FAR, subscriptionType: "max", rateLimitTier: "default_claude_max_5x" } }));
-	resetCliTokensForTest();
+	noKeychain();
 	auth({ accounts: [{ name: "default", store: "claude-cli", dirId, profile: { subscriptionType: "Claude Ultra" } }, { name: "second", store: "claude-cli", dirId }, { name: "old", access: "tok-old", expires: FAR }] });
 	expect(subscriptionAccounts().map(a => [a.name, a.plan])).toEqual([["default", "Ultra"], ["second", "Max 5x"], ["old", undefined]]);
 	const u = new AccountUsage(async () => new Response(JSON.stringify(body(10, 20)), { status: 200 }));
@@ -163,7 +170,7 @@ test("a Claude CLI login is read with the token the CLI keeps for its account di
 	const dir = join(agentDir, "anthropic-subscription-claude", dirId);
 	mkdirSync(dir, { recursive: true });
 	writeFileSync(join(dir, ".credentials.json"), JSON.stringify({ claudeAiOauth: { accessToken: "tok-cli", expiresAt: FAR } }));
-	resetCliTokensForTest();
+	noKeychain();
 	auth({ accounts: [{ name: "default", source: "login", store: "claude-cli", dirId }, { name: "gone", store: "claude-cli", dirId: "c".repeat(32) }] });
 	expect(subscriptionAccount()).toMatchObject({ name: "default", token: "tok-cli", expiresAt: FAR });
 	expect(subscriptionAccounts().map(a => a.name)).toEqual(["default"]);

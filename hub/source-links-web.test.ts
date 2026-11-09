@@ -136,13 +136,20 @@ test("a pressed row is no link, so a drag from its words selects them; a real cl
 	await view.evaluate(`void (window.__probe = ev => { if (ev.target.closest?.(".mlist-src a.mlist-row")) { (window.__opened ??= []).push(!ev.defaultPrevented); ev.preventDefault(); } }, document.addEventListener("click", window.__probe))`);
 	const word = ".mlist-src a.mlist-row .mlist-t";
 	const { x, y } = await page<{ x: number; y: number }>(`(() => { const el = document.querySelector(${JSON.stringify(word)}); el.scrollIntoView({ block: "center" }); const r = el.getBoundingClientRect(); return { x: r.left + 8, y: r.top + r.height / 2 }; })()`);
+	// view.click resolves when the input is sent, not when the page has handled it: each step waits for the page to see its click
+	// before the next selection, or a slow page reads __opened before any click arrived
+	const clicks = (n: number) => waitFor(`(window.__opened ?? []).length === ${n}`);
 	await view.click(x, y);
+	await clicks(1);
 	const select = `getSelection().selectAllChildren(document.querySelector(${JSON.stringify(word)}))`;
 	await view.evaluate(select);
 	await view.click(x, y);
+	await clicks(2);
 	await view.evaluate(select);
 	await view.click(x + 40, y + 20);
+	await waitFor(`getSelection().isCollapsed`);
 	await view.click(x, y);
+	await clicks(4);
 	const opened = await page<boolean[]>(`window.__opened`);
 	await view.evaluate(`void (document.removeEventListener("click", window.__probe), getSelection().removeAllRanges())`);
 	expect(opened).toEqual([true, false, false, true]);

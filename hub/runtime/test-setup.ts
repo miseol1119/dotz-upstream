@@ -1,7 +1,7 @@
 // bun test preload (bunfig.toml): an isolated DOTZ_DIR with a throwaway config, a binary path that cannot exist (so no
 // test can ever start a real omo or omp), and the fake clock. Runs before any hub module reads config.ts.
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { installGitHooks } from "../git-hooks.ts";
@@ -9,6 +9,23 @@ import { setMachineProbe } from "../limits.ts";
 import { liveDataDir } from "../live-guard.ts";
 import { installClock } from "./test-clock.ts";
 import { takeSuiteSlot } from "./test-slot.ts";
+
+// A fresh worktree has no node_modules (or an older one after a dependency was added or bumped): the files that import the missing
+// package then fail as if they were flaky. Stop the run at once with what to do instead. The pre-push hook's limits run in an exported
+// tree with no node_modules and needs none (DOTZ_TEST_NO_DEPS).
+if (!process.env.DOTZ_TEST_NO_DEPS) {
+	const root = join(import.meta.dir, "..", "..");
+	const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+	const stale = Object.entries({ ...pkg.dependencies, ...pkg.devDependencies }).filter(([name, want]) => {
+		const at = join(root, "node_modules", name, "package.json");
+		if (!existsSync(at)) return true;
+		return /^\d+\.\d+\.\d+$/.test(want) && (JSON.parse(readFileSync(at, "utf8")) as { version?: string }).version !== want;
+	}).map(([name, want]) => `${name}@${want}`);
+	if (stale.length) {
+		console.error(`dotz tests: node_modules does not match package.json (${stale.join(", ")}). Run \`bun install --frozen-lockfile\` in ${root} first.`);
+		process.exit(1);
+	}
+}
 
 installGitHooks(join(import.meta.dir, "..", "..")); // the push gate reaches a developer clone here (hub/git-hooks.ts)
 

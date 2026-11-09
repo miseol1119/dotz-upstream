@@ -96,8 +96,10 @@ const boot = async (width = 1280, height = 900) => {
 	return v;
 };
 const openModels = async (v: View) => {
-	await run(v, `go("models")`);
-	await waitFor(v, `document.querySelector('[data-target="in-use"]')`);
+	// go("models") paints from the M it has and reads /api/models again: wait for that read to replace M, or a test's edit of M is
+	// thrown away when the read lands under load
+	await run(v, `window.__mOld = M; go("models")`);
+	await waitFor(v, `M !== window.__mOld && document.querySelector('[data-target="in-use"]')`);
 };
 
 const menuLabels = async (v: View) => q<string[]>(v, `return [...document.querySelectorAll(".menu .mi .ml")].map(n => n.textContent)`);

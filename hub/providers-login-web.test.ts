@@ -1,4 +1,4 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, afterEach, expect, test } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { appAsset, indexPage } from "./webapp.ts";
@@ -100,6 +100,9 @@ const server = Bun.serve({
 type View = InstanceType<typeof Bun.WebView>;
 const views: View[] = [];
 const open = (width: number, height: number): View => { const v = new Bun.WebView({ width, height }); views.push(v); return v; };
+// Every view reads the same fake hub and pushes to the shared `calls`: an earlier test's page still open (its login success reloads
+// 설정 → 계정 after the test ends) would land a GET /api/accounts in the next test's list, so each test's views close when it ends.
+afterEach(() => { for (const v of views.splice(0)) v.close(); });
 afterAll(() => { for (const v of views) v.close(); for (const c of streams) { try { c.close(); } catch { /* already closed */ } } server.stop(true); });
 
 const waitFor = (v: View, expr: string, ms = 4000) =>

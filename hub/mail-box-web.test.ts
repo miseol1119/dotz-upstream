@@ -158,7 +158,8 @@ describe("actions on a selection", () => {
 		expect(posts[0].path).toBe("/api/mail/fx-fail/action");
 		await waitFor(v, `document.querySelector(".toast, #toast, .snack")?.textContent.includes("Gmail에 반영하지 못했어요")`);
 		expect(await ev<number>(v, `[...document.querySelectorAll("body *")].filter(e => e.children.length === 0 && e.textContent === "Gmail에 반영하지 못했어요").length`)).toBe(1);
-		expect(await ev<boolean>(v, `${rowJs("처리가 안 되는 메일")}.classList.contains("mr-new")`)).toBe(true);
+		// the toast is drawn at once, the list repaint that puts the row back is scheduled (mbRefresh -> monSchedule): wait for it
+		await waitFor(v, `${rowJs("처리가 안 되는 메일")}.classList.contains("mr-new")`);
 	}, 30_000);
 
 	test("a mailbox that will not follow still changes in dotz and shows the usual done toast with no notice line", async () => {
