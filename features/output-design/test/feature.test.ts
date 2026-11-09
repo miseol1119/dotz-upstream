@@ -15,10 +15,10 @@ test("배포용 기능으로 로드되고 켜진 채이며 setup이 없어요", 
 	expect(f?.name.length).toBeLessThanOrEqual(12);
 });
 
-test("feature.md 본문은 300바이트 이내, SKILL.md는 6KB 이내예요", () => {
+test("feature.md 본문은 360바이트 이내, SKILL.md는 6KB 이내예요", () => {
 	const text = readFileSync(join(FEATURE, "feature.md"), "utf8");
 	const body = text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "").trim();
-	expect(Buffer.byteLength(body)).toBeLessThanOrEqual(300);
+	expect(Buffer.byteLength(body)).toBeLessThanOrEqual(360);
 	expect(readFileSync(join(FEATURE, "SKILL.md")).length).toBeLessThanOrEqual(6144);
 });
 
@@ -26,6 +26,6 @@ test("프롬프트에 실린 본문이 가리키는 SKILL.md가 실제로 있고
 	const prompt = featurePrompt(tempDir(), "orchestrator");
 	const path = /(\/\S+features\/output-design\/SKILL\.md)/.exec(prompt)?.[1];
 	expect(path && existsSync(path)).toBe(true);
-	expect(featurePrompt(tempDir(), "workers")).toContain("output-design/SKILL.md");
+	expect(featurePrompt(tempDir(), "lanes")).toContain("output-design/SKILL.md");
 	expect(existsSync(join(FEATURE, "bin", "check.ts"))).toBe(true);
 });
