@@ -180,3 +180,31 @@ body { display: flow-root; }
   .appbar :is(.ib, .ustrip, .conn)::after { content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, var(--btn-hit)); height: max(100%, var(--btn-hit)); transform: translate(-50%, -50%); }
   .appbar #back::after { left: 0; transform: translateY(-50%); }
 }
+
+/* phone / touch: a control in the page body keeps its drawn size and answers a tap over --btn-hit through ::after, like the app bar above (a list row only needs 40). A row that scrolls sideways clips what hangs out above and below it (overflow-x: auto clips y too), so it carries the area as padding and gives the same back as negative margin: nothing moves. Where two areas would share a strip, the line gap or the end of the stack gives way, not the drawn size. */
+@media (pointer: coarse), (max-width: 639px) {
+  :where(.subsum, .mtop-b, .hgreet-more, .hgreet .subline, .board .ch .ib, .ct-file, #c-attach, #send-btn, .cbar .cchip, .mr-f, .nsc-fb, .hm-chip, .pmv-edit, .pmv-more, .dr-rm, .dr-rc-add, .dr-rc-edit .btn, .kk-add-btn) { position: relative; }
+  :where(.subsum, .mtop-b, .hgreet-more, .hgreet .subline, .board .ch .ib, .ct-file, #c-attach, #send-btn, .cbar .cchip, .mr-f, .nsc-fb, .hm-chip, .pmv-edit, .pmv-more, .dr-rm, .dr-rc-add, .dr-rc-edit .btn, .kk-add-btn)::after { content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, var(--btn-hit)); height: max(100%, var(--btn-hit)); transform: translate(-50%, -50%); }
+  .subsum { z-index: 1; }
+  .subsum::after { top: calc(var(--sp-3) * -1); bottom: calc(var(--sp-1) * -1); height: auto; transform: translateX(-50%); }
+  .qa .btn.inrow::after { inset: calc(var(--sp-2) * -1 - 1px) calc(var(--sp-05) * -1); }
+  .nsc-f { padding-block: var(--sp-2); margin: calc(var(--sp-1) - var(--sp-2)) 0 0; }
+  .rq-hd2 .nsc-f { margin-top: calc(var(--sp-2) * -1); }
+  .pl-chips { padding-block: var(--sp-2); margin-block: calc(var(--sp-2) * -1); }
+  .mr-filter { padding-top: var(--sp-2); margin-top: calc(var(--sp-15) * -1); }
+  #kk-rooms .kk-views { padding: var(--sp-05) 0 calc(var(--sp-3) + var(--sp-05)); margin-bottom: calc(var(--sp-3) * -1); }
+  #kk-rooms .kk-lh { padding-bottom: var(--sp-3); }
+  #kk-rooms .kk-views .mr-f::after, .kk-add-btn::after { top: 0; height: var(--btn-hit); transform: translateX(-50%); }
+  #kk-rooms .kk-views .mr-f::after { top: calc(var(--sp-05) * -1); }
+  .ct-body { padding-block: var(--sp-3); margin-block: calc(var(--sp-3) * -1); }
+  .ct-file { z-index: 1; }
+  #c-attach::after { top: calc(var(--sp-2) * -1); height: var(--btn-hit); transform: translateX(-50%); }
+  #cbar { padding-block: var(--sp-15); margin-block: calc(var(--sp-15) * -1); }
+  .hm-chips { row-gap: var(--sp-2); padding-bottom: var(--sp-05); }
+  .pmv-edit::after { left: 0; width: 100%; height: var(--btn-hit); transform: none; }
+  .mtop .mtop-b:first-child::after { left: 0; transform: translateY(-50%); }
+  .mtop .mtop-b:last-child::after { left: auto; right: 0; transform: translateY(-50%); }
+  .pmv-title::after { top: calc(var(--sp-3) * -1); }
+  .pmv-purpose::after { top: calc(var(--sp-1) * -1); }
+  .pmv-hrow { padding-top: var(--sp-15); }
+}
