@@ -107,7 +107,9 @@ textarea.mbox-ta { display: block; flex: 1; min-height: 160px; margin: var(--sp-
 .mbox-sf .mbox-attach { order: -1; margin-right: auto; }
 .mbox-sf .mbox-save { order: 1; }
 @media (max-width: 639px) {
-  .mbox-sheet { inset: 0; width: auto; height: auto; max-height: none; border: 0; border-radius: 0; }
+  /* the keyboard: like the composer (12-composer-phone.css), the sheet ends where the keyboard begins (--kb) and is as tall as what is still
+     visible (--vvh), so the body's end and the send row stay above it; both come from web/js/34-composer-viewport.js */
+  .mbox-sheet { inset: auto 0 var(--kb, 0px) 0; width: auto; height: var(--vvh, 100dvh); max-height: none; border: 0; border-radius: 0; }
   .mbox-sheet.min { inset: auto 0 0 0; height: fit-content; max-height: 56px; border-radius: 20px 20px 0 0; }
   .mbox-sb { flex: 1; padding: var(--sp-1) var(--sp-5) var(--sp-4); }
   .mbox-sf { padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom)); }

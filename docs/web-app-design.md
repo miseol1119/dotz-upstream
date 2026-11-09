@@ -505,7 +505,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 - 상태: `visualViewport` 없으면 아무것도 안 해요. 레이아웃은 이 변수를 CSS가 써서 잡아요(스크립트가 위치를 직접 정하지 않음).
 - 데이터: 없음.
 - 근거: web/js/34-composer-viewport.js:1-24.
-- css: web/css/12-composer-phone.css(`--kb`, `--vvh`; `@media (max-width:639px)` :6), 13-code-shell.css, 14-overlay.css(`--vvh`).
+- css: web/css/12-composer-phone.css(`--kb`, `--vvh`; `@media (max-width:639px)` :6), 13-code-shell.css, 14-overlay.css(`--vvh`), 20-mail-box.css(폰 메일 쓰기 시트: 아래 끝 `--kb`, 높이 `--vvh`).
 
 ### 입력창 (메시지 보내기와 중단)
 - 목적: 현재 대화 대상에 글/파일/요소를 보내고, 작업 중이면 끼워넣기, 대기열, 중단을 해요.
