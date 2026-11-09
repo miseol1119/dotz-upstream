@@ -407,6 +407,15 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 - 근거: web/js/11-todo-strip.js:64-67 (`isRestart`, `cleanRestart`, `paintRestartBanner`), 13-data.js:20 (ingestMsg에서 호출); web/index.html:91.
 - css: 04-files.css(`.gban`), 01-tokens.css(`.gban`), 22-shell.css(`.gban`).
 
+### 분할 칸 (`#split`, 43-panes*.js)
+- 목적: 넓은 창(1100px 이상)에서 대화와 프로젝트를 2~4칸으로 나란히 봐요. 설계와 상태 목록은 docs/split-panes.md.
+- 구성: `#views` 안 `#split` = 왼쪽 목록 단(`.pane-side`: 대화 목록 `#chat-convo` 또는 `#v-projects`) + 트리(`.pane-row`/`.pane-col`, 경계선 `.pane-bar`, 칸 `.pane`). 활성 칸(`.pane.on`)은 진짜 `#v-chat`/`#v-project`(`.in-pane`)를 담고, 비활성 칸은 거울(`.pane-mir`: `.pane-hd`, `.pane-tl`, `.pane-cmp`)이에요.
+- 기능: 목록 행·칸 머리줄 끌기(가장자리=나누기, 가운데=바꾸기, 머리줄 가운데=자리 바꾸기), 경계선 끌기와 두 번 눌러 반반, ⌥⌘\ ⌥⌘- ⌥⌘1~4 ⌥⌘W, 명령 팔레트의 이름 붙인 배치, 칸 머리줄 점.
+- 상태: 칸이 하나거나 창이 1100px 미만이면 `#split`이 없고 모든 노드가 원래 자리에 있어요. 마지막 배치는 `localStorage dotz-panes`, 이름 붙인 배치는 `dotz-pane-layouts`.
+- 데이터: 실시간 연결은 하나(99-boot.js), `paneEvent`가 비활성 칸에 나눠요.
+- 근거: web/js/43-panes.js, 43-panes-view.js, 43-panes-mirror.js, 43-panes-drag.js, 43-panes-keys.js, 43-panes-layouts.js; 테스트 hub/split-panes-web.test.ts, hub/split-panes-drag-web.test.ts.
+- css: 26-panes.css.
+
 ### 할 일 줄 (`#todo`)
 - 목적: 입력창 위 한 줄로 대화의 계획(지금 단계와 `완료/전체`)을 보여주고, 눌러서 전체 목록을 펼쳐요.
 - 구성: `#todo` 안에 `button.td-bar`(상태 아이콘 `.td-g`, 현재 할 일 `.td-cur`, 진행 `.td-n`, 화살표 `.td-ch`), 펼치면 `.td-list`(단계 이름 `.td-ph`, 항목 `.td-r.tr-{act|done|drop|pend}`).

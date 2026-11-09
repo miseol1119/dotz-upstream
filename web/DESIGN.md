@@ -92,6 +92,8 @@ Heights, padding, gaps, type steps and don'ts for each display form (list row, c
 Cards keep 20px padding, list rows 8/16px with a 44px minimum height. No shadows on cards; menus and dialogs keep one soft
 float shadow (`--float`, `--shadow-menu`, `--shadow-dialog`, `--shadow-sheet`). Type and space use the scale tokens
 (`--fs-*`, `--lh-*`, `--sp-*`) in `web/css/01-tokens.css`; the pill-sparingly rule is in `docs/ui-spec.md`.
+Split panes (`web/css/26-panes.css`) add no tokens: a pane is a card, the active pane is marked by `--ff-ring` only, and a drop
+zone is the file-drop look (`--accent` at 12% + `--ff-ring`); the rules are in `docs/ui-spec.md` (분할 칸).
 
 ### Space scale
 
