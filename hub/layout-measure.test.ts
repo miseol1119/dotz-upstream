@@ -85,6 +85,10 @@ test("concentric: an inner radius that is not outer radius minus inset fails, th
 	expect(await measure(inner(32, 32), "concentric")).toEqual([]);
 	expect(bad(await measure(inner(100, 32), "concentric")).map(i => i.value)).toEqual([8]);
 	expect(bad(await measure(inner(36, 32), "concentric")).map(i => i.value)).toEqual([8]);
+	// a segmented track drawn by its segments: the chosen first cell is judged against the track's rounded end, not the side where the track goes on
+	const track = (r: number) => `<style>.t{display:flex}.t b{position:relative;width:80px;height:32px;background:#e8eaf0}.t b:first-child{border-radius:8px 0 0 8px}.t b:last-child{border-radius:0 8px 8px 0}.t b.on::before{content:"";position:absolute;left:2px;top:2px;width:76px;height:28px;border-radius:${r}px;background:#fff}</style><div class="t"><b class="on"></b><b></b><b></b></div>`;
+	expect(bad(await measure(track(6), "concentric"))).toEqual([]);
+	expect(bad(await measure(track(2), "concentric")).map(i => i.value)).toEqual([4]);
 });
 
 test("left-edges: lines 1-3px apart are near-tangent, a card's own indentation is counted in the card", async () => {

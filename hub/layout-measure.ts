@@ -238,6 +238,15 @@ function concentric(cfg: any, ctx: any, H: any) {
 		}
 		return null;
 	};
+	// a segmented track drawn by its segments: an outer side flush against a sibling of the same fill is the track going on, not an edge,
+	// so the corners on that side are not judged (the chosen cell is concentric with the whole track, not with its own segment)
+	const continues = (o: Element, side: string) => {
+		const sib = side === "left" ? o.previousElementSibling : o.nextElementSibling;
+		if (!sib) return false;
+		const a = o.getBoundingClientRect(), b = sib.getBoundingClientRect(), sc = H.cs(sib);
+		const flush = side === "left" ? Math.abs(a.left - b.right) < 0.5 : Math.abs(b.left - a.right) < 0.5;
+		return flush && Math.abs(a.top - b.top) < 0.5 && Math.abs(a.bottom - b.bottom) < 0.5 && H.painted(sc) && sc.backgroundColor === H.cs(o).backgroundColor;
+	};
 	const rootEls: Element[] = H.roots(ctx.scope);
 	const seen = new Set<string>();
 	for (const el of H.all(ctx.scope) as Element[]) {
@@ -260,7 +269,7 @@ function concentric(cfg: any, ctx: any, H: any) {
 			let worst = -1, detail = "";
 			for (const [k, a, b2] of CORNERS) {
 				const ia = ins[a!]!, ib = ins[b2!]!;
-				if (ia > cfg.inset || ib > cfg.inset) continue;
+				if (ia > cfg.inset || ib > cfg.inset || continues(outer.el, b2!)) continue;
 				// flush against a corner of an outer box that clips its content: the outer curve already cuts it
 				if (ia < 0.5 && ib < 0.5 && /hidden|clip/.test(H.cs(outer.el).overflowX + H.cs(outer.el).overflowY)) continue;
 				const inset = Math.max((ia + ib) / 2, 0), want = Math.max(outer.r[k]! - inset, 0), have = inner.r[k]!;
