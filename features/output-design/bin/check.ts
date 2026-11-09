@@ -8,6 +8,7 @@
 import { parseArgs } from "node:util";
 import { existsSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { measureMobile, measureMotion, measureRaw, prepCss } from "./measure-more.ts";
 
 export const RULES: Record<string, { w: number; label: string }> = {
 	contrast: { w: 1.5, label: "글자 대비" },
@@ -26,6 +27,19 @@ export const RULES: Record<string, { w: number; label: string }> = {
 	"line-height": { w: 1, label: "줄 간격" },
 	"line-length": { w: 1, label: "한 줄 길이" },
 	"overflow-x": { w: 1.5, label: "가로 넘침" },
+	"zoom-lock": { w: 1, label: "확대 잠금" },
+	"safe-area": { w: 0.5, label: "안전 영역에 cover 없음" },
+	"theme-color": { w: 0.5, label: "상태 막대 색 하나" },
+	"vh-shell": { w: 1, label: "100vh 앱 틀" },
+	"hover-ungated": { w: 1, label: "터치에 남는 hover" },
+	"input-font": { w: 1, label: "입력칸 글자 16px 미만" },
+	"transition-all": { w: 0.5, label: "transition: all" },
+	"ease-in": { w: 0.5, label: "ease-in 움직임" },
+	"slow-motion": { w: 0.5, label: "300ms 넘는 움직임" },
+	"scale-zero": { w: 0.5, label: "scale(0)에서 시작" },
+	"layout-motion": { w: 1, label: "배치 속성 움직임" },
+	"no-reduced-motion": { w: 1, label: "움직임 줄이기 없음" },
+	"raw-value": { w: 1.5, label: "화면에 샌 값" },
 };
 type Hit = { rule: string; sel: string; val: string };
 type PageOut = { swapped: number; unread: number; hits: Hit[] };
@@ -575,7 +589,7 @@ async function main() {
 				await withTimeout(view.evaluate("document.fonts.ready.then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1)))))"), 10000, "글꼴 기다리기");
 				for (const c of COMBOS.filter((x) => x.w === w)) {
 					const cfg = { scheme: c.scheme, touch: w === 390 && c.scheme === "light", narrow: w === 390 };
-					const raw = await withTimeout(view.evaluate(`(() => { const K = (${kit})(${JSON.stringify(cfg)}); (${measureA})(K); (${measureB})(K); return JSON.stringify({ swapped: K.swapped, unread: K.unread, hits: K.hits }); })()`), 60000, "측정");
+					const raw = await withTimeout(view.evaluate(`(() => { const K = (${kit})(${JSON.stringify(cfg)}); (${measureA})(K); (${measureB})(K); (${prepCss})(K); (${measureMobile})(K); (${measureMotion})(K); (${measureRaw})(K); return JSON.stringify({ swapped: K.swapped, unread: K.unread, hits: K.hits }); })()`), 60000, "측정");
 					const out = JSON.parse(String(raw)) as PageOut;
 					swappedMax = Math.max(swappedMax, out.swapped);
 					unreadMax = Math.max(unreadMax, out.unread);
