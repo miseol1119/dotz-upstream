@@ -181,7 +181,9 @@ function pickOption(dc, bi, opt, note) {
 async function answerEach(dc, bi, opt, note) {
   DC.st[dc.key] = "sending"; paintDecision();
   try { await ntPost(dc.blocks[bi].nd, opt.n, note, DC.files[dc.key], opt.label); delete DC.files[dc.key]; } catch (e) { toast(e.message, true); }
-  delete DC.st[dc.key]; delete DC.picks[dc.key]; delete DC.step[dc.key];
+  delete DC.picks[dc.key]; delete DC.step[dc.key];
+  // The last question of the card answered: it leaves through dcLeave (fades, then goes) like any answered card; the others still wait on the card.
+  if (decisionOf(dc.t)) delete DC.st[dc.key]; else DC.st[dc.key] = "sent";
   paintDecision();
 }
 function dcSendAll(dc) {
@@ -510,11 +512,27 @@ function choiceRow(dc, step, o, picks, st) {
 }
 const dcDesc = o => o.desc.replace(/`/g, "");   // one plain line under the name: code marks would show raw
 const dcAgain = box => () => (box === DK.box ? dkPaint() : paintDecision());   // the paint that owns a decision box, for a held repaint (paintKeep)
+// From the tap until the card is gone it stays where it was, so the dock does not move under the thumb while the chosen row fades: its height is
+// kept, and whatever arrives below it meanwhile (the working line) is taken out of its bottom margin.
+function dcHold(box, on) {
+  if (!on) { delete box.dataset.hold; box.style.height = ""; box.style.marginBottom = ""; return; }
+  if (box.dataset.hold || !box.offsetHeight) return;
+  box.dataset.hold = "1"; box.style.height = `${box.offsetHeight}px`;
+  const top0 = box.getBoundingClientRect().top;
+  const keep = () => {
+    if (!box.dataset.hold) return;
+    const drift = box.getBoundingClientRect().top - top0;
+    if (Math.abs(drift) > 0.5) box.style.marginBottom = `${parseFloat(getComputedStyle(box).marginBottom) + drift}px`;
+    requestAnimationFrame(keep);
+  };
+  requestAnimationFrame(keep);
+}
 function renderDecision(box, dc, picks, step) {
   if (dc.close) { renderSheet(box, dc, picks, step); return; }
   // Folded per conversation, not per question (owner 2026-11-04: the arrow did not lower it): the bot re-asks what is left as a new
   // message, and a fold kept on the old question let the next one cover the conversation again.
   const st = DC.st[dc.key] || "", fold = !!DC.fold[dc.t], old = $(".dc-body", box), top = old && box.dataset.key === dc.key ? old.scrollTop : 0;
+  dcHold(box, !!st);
   // A draft message starts with its quoted draft, so the question is the block's own title without the draft's id.
   const qText = dc.draft ? draftQ(dc.blocks[0] && dc.blocks[0].title) : dc.question;
   // ONE tight header (owner 2026-11-03): 확인 필요 · 답 기다림 on one line, then the short question; the card asks only what it must.
@@ -604,7 +622,8 @@ function dcLeave(box, dc) {
     dcOut = await motionOut(box);
     if (DC.cur) { if (dcOut && dcOut.cancel) dcOut.cancel(); dcOut = null; delete box.dataset.out; return; }
     if (dcOut && dcOut.cancel) dcOut.cancel();
-    dcOut = null; dcLast = null; box.hidden = true; delete box.dataset.sig; delete box.dataset.key; delete box.dataset.st; delete box.dataset.out; clear(box);
+    dcOut = null; dcLast = null; box.hidden = true; dcHold(box, false); if (dc.each) { delete DC.st[dc.key]; delete DC.picks[dc.key]; } delete box.dataset.sig; delete box.dataset.key; delete box.dataset.st; delete box.dataset.out; clear(box);
+    paintDecision();
   })();
 }
 // The decision as a card in the message itself. It never fires on its own: open, it is the question that waits (the docked card's own, same key, so one answer closes
@@ -675,9 +694,10 @@ function paintDecision() {
   const arrived = S && freshKeys(DC_SEEN, dc ? [...DC_SEEN, dc.key] : [...DC_SEEN]).has(dc && dc.key) && dcShownT === target;
   if (S) dcShownT = target;
   const waiting = dc || line || isFixedT(target) ? null : dcWaitingCard(target);
-  if (waiting) dcPointer(box, waiting);
-  else if (!dc && dcLast && !box.hidden && box.dataset.key === dcLast.key && DC.st[dcLast.key]) dcLeave(box, dcLast);
-  else if (!dc) { box.hidden = true; delete box.dataset.sig; delete box.dataset.key; delete box.dataset.st; clear(box); }
+  // The card whose answer is going out leaves first (the echo of the answer can arrive before it), then the pointer to the next waiting one takes its place.
+  if (!dc && dcLast && !box.hidden && box.dataset.key === dcLast.key && DC.st[dcLast.key]) dcLeave(box, dcLast);
+  else if (waiting) dcPointer(box, waiting);
+  else if (!dc) { box.hidden = true; dcHold(box, false); delete box.dataset.sig; delete box.dataset.key; delete box.dataset.st; clear(box); }
   else {
     const picks = DC.picks[dc.key] || [], step = DC.step[dc.key] ?? Math.max(0, dc.blocks.findIndex((_, i) => !picks[i]));
     const sig = dcSig(dc, picks, step);
