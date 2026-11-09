@@ -859,7 +859,7 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 				lane: name => lanes.get(name),
 				conv: key => { const c = convs.conversations().find(x => x.primary === key); return c && { name: c.meta.name, live: convs.live(c) }; },
 			});
-			if (!b.text && !files.length && !elements.length) return json({ error: "text required" }, 400);
+			if (!String(b.text ?? "").trim() && !files.length && !elements.length) return json({ error: "text required" }, 400);
 			const text = String(b.text ?? "");
 			const login = req.headers.get("tailscale-user-login") ?? "local";
 			// mode: none (main takes it as the next message, a working lane is steered), "steer" (into the running turn

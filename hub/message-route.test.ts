@@ -3,7 +3,7 @@ import { setupEnv } from "../features/reply-drafts/test/helpers.ts";
 import { HUB_TOKEN } from "./config.ts";
 import { makeRoute } from "./routes.ts";
 
-// POST /api/message: what the composer sends is stored once.
+// POST /api/message: what the composer sends is stored once, and nothing is stored for an empty message.
 const env = setupEnv();
 afterAll(env.cleanup);
 
@@ -20,5 +20,11 @@ describe("POST /api/message", () => {
 		expect(await lines("중복 시험")).toBe(1);
 		await call("POST", "/api/message", { text: "중복 시험", cid: "c-2" });
 		expect(await lines("중복 시험")).toBe(2);
+	});
+	test("a message of spaces only is refused and nothing is stored", async () => {
+		const r = await call("POST", "/api/message", { text: "   " });
+		expect(r.status).toBe(400);
+		expect(typeof ((await r.json()) as { error?: string }).error).toBe("string");
+		expect(await lines("   ")).toBe(0);
 	});
 });
