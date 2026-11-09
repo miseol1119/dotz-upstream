@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { clockKo, deriveLabel, describeOutput, humanLabel, isKeyLabel, isMachineOutput, nameKo, plainLabel, rawFence, scheduleLine, sentinelMatch, watchLine, watchSummary } from "./watchtext.ts";
+import { clockKo, deriveLabel, describeOutput, humanLabel, isKeyLabel, isMachineOutput, nameKo, plainLabel, rawFence, scheduleLabel, scheduleLine, sentinelMatch, watchLine, watchSummary } from "./watchtext.ts";
 
 const KAKAO = "kakao chat=100000000000001 new=1 from=3900000000000000001 to=3900000000000000001 at=2026-10-22T12:26:36.000Z";
 const NOW = Date.parse("2026-10-22T13:00:00.000Z");
@@ -69,6 +69,33 @@ test("a schedule fire says a job started; the instruction folds, and the bell ge
 	expect(scheduleLine("주간 보고 정리")).toBe("예약한 일이 시작됐어요\n주간 보고 정리");
 });
 
+// Schedule texts are the whole instruction a schedule runs (Big Bath audit 2026-11-10): the owner reads the first sentence without what it runs.
+const SCHEDULES: [string, string][] = [
+	["Big Bath 점검 시간이에요. ~/.dotz/projects/big-bath/README.md대로 돌려요. `bun ~/.dotz/projects/big-bath/collect.ts`로 요청을 모아요.", "Big Bath 점검 시간이에요"],
+	["ch:7 피드백 데일리 보고: `ssh -o BatchMode=yes user@100.64.0.2 python3 - 24 < ~/.dotz/projects/feedback/collect.py`로 지난 24시간 메시지를 정리해요.", "피드백 데일리 보고: 지난 24시간 메시지를 정리해요"],
+	["피드백 데일리 보고: ssh -o BatchMode=yes user@100.64.0.2 python3 - 24 < ~/x.py", "피드백 데일리 보고"],
+	["00:00 릴리스(v261110.1, ecb372f) 재시작이 전체 시험 때문에 미뤄졌던 것 다시 확인: 7420 게이트웨이 pid 시작 시각을 봐요.", "00:00 릴리스(v261110.1) 재시작이 전체 시험 때문에…"],
+	["PR #71(프로젝트 목록 컴퓨터별 묶기, 5ec3dd7b) 실제 확인: 이 맥 설치본에 5ec3dd7b가 들어갔는지 보고(00시 릴리스), 들어갔으면 화면을 봐요.", "PR #71(프로젝트 목록 컴퓨터별 묶기) 실제 확인"],
+	["flaky-tests 3차: 맥이 한가한지(uptime load < 10) 보고 origin/main에서 ~/.dotz/projects/flaky-tests/run3.sh로 전체 테스트 3회. 2차(a3efff11) 때 실패한 파일을 봐요.", "flaky-tests 3차"],
+];
+// A match whose output lists items ("새 PR: ...") is counted like a change; one plain line keeps the match phrase.
+const MATCHES: [string, string, string, string][] = [
+	["깃허브 PR·이슈 확인", "matched /./", "새 PR: example/dotz#72 sample-user 접속 모드 표시", "깃허브 PR·이슈 확인: 새 PR 1건"],
+	["재시도 감시", "matched /./", "워커 도구 도중 끊김: 토큰 59.8M → 75.6M\n같은 호출 반복: 토큰 12.1M → 16.5M\n빈 깨움 cm:sample:notification: 토큰 12.2M → 16.3M", "재시도 감시: 조건에 맞는 항목 3건"],
+	["재고", "matched /./", "재고가 들어왔어요", "재고: 조건에 맞는 결과가 나왔어요"],
+];
+
+test("a schedule is named by its first sentence, without the commands, paths and ids it runs", () => {
+	for (const [text, name] of SCHEDULES) {
+		expect(scheduleLabel(text)).toBe(name);
+		expect(scheduleLine(text, { raw: false })).toBe(name);
+	}
+});
+
+test("a match that lists items says how many in its first line, as a change does", () => {
+	for (const [label, reason, out, head] of MATCHES) expect(watchLine(label, reason, out, { raw: false })).toBe(`${head}\n${out}`);
+});
+
 test("a JSON report reads in Korean key words, a long log says its lines and last time, a recovery drops its status word", () => {
 	const opts = { now: NOW, tz: TZ };
 	expect(watchLine("상태", "output changed", JSON.stringify({ status: "ok", count: 3, latest: { title: "샘플 항목" }, build: true }), opts)).toBe(
@@ -85,8 +112,8 @@ test("web/js/11-watchtext.js words the same posts as this module", () => {
 	const web = new Function(`${src}; return { watchLine, scheduleLine, humanLabel };`)() as Record<string, (...a: any[]) => string>;
 	const opts = { now: NOW, tz: TZ };
 	const cases: [string, string, string, string?][] = [["kakao-new", "matched /./", KAKAO], ["재고", "output changed", "새 메일이 1통 왔어요"], ["저장소 감시", "matched /gone/", "sample-repo-gone"], ["저장소 감시", "matched /gone/", "READY\n재고가 들어왔어요"], ["저장소 감시", "output changed", "sample-repo-gone", "sample-repo-here"], ["api-health", "failed 3 times in a row (exit 7)", "curl: (7) boom"], ["x", "recovered", ""], ["x", "recovered", "ok"], ["상태", "output changed", '{"status":"ok","latest":{"at":"2025-01-02T01:00:00Z"}}'], ["로그", "output changed", "2025-01-02T01:10:00Z a=1 b=2\n2025-01-02T01:11:00Z a=1 b=3\n2025-01-02T01:12:00Z a=1 b=4"], ["재고", "output changed", "Item A\nItem C", "Item A\nItem B"], ["재고", "fail", "DOTZ_FAIL login\nx"], ["상태", "output changed", '{"version":"8.2.36","id":"q"}'], ["상태", "output changed", "+ Build 9.1.0\n- Build 9.0.9"], ["sample-items", "match", ITEMS_NOW, ITEMS_PREV]];
-	for (const [l, r, o, prev] of cases) expect(web.watchLine!(l, r, o, { ...opts, prev })).toBe(watchLine(l, r, o, { ...opts, prev }));
-	for (const t of ["ch:7 morning brief: summarize", "주간 보고 정리"]) expect(web.scheduleLine!(t)).toBe(scheduleLine(t));
+	for (const [l, r, o, prev] of [...cases, ...MATCHES.map(([l, r, o]) => [l, r, o] as [string, string, string])]) expect(web.watchLine!(l, r, o, { ...opts, prev })).toBe(watchLine(l, r, o, { ...opts, prev }));
+	for (const t of ["ch:7 morning brief: summarize", "주간 보고 정리", ...SCHEDULES.map(([t]) => t)]) expect(web.scheduleLine!(t)).toBe(scheduleLine(t));
 	expect(web.humanLabel!("kakao-new")).toBe(humanLabel("kakao-new"));
 });
 

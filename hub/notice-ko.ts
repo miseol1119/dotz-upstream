@@ -164,7 +164,8 @@ function prose(s: string, o: PlainOpts): string {
 	t = t.replace(/^\[([^\]\n]{2,30})\][ \t]+(?=\S)/gm, (m, label: string) => (/^[\d\sx]+$/i.test(label) ? m : `${label}: `));
 	// An id can be all a code span held, or all a "근거:" piece: neither its marks nor its separator stay behind.
 	t = t.replace(/``/g, "").replace(/(:|·)[ \t]*·/g, "$1");
-	return josa(t).replace(/\(\s*[,·]?\s*\)|\[\s*\]/g, "").replace(/[ \t]+([,.!?)])/g, "$1").replace(/[ \t]{2,}/g, " ").replace(/[ \t]+$/gm, "").replace(/[ \t]*·[ \t]*$/gm, "");
+	// An id that ended a bracket's list leaves its comma ("(v1.2, )"), one that led it leaves it the other way.
+	return josa(t).replace(/[ \t]*[,·][ \t]*\)/g, ")").replace(/\([ \t]*[,·][ \t]*/g, "(").replace(/\(\s*\)|\[\s*\]/g, "").replace(/[ \t]+([,.!?)])/g, "$1").replace(/[ \t]{2,}/g, " ").replace(/[ \t]+$/gm, "").replace(/[ \t]*·[ \t]*$/gm, "");
 }
 
 // An error message as the owner reads it. Korean stays; an English / HTTP one becomes a sentence; "name: <english error>" keeps the name.

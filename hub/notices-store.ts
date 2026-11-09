@@ -9,7 +9,7 @@ import { alertMatter, quietAlert } from "./alert-gate.ts";
 import { eventTarget, isPeerMessage, type HubEvent } from "./events.ts";
 import { classOfNotice } from "./notice-class.ts";
 import { dropClaim, isSilent, parkedTone } from "./tone.ts";
-import { describeOutput, humanLabel, isIssue, itemRefOf, LOGIN_BLOCKED_KO, PROVIDER_BACK_KO, scheduleLine, sentinelMatch, watchLine } from "./watchtext.ts";
+import { describeOutput, humanLabel, isIssue, itemRefOf, LOGIN_BLOCKED_KO, matchTitle, PROVIDER_BACK_KO, scheduleLine, sentinelMatch, watchLine, watchReasonKo } from "./watchtext.ts";
 import { resolveItem, type WatchItem } from "./watchitem.ts";
 import type { Decision, DecisionOpt, Notice, NoticeKind, NoticeTone } from "./notices-types.ts";
 import { appBlocked, appOf, closedHooks, decisionHooks, orchestratorUp, stampApp, summarizeWatch, unreadHooks, watchLabelOf } from "./notices-wiring.ts";
@@ -20,12 +20,21 @@ import { broadcast, summary } from "./notices-read.ts";
 import { QUIET_MS, awaitingReply, isViewing, quietReplies, viewers } from "./notices-viewing.ts";
 import { decisionsOf, expiresAtOf, sending } from "./notices-decisions.ts";
 
+// A report stored before a schedule was said by its short name and a match that lists items by its count (2026-11-10) reads as a new one does.
+const MATCHED = `: ${watchReasonKo("matched /./")}`;
+function restored(n: Notice): string {
+	if (n.kind !== "watch") return n.text;
+	if (n.title === "예약") return clean(scheduleLine(n.text, { raw: false })).text;
+	const [head = "", ...rest] = n.text.split("\n");
+	const title = head.endsWith(MATCHED) ? matchTitle(rest.join("\n")) : undefined;
+	return title ? [`${head.slice(0, -MATCHED.length)}: ${title}`, ...rest].join("\n") : n.text;
+}
 const load = (): Notice[] => {
 	if (!existsSync(paths.notices)) return [];
 	try {
 		const parsed = JSON.parse(readFileSync(paths.notices, "utf8"));
-		// An entry stored before the claim word was dropped reads the same as a new one (clean).
-		return Array.isArray(parsed) ? parsed.filter((n): n is Notice => typeof n?.id === "string" && typeof n.text === "string").map(n => ({ ...n, text: dropClaim(n.text) })) : [];
+		// An entry stored before the claim word was dropped reads the same as a new one (clean), and so does an older report (restored).
+		return Array.isArray(parsed) ? parsed.filter((n): n is Notice => typeof n?.id === "string" && typeof n.text === "string").map(n => ({ ...n, text: restored({ ...n, text: dropClaim(n.text) }) })) : [];
 	} catch (e) {
 		log(`notices.json unreadable, starting empty: ${e}`);
 		return [];

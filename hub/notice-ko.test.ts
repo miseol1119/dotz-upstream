@@ -62,6 +62,12 @@ test("the page's copy is this code, and runs to the same answers", () => {
 	});
 });
 
+test("an id cut out of a bracket's list leaves no comma behind", () => {
+	expect(noticeKo("00:00 릴리스(v261110.1, ecb372f) 재시작을 다시 확인해요")).toBe("00:00 릴리스(v261110.1) 재시작을 다시 확인해요");
+	expect(noticeKo("PR #71(프로젝트 목록 컴퓨터별 묶기, 5ec3dd7b) 실제 확인")).toBe("PR #71(프로젝트 목록 컴퓨터별 묶기) 실제 확인");
+	expect(noticeKo("배포(ecb372f, 어제) 확인")).toBe("배포(어제) 확인");
+});
+
 test("an id that was all of a code span leaves no marks behind", () => {
 	expect(noticeKo("근거: `a1b2c3d` · 테스트 24개 통과")).toBe("근거: 테스트 24개 통과");
 	expect(noticeKo("커밋 `e1b86a59`, 테스트 · `a1b2c3d` · 끝")).not.toContain("``");

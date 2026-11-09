@@ -4,7 +4,7 @@ import { loadProjects } from "./projects.ts";
 import { listSchedules } from "./schedule.ts";
 import { allWatches, type Watch } from "./watch.ts";
 import { watchConnection } from "./watch-status.ts";
-import { describeOutput, failKindKo } from "./watchtext.ts";
+import { describeOutput, failKindKo, scheduleLabel } from "./watchtext.ts";
 import { projectTitle, type ScopeContext, watchScope } from "./watch-scope.ts";
 import { getSetup, watchLabel } from "./workchannels.ts";
 
@@ -79,9 +79,9 @@ export function listMonitors(): Monitor[] {
 		};
 	});
 	const schedules: Monitor[] = listSchedules().map(s => {
-		// A schedule's text starts with its internal target (ch:<id>, lane:<name>); the owner reads the words.
+		// A schedule's text is the whole instruction it runs, after its internal target (ch:<id>, lane:<name>); the owner reads its short name.
 		const channel = /^\s*(ch:\d+)/.exec(s.text)?.[1];
-		const name = s.text.replace(/^\s*(?:(?:ch|lane|th):\S+\s*)+/, "").trim().slice(0, 200) || "예약";
+		const name = scheduleLabel(s.text) || "예약";
 		return {
 			name,
 			schedule: s.id,

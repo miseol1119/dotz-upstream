@@ -1487,6 +1487,19 @@ test("a monitor report with nothing new is a record (log), also when it was stor
 	expect(loadIn(dir).items.map(n => (n as Listed).cls)).toEqual(["log"]);
 });
 
+test("reports stored before 2026-11-10 read as new ones do: a schedule by its short name, a match that lists items by its count", () => {
+	const at = new Date(Date.now() - 3_600_000).toISOString();
+	const dir = storeDir({
+		notices: [
+			stale("fffffff2", "main", at, { kind: "watch", title: "예약", text: "flaky-tests 3차: 맥이 한가한지(uptime load < 10) 보고 origin/main에서 …", key: undefined }),
+			stale("fffffff3", "alert", at, { kind: "watch", title: "깃허브 PR·이슈 확인", text: "깃허브 PR·이슈 확인: 조건에 맞는 결과가 나왔어요\n새 PR: 새 저장소 목록 표시", open: "alert", src: "alert", key: undefined }),
+		],
+	});
+	const text = Object.fromEntries(loadIn(dir).items.map(n => [n.id, n.text]));
+	expect(text.fffffff2).toBe("flaky-tests 3차");
+	expect(text.fffffff3).toBe("깃허브 PR·이슈 확인: 새 PR 1건\n새 PR: 새 저장소 목록 표시");
+});
+
 test("a report that found nothing new is a log, in the alert and the monitor paths alike; one that found something stays listed", () => {
 	emit("outbox", { ts: ts(), kind: "out", source: "gateway", target: "ch:9571", text: "[감시9571] 확인했어요. 바뀐 곳은 없어요." });
 	emit("outbox", { ts: ts(), kind: "out", source: "gateway", target: "alert", text: "[감시9572] 확인했어요. 바뀐 곳은 없어요." });

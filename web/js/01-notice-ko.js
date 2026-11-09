@@ -273,7 +273,7 @@ function prose(s, o) {
   t = t.split(/(`[^`\n]*`)/).map((s, i) => i % 2 ? s : s.replace(STATUS, "")).join("");
   t = t.replace(/^\[([^\]\n]{2,30})\][ \t]+(?=\S)/gm, (m, label) => /^[\d\sx]+$/i.test(label) ? m : `${label}: `);
   t = t.replace(/``/g, "").replace(/(:|·)[ \t]*·/g, "$1");
-  return josa(t).replace(/\(\s*[,·]?\s*\)|\[\s*\]/g, "").replace(/[ \t]+([,.!?)])/g, "$1").replace(/[ \t]{2,}/g, " ").replace(/[ \t]+$/gm, "").replace(/[ \t]*·[ \t]*$/gm, "");
+  return josa(t).replace(/[ \t]*[,·][ \t]*\)/g, ")").replace(/\([ \t]*[,·][ \t]*/g, "(").replace(/\(\s*\)|\[\s*\]/g, "").replace(/[ \t]+([,.!?)])/g, "$1").replace(/[ \t]{2,}/g, " ").replace(/[ \t]+$/gm, "").replace(/[ \t]*·[ \t]*$/gm, "");
 }
 function errorKo(msg) {
   const m = msg.trim();

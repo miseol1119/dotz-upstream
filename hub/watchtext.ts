@@ -169,12 +169,25 @@ function keepMoved(added: string[], removed: string[]): { added: string[]; remov
 	});
 	return { added: now, removed: removed.filter(l => !moved.has(l)) };
 }
-// "이슈 갱신 4건" when the added lines share one or two short kinds, else "새 항목 N건"; then "사라진 항목 M건".
+// "이슈 갱신 4건" when the lines share one or two short kinds.
+function kindTitle(lines: string[]): string | undefined {
+	const kinds = [...new Set(lines.map(kindOf))];
+	if (kinds.length > 2 || !kinds.every(k => k && k.length <= 12)) return undefined;
+	return kinds.map(k => `${k} ${lines.filter(l => kindOf(l) === k).length}건`).join(" · ");
+}
+// "이슈 갱신 4건" (kindTitle), else "새 항목 N건"; then "사라진 항목 M건".
 function changeTitle(added: string[], removed: string[]): string {
-	const kinds = [...new Set(added.map(kindOf))];
-	const named = kinds.length <= 2 && kinds.every(k => k && k.length <= 12);
-	const a = !added.length ? [] : named ? kinds.map(k => `${k} ${added.filter(l => kindOf(l) === k).length}건`) : [`새 항목 ${added.length}건`];
+	const a = added.length ? [kindTitle(added) ?? `새 항목 ${added.length}건`] : [];
 	return [...a, ...(removed.length ? [`사라진 항목 ${removed.length}건`] : [])].join(" · ");
+}
+// A match whose output lists items one per line ("새 PR: owner/repo#72 ...") is counted as a change is: "새 PR 1건", or "조건에 맞는 항목 3건" when the
+// lines have no common kind. One line that is not an item, or output that is not plain Korean, has no count.
+const LISTED = /^\S.{0,40}?:\s+\S/;
+export function matchTitle(output: string): string | undefined {
+	if (!HANGUL.test(output) || isMachineOutput(output)) return undefined;
+	const items = linesOf(output).map(l => l.replace(/^[-•]\s+/, "")).filter(l => !SENTINEL.test(l));
+	if (!items.length || !items.every(l => LISTED.test(l))) return undefined;
+	return kindTitle(items) ?? (items.length > 1 ? `조건에 맞는 항목 ${items.length}건` : undefined);
 }
 
 function flatJson(v: unknown, key: string, out: string[], now?: number, tz?: string): void {
@@ -263,7 +276,8 @@ export function watchLine(label: string, reason: string, output = "", opts: Line
 	const d = describeOutput(out, { prev: opts.prev, issue: isIssue(reason), now: opts.now, tz: opts.tz });
 	// Only a change or a match is said by its count; "다시 정상이에요" and other reasons stay (notices-store reads them).
 	const counted = /^(output changed|change|match|matched \/)/.test(reason.trim());
-	const lines = [first((counted && d.readable && d.title) || watchReasonKo(reason))];
+	const listed = reason.trim().startsWith("match") && d.text !== WATCH_UNCHANGED_KO ? matchTitle(out) : undefined;
+	const lines = [first((counted && d.readable && (d.title ?? listed)) || watchReasonKo(reason))];
 	const text = d.readable ? d.text : opts.summary ?? "";
 	if (text && text === out) return `${lines[0]}\n${out}`;
 	if (text) lines.push(text);
@@ -316,15 +330,53 @@ export function deriveLabel(i: LabelInput): string {
 export const isKeyLabel = (label: string): boolean => KEYISH.test(label.trim().replace(/\s+/g, "-")) && !/[A-Z가-힣]/.test(label);
 
 const TARGETS = /^\s*(?:(?:ch|lane|th):\S+\s*)+/;
-const SUMMARY_MAX = 60;
+// A schedule's name is as long as a title on the web (web/js/30-monitoring.js MON_TITLE_MAX).
+const LABEL_MAX = 40;
+// A command in a schedule's text (the web's MON_CMD): a file name, a shell command with its flags or a path, a flag, a redirect or pipe, a path, an address.
+const CMD = /\b[\w.-]+\.(?:md|jsonl?|ya?ml|toml|log|py|sh)\b|\b(?:ssh|scp|rsync|curl|wget|python3?|node|bun|npm|npx|bash|zsh|git|sudo|docker|osascript)\s+(?:-|[\w.-]*@|~|\.{0,2}\/|[\w.-]+\.(?:py|sh|js|ts|mjs)\b)|(?:^|\s)-{1,2}[A-Za-z][\w-]*(?:=|\s|$)|\s[<>|]{1,2}\s|\$\(|~\/|(?:^|\s)\.{0,2}\/[\w.-]+\/|@\d{1,3}(?:\.\d{1,3}){3}/;
+// What the text runs and names for the machine, with the particle after it ("README.md대로", "`bun x.ts`로"): a code span, a path or file name, a commit id.
+const PARTICLE = "(?:대로|으로|에서|로|을|를|이|가|은|는|에|의)?";
+const RUNS = new RegExp(
+	["`[^`\\n]*(?:`|$)", "(?<!\\S)(?:~|\\.{1,2})?\\/[\\w.\\/-]*[\\w\\/]", "(?<![\\w.\\/-])[\\w.\\/-]*\\.(?:md|jsonl?|ya?ml|toml|log|py|sh|ts|js|mjs)\\b", "\\b(?=[0-9a-f]*\\d)(?=[0-9a-f]*[a-f])[0-9a-f]{7,40}\\b"]
+		.map(p => `${p}${PARTICLE}`)
+		.join("|"),
+	"g",
+);
+const cutWords = (s: string, n: number): string => {
+	if (s.length <= n) return s;
+	const t = s.slice(0, n - 1), at = t.lastIndexOf(" ");
+	return `${(at > n / 2 ? t.slice(0, at) : t).replace(/[\s,·:(]+$/, "")}…`;
+};
 
-// A schedule fire: its text is the instruction to the orchestrator (often English, with commands). The owner reads that a scheduled job started, plus the
-// first line when it is Korean; the instruction itself folds (raw: false is the bell's one line: that first line, else the plain phrase).
+// The short name of a schedule, from its text (the whole instruction it runs): the first sentence without what it runs (RUNS, a bracket or the rest of a
+// sentence that holds a command), without the brackets and commas an id leaves behind; a sentence too long for a title keeps the words before its first
+// ": " ("flaky-tests 3차"), else it is cut between words. "" when nothing readable is left.
+export function scheduleLabel(text: string): string {
+	let s = (text.replace(TARGETS, "").trim().split("\n")[0] ?? "").replace(/\s+/g, " ");
+	s = s.replace(/\s*[(（][^()（）]*(?:[)）]|$)/g, m => (CMD.test(m) || /^\s*[(（]state\s/.test(m) ? "" : m)).replace(RUNS, "");
+	s = s.replace(/[ \t]*[,·][ \t]*([)）])/g, "$1").replace(/([(（])[ \t]*[,·][ \t]*/g, "$1").replace(/\s*[(（]\s*[)）]/g, "");
+	s = s.replace(/\s+([,.!?)])/g, "$1").replace(/\s{2,}/g, " ").trim();
+	if (CMD.test(s)) {
+		const i = s.search(/[:：]\s/), keep: string[] = [];
+		for (const t of (i > 0 ? s.slice(0, i) : s).split(/(?<=[.!?。])\s+/)) {
+			if (CMD.test(t)) break;
+			keep.push(t);
+		}
+		s = keep.join(" ");
+	}
+	const sentence = (s.split(/(?<=[.!?。])\s+/)[0] ?? "").replace(/[\s,·:.。]+$/, "");
+	const head = sentence.split(/[:：]\s/)[0]!.trim();
+	const label = sentence.length > LABEL_MAX && head !== sentence && head.length <= LABEL_MAX && /[가-힣A-Za-z]{2,}/.test(head) ? head : cutWords(sentence, LABEL_MAX);
+	return /[가-힣A-Za-z]{2,}/.test(label) && !isMachineOutput(label) ? label : "";
+}
+
+// A schedule fire: its text is the instruction to the orchestrator (often English, with commands). The owner reads that a scheduled job started, plus its
+// name (scheduleLabel) when it is Korean; the instruction itself folds (raw: false is the bell's one line: that name, else the plain phrase).
 export function scheduleLine(text: string, opts: LineOpts = {}): string {
 	const body = text.replace(TARGETS, "").trim();
-	const first = body.split("\n")[0]!.trim();
 	const head = "예약한 일이 시작됐어요";
-	const said = HANGUL.test(first) && !isMachineOutput(first) ? (first.length > SUMMARY_MAX ? `${first.slice(0, SUMMARY_MAX - 1)}…` : first) : "";
+	const label = scheduleLabel(body);
+	const said = HANGUL.test(label) ? label : "";
 	if (opts.raw === false) return said || head;
 	const lines = [head];
 	if (said) lines.push(said);
