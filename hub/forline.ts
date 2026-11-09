@@ -7,6 +7,7 @@ const NAME_RE = NAME.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // 땃쥐 is the other gateway's name: reports stored there still carry it. `-# ` is how a system note is stored (hub/outbound.ts).
 const FOR_LINE = new RegExp(`^\\s*(?:-#?\\s+)?(?:\\*\\*)?(?:For (?:${NAME_RE}|땃쥐):|(?:${NAME_RE}|땃쥐) 몫:)`, "i");
 const FENCE = /^\s*```/;
+export const isForLine = (line: string): boolean => FOR_LINE.test(line);
 
 export function dropForLine(text: string): string {
 	let fence = false;

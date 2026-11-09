@@ -8,6 +8,7 @@ import { bareAsk, normalizeAsk } from "./ask-normalize.ts";
 import { parseDecisions } from "./choices.ts";
 import { join } from "node:path";
 import { workerCheck } from "./activity.ts";
+import { orchestratorOnlyAsk } from "./forline.ts";
 import { msg } from "./i18n.ts";
 import { checkDone, doneChecks, type Check } from "./donesignals.ts";
 import { unlanded } from "./lanetree.ts";
@@ -86,7 +87,8 @@ export function report(lane: Lane, written: string, notice: boolean | "pause" = 
 	// 2026-10-21: their [done] could not be verified).
 	const claimsDone = tone === "done" || (!tone && /\[(done|완료)\]/i.test(text));
 	lane.claim = claimsDone ? { state: "reported", at: now() } : tone ? undefined : lane.claim;
-	if (tone === "ask" && !notice) {
+	// An [ask] that only hands its question to the orchestrator ("<bot> 몫:") waits on no owner answer: no 답변 필요 mark, no pending-ask entry.
+	if (tone === "ask" && !notice && !orchestratorOnlyAsk(parseTone(text).text)) {
 		lane.askRefused = false;
 		lane.pendingAsk = { text, at: now() };
 		writeAtomic(pendingAskFile(lane.name), `${text}\n`);

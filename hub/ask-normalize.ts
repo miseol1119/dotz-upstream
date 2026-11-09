@@ -7,7 +7,7 @@
 import { askedDraft } from "./ask-options.ts";
 import { D_CLOSE, DECISION_HEAD, D_OPT, DETAIL_DESC, DETAIL_MARK, parseDecisions, stripRecommendMark } from "./choices.ts";
 import { parseDraftApproval, parseQuotedDraft } from "./draft-approval.ts";
-import { orchestratorOnlyAsk } from "./forline.ts";
+import { isForLine, orchestratorOnlyAsk } from "./forline.ts";
 import { parseTone, splitTone } from "./tone.ts";
 
 const FENCE = /^\s*```/;
@@ -66,7 +66,9 @@ function optionOf(body: string, headed = false): Option | undefined {
 const isTail = (line: string) => META.test(line) || D_CLOSE.test(line) || CLOSING.test(line) || LABELED.test(line);
 
 // The options from line `from` to the message's end (or `limit`): nothing but options, one description line each, and closing lines.
-function readOptions(lines: string[], fenced: boolean[], from: number, limit: number): { options: Option[]; end: number } | undefined {
+// In an [ask] (`marked`) a numbered list under the question is its options however long they run (split-panes 2026-11-09): a long name is cut
+// to a button's size with the whole line as its description, as under a "결정:" line.
+function readOptions(lines: string[], fenced: boolean[], from: number, limit: number, marked: boolean): { options: Option[]; end: number } | undefined {
 	const options: Option[] = [];
 	let style = "";
 	let i = from;
@@ -78,7 +80,7 @@ function readOptions(lines: string[], fenced: boolean[], from: number, limit: nu
 		const n = NUMBERED.exec(line), b = BULLET.exec(line);
 		const body = n && style !== "bullet" && Number(n[1]) === options.length + 1 ? n[2] : !n && b && style !== "number" ? b[1] : undefined;
 		if (body !== undefined) {
-			const o = optionOf(body);
+			const o = optionOf(body, marked && !!n);
 			if (!o) return undefined;
 			options.push(o);
 			style = n ? "number" : "bullet";
@@ -106,9 +108,11 @@ function findBlock(lines: string[], fenced: boolean[], limit: number, marked: bo
 		if (fenced[q] || !line.trim() || /^\s*[>|]/.test(line)) continue;
 		const head = HEADING.exec(line);
 		if (!head && BULLET.test(line)) continue;
+		// A question on the "For <bot>:" line is the orchestrator's to answer: its list is no owner card (forline.ts orchestratorOnlyAsk).
+		if (isForLine(line)) return undefined;
 		const text = head ? (head[1] ?? "") : plain(line);
 		if (!head && !ASKS.test(text)) continue;
-		const got = readOptions(lines, fenced, q + 1, limit);
+		const got = readOptions(lines, fenced, q + 1, limit, marked);
 		if (!got) continue;
 		const parts = sentences(text);
 		const at = parts.findLastIndex(s => /[?？]|까요|나요|주세요/.test(s));
