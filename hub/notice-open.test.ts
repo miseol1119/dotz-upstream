@@ -167,8 +167,8 @@ describe("entry points use the shared handler", () => {
 		make({ current: "chat", target: "alert" });
 		expect(tap({})).toEqual(["stop", "prevent"]);
 		expect(opened).toEqual([{ e: msgs[0] }]);
-		const link = "a, summary, details[open] pre, input, textarea, button:not(.dcm-row)";
-		expect(tap({ [link]: true })).toEqual([]);   // a link / fold / other button inside keeps its own job
+		const link = "a, summary, details[open] pre, input, textarea, button:not(.dcm-row), .fatt";
+		expect(tap({ [link]: true })).toEqual([]);   // a link / fold / other button / file row inside keeps its own job
 		expect(opened).toHaveLength(1);
 		make({ current: "chat", target: "main" });   // the main chat is untouched: its choice rows answer in place
 		expect(tap({})).toEqual([]);
