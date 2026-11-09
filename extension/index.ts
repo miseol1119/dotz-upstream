@@ -35,6 +35,7 @@ import { installHarnessTools } from "./harness-tools.ts";
 import { installOutputCap } from "./output-cap.ts";
 import { installOwnerValues } from "./owner-values.ts";
 import { installTaskCap } from "./task-cap.ts";
+import { installEffortBound } from "./effort-bound.ts";
 import { installBgGuard } from "./bg-guard.ts";
 import { jsonZod, params } from "./schema.ts";
 import { secretIn } from "./peer-secrets.ts";
@@ -662,6 +663,7 @@ export default function dotz(host: any) {
 	if (process.env.DOTZ_ORCHESTRATOR === "1") {
 		enforceRules(pi);
 		installCompactKept(pi);
+		installEffortBound(pi, join(DATA, "effort-bound.json"));
 		orchestratorTools(pi);
 	}
 	else terminalClient(pi);

@@ -179,6 +179,18 @@ with a warning that names the session's current context tokens; repeat the comma
 it. The API (`PUT /api/models`) answers 409 `{requires_force: true, context_tokens}` until the body has
 `"force": true`; the web UI shows that warning as a confirm dialog and then sends with force.
 
+**Results at their spawn effort.** The orchestrator (extension/effort-bound.ts) records its thinking level with each piece
+of background work it starts: a `task` worker (a `[later]` request's worker included) and a session given work with
+`dotz_lane` launch/send/handover (`<data>/effort-bound.json`). A turn that a result starts (OmO's task completion wake, a
+session report from the inbox) runs at the recorded level, set in `before_agent_start` and put back at `agent_end`, so the
+owner's next message and work spawned after an effort change use the current setting. Several results in one turn run at
+the highest of their levels; a recorded level equal to the current one sends no switch; a result that arrives while a turn
+runs joins that turn. Sessions keep their own model and effort for their whole run (`lane.model`, fixed at launch). Cost:
+on Opus/Sonnet 5.5 OmO sends an effort change as an appended configuration message, so the cached prefix stays: 9 of 9
+in-place switches in the orchestrator's sessions (132-249K context, 2026-11-02..09) read the whole prefix from cache and
+wrote 0.5-3.2K, and a real OmO run switched for one result turn (medium -> low -> medium) read 29,987 then 30,545 of
+~30K from cache and wrote 558 and 201. So each result turn switches directly instead of waiting to batch results.
+
 **Context and compaction.** Context tokens come from each assistant message's usage and from the conversation's
 RPC `get_state` / `get_session_stats` (`contextUsage`: tokens, window, percent; OmO and omp speak the same pi RPC).
 `/compact` sends the RPC `compact`: immediately when the conversation is idle, otherwise the state is `queued` and it is
