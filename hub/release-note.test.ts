@@ -62,6 +62,22 @@ describe("buildReleaseNote", () => {
 		}
 	});
 
+	test("a 왜: sentence wrapped over lines is taken whole, never cut at a line break", () => {
+		// Bodies of two real commits whose reasons came out as "...보였고,." in a release note.
+		const wrapped: NoteCommit[] = [
+			{ subject: "사용량 한도 알림의 초기화 남은 시간을 내림해 한국어로 표시", body: "왜: 채팅/알림과 usage CLI의 한도 문구는 남은 시간을 반올림해 6일 23시간 59분이 7d0h로 보였고,\n웹 사용량 화면(6일 23시간)과 단위와 값이 달랐다.\n\n어떻게: 남은 시간을 웹 화면과 같은 규칙으로 내림해 두 단위까지 쓴다(6일 23시간 뒤 초기화,\n3시간 12분, 59분), 지난 초기화는 \"초기화 중\".", files: ["hub/usage.ts"] },
+			{ subject: "사용량 화면에 Claude 요금제 이름과 내림한 초기화 남은 시간 표시", body: "왜: 사용량 상세 화면이 구독 요금제(Pro, Max 5x, Max 20x, Ultra 등)를 구분하지 않았고,\n초기화까지 남은 시간을 반올림해 6일 23시간이 7일로 보였다.\n\n어떻게: 남은 시간은 내림해 두 단위로만 쓴다.", files: ["web/a.js"] },
+			{ subject: "끊긴 이유는 싣지 않아요", body: "왜: 이 문장은 끝나지 않고,\n\n어떻게: 이것도 끝나지 않고,", files: ["web/b.js"] },
+		];
+		const items = note(wrapped).split("\n").filter(l => l.startsWith("- "));
+		expect(items).toEqual([
+			"- 사용량 화면에 Claude 요금제 이름과 내림한 초기화 남은 시간 표시. 사용량 상세 화면이 구독 요금제(Pro, Max 5x, Max 20x, Ultra 등)를 구분하지 않았고, 초기화까지 남은 시간을 반올림해 6일 23시간이 7일로 보였다.",
+			"- 끊긴 이유는 싣지 않아요",
+			"- 사용량 한도 알림의 초기화 남은 시간을 내림해 한국어로 표시. 채팅/알림과 usage CLI의 한도 문구는 남은 시간을 반올림해 6일 23시간 59분이 7d0h로 보였고, 웹 사용량 화면(6일 23시간)과 단위와 값이 달랐다.",
+		]);
+		for (const item of items) expect(item).not.toMatch(/[,;:]\s*\.?$/);
+	});
+
 	test("nothing to report still gives a note", () => {
 		expect(note(FIXTURE.slice(0, 2))).toContain("이번 버전에는 바뀐 기능이 없어요.");
 	});

@@ -49,8 +49,11 @@ function topicOf(files: readonly string[]): string {
 	return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] ?? OTHER;
 }
 
+// A wrapped body breaks lines mid-sentence, so the first paragraph is one line before it is split into sentences; one left open (ending in a comma) is no reason at all.
 function firstSentence(text: string): string {
-	const sentence = text.trim().split(/(?<=[.!?])\s+|\n/)[0]?.replace(TICKET, "").trim() ?? "";
+	const paragraph = text.trim().split(/\n\s*\n/)[0].replace(/\s+/g, " ");
+	const sentence = paragraph.split(/(?<=[.!?])\s+/)[0].replace(TICKET, "").trim();
+	if (/[,;:]$/.test(sentence)) return "";
 	return sentence && !/[.!?]$/.test(sentence) ? `${sentence}.` : sentence;
 }
 
