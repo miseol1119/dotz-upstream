@@ -78,9 +78,12 @@ const SCHEDULES: [string, string][] = [
 	["PR #71(프로젝트 목록 컴퓨터별 묶기, 5ec3dd7b) 실제 확인: 이 맥 설치본에 5ec3dd7b가 들어갔는지 보고(00시 릴리스), 들어갔으면 화면을 봐요.", "PR #71(프로젝트 목록 컴퓨터별 묶기) 실제 확인"],
 	["flaky-tests 3차: 맥이 한가한지(uptime load < 10) 보고 origin/main에서 ~/.dotz/projects/flaky-tests/run3.sh로 전체 테스트 3회. 2차(a3efff11) 때 실패한 파일을 봐요.", "flaky-tests 3차"],
 ];
-// A match whose output lists items ("새 PR: ...") is counted like a change; one plain line keeps the match phrase.
-const MATCHES: [string, string, string, string][] = [
-	["깃허브 PR·이슈 확인", "matched /./", "새 PR: example/dotz#72 sample-user 접속 모드 표시", "깃허브 PR·이슈 확인: 새 PR 1건"],
+// A match whose output lists items ("새 PR: ...") is counted like a change; one plain line keeps the match phrase. The last column is the items as shown:
+// a kind the count already names is not said again on each item (undefined: the output as it is).
+const MATCHES: [string, string, string, string, string?][] = [
+	["깃허브 PR·이슈 확인", "matched /./", "새 PR: example/dotz#72 sample-user 접속 모드 표시", "깃허브 PR·이슈 확인: 새 PR 1건", "example/dotz#72 sample-user 접속 모드 표시"],
+	["깃허브 이슈", "matched /./", "새 이슈: example/dotz#80 로그인 오류\n새 이슈: example/dotz#81 알림이 두 번 와요", "깃허브 이슈: 새 이슈 2건", "example/dotz#80 로그인 오류\nexample/dotz#81 알림이 두 번 와요"],
+	["깃허브 PR·이슈 확인", "matched /./", "새 PR: example/dotz#72 접속 모드 표시\n새 이슈: example/dotz#80 로그인 오류", "깃허브 PR·이슈 확인: 새 PR 1건 · 새 이슈 1건"],
 	["재시도 감시", "matched /./", "워커 도구 도중 끊김: 토큰 59.8M → 75.6M\n같은 호출 반복: 토큰 12.1M → 16.5M\n빈 깨움 cm:sample:notification: 토큰 12.2M → 16.3M", "재시도 감시: 조건에 맞는 항목 3건"],
 	["재고", "matched /./", "재고가 들어왔어요", "재고: 조건에 맞는 결과가 나왔어요"],
 ];
@@ -93,7 +96,7 @@ test("a schedule is named by its first sentence, without the commands, paths and
 });
 
 test("a match that lists items says how many in its first line, as a change does", () => {
-	for (const [label, reason, out, head] of MATCHES) expect(watchLine(label, reason, out, { raw: false })).toBe(`${head}\n${out}`);
+	for (const [label, reason, out, head, shown] of MATCHES) expect(watchLine(label, reason, out, { raw: false })).toBe(`${head}\n${shown ?? out}`);
 });
 
 test("a JSON report reads in Korean key words, a long log says its lines and last time, a recovery drops its status word", () => {

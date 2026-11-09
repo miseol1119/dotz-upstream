@@ -189,6 +189,13 @@ export function matchTitle(output: string): string | undefined {
 	if (!items.length || !items.every(l => LISTED.test(l))) return undefined;
 	return kindTitle(items) ?? (items.length > 1 ? `조건에 맞는 항목 ${items.length}건` : undefined);
 }
+// The items under a match's count (matchTitle): when the count names their one kind ("새 PR 1건"), an item does not say it again ("새 PR: owner/repo#72 ..."
+// reads "owner/repo#72 ..."). Items under two kinds or under "조건에 맞는 항목 N건" keep theirs.
+export function matchItems(text: string, title: string): string {
+	const kind = /^(.+) \d+건$/.exec(title)?.[1];
+	if (!kind || kind.includes(" · ")) return text;
+	return text.replace(/^([ \t]*(?:[-•][ \t]+)?)([^:\n]{1,20}?):[ \t]+(?=\S)/gm, (m, pre: string, k: string) => (k === kind ? pre : m));
+}
 
 function flatJson(v: unknown, key: string, out: string[], now?: number, tz?: string): void {
 	if (out.length >= 8) return;
@@ -277,10 +284,12 @@ export function watchLine(label: string, reason: string, output = "", opts: Line
 	// Only a change or a match is said by its count; "다시 정상이에요" and other reasons stay (notices-store reads them).
 	const counted = /^(output changed|change|match|matched \/)/.test(reason.trim());
 	const listed = reason.trim().startsWith("match") && d.text !== WATCH_UNCHANGED_KO ? matchTitle(out) : undefined;
-	const lines = [first((counted && d.readable && (d.title ?? listed)) || watchReasonKo(reason))];
+	const said = counted && d.readable && (d.title ?? listed);
+	const lines = [first(said || watchReasonKo(reason))];
 	const text = d.readable ? d.text : opts.summary ?? "";
-	if (text && text === out) return `${lines[0]}\n${out}`;
-	if (text) lines.push(text);
+	const shown = listed && said === listed ? matchItems(text, listed) : text;
+	if (text && text === out) return `${lines[0]}\n${shown}`;
+	if (shown) lines.push(shown);
 	if (opts.raw !== false) lines.push(rawFence(out));
 	return lines.join("\n");
 }

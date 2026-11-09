@@ -9,7 +9,7 @@ import { alertMatter, quietAlert } from "./alert-gate.ts";
 import { eventTarget, isPeerMessage, type HubEvent } from "./events.ts";
 import { classOfNotice } from "./notice-class.ts";
 import { dropClaim, isSilent, parkedTone } from "./tone.ts";
-import { describeOutput, humanLabel, isIssue, itemRefOf, LOGIN_BLOCKED_KO, matchTitle, PROVIDER_BACK_KO, scheduleLine, sentinelMatch, watchLine, watchReasonKo } from "./watchtext.ts";
+import { describeOutput, humanLabel, isIssue, itemRefOf, LOGIN_BLOCKED_KO, matchItems, matchTitle, PROVIDER_BACK_KO, scheduleLine, sentinelMatch, watchLine, watchReasonKo } from "./watchtext.ts";
 import { resolveItem, type WatchItem } from "./watchitem.ts";
 import type { Decision, DecisionOpt, Notice, NoticeKind, NoticeTone } from "./notices-types.ts";
 import { appBlocked, appOf, closedHooks, decisionHooks, orchestratorUp, stampApp, summarizeWatch, unreadHooks, watchLabelOf } from "./notices-wiring.ts";
@@ -27,7 +27,7 @@ function restored(n: Notice): string {
 	if (n.title === "예약") return clean(scheduleLine(n.text, { raw: false })).text;
 	const [head = "", ...rest] = n.text.split("\n");
 	const title = head.endsWith(MATCHED) ? matchTitle(rest.join("\n")) : undefined;
-	return title ? [`${head.slice(0, -MATCHED.length)}: ${title}`, ...rest].join("\n") : n.text;
+	return title ? [`${head.slice(0, -MATCHED.length)}: ${title}`, matchItems(rest.join("\n"), title)].join("\n") : n.text;
 }
 const load = (): Notice[] => {
 	if (!existsSync(paths.notices)) return [];

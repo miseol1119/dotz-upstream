@@ -1497,7 +1497,7 @@ test("reports stored before 2026-11-10 read as new ones do: a schedule by its sh
 	});
 	const text = Object.fromEntries(loadIn(dir).items.map(n => [n.id, n.text]));
 	expect(text.fffffff2).toBe("flaky-tests 3차");
-	expect(text.fffffff3).toBe("깃허브 PR·이슈 확인: 새 PR 1건\n새 PR: 새 저장소 목록 표시");
+	expect(text.fffffff3).toBe("깃허브 PR·이슈 확인: 새 PR 1건\n새 저장소 목록 표시");
 });
 
 test("a report that found nothing new is a log, in the alert and the monitor paths alike; one that found something stays listed", () => {

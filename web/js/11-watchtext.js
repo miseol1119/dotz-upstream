@@ -100,6 +100,12 @@ function wtMatchTitle(output) {
   if (!items.length || !items.every(l => /^\S.{0,40}?:\s+\S/.test(l))) return undefined;
   return wtKindTitle(items) ?? (items.length > 1 ? "조건에 맞는 항목 " + items.length + "건" : undefined);
 }
+// hub/watchtext.ts matchItems: under a count that names one kind ("새 PR 1건"), an item does not say that kind again.
+function wtMatchItems(text, title) {
+  const kind = (/^(.+) \d+건$/.exec(title) || [])[1];
+  if (!kind || kind.includes(" · ")) return text;
+  return text.replace(/^([ \t]*(?:[-•][ \t]+)?)([^:\n]{1,20}?):[ \t]+(?=\S)/gm, (m, pre, k) => (k === kind ? pre : m));
+}
 function wtFlat(v, key, out, now, tz) {
   if (out.length >= 8) return;
   if (v && typeof v === "object" && !Array.isArray(v)) {
@@ -162,11 +168,13 @@ function watchLine(label, reason, output = "", opts = {}) {
   if (String(reason).trim() === "recovered" && /^[\w.-]{1,12}$/.test(out)) return head(watchReasonKo(reason)) + "\n점검이 다시 통과했어요";
   const d = describeOutput(out, { prev: opts.prev, issue: wtIssue(reason), now: opts.now, tz: opts.tz });
   const listed = String(reason).trim().startsWith("match") && d.text !== "내용은 그대로이고 시각 같은 값만 바뀌었어요" ? wtMatchTitle(out) : undefined;
-  const first = head((/^(output changed|change|match|matched \/)/.test(String(reason).trim()) && d.readable && (d.title ?? listed)) || watchReasonKo(reason));
+  const said = /^(output changed|change|match|matched \/)/.test(String(reason).trim()) && d.readable && (d.title ?? listed);
+  const first = head(said || watchReasonKo(reason));
   const text = d.readable ? d.text : opts.summary || "";
-  if (text && text === out) return first + "\n" + out;
+  const shown = listed && said === listed ? wtMatchItems(text, listed) : text;
+  if (text && text === out) return first + "\n" + shown;
   const lines = [first];
-  if (text) lines.push(text);
+  if (shown) lines.push(shown);
   if (opts.raw !== false) lines.push(rawFence(out));
   return lines.join("\n");
 }
