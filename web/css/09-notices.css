@@ -1,6 +1,6 @@
 /* Rows of the 모니터링 screen (30-monitoring.js), the jump highlight (30-notices.js), the 홈 cards (08-home.js) and the decision sheet (30-notices.js). */
 .nt-row { display: flex; align-items: flex-start; gap: var(--sp-3); width: 100%; min-height: var(--row-h); padding: var(--row-py) var(--sp-3); border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--fg); font: inherit; text-align: left; }
-.nt-row:hover { background: var(--card-hover); }
+@media (hover: hover) { .nt-row:hover { background: var(--card-hover); } }
 .nt-row:active { background: var(--active); }
 .nt-dot { flex: none; width: 8px; height: 8px; margin-top: 7px; /* nudge: 8px dot centred on the first 22px text line */ border-radius: 50%; background: var(--fg-3); }
 .nt-dot.tone-done { background: var(--ok); }
@@ -36,7 +36,7 @@
 .nt-mon { cursor: default; }
 button.nt-mon { cursor: pointer; }
 button.nt-mon .chev { flex: none; align-self: center; color: var(--fg-3); }
-div.nt-mon:hover, div.nt-mon:active { background: transparent; }
+div.nt-mon:active { background: transparent; } @media (hover: hover) { div.nt-mon:hover { background: transparent; } }
 div.nt-mon .nt-dot { margin-top: 7px; /* nudge: same dot centring in the monitoring row */ }
 
 /* Home cards: 알림 / 작업내역 / 모니터링 (as tall as their content on the board, 07-board.js fit). */
@@ -45,7 +45,7 @@ div.nt-mon .nt-dot { margin-top: 7px; /* nudge: same dot centring in the monitor
 .hc-list { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .hc-row { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; font: 400 14px/20px var(--font); }
 .hc-row { cursor: pointer; border-radius: var(--r-ctl); margin-inline: calc(var(--sp-15) * -1); padding: var(--sp-1) var(--sp-15); }
-.hc-row:hover { background: var(--card-hover); }
+@media (hover: hover) { .hc-row:hover { background: var(--card-hover); } }
 .hc-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .hc-row .nt-dot { margin-top: 0; }
 .hc-row .tb { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -92,7 +92,7 @@ div.nt-mon .nt-dot { margin-top: 7px; /* nudge: same dot centring in the monitor
 .ds-md code { overflow-wrap: anywhere; }
 .ds-opt, .ds-direct { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: var(--sp-05); width: 100%; min-height: var(--sheet-h); padding: var(--sp-2) var(--sp-4); border: 0; border-radius: var(--r-ctl); background: var(--fs-fill); color: var(--fg); font: inherit; text-align: left; }
 .ds-opt.c { align-items: center; }
-.ds-opt:hover, .ds-direct:hover { background: var(--hover); }
+@media (hover: hover) { .ds-opt:hover, .ds-direct:hover { background: var(--hover); } }
 .ds-opt:active, .ds-direct:active { background: var(--active); }
 .ds-opt:disabled, .ds-direct:disabled { opacity: .55; }
 .ds-lb { display: flex; align-items: center; gap: var(--sp-2); font: 600 15px/22px var(--font); overflow-wrap: anywhere; }

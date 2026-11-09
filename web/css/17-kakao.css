@@ -183,7 +183,7 @@
 .kk-quote { display: flex; flex-direction: column; gap: var(--sp-05); align-self: stretch; margin: calc(var(--sp-05) * -1) calc(var(--sp-1) * -1) 0; padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-2); border: 0; border-left: 3px solid color-mix(in srgb, currentColor 35%, transparent); border-radius: 8px; background: color-mix(in srgb, currentColor 8%, transparent); color: inherit; text-align: left; font: 400 12px/17px var(--font); }
 /* not ".jump": that global class (05-log.css) is the absolutely placed scroll-to-latest button, and it pulled every quote out of its bubble */
 .kk-quote.kk-qjump { cursor: pointer; border-left-color: var(--accent); }
-.kk-quote.kk-qjump:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
+@media (hover: hover) { .kk-quote.kk-qjump:hover { background: color-mix(in srgb, currentColor 14%, transparent); } }
 .kk-quote .kk-qn { display: flex; align-items: baseline; gap: var(--sp-2); }
 .kk-qgo { margin-left: auto; flex: none; color: var(--accent); font-size: 11px; font-weight: 600; }
 .kk-quote.busy .kk-qgo { visibility: hidden; }

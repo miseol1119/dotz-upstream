@@ -6,16 +6,16 @@
 two separate paths under their own chips and a long one ends in an ellipsis. */
 .fpath, .lb-p, .tv-p { display: block; width: 0; min-width: 100%; max-width: 100%; padding: 0; border: 0; background: none; color: var(--fg-3); font: 400 12px/18px var(--font); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: copy; }
 .fpath { margin-top: var(--sp-1); }
-.fpath:hover, .lb-p:hover, .tv-p:hover { color: var(--fg-2); }
+@media (hover: hover) { .fpath:hover, .lb-p:hover, .tv-p:hover { color: var(--fg-2); } }
 .fbox > .fatt { padding-right: var(--sp-12); max-width: 260px; }
 .fdl { position: absolute; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 16px; color: var(--fg-2); text-decoration: none; }
 .fdl svg { width: 16px; height: 16px; }
 .fbox > .fatt + .fdl { top: 12px; right: 8px; }
-.fbox > .fatt + .fdl:hover { background: var(--card); color: var(--fg); }
+@media (hover: hover) { .fbox > .fatt + .fdl:hover { background: var(--card); color: var(--fg); } }
 .fbox > .thumb + .fdl { top: 6px; right: 6px; background: rgb(0 0 0 / .55); color: #fff; }
-.fbox > .thumb + .fdl:hover { background: rgb(0 0 0 / .72); }
+@media (hover: hover) { .fbox > .thumb + .fdl:hover { background: rgb(0 0 0 / .72); } }
 .mfiles .fatt.off { cursor: default; opacity: .55; padding-right: var(--sp-3); }
-.mfiles .fatt.off:hover { background: var(--layer); }
+@media (hover: hover) { .mfiles .fatt.off:hover { background: var(--layer); } }
 @media (pointer: coarse) { .fdl { width: 36px; height: 36px; border-radius: 18px; } .fbox > .fatt + .fdl { top: 10px; } }
 .bm .md code.path.fp { cursor: pointer; }
 .bm .md code.path.fp:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -32,7 +32,7 @@ dialog.lbox::backdrop { background: transparent; }
 .lbox .lb-img img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; touch-action: none; cursor: zoom-in; user-select: none; -webkit-user-select: none; }
 .lbox .lb-img.zoomed img { cursor: grab; }
 .lbox .lb-nav { position: absolute; top: 50%; display: grid; place-items: center; width: 40px; height: 40px; margin-top: calc(var(--sp-5) * -1); padding: 0; border: 0; border-radius: var(--r-sheet); background: rgb(255 255 255 / .16); color: #fff; cursor: pointer; }
-.lbox .lb-nav:hover { background: rgb(255 255 255 / .28); }
+@media (hover: hover) { .lbox .lb-nav:hover { background: rgb(255 255 255 / .28); } }
 .lbox .lb-nav.prev { left: var(--sp-3); }
 .lbox .lb-nav.next { right: var(--sp-3); }
 .lbox .lb-img.zoomed .lb-nav { display: none; }
@@ -42,7 +42,7 @@ dialog.lbox::backdrop { background: transparent; }
 .ended > summary svg { width: 16px; height: 16px; transition: transform var(--m-fast) var(--m-ease); }
 .ended[open] > summary svg { transform: rotate(90deg); }
 .ended .er { display: flex; align-items: center; gap: var(--sp-2); width: 100%; padding: var(--sp-3) var(--sp-4); border: 0; background: transparent; color: var(--fg); font-size: 14px; text-align: left; }
-.ended .er:hover { background: var(--card-hover); }
+@media (hover: hover) { .ended .er:hover { background: var(--card-hover); } }
 .ended .er .sup { flex: none; margin-left: auto; color: var(--fg-3); font-size: 12px; white-space: nowrap; }
 .ended > summary > .elabel { flex: none; white-space: nowrap; }
 .ended > summary > .ecounts { flex: 1; min-width: 0; color: var(--fg-3); font-size: 13px; font-weight: 500; }
@@ -56,7 +56,7 @@ dialog.lbox::backdrop { background: transparent; }
 .ended .erow { display: flex; align-items: center; }
 .ended .erow .er { flex: 1; min-width: 0; border-top: 0; padding-right: var(--sp-2); }
 .ended .erow .edel { margin-right: var(--sp-3); color: var(--fg-3); }
-.ended .erow .edel:hover { color: var(--err); background: color-mix(in srgb, var(--err) 12%, transparent); }
+@media (hover: hover) { .ended .erow .edel:hover { color: var(--err); background: color-mix(in srgb, var(--err) 12%, transparent); } }
 .ended .er .tag { flex: none; }
 .ended .erow .er .en { flex: 0 1 auto; min-width: 3em; }
 .ended .erow .er .sup { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -85,7 +85,7 @@ dialog.lbox::backdrop { background: transparent; }
 .gban .tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gban .tx b { color: var(--fg); font-weight: 600; }
 .gban .x { flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--fg-3); font-size: 18px; line-height: 28px; }
-.gban .x:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { .gban .x:hover { background: var(--hover); color: var(--fg); } }
 @media (max-width: 639px) { .gban { width: calc(100% - 24px); } }
 .bm .md { font-size: 15.5px; line-height: 28px; }
 .bm > .mt { margin-bottom: var(--sp-15); } .bm > .mt .mn { color: var(--fg); }
@@ -175,7 +175,7 @@ dialog.lbox::backdrop { background: transparent; }
 .md hr { margin: var(--sp-3) 0; border: 0; border-top: 1px solid var(--line); }
 .md blockquote { margin: 0 0 var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); background: var(--layer); color: var(--fg-2); }
 details.work > summary { display: flex; align-items: center; gap: var(--sp-2); width: fit-content; max-width: 100%; min-height: 28px; margin-left: calc(var(--sp-1) * -1); padding: 0 var(--sp-2) 0 var(--sp-1); border-radius: 8px; color: var(--fg-2); font-size: 13px; line-height: 20px; cursor: pointer; list-style: none; }
-details.work > summary:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { details.work > summary:hover { background: var(--hover); color: var(--fg); } }
 details.work > summary::-webkit-details-marker { display: none; }
 details.work > summary::before { content: ""; flex: none; width: 5px; height: 5px; border-right: 1.5px solid var(--fg-2); border-bottom: 1.5px solid var(--fg-2); transform: rotate(-45deg); transition: transform var(--m-fast) var(--m-ease); }
 details.work[open] > summary::before { transform: rotate(45deg); }
@@ -278,7 +278,7 @@ details.work.live .wdot { display: block; }
 .sendrow:focus-within { border-color: var(--accent); }
 .cbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-15); min-height: 28px; margin-top: var(--sp-2); padding: 0 var(--sp-1); }
 .cchip { display: inline-flex; align-items: center; gap: var(--sp-15); flex: none; height: 26px; max-width: 100%; padding: 0 var(--sp-3); border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--fg-2); font-size: 12.5px; line-height: 16px; font-weight: 500; white-space: nowrap; }
-button.cchip:hover { background: var(--layer); color: var(--fg); }
+@media (hover: hover) { button.cchip:hover { background: var(--layer); color: var(--fg); } }
 .cchip.warn { color: var(--warn); }
 /* 360-390px: the chips pull together while the api label shares the row, so the bar keeps fitting without scrolling. */
 @media (max-width: 600px) { .cbar.api { gap: var(--sp-05); } .cbar.api .cchip { padding: 0 var(--sp-15); } .cbar.api .cchip.capi { font-size: 10.5px; } }

@@ -24,7 +24,7 @@
 .rc-raw > summary::-webkit-details-marker { display: none; }
 .rc-raw > summary::before { content: ""; flex: none; width: 5px; height: 5px; border-right: 1.5px solid var(--fg-2); border-bottom: 1.5px solid var(--fg-2); transform: rotate(-45deg); transition: transform var(--m-fast) var(--m-ease); }
 .rc-raw[open] > summary::before { transform: rotate(45deg); }
-.rc-raw > summary:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { .rc-raw > summary:hover { background: var(--hover); color: var(--fg); } }
 .rc-rawbody { margin-top: var(--sp-2); padding: var(--sp-3) var(--sp-4); max-height: 60vh; overflow: auto; border-radius: var(--r-ctl); background: var(--layer); color: var(--fg-2); }
 .bm.rc .rc-rawbody .md { font-size: 14px; line-height: 22px; }
 .rc-rawbody .md .tbl { background: var(--card); }
@@ -80,7 +80,7 @@
 .mb-txt details > summary::-webkit-details-marker { display: none; }
 .mb-txt details > summary::before { content: ""; flex: none; width: 5px; height: 5px; border-right: 1.5px solid var(--fg-2); border-bottom: 1.5px solid var(--fg-2); transform: rotate(-45deg); transition: transform var(--m-fast) var(--m-ease); }
 .mb-txt details[open] > summary::before { transform: rotate(45deg); }
-.mb-txt details > summary:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { .mb-txt details > summary:hover { background: var(--hover); color: var(--fg); } }
 .mb-txt details > div { margin-top: var(--sp-2); padding-left: var(--sp-3); border-left: 3px solid var(--line-2); font-size: 14px; line-height: 22px; }
 .rc-rawbody .md th { background: var(--layer); }
 @media (max-width: 1099px) { .appbar.cvconv h1 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; font-size: var(--fs-card); line-height: var(--lh-card); overflow-wrap: anywhere; } }
@@ -88,7 +88,7 @@
 #mon-tl > .bm.rc.mr { gap: var(--sp-05); padding: var(--sp-2) var(--sp-4); cursor: pointer; }
 /* Rows off screen are not styled or painted until they scroll near, so adding a page of mail costs what the visible rows do. */
 #mon-tl > .bm.rc.mr { content-visibility: auto; contain-intrinsic-block-size: auto var(--row-h); }
-#mon-tl > .bm.rc.mr:hover { background: var(--hover); }
+@media (hover: hover) { #mon-tl > .bm.rc.mr:hover { background: var(--hover); } }
 #mon-tl > .bm.rc.mr:focus-visible { outline-offset: -2px; }
 /* A mail row is one compact line each: who and when, the subject, two summary points, the first thing to do (owner 2026-10-27). */
 .mr .rc-title { overflow: hidden; font-size: 14.5px; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
@@ -120,7 +120,7 @@ ul.mr-sum.mr-pts { display: block; margin: 0; padding: 0; list-style: none; }
 /* --fg-2 and a larger icon (owner 2026-10-29): the --fg-3 dots were easy to miss on the card */
 .rc-hd .mr-more { margin: calc(var(--sp-15) * -1) calc(var(--sp-2) * -1) calc(var(--sp-15) * -1) 0; color: var(--fg-2); }
 .rc-hd .mr-more .ic { width: 20px; height: 20px; }
-.rc-hd .mr-more:hover, .rc-hd .mr-more[aria-expanded="true"] { background: var(--active); color: var(--fg); }
+.rc-hd .mr-more[aria-expanded="true"] { background: var(--active); color: var(--fg); } @media (hover: hover) { .rc-hd .mr-more:hover { background: var(--active); color: var(--fg); } }
 /* 초안 작성 on the open mail's card (11-todo-strip.js): below 1100px, where the conversation head and its 초안 작성 are hidden */
 .rc-hd .rc-src + .mr-more, .rc-hd .tag + .mr-more { margin-left: auto; }
 @media (pointer: coarse), (max-width: 639px) { .rc-hd .mr-more { margin: calc((var(--sp-15) + var(--sp-1)) * -1) calc((var(--sp-2) + var(--sp-05)) * -1) calc((var(--sp-15) + var(--sp-1)) * -1) 0; } }
@@ -129,7 +129,7 @@ ul.mr-sum.mr-pts { display: block; margin: 0; padding: 0; list-style: none; }
 .mr-files { display: flex; flex-direction: column; gap: var(--sp-05); margin-top: var(--sp-1); padding-top: var(--sp-2); border-top: 1px solid var(--line); }
 .mr-fh { color: var(--fg-3); font-size: 12px; line-height: 16px; font-weight: 600; }
 .mr-file { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; min-height: 44px; padding: 0 var(--sp-2); border-radius: var(--r-ctl); color: var(--fg); font-size: 14px; line-height: 20px; text-decoration: none; }
-.mr-file:hover { background: var(--hover); }
+@media (hover: hover) { .mr-file:hover { background: var(--hover); } }
 .mr-file .ic { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; color: var(--fg-2); }
 .mr-fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mr-fsize { flex: none; color: var(--fg-3); font-size: 12px; }
@@ -160,10 +160,10 @@ ul.mr-sum.mr-pts { display: block; margin: 0; padding: 0; list-style: none; }
 .dr-rc-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0; border: 0; background: transparent; color: var(--fg); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; }
 .dr-rc-t:disabled { cursor: default; }
 .dr-rc-x { flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 14px; background: transparent; color: var(--fg-3); cursor: pointer; }
-.dr-rc-x:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { .dr-rc-x:hover { background: var(--hover); color: var(--fg); } }
 .dr-rc-x .ic { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .dr-rc-add { display: inline-flex; align-items: center; gap: var(--sp-1); min-height: 28px; padding: 0 var(--sp-3); border: 1px dashed var(--line-2); border-radius: var(--r-ctl); background: transparent; color: var(--fg-2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-.dr-rc-add:hover { background: var(--hover); }
+@media (hover: hover) { .dr-rc-add:hover { background: var(--hover); } }
 .dr-rc-add .ic { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .dr-rc-edit { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); min-width: 0; }
 .dr-rc-in { min-width: 0; width: 15em; max-width: 100%; height: 32px; padding: 0 var(--sp-3); border: 0; border-radius: var(--r-ctl); background: var(--ff-fill); color: var(--fg); font: inherit; font-size: 13px; }
@@ -185,7 +185,7 @@ ul.mr-sum.mr-pts { display: block; margin: 0; padding: 0; list-style: none; }
 .dr-files { display: flex; flex-direction: column; gap: var(--sp-15); min-width: 0; margin-top: var(--sp-3); }
 .dr-fh { color: var(--fg-3); font-size: 12px; line-height: 16px; font-weight: 600; }
 .dr-att { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; min-height: var(--row-h); padding: var(--sp-2) var(--sp-3); border-radius: var(--r-ctl); background: var(--layer); color: var(--fg); text-decoration: none; }
-a.dr-att:hover { background: var(--hover); }
+@media (hover: hover) { a.dr-att:hover { background: var(--hover); } }
 a.dr-att:active { background: var(--active); }
 .dr-fi { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--card); color: var(--fg-2); }
 .dr-fi .ic, .dr-att > .ic, .dr-none .ic { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
@@ -206,17 +206,17 @@ a.dr-att:active { background: var(--active); }
 .dr-ar { display: flex; align-items: center; gap: var(--sp-15); min-width: 0; }
 .dr-ar > .dr-att { flex: 1; }
 .dr-x { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--fg-3); cursor: pointer; }
-.dr-x:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { .dr-x:hover { background: var(--hover); color: var(--fg); } }
 .dr-x .ic { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; }
 .dr-add { display: flex; align-items: center; justify-content: center; gap: var(--sp-2); height: var(--btn-h); padding: 0 var(--sp-4); border: 1px dashed var(--line-2); border-radius: var(--r-ctl); background: transparent; color: var(--fg-2); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-.dr-add:hover { background: var(--hover); }
+@media (hover: hover) { .dr-add:hover { background: var(--hover); } }
 .dr-add:disabled { opacity: 0.6; cursor: default; }
 .dr-add .ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .dr-menu { display: flex; flex-direction: column; gap: var(--sp-15); }
 .dr-menu .btn { width: 100%; min-height: 44px; }
 .dr-lib { display: flex; flex-direction: column; gap: var(--sp-1); max-height: 220px; overflow-y: auto; }
 .dr-li { display: flex; align-items: center; gap: var(--sp-2); min-height: 44px; padding: var(--sp-15) var(--sp-3); border: 0; border-radius: var(--r-ctl); background: var(--layer); color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
-.dr-li:hover { background: var(--hover); }
+@media (hover: hover) { .dr-li:hover { background: var(--hover); } }
 .dr-hit { --tone: var(--accent); display: inline-flex; align-items: center; gap: var(--sp-15); flex: none; color: var(--fg-2); font-size: 11px; font-weight: 600; line-height: 18px; }
 .dr-q2 { margin: var(--sp-3) 0 var(--sp-2); color: var(--fg-2); font: 500 13px/18px var(--font); }
 .dr-edit.ask { min-height: 64px; }
@@ -230,13 +230,13 @@ a.dr-att:active { background: var(--active); }
 .dr-edit:focus { outline: 0; box-shadow: var(--ff-ring); }
 @media (pointer: coarse), (max-width: 639px) { .dr-mail { padding: var(--sp-3); } .dr-row .dr-send { flex: 1; } .dr-add, .dr-act .btn { height: var(--btn-hit); } }
 .dr-rm { color: var(--fg-3); cursor: pointer; }
-.dr-rm:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { .dr-rm:hover { background: var(--hover); color: var(--fg); } }
 .dr-rm .ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; }
 /* a handled reply draft folded under its mail in the conversation (30-mail-sent.js): one line, a tap unfolds the mail as it went out */
 .ms-slot { display: flex; flex-direction: column; gap: var(--sp-15); min-width: 0; margin: var(--sp-1) 0 var(--sp-2); }
 .ms-card { display: flex; flex-direction: column; min-width: 0; border-radius: var(--r-card); background: var(--card); }
 .ms-line { display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-width: 0; min-height: var(--row-h); padding: 0 var(--sp-4); border: 0; border-radius: var(--r-card); background: transparent; color: var(--fg-2); font: 500 14px/20px var(--font); text-align: left; cursor: pointer; }
-.ms-line:hover { background: var(--card-hover); }
+@media (hover: hover) { .ms-line:hover { background: var(--card-hover); } }
 .ms-line .ic { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .ms-k { flex: none; color: var(--fg); font-weight: 600; white-space: nowrap; }
 .ms-m { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-3); font-size: 13px; }
@@ -256,8 +256,8 @@ a.dr-att:active { background: var(--active); }
 :is(.mr-filter, .pl-chips) .mr-f:first-child, .nsc-fb:first-child { border-top-left-radius: var(--r-seg); border-bottom-left-radius: var(--r-seg); }
 :is(.mr-filter, .pl-chips) .mr-f:last-child, .nsc-fb:last-child { border-top-right-radius: var(--r-seg); border-bottom-right-radius: var(--r-seg); }
 :is(.mr-filter, .pl-chips) .mr-f::before, .nsc-fb::before { content: ""; position: absolute; inset: var(--sp-05); z-index: -1; border-radius: var(--r-seg-in); }
-:is(.mr-filter, .pl-chips) .mr-f:hover, .nsc-fb:hover { background: var(--seg-track); color: var(--fg); }
-:is(.mr-filter, .pl-chips) .mr-f:not(.on):hover::before, .nsc-fb:not(.on):hover::before { background: color-mix(in srgb, var(--seg-on) 50%, transparent); }
+@media (hover: hover) { :is(.mr-filter, .pl-chips) .mr-f:hover, .nsc-fb:hover { background: var(--seg-track); color: var(--fg); } }
+@media (hover: hover) { :is(.mr-filter, .pl-chips) .mr-f:not(.on):hover::before, .nsc-fb:not(.on):hover::before { background: color-mix(in srgb, var(--seg-on) 50%, transparent); } }
 :is(.mr-filter, .pl-chips) .mr-f.on, .nsc-fb.on { color: var(--fg); font-weight: 600; }
 :is(.mr-filter, .pl-chips) .mr-f.on::before, .nsc-fb.on::before { background: var(--seg-on); }
 :is(.mr-filter, .pl-chips) .mr-fn { margin-left: var(--sp-05); font-size: 11px; font-variant-numeric: tabular-nums; opacity: .8; }

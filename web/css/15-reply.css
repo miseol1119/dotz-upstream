@@ -9,7 +9,7 @@
 .mt:has(> .rp-btn) { position: relative; width: fit-content; max-width: 100%; }
 .rp-btn { position: absolute; top: 50%; left: 100%; display: grid; place-items: center; width: 24px; height: 24px; margin: calc(var(--sp-3) * -1) 0 0 var(--sp-2); padding: 0; border: 0; border-radius: var(--r-ctl); background: var(--hover); color: var(--fg-2); opacity: 0; pointer-events: none; transition: opacity var(--m-fast) var(--m-ease); }
 .rp-btn .ic { width: 14px; height: 14px; }
-.rp-btn:hover { background: var(--active); color: var(--fg); }
+@media (hover: hover) { .rp-btn:hover { background: var(--active); color: var(--fg); } }
 /* the 8px between the meta text and its button belongs to the button's hit area, so the pointer never leaves the row on its way there */
 .rp-btn::after { content: ""; position: absolute; top: 0; bottom: 0; right: 100%; width: 8px; }
 /* an own message is right-aligned: its button sits to the left of the time */

@@ -50,7 +50,7 @@ dialog.fs-card::backdrop { background: var(--scrim); }
 .fs-ey.ign { color: var(--fg-3); }
 .fs-hb { flex: none; display: flex; align-items: center; gap: var(--sp-05); }
 .fs-ign { flex: none; display: inline-flex; align-items: center; gap: var(--sp-1); min-height: 44px; padding: 0 var(--sp-3); border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--fg-2); font: 500 14px/20px var(--font); }
-.fs-ign:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { .fs-ign:hover { background: var(--hover); color: var(--fg); } }
 .fs-ign:active { background: var(--active); }
 .fs-ign:disabled { opacity: .55; }
 .ib.fs-x { width: 44px; height: 44px; border-radius: var(--r-ctl); color: var(--fg-3); }

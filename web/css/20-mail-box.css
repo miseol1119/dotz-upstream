@@ -3,7 +3,7 @@
 .mr-chk, .mbox-all { flex: none; width: 16px; height: 16px; margin: 0 var(--sp-15) 0 var(--sp-1); accent-color: var(--accent); cursor: pointer; }
 .mr-star { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--fg-3); }
 button.mr-star { cursor: pointer; }
-button.mr-star:hover { background: var(--active); color: var(--fg); }
+@media (hover: hover) { button.mr-star:hover { background: var(--active); color: var(--fg); } }
 .mr-star .ic { width: 16px; height: 16px; }
 .mr-star.on { color: var(--accent); }
 .mr-star.on .ic { fill: currentColor; }
@@ -26,7 +26,7 @@ span.mr-star:not(.on) { opacity: .45; }
 .mbox-n { margin-right: auto; font-variant-numeric: tabular-nums; }
 .mbox-bar.on .mbox-n { margin-right: var(--sp-1); color: var(--fg); font-weight: 600; }
 .mbox-b { display: inline-flex; align-items: center; gap: var(--sp-15); height: 32px; padding: 0 var(--sp-3); border: 0; border-radius: var(--r-ctl); background: var(--layer); color: var(--fg); font: inherit; font-size: 13px; line-height: 20px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.mbox-b:hover:not(:disabled) { background: var(--hover); }
+@media (hover: hover) { .mbox-b:hover:not(:disabled) { background: var(--hover); } }
 .mbox-b:disabled { opacity: .45; cursor: not-allowed; }
 .mbox-b .ic { width: 16px; height: 16px; }
 .mbox-b.mbox-x { width: 32px; padding: 0; justify-content: center; margin-left: auto; }
@@ -37,7 +37,7 @@ span.mr-star:not(.on) { opacity: .45; }
 .mtop { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 0; height: 40px; margin: 0 calc(var(--mpx) * -1) var(--sp-2); padding: 0 calc(var(--mpx) - var(--sp-2)); border-radius: var(--r-card) var(--r-card) var(--r-ctl) var(--r-ctl); background: var(--layer); }
 .mtop .mtop-b { flex: 0 1 36px; min-width: 32px; width: 36px; height: 32px; border-radius: var(--r-ctl); color: var(--fg-2); }
 .mtop .mtop-b .ic { width: 16px; height: 16px; }
-.mtop .mtop-b:hover { background: var(--active); color: var(--fg); }
+@media (hover: hover) { .mtop .mtop-b:hover { background: var(--active); color: var(--fg); } }
 /* the phone's bar holds all nine at the .ib touch size (36px) */
 @media (pointer: coarse), (max-width: 639px) { .mtop .mtop-b { height: 36px; } }
 @media (max-width: 639px) { .mtop { padding: 0 var(--sp-05); } }
@@ -65,7 +65,7 @@ span.mr-star:not(.on) { opacity: .45; }
 .mopen > .mr-files > .mr-fh { flex: 1 0 100%; font-weight: 500; }
 .mopen > .mr-files > .mr-file { position: relative; min-height: 36px; max-width: 100%; padding: 0 var(--sp-3); gap: var(--sp-15); background: var(--layer); font-size: 13px; }
 .mopen > .mr-files > .mr-file::after { content: ""; position: absolute; inset: -4px 0; }
-.mopen > .mr-files > .mr-file:hover { background: var(--hover); }
+@media (hover: hover) { .mopen > .mr-files > .mr-file:hover { background: var(--hover); } }
 .mopen > .mr-files > .mr-file .ic { width: 16px; height: 16px; }
 .mopen > .rc-raw > summary { display: none; }
 .mopen > .rc-raw { margin-top: var(--sp-1); }
@@ -89,7 +89,7 @@ span.mr-star:not(.on) { opacity: .45; }
 .mbox-fk { flex: none; width: 64px; color: var(--fg-3); font-size: 12px; line-height: 16px; font-weight: 500; }
 .mbox-in { flex: 1; min-width: 0; height: 44px; border: 0; outline: 0; background: none; color: var(--fg); font: inherit; font-size: 14px; }
 .mbox-cc { flex: none; height: 28px; padding: 0 var(--sp-2); border: 0; border-radius: 6px; background: none; color: var(--fg-3); font: inherit; font-size: 13px; line-height: 20px; cursor: pointer; }
-.mbox-cc:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { .mbox-cc:hover { background: var(--hover); color: var(--fg); } }
 textarea.mbox-ta { display: block; flex: 1; min-height: 160px; margin: var(--sp-3) 0 var(--sp-2); padding: 0; border: 0; outline: 0; resize: none; background: none; color: var(--fg); font: inherit; font-size: 14px; line-height: 22px; }
 .mbox-fw:empty { display: none; }
 /* the files are the open mail's chips (name, size, one action): 36px on the grey step */
@@ -100,7 +100,7 @@ textarea.mbox-ta { display: block; flex: 1; min-height: 160px; margin: var(--sp-
 .mbox-cn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mbox-cs { flex: none; color: var(--fg-3); font-variant-numeric: tabular-nums; }
 .mbox-cx { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--fg-3); cursor: pointer; }
-.mbox-cx:hover { background: var(--active); color: var(--fg); }
+@media (hover: hover) { .mbox-cx:hover { background: var(--active); color: var(--fg); } }
 .mbox-cx .ic { width: 14px; height: 14px; }
 /* the send row (ui-spec .fs-ft): the one filled button on the right, the paperclip at the left, 8px between */
 .mbox-sf { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-2); flex: none; padding: var(--sp-3) var(--sp-4) var(--sp-4); }
@@ -164,14 +164,14 @@ textarea.mbox-ta { display: block; flex: 1; min-height: 160px; margin: var(--sp-
 #mon-tl > .bm.rc.mr { position: relative; flex-flow: row wrap; align-items: center; column-gap: var(--sp-15); row-gap: var(--sp-05); padding: var(--sp-2) var(--sp-4); border-radius: 0; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--card) 55%, var(--bg)); }
 #mon-tl > :not(.mr) + .bm.rc.mr { border-top-left-radius: 12px; border-top-right-radius: 12px; }
 #mon-tl > .bm.rc.mr:not(:has(+ .bm.rc.mr)) { border-bottom: 0; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
-#mon-tl > .bm.rc.mr:hover, #mon-tl > .bm.rc.mr.mr-new { background: var(--card); }
+#mon-tl > .bm.rc.mr.mr-new { background: var(--card); } @media (hover: hover) { #mon-tl > .bm.rc.mr:hover { background: var(--card); } }
 #mon-tl > .bm.rc.mr.mr-sel { background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
 /* the reply state of a mail you need not act on is a plain grey word; only what waits for you (답장 필요, 미답장) keeps its colour */
 #mon-tl > .mr .rc-hd .tag:not(.warn, .unreplied) { padding: 0; background: none; color: var(--fg-3); font-weight: 400; }
 #mon-tl > .mr > .rc-hd { flex: 1 0 100%; height: 22px; gap: var(--sp-15); }
 #mon-tl > .mr .rc-hd .ib { width: 28px; height: 28px; margin: -3px calc(var(--sp-1) * -1); /* nudge: 28px button inside a 22px text line */ color: var(--fg-3); }
 #mon-tl > .mr .rc-hd .ib .ic { width: 16px; height: 16px; }
-#mon-tl > .mr .rc-hd .ib:hover { background: var(--active); color: var(--fg); }
+@media (hover: hover) { #mon-tl > .mr .rc-hd .ib:hover { background: var(--active); color: var(--fg); } }
 #mon-tl > .mr > .rc-title { flex: 1 1 0; min-width: 0; font-size: 15px; line-height: 22px; }
 #mon-tl > .mr > .mr-reply { flex: none; }
 #mon-tl > .mr > .mr-sum { flex: 1 0 100%; display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; line-height: 16px; }

@@ -1,7 +1,7 @@
 /* 설정 screens (docs/ui-spec.md 설정 행): one row = lead icon, title + one-line description, then the single right slot (.li-end) with a value or
    status tag and the chevron. Sections are plain .sec labels above one .list card, the same as the prototype's 설정. */
 .li-end > .chev { width: 14px; height: 14px; color: var(--fg-3); }
-.li.tap:hover .li-end > .chev { color: var(--fg); }
+@media (hover: hover) { .li.tap:hover .li-end > .chev { color: var(--fg); } }
 .li-end > .tag { flex: none; }
 .sec.sec-act > .tag { margin-left: 0; }
 .sec.sec-act > .tag + .btn { margin-left: auto; }
@@ -79,7 +79,7 @@
 .tplnote { padding: var(--sp-05) var(--sp-4) 0; color: var(--fg-3); font-size: 12px; line-height: 18px; }
 .tplnote[hidden] { display: none; }
 .as-tpl { flex: none; display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 0 var(--sp-3); border: 0; border-radius: var(--r-ctl); background: var(--card); color: var(--fg); font: 500 13px/20px var(--font); cursor: pointer; }
-.as-tpl:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { .as-tpl:hover { background: var(--hover); color: var(--fg); } }
 .as-tpl[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
 #mon-chips { flex-wrap: wrap; overflow-x: visible; }
 .as-tpl-x { width: 28px; padding: 0; }

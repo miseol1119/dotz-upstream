@@ -34,7 +34,7 @@
 .ans-files .fitem + .fitem { border-top: 1px solid var(--line); }
 .ans-files .fbox { width: 100%; }
 .ans-files .fbox > .fatt { flex: 1; min-width: 0; height: auto; min-height: var(--row-h); max-width: none; gap: var(--sp-3); padding: var(--sp-1) var(--sp-10) var(--sp-1) 0; border-radius: 0; background: none; }
-.ans-files .fbox > .fatt:hover { background: none; }
+@media (hover: hover) { .ans-files .fbox > .fatt:hover { background: none; } }
 .ans-files .fi-ic { border-radius: var(--r-ctl); background: var(--card); }
 .ans-files .fi-t { flex: 1; flex-direction: row; align-items: center; gap: var(--sp-2); }
 .ans-files .fi-n { flex: 1; min-width: 0; font-size: var(--fs-body); line-height: var(--lh-body); font-weight: 400; }

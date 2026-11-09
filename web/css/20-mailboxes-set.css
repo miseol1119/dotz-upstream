@@ -18,8 +18,8 @@
 /* 처리 방식 */
 .mxs-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-2); }
 .mxs-mode { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; padding: var(--sp-3); border: 0; border-radius: var(--r-card); background: var(--card); color: var(--fg); text-align: left; }
-.mxs-mode:hover { background: var(--card-hover); }
-.mxs-mode.on, .mxs-mode.on:hover { background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+@media (hover: hover) { .mxs-mode:hover { background: var(--card-hover); } }
+.mxs-mode.on { background: color-mix(in srgb, var(--accent) 10%, var(--card)); } @media (hover: hover) { .mxs-mode.on:hover { background: color-mix(in srgb, var(--accent) 10%, var(--card)); } }
 .mxs-mt { display: flex; align-items: center; gap: var(--sp-2); font: 600 var(--fs-sec)/var(--lh-sec) var(--font); white-space: nowrap; }
 .mxs-rd { flex: none; width: 16px; height: 16px; border: 1.5px solid var(--line-2); border-radius: 50%; }
 .mxs-mode.on .mxs-rd { border: 5px solid var(--accent); }
@@ -28,7 +28,7 @@
 /* one folding item at a time */
 .mxs .list > button.li + button.li { border-top: 1px solid var(--line); }
 .mxs-ah { display: flex; align-items: center; gap: var(--sp-3); width: 100%; min-height: calc(var(--row-h) + var(--sp-1)); padding: var(--sp-2) var(--sp-4); border: 0; background: none; color: var(--fg); text-align: left; }
-.mxs-ah:hover { background: var(--card-hover); }
+@media (hover: hover) { .mxs-ah:hover { background: var(--card-hover); } }
 .mxs-al { flex: none; font: 500 var(--fs-row)/var(--lh-row) var(--font); }
 .mxs-av { flex: 1; min-width: 0; overflow: hidden; color: var(--fg-3); font-size: var(--fs-body); line-height: var(--lh-sec); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .mxs-ah .ic { flex: none; color: var(--fg-3); transition: transform var(--m-fast) var(--m-ease); }
@@ -45,14 +45,14 @@
 .mxs-c { max-width: 100%; padding: 0 var(--sp-1) 0 var(--sp-3); background: var(--card); }
 .mxs-c .tx { min-width: 0; }
 .mxs-cx { display: grid; place-items: center; width: var(--sp-6); height: var(--sp-6); padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--fg-3); }
-.mxs-cx:hover { background: var(--active); color: var(--fg); }
+@media (hover: hover) { .mxs-cx:hover { background: var(--active); color: var(--fg); } }
 .mxs-cx .ic { width: 14px; height: 14px; }
 .mxs-c2 { background: transparent; color: var(--fg-2); box-shadow: inset 0 0 0 1px var(--line-2); }
-.mxs-c2:hover { background: var(--hover); }
+@media (hover: hover) { .mxs-c2:hover { background: var(--hover); } }
 .mxs-c2 .ic { width: 14px; height: 14px; }
 .mxs-ci { width: calc(var(--sp-10) * 4 + var(--sp-5)); max-width: 100%; height: var(--ctl-h); }
 .mxs-ic { padding: 0 var(--sp-3); }
-.mxs-ic.on, .mxs-ic.on:hover { background: var(--fg); color: var(--bg); }
+.mxs-ic.on { background: var(--fg); color: var(--bg); } @media (hover: hover) { .mxs-ic.on:hover { background: var(--fg); color: var(--bg); } }
 .mxs-ic .ic { width: 16px; height: 16px; }
 .mxs-jr { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); min-height: var(--ctl-h); }
 

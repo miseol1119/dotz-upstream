@@ -11,7 +11,7 @@
 /* the open conversation: a small accent dot in the row's left padding (the slot every row already has, so text never shifts); phone only — the wide layout already highlights the row */
 .cv-row { position: relative; }
 @media (max-width: 1099px) { .cv-row.on::before { content: ""; position: absolute; top: 50%; left: 5px; --dot: 6px; width: var(--dot); height: var(--dot); margin-top: calc(var(--dot) / -2); border-radius: 50%; background: var(--accent); } }
-.cv-row:hover { background: var(--card-hover); }
+@media (hover: hover) { .cv-row:hover { background: var(--card-hover); } }
 .cv-av { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--layer); color: var(--fg-2); font: 700 15px/24px var(--font); }
 .cv-av .ic { width: 20px; height: 20px; }
 /* 아이콘이 든 면은 둥근 사각 (시제품 .li .ico, 10px); 이니셜이 든 사람 아바타는 원 */
@@ -64,7 +64,7 @@
 /* a gateway system line (11-todo-strip.js sysLine): small, muted and centered like the divider above, no bubble */
 .tl-in > .cv-sys { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--sp-1) var(--sp-15); align-self: center; width: fit-content; max-width: 100%; margin: var(--sp-2) auto 0; padding: var(--sp-05) var(--sp-3); border: 0; border-radius: var(--r-ctl); background: none; color: var(--fg-3); font: 500 12px/16px var(--font); text-align: center; overflow-wrap: anywhere; }
 .tl-in > button.cv-sys { cursor: pointer; }
-.tl-in > button.cv-sys:hover { background: var(--line-2); color: var(--fg-2); }
+@media (hover: hover) { .tl-in > button.cv-sys:hover { background: var(--line-2); color: var(--fg-2); } }
 .cv-sys .ic { width: 14px; height: 14px; flex: none; }
 .cv-sys .cv-sys-st { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--fg-2); }
 .cv-sys .cv-sys-st[hidden] { display: none; }
@@ -192,7 +192,7 @@
 /* the result file of a finished worker under its system line (11-todo-strip.js hcSysFiles); a running line does not pulse */
 .tl-in > .cv-sys-f { display: flex; flex-wrap: wrap; justify-content: center; align-self: center; gap: var(--sp-15); max-width: 100%; margin: var(--sp-15) auto 0; }
 .cv-sys-f .fatt { height: 44px; max-width: 100%; background: var(--card); text-decoration: none; cursor: pointer; }
-.cv-sys-f .fatt:hover { background: var(--hover); }
+@media (hover: hover) { .cv-sys-f .fatt:hover { background: var(--hover); } }
 
 /* 감시 변화 알림 행 (소개 페이지 가격 알림): 32px 둥근 아이콘 칸, 500 제목, 아래 13px 회색 변화 줄(옛값 취소선·새값 600 강조색), 오른쪽 회색 시각(원칙 2·4) */
 .hr.nt-w .hn1 { font-weight: 500; }

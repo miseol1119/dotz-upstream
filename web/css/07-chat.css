@@ -41,14 +41,14 @@
 .sendrow textarea::placeholder { white-space: nowrap; text-overflow: ellipsis; }   /* 폰에서 긴 안내 글이 두 줄로 접혀 상자를 키우지 않게 한 줄로 (시제품 .cmp는 한 줄) */
 #c-attach, .sendrow > .cmp-plus { grid-area: plus; display: inline-flex; align-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 0; justify-content: center; border-radius: 50%; background: transparent; color: var(--fg-2); font-size: 0; }
 #c-attach .ic, .sendrow > .cmp-plus .ic { width: 20px; height: 20px; }
-#c-attach:hover, .sendrow > .cmp-plus:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { #c-attach:hover, .sendrow > .cmp-plus:hover { background: var(--hover); color: var(--fg); } }
 .sendrow > .ib { grid-area: send; width: 36px; height: 36px; border-radius: 50%; }
 .sendrow > .cbar { grid-area: bar; margin: 0; padding: var(--sp-1) var(--sp-1) var(--sp-05); min-height: 0; }
 #cbar { display: flex; align-items: center; flex-wrap: nowrap; gap: var(--sp-15); min-height: 20px; margin: var(--sp-1) 0 0; padding: 0 var(--sp-05); overflow-x: auto; scrollbar-width: none; }
 #cbar::-webkit-scrollbar { display: none; }
 #cbar .cchip { height: auto; min-height: 20px; padding: 0 var(--sp-05); background: transparent; color: var(--fg-3); font-size: 12px; line-height: 16px; }
 #cbar button.cchip { cursor: pointer; }
-#cbar button.cchip:hover { background: transparent; color: var(--fg); }
+@media (hover: hover) { #cbar button.cchip:hover { background: transparent; color: var(--fg); } }
 #cbar .cchip.cown { opacity: 1; color: var(--fg-3); }
 @media (pointer: coarse) { #cbar { min-height: var(--btn-h-sm); margin-top: 0; } #cbar button.cchip { min-height: var(--btn-h-sm); padding: 0 var(--sp-15); } }
 #cbar .working { display: none !important; }
@@ -69,7 +69,7 @@
 .au input:not([type=checkbox]):focus { outline: 0; box-shadow: var(--ff-ring); }
 .au .fld label { color: var(--fg-2); font-size: var(--fs-meta); line-height: var(--lh-meta); }
 .au .eye { height: var(--field-h); padding: 0 var(--sp-3); border: 0; border-radius: var(--r-ctl); background: var(--ff-fill); color: var(--fg-2); font: 500 13px/20px var(--font); }
-.au .eye:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { .au .eye:hover { background: var(--hover); color: var(--fg); } }
 .au input.bad, .au input.bad:not([type=checkbox]):focus { box-shadow: inset 0 0 0 1.5px var(--err); }
 .au .ferr { color: var(--err); }
 .au .rem { color: var(--fg-2); font-size: 13px; }
@@ -100,7 +100,7 @@
 .dcard.fold .dc-hd { padding-bottom: var(--sp-2); }
 .dcard.fold .dc-decide { display: none; }
 .dc-fold { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--fg-3); }
-.dc-fold:hover { background: var(--hover); }
+@media (hover: hover) { .dc-fold:hover { background: var(--hover); } }
 .dc-fold .ic { width: 16px; height: 16px; transition: transform var(--m-fast) var(--m-ease); }
 .dcard.fold .dc-fold .ic { transform: rotate(180deg); }
 .dc-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--sp-05); padding: 0 var(--sp-15) var(--sp-15); overflow-y: auto; overscroll-behavior: contain; }
@@ -114,7 +114,7 @@
 .dc-inl .dc-q { margin: 0 0 var(--sp-05); padding: 0 var(--sp-1); }
 .dc-inl > .dc-ds { padding: 0 var(--sp-1); }
 .dc-row, .dcm-row { flex: none; display: flex; align-items: flex-start; gap: var(--sp-2); width: 100%; min-height: 40px; padding: var(--sp-15) var(--sp-3); border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
-.dc-row:hover:not(:disabled), .dcm-row:hover:not(:disabled) { background: var(--hover); }
+@media (hover: hover) { .dc-row:hover:not(:disabled), .dcm-row:hover:not(:disabled) { background: var(--hover); } }
 .dc-row:active:not(:disabled), .dcm-row:active:not(:disabled) { background: var(--active); }
 .dc-row:disabled, .dcm-row:disabled { cursor: default; }
 .dc-row:disabled:not(.on), .dcm-row:disabled:not(.on) { opacity: .6; }

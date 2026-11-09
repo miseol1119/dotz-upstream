@@ -3,7 +3,7 @@
    >= 900px: the original is a separate card (header 원문 + x, own scroll) to the left, the draft slides right (250ms). Narrower: the 초안 | 원문 toggle slides between them. */
 .od-bar { flex: none; display: flex; margin: 0 var(--sp-4) var(--sp-2); }
 .od-tg { display: inline-flex; align-items: center; gap: var(--sp-15); min-height: 36px; padding: 0 var(--sp-3); border: 0; border-radius: var(--r-ctl); background: var(--fs-fill); color: var(--fg-2); font: 500 14px/20px var(--font); }
-.od-tg:hover { background: var(--hover); }
+@media (hover: hover) { .od-tg:hover { background: var(--hover); } }
 .od-tg:active { background: var(--active); }
 .od-tg svg { flex: none; width: 16px; height: 16px; }
 .od-tt { color: var(--fg); font-weight: 600; }

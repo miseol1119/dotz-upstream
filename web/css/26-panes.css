@@ -19,7 +19,7 @@
 .pane-bar::after { content: ""; position: absolute; inset: 0; margin: auto; border-radius: var(--r-ctl); background: transparent; }
 .pane-row > .pane-bar::after { width: var(--sp-05); }
 .pane-col > .pane-bar::after { height: var(--sp-05); }
-.pane-bar:hover::after, .pane-bar:active::after { background: var(--accent); }
+.pane-bar:active::after { background: var(--accent); } @media (hover: hover) { .pane-bar:hover::after { background: var(--accent); } }
 
 #split #v-chat.in-pane { flex: 1; height: auto; min-height: 0; width: 100%; max-width: none; margin: 0; padding: 0; grid-template-columns: minmax(0, 1fr); }
 #split #v-chat.in-pane::before { display: none; }

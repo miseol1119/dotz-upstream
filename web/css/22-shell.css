@@ -20,12 +20,12 @@ body { display: flow-root; }
   .appbar .ustrip { display: none; }
   /* brand: the mark and the assistant's name, 40px like the nav items below it */
   .brand { display: flex; align-items: center; gap: var(--sp-2); width: 100%; height: 40px; padding: 0 var(--sp-3); border: 0; border-radius: var(--r-ctl); background: transparent; color: inherit; font: 600 15px/20px var(--font); letter-spacing: 0; text-align: left; }
-  .brand:hover { background: var(--hover); }
+  @media (hover: hover) { .brand:hover { background: var(--hover); } }
   .brand .logo { width: 20px; height: 20px; }
   /* nav: one column, 40px rows, the open item a white card */
   .rail { display: flex; flex: none; flex-direction: column; align-self: stretch; gap: var(--sp-05); width: 100%; min-width: 0; margin: 0; margin-top: var(--sp-2); }
   .ni { position: relative; display: flex; flex: none; flex-direction: row; align-items: center; justify-content: flex-start; gap: var(--sp-2); width: 100%; height: 40px; padding: 0 var(--sp-3); border-radius: var(--r-ctl); background: transparent; color: var(--fg-2); font-size: 14px; line-height: 20px; font-weight: 500; text-align: left; }
-  .ni:hover { background: var(--hover); color: var(--fg); }
+  @media (hover: hover) { .ni:hover { background: var(--hover); color: var(--fg); } }
   .ni.on { background: var(--card); color: var(--fg); font-weight: 700; }
   .ni.on::after, .ni.on::before { content: none; }
   .ni .ic { display: block; width: 16px; height: 16px; }
@@ -36,7 +36,7 @@ body { display: flow-root; }
   /* lower area: what the limits say now; a tap opens 사용량 */
   .sfoot { margin-top: auto; padding-top: var(--sp-2); }
   .sf-row { display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-height: 40px; padding: var(--sp-15) var(--sp-3); border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--fg-2); text-align: left; }
-  .sf-row:hover { background: var(--hover); color: var(--fg); }
+  @media (hover: hover) { .sf-row:hover { background: var(--hover); color: var(--fg); } }
   .sf-row .ic { color: var(--fg-3); }
   .sf-row .sf-k { flex: none; font-size: 12px; line-height: 16px; font-weight: 500; }
   .sf-row .sf-bar { flex: 1; min-width: 0; height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
@@ -47,9 +47,9 @@ body { display: flow-root; }
   .sf-ring { display: none; }
   /* the fold control is a bare thin chevron on the line between the sidebar and the main column, at the page title's height: out of every flow, so it takes no width and the title never moves; ‹ open, › folded */
   .app { position: relative; }
-  .side-tog, .side-tog:hover { background: transparent; }
+  .side-tog { background: transparent; } @media (hover: hover) { .side-tog:hover { background: transparent; } }
   .side-tog { position: absolute; left: calc(var(--side-w) - 14px); top: 16px; display: inline-grid; width: 28px; height: 28px; color: var(--fg-3); }
-  .side-tog:hover { color: var(--fg); }
+  @media (hover: hover) { .side-tog:hover { color: var(--fg); } }
   .side-tog .ic { width: 16px; height: 16px; }
   .side-min .side-tog .ic { transform: scaleX(-1); }
   /* folded (:root.side-min, 04-state.js sideToggle): a 60px icon rail. Names go to the title and the aria-label, a tab's dot sits at its icon's bottom right, the usage row is a ring of the same share and color with the number inside */
@@ -121,7 +121,7 @@ body { display: flow-root; }
 /* the prototype's alert strip: one card-like row under the greeting */
 .hstrip { min-height: 48px; background: var(--card); border-radius: var(--r-card); }
 .hstrip .tx { display: flex; flex-direction: column; gap: var(--sp-05); }
-.hstrip:hover { background: var(--card-hover); }
+@media (hover: hover) { .hstrip:hover { background: var(--card-hover); } }
 .hstrip .sup { color: var(--fg-2); }
 .hstrip .end { flex: none; display: flex; align-items: center; }
 

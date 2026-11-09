@@ -3,7 +3,7 @@
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: var(--sp-3); }
 .card { position: relative; min-width: 0; border: 0; border-radius: var(--r-card); background: var(--card); padding: var(--sp-5); }
 .card.tap { cursor: pointer; }
-.card.tap:hover { background: var(--card-hover); }
+@media (hover: hover) { .card.tap:hover { background: var(--card-hover); } }
 .card.tap:focus-visible { outline-offset: 0; }
 .card.foot { display: flex; flex-direction: column; }
 .cf { display: flex; align-items: center; gap: var(--sp-2); margin-top: auto; padding-top: var(--sp-3); }
@@ -13,7 +13,7 @@ code.path-short { display: inline-block; max-width: 100%; vertical-align: bottom
 .ch { display: flex; align-items: center; gap: var(--sp-2); min-height: 20px; margin-bottom: var(--sp-3); }
 .ch h3 { flex: 1; min-width: 0; margin: 0; font: 600 var(--fs-card)/var(--lh-card) var(--font); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ch .chev { width: 14px; height: 14px; color: var(--fg-3); }
-.card.tap:hover .chev { color: var(--fg); }
+@media (hover: hover) { .card.tap:hover .chev { color: var(--fg); } }
 .big { font: 700 var(--fs-big)/var(--lh-big) var(--font); letter-spacing: -.01em; }
 .sup { color: var(--fg-2); font-size: var(--fs-meta); line-height: var(--lh-meta); }
 .err-t { color: var(--err); }
@@ -37,7 +37,7 @@ button.cchip.unrep-no { height: 22px; padding: 0 var(--sp-2); font-size: 11.5px;
 /* 초안 작성 beside 답장 안 함: the one action that moves the mail forward, so it carries the accent (30-monitoring.js mailDraftButton).
    A tonal pill with the pencil (owner 2026-10-29: bare accent text looked unfinished); --layer on the card, --hover under the pointer. */
 button.cchip.mr-draft { height: 24px; gap: var(--sp-1); padding: 0 var(--sp-3) 0 var(--sp-2); background: var(--layer); font-size: 12px; font-weight: 600; color: var(--accent); }
-button.cchip.mr-draft:hover { background: var(--hover); }
+@media (hover: hover) { button.cchip.mr-draft:hover { background: var(--hover); } }
 button.cchip.mr-draft .ic { width: 14px; height: 14px; stroke-width: 2; }
 /* a mail's row buttons on a phone: a finger-sized target (the row itself opens the mail, so a near miss must not) */
 @media (pointer: coarse), (max-width: 639px) { button.cchip.mr-act { height: 32px; padding: 0 var(--sp-3); font-size: 13px; } button.cchip.mr-draft { padding: 0 var(--sp-3); } button.cchip.mr-draft .ic { width: 16px; height: 16px; } }
@@ -45,7 +45,7 @@ button.cchip.mr-draft .ic { width: 14px; height: 14px; stroke-width: 2; }
 .row + .row { margin-top: var(--sp-2); }
 .row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row.tap { cursor: pointer; }
-.row.tap:hover .nm { color: var(--accent); }
+@media (hover: hover) { .row.tap:hover .nm { color: var(--accent); } }
 .kv { display: flex; justify-content: space-between; gap: var(--sp-3); align-items: baseline; }
 .kv .k { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kv + .kv { margin-top: var(--sp-2); }
@@ -60,7 +60,7 @@ button.cchip.mr-draft .ic { width: 14px; height: 14px; stroke-width: 2; }
 .list { border: 0; border-radius: var(--r-card); background: var(--card); overflow: hidden; }
 .list > * + * { border-top: 1px solid var(--line); }
 .li { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; min-height: var(--row-h); padding: var(--row-py) var(--row-px); color: inherit; text-align: left; width: 100%; border: 0; background: transparent; }
-button.li:hover, .li.tap:hover { background: var(--card-hover); }
+@media (hover: hover) { button.li:hover, .li.tap:hover { background: var(--card-hover); } }
 .li .lead { flex: none; display: inline-flex; color: var(--fg-3); }
 .li .tx { flex: 1; min-width: 0; }
 .li .hd { font-size: var(--fs-row); line-height: var(--lh-row); font-weight: 500; }
@@ -75,7 +75,7 @@ button.li:hover, .li.tap:hover { background: var(--card-hover); }
 .pickbox { display: flex; flex-direction: column; gap: var(--sp-4); max-height: min(46dvh, 340px); overflow-y: auto; margin: 0 calc(var(--sp-1) * -1); padding: 0 var(--sp-1); }
 .kb:empty { display: none; }
 .li.on, button.li:active, .li.tap:active { background: var(--row-sel); }
-.li.off, .li.off:hover { background: transparent; cursor: default; }
+.li.off { background: transparent; cursor: default; } @media (hover: hover) { .li.off:hover { background: transparent; cursor: default; } }
 .li.off .hd, .li.off .lead { color: var(--fg-3); }
 /* 계정 card rows (web/js/25-settings-accounts.js): grip, order number, the tap area; a dragged row lifts and the rows it passes shift */
 .li.acc { gap: var(--sp-1); padding-left: var(--sp-15); padding-right: var(--sp-2); }
@@ -83,9 +83,9 @@ button.li:hover, .li.tap:hover { background: var(--card-hover); }
 .acc-no { justify-content: center; min-width: 20px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .acc-grip { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 40px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--fg-3); cursor: grab; touch-action: none; }
 .acc-grip::before { content: ""; width: 10px; height: 16px; background: radial-gradient(circle, currentColor 1.4px, transparent 1.7px) 0 0 / 5px 5.34px; }
-.acc-grip:hover { background: var(--card-hover); color: var(--fg-2); }
+@media (hover: hover) { .acc-grip:hover { background: var(--card-hover); color: var(--fg-2); } }
 .acc-mv { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--fg-2); font-size: 16px; }
-.acc-mv:hover:not(:disabled) { background: var(--card-hover); color: var(--fg); }
+@media (hover: hover) { .acc-mv:hover:not(:disabled) { background: var(--card-hover); color: var(--fg); } }
 .acc-dragging .li.acc { transition: transform var(--m-fast) var(--m-ease); }
 .acc-dragging .li.acc.drag { position: relative; z-index: 2; transition: none; background: var(--card); box-shadow: 0 6px 20px rgb(0 0 0 / .18); cursor: grabbing; }
 .rt-roles { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
@@ -106,7 +106,7 @@ button.li:hover, .li.tap:hover { background: var(--card-hover); }
 .chips::-webkit-scrollbar { display: none; }
 /* chips are small boxes; a filter row is a segmented track (16-result-card.css), a screen tab an underline (20-mailboxes.css) */
 .chip { display: inline-flex; align-items: center; gap: var(--sp-15); flex: none; height: var(--chip-h); padding: 0 var(--sp-3); border: 0; border-radius: var(--r-ctl); background: var(--card); color: var(--fg-2); font-size: 13px; font-weight: 500; max-width: 100%; }
-.chip:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { .chip:hover { background: var(--hover); color: var(--fg); } }
 .chip.on { background: var(--fg); color: var(--bg); }
 /* 두 값 설정 (rowToggle): the current value in one segment-shaped cell on the row's card; the small mark says a tap swaps it */
 .chip.tgl { border-radius: var(--r-seg); background: var(--layer); color: var(--fg); font-weight: 500; }

@@ -35,9 +35,9 @@
 .pl-empty-a { margin-top: var(--sp-3); }
 .pl-row { display: flex; align-items: center; gap: var(--sp-3); width: 100%; min-width: 0; min-height: 48px; margin: 0; padding: var(--sp-2) var(--sp-4); border: 0; background: transparent; color: inherit; text-align: left; }
 .pl-row + .pl-row { border-top: 1px solid var(--line); }
-.pl-row:hover { background: var(--card-hover); }
+@media (hover: hover) { .pl-row:hover { background: var(--card-hover); } }
 /* the open project: the same selected fill as the chat list (.cv-row.on) */
-.pl-row.on, .pl-row.on:hover, .pl-row:active { background: var(--row-sel); }
+.pl-row.on, .pl-row:active { background: var(--row-sel); } @media (hover: hover) { .pl-row.on:hover { background: var(--row-sel); } }
 /* the icon surface of the chat list (.cv-av): a 36px round layer tile, not a button */
 .pl-row > .ico { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--layer); color: var(--fg-2); }
 .pl-row > .ico .ic { width: 20px; height: 20px; }
@@ -71,8 +71,8 @@
 .pmv-hact .ib.pmv-more { width: 40px; height: 40px; border-radius: 50%; background: var(--layer); color: var(--fg-2); }
 /* a tonal button on the header card takes the page gray, so it reads as a control on the white card */
 .pmv-hrow .btn.tonal { background: var(--layer); }
-.pmv-hrow .btn.tonal:hover { background: var(--hover); }
-.pmv-hact .ib.pmv-more:hover { background: var(--card-hover); color: var(--fg); }
+@media (hover: hover) { .pmv-hrow .btn.tonal:hover { background: var(--hover); } }
+@media (hover: hover) { .pmv-hact .ib.pmv-more:hover { background: var(--card-hover); color: var(--fg); } }
 .pmv-hact .ib.pmv-more .ic { width: 20px; height: 20px; }
 
 /* ---- level 3: a section page (an overlay, full screen on a phone) ---- */

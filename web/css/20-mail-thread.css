@@ -7,7 +7,7 @@
 .mhd-n { color: var(--fg); font-weight: 600; }
 .mhd-a { color: var(--fg-3); }
 .mhd-more { min-height: 24px; padding: 0 var(--sp-15); border: 0; border-radius: 6px; background: var(--card); color: var(--accent); font: 500 12px/20px var(--font); cursor: pointer; }
-.mhd-more:hover { background: var(--hover); }
+@media (hover: hover) { .mhd-more:hover { background: var(--hover); } }
 .mhd-wrap .mhd { margin-top: var(--sp-1); }
 /* the open mail's one muted line of recipients; its chevron opens the full header (.mhd) */
 .mhd-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-15); min-width: 0; margin-top: var(--sp-05); }
@@ -15,7 +15,7 @@
 .mhd-tl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mhd-ch { flex: none; width: 16px; height: 16px; transition: transform var(--m-fast) var(--m-ease); }
 .mhd-tog.open .mhd-ch { transform: rotate(180deg); }
-.mhd-tog:hover { color: var(--fg-2); }
+@media (hover: hover) { .mhd-tog:hover { color: var(--fg-2); } }
 .mr-to { overflow: hidden; color: var(--fg-3); font-size: 12px; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
 .od-pane .mhd-wrap .mhd { margin-top: 0; }
 
@@ -29,7 +29,7 @@
 .mth-list { display: flex; flex-direction: column; gap: var(--sp-05); margin: 0; padding: 0; list-style: none; }
 .mth-m > .mth-list { margin-top: var(--sp-1); padding: var(--sp-1); border-radius: var(--r-ctl); background: var(--layer); }
 .mth-row { display: flex; flex-direction: column; gap: var(--sp-05); width: 100%; padding: var(--sp-2) var(--sp-3); border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.mth-row:hover { background: var(--card-hover); }
+@media (hover: hover) { .mth-row:hover { background: var(--card-hover); } }
 .mth-row.on { background: var(--row-sel); cursor: default; }   /* the selected fill of every list (.cv-row.on) */
 .mth-top { display: flex; align-items: center; gap: var(--sp-15); min-width: 0; }
 .mth-when { flex: 1; min-width: 0; color: var(--fg-3); font-size: 12px; line-height: 16px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

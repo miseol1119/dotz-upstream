@@ -6,10 +6,10 @@
 .hm-simple { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--hm-gap); align-items: start; }
 /* toolbar: tonal buttons sit on the gray canvas here, so they take the card fill to stay visible */
 .hm-bar > .btn.tonal { background: var(--card); }
-.hm-bar > .btn.tonal:hover { background: var(--card-hover); }
+@media (hover: hover) { .hm-bar > .btn.tonal:hover { background: var(--card-hover); } }
 .hm-st { position: relative; display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; padding: var(--sp-5); border-radius: var(--r-card); background: var(--card); }
 .hm-st.one { cursor: pointer; }
-.hm-st.one:hover { background: var(--card-hover); }
+@media (hover: hover) { .hm-st.one:hover { background: var(--card-hover); } }
 .hm-st.on { background: var(--active); }
 .hm-st.rel { background: var(--card-hover); }
 .hm-row.rel { background: var(--card-hover); }
@@ -30,7 +30,7 @@ button.hm-sh { cursor: pointer; }
 .hm-list.fix { height: var(--hm-list-h); }
 .hm-rows { display: flex; flex-direction: column; gap: var(--sp-05); margin: 0 calc(var(--sp-3) * -1); }
 .hm-row { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; min-height: 44px; padding: var(--sp-15) var(--sp-3); border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--fg); text-align: left; }
-.hm-row:hover { background: var(--card-hover); }
+@media (hover: hover) { .hm-row:hover { background: var(--card-hover); } }
 .hm-row.on { background: var(--active); }
 .hm-row .dot { flex: none; }
 .hm-row .tx { flex: 1 1 0; display: flex; flex-direction: column; gap: var(--sp-05); min-width: 0; }
@@ -41,7 +41,7 @@ button.hm-sh { cursor: pointer; }
 .hm-with .wl { color: var(--fg-3); font: 500 12px/16px var(--font); }
 .hm-chips { display: flex; flex-wrap: wrap; gap: var(--sp-15); }
 .hm-chip { display: inline-flex; align-items: center; gap: var(--sp-15); min-width: 0; max-width: 100%; min-height: 28px; padding: var(--sp-05) var(--sp-3); border: 0; border-radius: var(--r-ctl); background: var(--layer); color: var(--fg-2); font: 500 12px/16px var(--font); }
-.hm-chip:hover { background: var(--hover); color: var(--fg); }
+@media (hover: hover) { .hm-chip:hover { background: var(--hover); color: var(--fg); } }
 .hm-chip.on { background: var(--active); color: var(--fg); }
 .hm-chip.warn { background: color-mix(in srgb, var(--warn) 12%, var(--layer)); color: var(--warn); }
 .hm-chip.err { background: color-mix(in srgb, var(--err) 12%, var(--layer)); color: var(--err); }
@@ -171,10 +171,10 @@ textarea.fi { display: block; height: auto; padding: var(--sp-2) var(--sp-3); li
 .fc-gh .note { flex-basis: 100%; margin: 0 0 0 var(--sp-6); }
 .fc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--sp-2); margin: var(--sp-2) 0 var(--sp-5); }
 .fc-card { display: flex; flex-direction: column; gap: var(--sp-15); min-width: 0; padding: var(--sp-3) var(--sp-4); border-radius: var(--r-ctl); background: var(--card); cursor: pointer; }
-.fc-card:hover { background: var(--card-hover); }
+@media (hover: hover) { .fc-card:hover { background: var(--card-hover); } }
 /* Material 3 card types instead of a colored side stripe: enforced = filled card, advisory = outlined card. */
 .fc-card.enforced, .hs-ft.enforced { background: var(--layer); }
-.fc-card.enforced:hover, .hs-ft.enforced.go:hover { background: var(--active); }
+@media (hover: hover) { .fc-card.enforced:hover, .hs-ft.enforced.go:hover { background: var(--active); } }
 .fc-card.off { opacity: .6; }
 .fc-card .top, .hs-ft .top { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .fc-card .nm, .hs-ft .nm { flex: 1; min-width: 0; font: 500 14px/20px var(--font); overflow-wrap: anywhere; }
@@ -185,7 +185,7 @@ textarea.fi { display: block; height: auto; padding: var(--sp-2) var(--sp-3); li
 .hs-fts { display: flex; flex-direction: column; gap: var(--sp-2); }
 .hs-ft { display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-2) var(--sp-4); border-radius: var(--r-ctl); background: var(--layer); }
 .hs-ft.go { cursor: pointer; }
-.hs-ft.go:hover { background: var(--hover); }
+@media (hover: hover) { .hs-ft.go:hover { background: var(--hover); } }
 .hs-ft.on, .hs-ft.enforced.on { background: var(--active); }
 .hs-fw > .fi { margin-top: var(--sp-2); }
 .fc-sw { display: inline-flex; align-items: center; gap: var(--sp-15); flex: none; }
@@ -211,7 +211,7 @@ textarea.fi { display: block; height: auto; padding: var(--sp-2) var(--sp-3); li
 .hm-cs .cl { position: sticky; top: 0; z-index: 1; margin: 0 calc(var(--sp-2) * -1); padding: var(--sp-15) var(--sp-2) var(--sp-1); background: var(--card); color: var(--fg-3); font: 500 12px/16px var(--font); }
 .hm-cs .cl:not(:first-child) { margin-top: var(--sp-15); }
 .hm-cr { display: flex; flex: none; flex-direction: column; gap: var(--sp-05); min-width: 0; padding: var(--sp-15) var(--sp-2); margin: 0 calc(var(--sp-2) * -1); border: 0; border-radius: 8px; background: transparent; color: var(--fg); text-align: left; font: 500 13px/18px var(--font); }
-.hm-cr:hover { background: var(--card-hover); }
+@media (hover: hover) { .hm-cr:hover { background: var(--card-hover); } }
 .hm-cr .m1 { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-1) var(--sp-15); min-width: 0; word-break: keep-all; overflow-wrap: anywhere; }
 .hm-cr .m2 { color: var(--fg-3); font-weight: 400; font-size: 12px; line-height: 16px; }
 .hm-cr .m2.mono { font-family: var(--mono); font-size: 11px; }

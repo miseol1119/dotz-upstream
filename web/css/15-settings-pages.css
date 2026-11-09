@@ -35,8 +35,8 @@
 #models .fb-list { --fb-n-w: 20px; gap: 0; }
 #models .fb-item { flex-wrap: wrap; border-radius: 0; background: transparent; padding: var(--sp-2) var(--row-px); border-top: 1px solid var(--line); }
 #models .fb-item.base { border-top: 0; }
-#models .fb-item[data-i]:hover { background: var(--card-hover); }
-#models .fb-item.open, #models .fb-item.open:hover { background: var(--layer); }
+@media (hover: hover) { #models .fb-item[data-i]:hover { background: var(--card-hover); } }
+#models .fb-item.open { background: var(--layer); } @media (hover: hover) { #models .fb-item.open:hover { background: var(--layer); } }
 #models .fb-item > .fb-usage { padding-left: calc(var(--fb-n-w) + var(--sp-2)); margin-top: var(--sp-1); }
 #models .fb-item.in-use { background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
 #models .fb-n { width: var(--fb-n-w); height: auto; border-radius: 0; background: none; color: var(--fg-3); font-size: 13px; line-height: 18px; }
