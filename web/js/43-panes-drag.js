@@ -61,8 +61,10 @@ function paneDragBoxes() {
 }
 // The left or right edge when the pointer is in the outer quarter of that side, else the middle (panes sit side by side only, owner 950d715f);
 // edges are off when they cannot add a pane, and so are they when the two halves would be narrower than a pane may be (280px, 43-panes-view.js).
+// The keys ask the same (43-panes-keys.js paneKeySplit).
+const paneSplitFits = r => (r.width - 16) / 2 >= 280;
 function paneDragZone(r, x, y, edges) {
-  if (!edges || (r.width - 16) / 2 < 280) return "center";
+  if (!edges || !paneSplitFits(r)) return "center";
   const l = (x - r.left) / r.width, rt = (r.right - x) / r.width;
   return l < 0.25 && l <= rt ? "left" : rt < 0.25 ? "right" : "center";
 }
@@ -70,7 +72,7 @@ function paneDragZone(r, x, y, edges) {
 function paneDragAim(x, y) {
   const boxes = PD.src.no ? [] : paneDragBoxes(), box = boxes.find(b => b.id !== PD.src.pane && x >= b.r.left && x < b.r.right && y >= b.r.top && y < b.r.bottom);
   const edges = !!PD.src.pane || paneCount() < PANE_MAX;
-  PD.hit = box ? { id: box.id, r: box.r, side: paneDragZone(box.r, x, y, edges), full: !edges } : null;
+  PD.hit = box ? { id: box.id, r: box.r, side: paneDragZone(box.r, x, y, edges), full: !edges, narrow: edges && !paneSplitFits(box.r) } : null;
   paneDragPaint();
 }
 const PD_SIDE = { left: "왼쪽", right: "오른쪽" };
@@ -82,7 +84,7 @@ function paneDragHint() {
   if (src.pane) return hit.side === "center" ? "자리 바꾸기" : `${PD_SIDE[hit.side]}으로 옮기기`;
   if (paneCount() > 1 && paneOpenIn(src.kind, src.t)) return "열려 있는 칸으로 가요";
   if (hit.side !== "center") return `${PD_SIDE[hit.side]}에 새 칸`;
-  return hit.full ? "칸은 2개까지라 이 칸을 바꿔요" : paneCount() > 1 ? "이 칸을 바꿔요" : "여기서 열기";
+  return hit.full ? "칸은 2개까지라 이 칸을 바꿔요" : paneCount() > 1 ? "이 칸을 바꿔요" : hit.narrow ? "창이 좁아 여기서 열어요" : "여기서 열기";
 }
 function paneDragPaint() {
   const h = PD.hit, hint = PD.ghost && PD.ghost.querySelector(".pn-gh");

@@ -13,6 +13,9 @@ const paneTourKeys = () => {
 // A split from the keyboard opens the main chat, or when that is open 작업내역, or the first running session that is not open yet.
 function paneKeySplit(side) {
   if (paneCount() >= PANE_MAX) { toast("창은 두 개까지 열 수 있어요", true); return; }
+  // the drag's rule: no split that leaves a pane under 280px (43-panes-drag.js paneSplitFits)
+  const box = paneDragBoxes()[0];
+  if (box && !paneSplitFits(box.r)) { toast("창이 좁아 칸을 나눌 수 없어요", true); return; }
   const here = paneHere(), shown = t => (paneCount() > 1 ? !!paneOpenIn("chat", t) : here.kind === "chat" && here.t === t);
   const { wait, run } = sessionsNow();
   const t = [MAIN, "worklog", ...[...wait, ...run].map(l => `lane:${l.name}`)].find(x => !shown(x));

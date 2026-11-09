@@ -21,8 +21,8 @@ const hub = fakeHub({
 afterAll(() => hub.stop());
 
 type V = Awaited<ReturnType<typeof open>>;
-const open = async () => {
-	const v = await hub.view({ width: 1280, height: 800 }, "/#chat");
+const open = async (width = 1280) => {
+	const v = await hub.view({ width, height: 800 }, "/#chat");
 	await waitFor(v, `target === "main" && CV.placed && tl.querySelectorAll(".bm").length >= 1 && !!document.querySelector('#chat-convo .cv-row[data-t="lane:다라"]')`);
 	return v;
 };
@@ -190,6 +190,28 @@ test("⌥⌘\\ splits, ⌥⌘1 and ⌥⌘W work the panes, and ⌘\\ alone still
 	await key(v, "Backslash");
 	expect(await ev(v, `document.documentElement.classList.contains("side-min")`)).toBe(true);
 	expect(await ev(v, `paneCount()`)).toBe(1);
+});
+
+// One conversation is 644px narrower than the window (sidebar, list column, edges): its halves reach 280px at 1220px.
+test("where two panes would be narrower than 280px the keys split nothing and say why, like the drag; from 1220px both split", async () => {
+	const v = await open(1219);
+	await drag(v, ROW("lane:가나"), ONE, 0.97, 0.5, false);
+	await waitFor(v, `PD && PD.hit`);
+	expect(await ev(v, `[PD.hit.side, $(".pn-ghost .pn-gh").textContent]`)).toEqual(["center", "창이 좁아 여기서 열어요"]);
+	await run(v, `document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, button: 0 }))`);
+	await waitFor(v, `!document.querySelector(".pn-ghost, .pn-zone")`);
+	await key(v, "Backslash", "altKey: true,");
+	await waitFor(v, `!!document.querySelector(".snack")`);
+	expect(await ev(v, `[paneCount() < 2, !!$("#split"), document.querySelector(".snack").textContent]`)).toEqual([true, false, "창이 좁아 칸을 나눌 수 없어요"]);
+	const w = await open(1220);
+	await drag(w, ROW("lane:가나"), ONE, 0.97, 0.5, false);
+	await waitFor(w, `PD && PD.hit`);
+	expect(await ev(w, `[PD.hit.side, $(".pn-ghost .pn-gh").textContent]`)).toEqual(["right", "오른쪽에 새 칸"]);
+	await run(w, `document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })); document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, button: 0 }))`);
+	await waitFor(w, `!document.querySelector(".pn-ghost, .pn-zone")`);
+	await key(w, "Backslash", "altKey: true,");
+	await waitFor(w, `paneCount() === 2 && document.querySelectorAll("#split .pane").length === 2`);
+	expect(await ev(w, `[...document.querySelectorAll("#split .pane")].map(n => Math.round(n.getBoundingClientRect().width) >= 280)`)).toEqual([true, true]);
 });
 
 test("Ctrl+Shift+\\ splits without Alt, which AltGr layouts send as Ctrl+Alt; the screen tour lists the pane keys", async () => {
