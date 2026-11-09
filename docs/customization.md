@@ -130,6 +130,9 @@ A `render.js` body must use the same classes and tokens: `.kv` with `.k` and `.v
 `.sup`, `.tag` (`ok`, `warn`, `err`), and the CSS variables (`var(--fg)`, `var(--fg-2)`, `var(--fg-3)`). No inline
 colors, font sizes or fixed heights, and no buttons: logic goes in `actions`.
 
+The shipped feature `features/output-design/` (on by default) gives the bot the look rules for anything a person will see, and a
+check command (`bun features/output-design/bin/check.ts <url|file.html>`) that measures the result before it says done.
+
 ## Sidebar pins: `pins.json`
 
 ```json

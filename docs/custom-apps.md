@@ -110,4 +110,6 @@ answers under a sub-path also sets `web.path`.
 `errors: []` and `status: "running"`, never put secrets in it. App-specific request wording and bring-in steps are the
 owner's own material and live in their data folder (`custom/app-templates.json`, `custom/apps/<id>/`), never in this tree.
 
+How the app's pages should look is the shipped feature `features/output-design/` (look rules plus `bin/check.ts`, which measures a page at 390px and 1280px, light and dark, before the bot says done).
+
 Files under `docs/` are gitignored in this repo; add new ones with `git add -f`.
