@@ -36,15 +36,15 @@ function updRestartPending() {
   const i = UPD.info;
   return !!(i && !i.error && updState(i).pending);
 }
-// One badge for both: dotz's own version and every running harness, counted together. A pulled update that still waits for its restart keeps
-// the badge as 재시작 필요 (it is the next step, ahead of a newer version), so the update does not vanish half done.
+// One badge for both: dotz's own version and every running harness, each named (owner 2026-11-09: an OmO update read as a dotz one). A pulled
+// update that still waits for its restart keeps the badge as 재시작 필요 (it is the next step, ahead of a newer version), so it does not vanish half done.
 function paintUpdBadge() {
   const b = $("#nav-upd");
   if (!b) return;
-  const n = (updAvailable() ? 1 : 0) + hvNew(), restart = updRestartPending();
-  b.hidden = !n && !restart;
-  b.textContent = restart ? "재시작 필요" : n > 1 ? `업데이트 ${n}` : "새 버전";
-  b.title = restart ? "재시작하면 새 버전이 적용돼요" : "새 버전이 있어요";
+  const names = [...(updAvailable() ? ["dotz"] : []), ...hvList().filter(h => h.available).map(h => h.name)], restart = updRestartPending();
+  b.hidden = !names.length && !restart;
+  b.textContent = restart ? "재시작 필요" : `${names.join(" · ")} 새 버전`;
+  b.title = restart ? "재시작하면 새 버전이 적용돼요" : `${names.join(", ")} 새 버전이 있어요`;
   paintUpdBar();
 }
 // The top update bar (hub/update-now.ts, owner 2026-11-01: "상단 알림바 누르고 나서 설정가서 다시 업뎃하는게 번거롭네"): a new version offers

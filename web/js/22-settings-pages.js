@@ -90,7 +90,7 @@ function settingsList(go) {
       stRow("spark", "화면 안내 다시 보기", "화면 설명과 단축키", () => introOpen()),
       stRow(themeIc(), "표시", `${themeIs() === "dark" ? "다크" : "라이트"} · 대화 탭 ${chatTabMode() === "main" ? "메인" : "마지막"}`, () => go("display"))),
     stSec("시스템"), stList(
-      stRow("download", "업데이트", stUpdateSub(), () => go("update"), updRestartPending() ? stTag("재시작 필요") : updAvailable() ? stTag("새 버전") : hvNew() ? stTag("업데이트") : undefined),
+      stRow("download", "업데이트", stUpdateSub(), () => go("update"), updRestartPending() ? stTag("재시작 필요") : updAvailable() ? stTag("새 버전") : undefined),
       stRow("term", "실행 하네스", stRuntimeSub(), () => go("runtime"), hvNew() ? stTag("새 버전") : undefined),
       stRow("harness", "구성", "시스템 지도", () => go("harness"))),
   ];
