@@ -105,6 +105,8 @@ const DEFS = new Map<string, Def>([
 	["lanes.max_rss_gb", { type: "number", applies: "restart", default: DEFAULTS.max_rss_gb, min: 1, max: 128 }],
 	// main.ts COALESCE_MS
 	["gateway.coalesce_ms", { type: "number", applies: "restart", default: DEFAULTS.coalesce_ms, min: 0, max: COALESCE_MAX_MS }],
+	// main.ts restartGate (read at start)
+	["gateway.restart_cap_min", { type: "number", applies: "restart", default: DEFAULTS.restart_cap_min, min: 10, max: 1440 }],
 	// reflect.ts / token-audit.ts / update.ts
 	["reflect_at", { type: "text", applies: "restart", default: DEFAULTS.reflect_at }],
 	["token_audit_at", { type: "text", applies: "restart", default: DEFAULTS.token_audit_at }],
@@ -133,7 +135,7 @@ type Disk = {
 	discord?: { token_file?: string; owner_id?: string; guild?: string };
 	web?: { port?: number; tailscale_https_port?: number; allow_logins?: string[] };
 	lanes?: { max_active?: number; compact_at?: number; nightly_at?: string; max_rss_gb?: number };
-	gateway?: { coalesce_ms?: number };
+	gateway?: { coalesce_ms?: number; restart_cap_min?: number };
 	zele?: { enabled?: boolean; poll_sec?: number; brief_hour?: number };
 	omp_update?: { mode?: string; at?: string };
 	output_language?: string | { mode?: string };
@@ -340,7 +342,7 @@ export async function harnessGraph(opts: { terminals?: number; light?: boolean }
 			id: "gateway", kind: "gateway", group: "flow", label: N.gateway.label, status: "ok", summary: N.gateway.summary,
 			desc: N.gateway.desc(dur(FIRST_AFTER_MS)),
 			facts: [{ label: N.gateway.merge, value: N.gateway.mergeValue(disk.gateway?.coalesce_ms ?? DEFAULTS.coalesce_ms, dur(COALESCE_MAX_MS)) }, { label: N.gateway.direct, value: N.gateway.directValue }, { label: N.gateway.route, value: N.gateway.routeValue }, { label: N.gateway.restart, value: N.gateway.restartValue(dur(RESTART_NOTICE_MS)) }],
-			settings: [S("gateway.coalesce_ms")],
+			settings: [S("gateway.coalesce_ms"), S("gateway.restart_cap_min")],
 		},
 		// ---- orchestrator
 		{

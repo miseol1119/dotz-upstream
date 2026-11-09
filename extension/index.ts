@@ -379,7 +379,7 @@ function orchestratorTools(pi: any): void {
 		description: "Sessions (dotz_lane): one headless orchestrator (OmO or omp) per project folder, each with its own Discord channel; its reports come back as inbox turns. A stopped session whose conversation another runtime wrote cannot be resumed (send refuses it); continue it with action=handover {name, text?}: a fresh conversation of the same session, handed the previous conversation's recent exchanges, its brief and last report. A session is only for multi-hour, multi-step project work: anything under an hour you do yourself or with task subagents (their results come back into your own conversation), never a session for a 10-20 minute job. A session plans and reviews on its own model and runs implementation, tests, renders and grind work as task subagents on a cheaper subagent model. action=launch {why (why this needs a session rather than you or a task subagent: the hours and steps involved), hours (expected duration; under 1 is refused), owner_asked_for_lane? (true only when the owner asked for a session; skips the hours check), name [a-z0-9-] (internal key), title (REQUIRED for launch: the session's Discord channel name, or its thread name when home is given, read by the owner: 2-4 plain words in the owner's main language saying what the work is, e.g. 디스코드 설정; the gateway refuses the key, a folder or repo name, or anything codename-shaped like [a-z0-9._-] only), cwd absolute, brief (<= 8000 chars, paths not contents; must contain a machine-checkable line 'Done when: <check>; <check>', each check one of command `<shell>` [stdout~\"re\"] | file <path> | url <https://...> [status=200] [body~\"re\"] | merged <owner/repo>#<N>; the gateway re-runs them itself when the session reports [done] and marks it verified or sends the failures back to the session; a plain-text Done-when is accepted only with owner_asked_for_lane=true), model? (Fable or max/xhigh effort only with owner_asked_for_fable=true, when the owner explicitly asked for it; the same applies to worker_model), home? (ch:<id> of a work channel. Default: a session launched for a request from a work channel works in a thread on the owner's message there, one launched from a thread takes that thread over, one from chat gets a new channel; stop archives a thread and never deletes the channel), worker_model? (provider/model[:thinking] for this session's task subagents; default is lanes.worker_model from the config), est? (percent of the 5h usage window this job is expected to use, 0-100; default 15; the gate refuses when under 10% would remain, so give a realistic number: small fix ~5, big build ~30), force? (only after the owner OKs a budget-gate warning)}; list; send {name, text} (also resumes a stopped session's conversation); stop {name}; verify {name, text: evidence, force?} (only for a plain-text Done-when, which the gateway cannot check: after you checked it yourself; refused while the session's lane/<name> branch is not merged into its base, force=true only for work that stays unmerged on purpose, saying why in text; what you ran and the result; works only while the session's last report was [done], i.e. its claim is reported, and marks it verified, which the worklog entry then shows).",
 		parameters: z.object({ action: z.enum(["launch", "list", "send", "handover", "stop", "verify"]), why: z.string().optional(), hours: z.number().optional(), owner_asked_for_lane: z.boolean().optional(), name: z.string().optional(), title: z.string().optional(), kind: z.string().optional(), home: z.string().optional(), cwd: z.string().optional(), brief: z.string().optional(), text: z.string().optional(), model: z.string().optional(), worker_model: z.string().optional(), est: z.number().min(0).max(100).optional(), force: z.boolean().optional(), owner_asked_for_fable: z.boolean().optional() }),
 		async execute(_id: string, p: any) {
-			const held = laneHeld(p.action);
+			const held = laneHeld(p.action) ?? restartHeld(p.action, DATA);
 			if (held) return { content: [{ type: "text", text: held }] };
 			if (p.action === "launch" && !String(p.title ?? "").trim()) return { content: [{ type: "text", text: "title required: use 2-4 plain words of the work in the owner's language (e.g. 디스코드 설정)" }] };
 			const out =
@@ -577,6 +577,7 @@ function reportKeySpend(pi: any, file: string): void {
 
 import { isMain } from "./guard-config.ts";
 import { holdWorkOnApiKey, laneHeld } from "./apikey-hold.ts";
+import { holdOnRestart, restartHeld } from "./restart-hold.ts";
 
 export { isMain };
 
@@ -651,6 +652,7 @@ export default function dotz(host: any) {
 	installHarnessTools(pi);
 	installOwnerValues(pi);
 	if (process.env.DOTZ_LANE) {
+		holdOnRestart(pi, DATA, process.env.DOTZ_LANE);
 		enforceRules(pi);
 		installOutputCap(pi);
 		installCompactKept(pi);
@@ -661,6 +663,7 @@ export default function dotz(host: any) {
 	// ("Entry Dotz mode not found" in the terminal view); OmO names the session with setSessionName instead.
 	pi.on("session_start", () => (process.env.DOTZ_RUNTIME === "omo" ? pi.setSessionName?.("Dotz mode") : pi.setLabel?.("Dotz mode")));
 	if (process.env.DOTZ_ORCHESTRATOR === "1") {
+		holdOnRestart(pi, DATA);
 		enforceRules(pi);
 		installCompactKept(pi);
 		installEffortBound(pi, join(DATA, "effort-bound.json"));

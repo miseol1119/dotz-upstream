@@ -2,7 +2,8 @@ import { DATA_DIR, log, paths, selectorOf, lanesModel, now, chainAfter, fallback
 import { type Lane, laneLive, laneWorkerModel, lanes, dir, persist, ownerNotes, setStatus, portOf, type Record_, pendingFile } from "./lanestate.ts";
 import { broadcast } from "./events.ts";
 import { featurePrompt } from "./featuredirs.ts";
-import { existsSync, readFileSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "node:fs";
+import { RESTART_HELD_FILE } from "./restart.ts";
 import { withReplyLine, msg, modeFile, lang } from "./i18n.ts";
 import { worktreeNote, laneWorktree, dropWorktree, withWorktree, unlanded } from "./lanetree.ts";
 import { checkBrief } from "./lanegates.ts";
@@ -381,6 +382,16 @@ export function restoreLanes(): string[] {
 		const rec = JSON.parse(readFileSync(file, "utf8")) as Record_;
 		const lane: Lane = { ...rec, lastText: "", ctx: newCtx() };
 		lanes.set(name, lane);
+		// It stopped because the waiting restart refused its task workers (extension/restart-hold.ts): one note to go on, sent by the
+		// resume sweep like a message its busy session refused. A lane cut off mid-turn gets laneGatewayRestarted instead.
+		const restartHeld = join(dir(name), RESTART_HELD_FILE);
+		if (existsSync(restartHeld)) {
+			rmSync(restartHeld, { force: true });
+			if (rec.status === "idle" && !lane.refused) {
+				lane.refused = { text: msg().laneRestartResume, tries: 0 };
+				persist(lane);
+			}
+		}
 		if (existsSync(pendingFile(lane))) {
 			lane.lastText = readFileSync(pendingFile(lane), "utf8");
 			report(lane, lane.lastText, lane.lastText.startsWith("[lane error]"));

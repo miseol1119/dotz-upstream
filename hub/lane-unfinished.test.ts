@@ -1,7 +1,7 @@
 // A lane with unfinished work never sits idle unnoticed (hub/laneunfinished.ts, hub/laneresume.ts), and one with nothing to do stays down at
 // no cost. The session rows are reply-voice's own (2026-11-05, seq 226 and 228), cut to the fields the gateway reads.
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cfg } from "./config.ts";
 import { msg } from "./i18n.ts";
@@ -10,6 +10,7 @@ import { resumeUnfinished } from "./laneresume.ts";
 import * as l from "./lanes.ts";
 import type * as Lanes from "./lanes.ts";
 import { report } from "./lanereport.ts";
+import { RESTART_HELD_FILE } from "./restart.ts";
 import { dir, persist } from "./lanestate.ts";
 import { laneClosed, RESUME_BACKOFF_MS, saysClosed, unfinishedWork } from "./laneunfinished.ts";
 import { runState, stallStep } from "./runstate.ts";
@@ -372,6 +373,21 @@ test("a refused message a crash left behind goes once, whichever comes first of 
 	await advance(2000);
 	await flush();
 	expect(retried).toBe(0);
+	await clear(lane.name);
+});
+
+test("a lane the waiting restart paused (extension/restart-hold.ts) gets one note to go on after the restart", async () => {
+	const lane = idleLane("uf-restart-held");
+	session(lane, []);
+	await down(lane);
+	writeFileSync(join(dir(lane.name), RESTART_HELD_FILE), new Date().toISOString());
+	const back = await restart(lane.name);
+	expect(existsSync(join(dir(lane.name), RESTART_HELD_FILE))).toBe(false);
+	expect(await resumeUnfinished()).toEqual([lane.name]);
+	expect(lastAgent().sent.join("\n")).toContain(msg().laneRestartResume);
+	back.status = "idle";
+	back.prompted = undefined;
+	expect(await resumeUnfinished()).toEqual([]);
 	await clear(lane.name);
 });
 

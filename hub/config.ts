@@ -23,6 +23,8 @@ export type Config = {
 	discord: { token_file: string; owner_id: string; guild: string; app_id?: string; category?: string; work_category?: string };
 	web: { port: number; tailscale_https_port: number; allow_logins: string[]; /** How the web app is reached: "tailscale" (default), "cloudflare" (tunnel + Cloudflare Access, hub/cf-access.ts) or "local". */ access?: "tailscale" | "cloudflare" | "local"; /** false turns the entry check off (hub/entry-check.ts: own Host names, tailnet identity only through tailscale serve, no cross-site writes); default on. */ entry_check?: boolean; cloudflare?: { /** The tunnel's Public Hostname, or without a domain the <name>.<account>.workers.dev of extras/cf-worker (Workers VPC). */ hostname: string; team: string; aud: string; /** In DATA_DIR/secrets unless absolute (default cloudflared-tunnel-token). */ tunnel_token_file?: string }; machine_name?: string; peers?: string[]; peer_discovery?: boolean; peer_ports?: number[]; /** Waiting approval cards in one conversation that open the web's triage view (hub/approval-wire.ts; default 3). */ triage_min?: number };
 	orchestrator?: { rotate_tokens?: number; runtime?: string };
+	// `restart_cap_min`: a gateway restart that waited this long for running work alerts the owner once (hub/restart.ts); nothing is killed.
+	gateway?: { coalesce_ms?: number; restart_cap_min?: number };
 	ui?: { origin_view?: boolean };
 	// Monthly spend limit (USD) the owner set on the Anthropic platform console; the usage screen shows how much of it is used. Empty = none.
 	api_budget?: { monthly_usd?: number };
@@ -160,7 +162,7 @@ export const LANES_COMPACT_AT = 300_000;
 export const DEFAULTS = {
 	rotate_tokens: 300_000, nightly_at: "04:30", nightly_compact_at: 300_000, keep_recent: 40_000, rotate_mb: 50, max_rss_gb: 8, idle_stop_min: 20, worker_idle_min: 5,
 	conv_idle_stop_min: 20,
-	coalesce_ms: 2000, reflect_at: "04:40", token_audit_at: "04:30", update_at: "04:20", zele_poll_sec: 120, zele_brief_hour: 8, outlang_timeout_s: 30, web_port: 7420,
+	coalesce_ms: 2000, restart_cap_min: 90, reflect_at: "04:40", token_audit_at: "04:30", update_at: "04:20", zele_poll_sec: 120, zele_brief_hour: 8, outlang_timeout_s: 30, web_port: 7420,
 } as const;
 // The web server listens only here; the tailnet reaches it through `tailscale serve` (web.tailscale_https_port).
 export const HOST = "127.0.0.1";
@@ -176,6 +178,7 @@ export const BURST_WAIT_MS = 12_000;
 export const ACCOUNT_HISTORY_DAYS = 3;
 export const accountHistoryDays = () => positive(cfg.accounts?.history_days, ACCOUNT_HISTORY_DAYS);
 export const lanesCompactAt = () => positive(cfg.lanes?.compact_at, LANES_COMPACT_AT);
+export const restartCapMs = () => positive(cfg.gateway?.restart_cap_min, DEFAULTS.restart_cap_min) * 60_000;
 // Per-model context limits (config.json `context.models[<model id>]`). `window` replaces the window the runtime reports
 // (shown and used for the percent); `compact_at` is the token count at which the hub compacts a session on that model,
 // in place of the role's default (orchestrator.rotate_tokens / lanes.compact_at). With only `window` set, the default

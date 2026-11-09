@@ -2,7 +2,7 @@
 // 127.0.0.1 only. Tailnet access goes through `tailscale serve`, which adds the Tailscale-User-Login header.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cfg, DATA_DIR, HOME, HOST, log, NAME, now, paths, PORT, TZ, writeAtomic } from "./config.ts";
+import { cfg, DATA_DIR, HOME, HOST, log, NAME, now, paths, PORT, restartCapMs, TZ, writeAtomic } from "./config.ts";
 import "./lock.ts"; // must stay right after config.ts: takes the single-instance lock before the other modules load
 import "../firstrun/first-run-boot.ts"; // a seed install still in its web onboarding serves only that and never gets past this line (firstrun/first-run-boot.ts)
 import { parseCommand, setGatewayRestart } from "./control.ts";
@@ -45,7 +45,7 @@ import { applyAccountChange as holdOrchestratorKeepalive, applyAccountPin, orch,
 import { errorAsk, startResumeWatch, watchSession } from "./orch-error.ts";
 import { interruptedLanes } from "./lanereconnect.ts";
 import { queuedTargets } from "./queue.ts";
-import { createRestartGate, RESTART_NOTICE_MS } from "./restart.ts";
+import { createRestartGate, markRestartPending, RESTART_NOTICE_MS, restartCapText } from "./restart.ts";
 import { createWaitCheck } from "./waitcheck.ts";
 import { ownerMessage } from "./events.ts";
 import { forgetAccountUsage, onQuota, QUOTA_REFRESH_MS, refreshQuota, usageSnapshot } from "./providers.ts";
@@ -719,6 +719,8 @@ onEmit(workRows.seen);
 setInterval(() => void (subscriberCount() > 0 && workRows.sweep()), WORK_SWEEP_MS);
 const sweepWaitlist = waitlistSweep(stateWaitlist, items => broadcast({ kind: "waitlist", items }));
 setInterval(() => void (subscriberCount() > 0 && sweepWaitlist()), WORK_SWEEP_MS);
+// A previous process's wait is over: this one starts work again.
+markRestartPending(DATA_DIR, false);
 const restartGate = createRestartGate({
 	busy: busyNow,
 	collecting: () => bursts.size > 0,
@@ -726,6 +728,9 @@ const restartGate = createRestartGate({
 	minGapMs: Number(process.env.DOTZ_RESTART_MIN_GAP_MS ?? 5 * 60_000),
 	noticeAfterMs: RESTART_NOTICE_MS,
 	notice: text => void out(discord.status.enabled ? "worklog" : "web", text, undefined, { source: "gateway" }).catch(e => log(`restart wait notice failed: ${e}`)),
+	hold: () => markRestartPending(DATA_DIR, true),
+	capAfterMs: restartCapMs(),
+	cap: (busy, min) => alert(restartCapText(busy, min)),
 	log,
 	exit: () => {
 		updateNow()?.restarting();
