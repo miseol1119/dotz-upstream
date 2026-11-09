@@ -43,10 +43,11 @@ function paneMirror(p) {
   if (p.kind === "chat") {
     m.list = snap ? paneBare(snap.n) : el("div", { class: "tl-in" });
     m.wrap = el("div", { class: "timeline pane-tl" }, m.list);
+    m.wrap.addEventListener("scroll", () => edgeFade(m.wrap), { passive: true });
     if (snap) m.keys = snap.keys; else paneFill(m);
     const draft = String(ts(p.t).draft || "");
     const stub = el("button", { class: "pane-cmp", type: "button", "aria-label": "이 창에서 메시지 쓰기", onclick: () => { paneFocus(p.id); $("#text").focus(); } },
-      el("span", { class: draft ? "pane-cmp-t" : "pane-cmp-t ph" }, draft || "메시지 또는 /명령"));
+      el("span", { class: "pane-cmp-plus" }, icon("add")), el("span", { class: draft ? "pane-cmp-t" : "pane-cmp-t pane-cmp-ph" }, draft || "메시지 또는 /명령"));
     m.node = el("div", { class: "pane-mir" }, head, m.wrap, stub);
   } else {
     m.node = el("div", { class: "pane-mir" }, head, el("div", { class: "pane-pj" }, snap ? paneBare(snap.n) : el("div", { class: "empty", text: "이 창을 누르면 프로젝트가 열려요" })));
@@ -82,6 +83,7 @@ function paneMirrorsPlace() {
     if (!m.wrap) continue;
     const at = m.p.stick ? null : m.p.at, n = at && [...m.list.querySelectorAll("[data-ts]")].find(x => x.dataset.ts === at.ts);
     m.wrap.scrollTop = n ? n.getBoundingClientRect().top - m.wrap.getBoundingClientRect().top + m.wrap.scrollTop - at.off : m.wrap.scrollHeight;
+    edgeFade(m.wrap);
   }
 }
 

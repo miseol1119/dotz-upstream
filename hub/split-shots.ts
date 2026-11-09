@@ -14,7 +14,21 @@ async function split(view: View, lm: Lm, n: number, t: string, kind: string, sid
 }
 const open = (view: View, lm: Lm) => lm.goScreen(view, "chat-open");
 
+// Pulls a running session's row over the right edge of the one conversation and stops before the drop, so the zone overlay is on screen.
+async function dragOverEdge(view: View, lm: Lm): Promise<void> {
+	await open(view, lm);
+	await view.evaluate(`(() => {
+		const row = document.querySelector('#chat-convo .cv-row[data-t^="lane:"]'), r = row.getBoundingClientRect(), c = document.getElementById("cv-head").getBoundingClientRect(), b = document.getElementById("composer").getBoundingClientRect();
+		const fire = (type, x, y) => document.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: x, clientY: y, pointerId: 1, button: 0 }));
+		row.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: r.left + 20, clientY: r.top + 10, pointerId: 1, button: 0 }));
+		fire("pointermove", r.left + 40, r.top + 20);
+		fire("pointermove", c.right - 40, (c.top + b.bottom) / 2);
+	})()`);
+	await lm.waitFor(view, `!!document.querySelector(".pn-zone") && !!document.querySelector(".pn-ghost")`);
+}
+
 export const SPLIT_SHOTS: SplitShot[] = [
+	{ name: "drag", widths: [1280], run: dragOverEdge },
 	{ name: "two", widths: [1280, 1600], run: async (view, lm) => {
 		await open(view, lm);
 		await split(view, lm, 2, LANE, "chat", "right");

@@ -30,10 +30,20 @@
 .pane-mir { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .pane-hd { flex: none; display: flex; align-items: center; gap: var(--sp-2); min-width: 0; padding: var(--sp-3) var(--sp-4); }
 .pane-hd .pane-x { margin-left: auto; }
-.pane-tl { flex: 1; height: auto; min-height: 0; margin-inline: 0; padding: var(--sp-1) var(--sp-6) var(--sp-3); overflow: hidden auto; }
+.pane-tl { --edge-t: 0px; --edge-b: 0px; flex: 1; height: auto; min-height: 0; margin-inline: 0; padding: var(--sp-1) var(--sp-6) var(--sp-3); overflow: hidden auto; -webkit-mask-image: linear-gradient(transparent, #000 var(--edge-t), #000 calc(100% - var(--edge-b)), transparent); mask-image: linear-gradient(transparent, #000 var(--edge-t), #000 calc(100% - var(--edge-b)), transparent); }
+.pane-mir.fade-t > .pane-tl { --edge-t: var(--sp-3); }
+.pane-mir.fade-b > .pane-tl { --edge-b: var(--sp-3); }
 .pane-tl > .tl-in { max-width: none; gap: var(--sp-3); padding: var(--sp-1) 0 var(--sp-3); }
 .pane-tl > .tl-in > .um, .pane-tl > .tl-in > .bm { margin-top: 0; }
-.pane-cmp { flex: none; display: block; margin: var(--sp-2) var(--sp-3) var(--sp-3); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--fg); font: 400 var(--fs-chat)/var(--lh-chat) var(--font); text-align: left; cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pane-cmp-t.ph { color: var(--fg-3); }
+.pane-cmp { flex: none; display: flex; align-items: center; gap: var(--sp-1); min-height: var(--sp-12); margin: var(--sp-2) var(--sp-3) var(--sp-3); padding: var(--sp-15); border: 0; border-radius: var(--r-card); background: var(--layer); color: var(--fg); font: 400 var(--fs-row)/var(--lh-row) var(--font); text-align: left; cursor: text; }
+.pane-cmp-plus { flex: none; display: grid; place-items: center; width: 36px; height: 36px; color: var(--fg-2); }
+.pane-cmp-plus .ic { width: 20px; height: 20px; }
+.pane-cmp-t { flex: 1; min-width: 0; padding: 0 var(--sp-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane-cmp-ph { color: var(--fg-3); }
 .pane-pj { flex: 1; min-height: 0; overflow-y: auto; }
 .pane-pj > .view { max-width: none; margin: 0; padding: var(--sp-4); }
+
+/* dragging a row or a pane head (43-panes-drag.js): a ghost of the title at the pointer, the hovered zone drawn over its pane like the file drop (accent fill, --ff-ring edge) */
+body.pn-drag, body.pn-drag * { cursor: grabbing !important; user-select: none; }
+.pn-ghost { position: fixed; z-index: 2100; max-width: 240px; padding: var(--sp-1) var(--sp-3); border-radius: var(--r-ctl); background: var(--card); box-shadow: var(--float); color: var(--fg); font: 500 var(--fs-sec)/var(--lh-sec) var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.pn-zone { position: fixed; z-index: 2099; border-radius: var(--r-card); background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: var(--ff-ring); pointer-events: none; }

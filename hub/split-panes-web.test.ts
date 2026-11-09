@@ -49,7 +49,7 @@ test("the second pane builds #split, the third splits the active one, a full set
 	expect(await ev(v, `paneSplit("alert", "chat", "right")`)).toBe("p4");
 	expect(await ev(v, `paneSplit("worklog", "chat", "right")`)).toBe("");
 	expect(await ev(v, `paneCount()`)).toBe(4);
-	expect(SPLIT_SHOTS.map(s => s.name)).toEqual(["two", "three", "four"]);
+	expect(SPLIT_SHOTS.map(s => s.name)).toEqual(["drag", "two", "three", "four"]);
 });
 
 test("a pane that is already open takes the focus instead of a second copy", async () => {

@@ -27,8 +27,8 @@ function panePersist() {
   } catch { /* storage blocked: the layout only lasts until reload */ }
 }
 
-// Opens t next to the active pane (side: right | left | top | bottom). A target already open in a pane is not opened twice: that pane becomes active.
-function paneSplit(t, kind, side) {
+// Opens t next to the active pane, or next to pane atId (side: right | left | top | bottom). A target already open in a pane is not opened twice: that pane becomes active.
+function paneSplit(t, kind, side, atId = "") {
   if (paneCount() < 2) {
     const h = paneHere();
     PN.root = paneNew(h.kind, h.t); PN.active = PN.root.id;
@@ -36,7 +36,7 @@ function paneSplit(t, kind, side) {
   const dup = paneOpenIn(kind, t);
   if (dup) { paneFocus(dup.id); return dup.id; }
   if (paneCount() >= PANE_MAX) return "";
-  const at = paneFind(PN.active), np = paneNew(kind, t), first = side === "left" || side === "top";
+  const at = paneFind(atId) || paneFind(PN.active), np = paneNew(kind, t), first = side === "left" || side === "top";
   paneSwap(at, { dir: side === "left" || side === "right" ? "row" : "col", a: first ? np : at, b: first ? at : np, r: 0.5 });
   paneFocus(np.id);
   return np.id;
@@ -61,6 +61,26 @@ function paneFocus(id) {
   paneEnter(p);
   panePersist();
 }
+// A pane dragged by its head: onto the middle of another pane the two swap places, onto an edge (side) it moves next to that pane.
+function paneMove(id, dst, side) {
+  const x = paneFind(id), y = paneFind(dst);
+  if (!x || !y || x === y) return false;
+  if (side === "center") {
+    const px = paneParent(PN.root, x), py = paneParent(PN.root, y);
+    if (px === py) [px.a, px.b] = [px.b, px.a];
+    else {
+      if (px.a === x) px.a = y; else px.b = y;
+      if (py.a === y) py.a = x; else py.b = x;
+    }
+  } else {
+    const par = paneParent(PN.root, x), first = side === "left" || side === "top";
+    paneSwap(par, par.a === x ? par.b : par.a);
+    paneSwap(y, { dir: side === "left" || side === "right" ? "row" : "col", a: first ? x : y, b: first ? y : x, r: 0.5 });
+  }
+  paneSync();
+  panePersist();
+  return true;
+}
 function paneClose(id) {
   const p = paneFind(id);
   if (!p || paneCount() < 2) return false;
@@ -76,11 +96,9 @@ function paneClose(id) {
   return true;
 }
 
-// The saved layout, after the first go(): panes whose target is gone are dropped; the page keeps what it shows (the active pane takes it over, paneSync).
-function paneRestore() {
-  let d = null;
-  try { d = JSON.parse(localStorage.getItem(PANE_KEY) || "null"); } catch { /* a broken value is no layout */ }
-  if (!d || !d.root) return;
+// A saved layout {root, active, seq} as a live tree: panes whose target is gone or already shown are dropped, at most PANE_MAX stay. null when nothing is left.
+function panePrune(d) {
+  if (!d || !d.root) return null;
   const ok = p => p && (p.kind === "chat" ? validTarget(p.t) : p.kind === "project" && typeof p.t === "string" && (p.t.startsWith("builtin:") || !PRJ || PRJ.projects.some(x => x.key === p.t)));
   const seen = new Set();
   let left = PANE_MAX;
@@ -96,9 +114,17 @@ function paneRestore() {
     return { id: String(n.id), kind: n.kind, t: n.t, at: n.at && n.at.ts ? { ts: String(n.at.ts), off: Number(n.at.off) || 0 } : null, stick: n.stick !== false, dot: "" };
   };
   const root = prune(d.root);
-  if (!root) return;
-  PN = { root, active: "", seq: Math.max(Number(d.seq) || 0, ...paneLeaves(root).map(p => Number(p.id.slice(1)) || 0)) };
-  PN.active = (paneFind(d.active) || paneLeaves()[0]).id;
+  if (!root) return null;
+  const lv = paneLeaves(root);
+  return { root, active: (lv.find(p => p.id === d.active) || lv[0]).id, seq: Math.max(Number(d.seq) || 0, ...lv.map(p => Number(p.id.slice(1)) || 0)) };
+}
+// The saved layout, after the first go(): the page keeps what it shows (the active pane takes it over, paneSync).
+function paneRestore() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(PANE_KEY) || "null"); } catch { /* a broken value is no layout */ }
+  const r = panePrune(d);
+  if (!r) return;
+  PN = r;
   paneSync();
   panePersist();
 }
