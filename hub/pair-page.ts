@@ -11,12 +11,12 @@ export const PAIR_HTML = `<!doctype html>
 <meta name="color-scheme" content="light dark">
 <title>기기 연결</title>
 <style>
-:root{color-scheme:light;--bg:#f2f4f6;--card:#ffffff;--layer:#f2f4f6;--hover:#e9ecf0;--fg:#191f28;--fg-2:#4e5968;--fg-3:#6b7684;--accent:#3182f6;--on-accent:#ffffff;--err:#e42939;
+:root{color-scheme:light;--bg:#f2f4f6;--card:#ffffff;--layer:#f2f4f6;--hover:#e9ecf0;--fg:#191f28;--fg-2:#4e5968;--fg-3:#616b78;--accent:#3182f6;--on-accent:#ffffff;--err:#e32435;
 --fs-page:22px;--lh-page:30px;--fs-page-sm:20px;--lh-page-sm:28px;--fs-card:16px;--fs-body:14px;--lh-body:22px;
 --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:20px;--sp-8:32px;--r-card:18px;--r-ctl:10px;--sheet-w:480px;
 --btn-h:36px;--btn-hit:44px;--field-h:36px;--field-h-touch:40px;--m-base:220ms;--m-ease:cubic-bezier(.2, .7, .2, 1);
 --font:Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif;}
-@media (prefers-color-scheme: dark){:root{color-scheme:dark;--bg:#121214;--card:#1d1d21;--layer:#26262b;--hover:#2b2b31;--fg:#ececf0;--fg-2:#b0b4bc;--fg-3:#8e939c;--accent:#4c94ff;--on-accent:#ffffff;--err:#ff6369;}}
+@media (prefers-color-scheme: dark){:root{color-scheme:dark;--bg:#121214;--card:#1d1d21;--layer:#26262b;--hover:#2b2b31;--fg:#ececf0;--fg-2:#b0b4bc;--fg-3:#8e939c;--accent:#6ca7ff;--on-accent:#121214;--err:#ff6369;}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0;min-height:100%}

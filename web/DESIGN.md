@@ -15,9 +15,10 @@ borderless white cards, one sparing blue accent, big bold titles, short copy. Li
 | `--line` / `--line-2` | `#e5e8eb` / `#d1d6db` | `#2b2b31` / `#3d3d45` | hairlines inside a card; fields carry no border (see `--ff-fill`) |
 | `--fg` | `#191f28` | `#ececf0` | text |
 | `--fg-2` | `#4e5968` | `#b0b4bc` | secondary text |
-| `--fg-3` | `#6b7684` | `#8e939c` | meta text (4.5:1 on white) |
-| `--accent` | `#3182f6` | `#4c94ff` | primary button, send, selected / in-use, progress. Nothing else |
-| `--ok` / `--warn` / `--err` | `#0a8754` / `#b85e00` / `#e42939` | `#3ecf8e` / `#f5a524` / `#ff6369` | status dots and short status words only |
+| `--fg-3` | `#616b78` | `#8e939c` | meta text (4.5:1 on `--bg`, `--row-sel` and `--hover`) |
+| `--accent` | `#3182f6` | `#6ca7ff` | primary button, send, selected / in-use, progress. Nothing else (dark is lighter so its text reaches 4.5:1 on its own 14% tint) |
+| `--on-accent` / `--on-err` | `#ffffff` / `#ffffff` | `#121214` / `#121214` | text on a solid accent or danger fill (dark ink on the lighter dark colors, 4.5:1) |
+| `--ok` / `--warn` / `--err` | `#0a8754` / `#ae5900` / `#e32435` | `#3ecf8e` / `#f5a524` / `#ff6369` | status dots and short status words only |
 
 Rules: one accent per screen; status colors never decorate; no colored stripes on rounded surfaces; selection is a
 fill (`--card` on the canvas, `--fg` chip), not a border.

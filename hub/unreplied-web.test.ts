@@ -133,7 +133,7 @@ for (const [width, height] of [[390, 844], [1280, 800]] as const) {
 			expect(await fg(v, sel)).toBe(unread);
 			expect(await bg(v, sel)).toBe("rgba(0, 0, 0, 0)");
 			await run(v, `document.querySelector(${JSON.stringify(sel)}).classList.add("drafted")`);
-			expect(await fg(v, sel)).toBe(theme === "dark" ? "rgb(76, 148, 255)" : unread);
+			expect(await fg(v, sel)).toBe(theme === "dark" ? "rgb(108, 167, 255)" : unread);
 		});
 	});
 }

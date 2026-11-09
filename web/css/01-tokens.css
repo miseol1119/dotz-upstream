@@ -15,9 +15,9 @@
   /* a selected or pressed row inside a card: never the page's own grey (--bg/--layer), so a first or last row keeps the card's edge */
   --row-sel: #e8ebee;
   --line: #e5e8eb; --line-2: #d1d6db;
-  --fg: #191f28; --fg-2: #4e5968; --fg-3: #6b7684;
+  --fg: #191f28; --fg-2: #4e5968; --fg-3: #616b78;
   --accent: #3182f6; --on-accent: #ffffff;
-  --ok: #0a8754; --warn: #b85e00; --err: #e42939;
+  --ok: #0a8754; --warn: #ae5900; --err: #e32435; --on-err: #ffffff;
   /* 미답장 (waiting for the owner's reply): orange fill + its text colour, 5.2:1 on white (light), 8:1 on the dark card (dark) */
   --unreplied: #c2410c; --on-unreplied: #ffffff;
   /* KakaoTalk chat (30-kakao.js): the room's backdrop, incoming / own bubbles, time and date chip */
@@ -79,8 +79,8 @@
   --row-sel: #2b2b31;
   --line: #2b2b31; --line-2: #3d3d45;
   --fg: #ececf0; --fg-2: #b0b4bc; --fg-3: #8e939c;
-  --accent: #4c94ff; --on-accent: #ffffff;
-  --ok: #3ecf8e; --warn: #f5a524; --err: #ff6369;
+  --accent: #6ca7ff; --on-accent: #121214;
+  --ok: #3ecf8e; --warn: #f5a524; --err: #ff6369; --on-err: #121214;
   --unreplied: #ff9a4d; --on-unreplied: #1b1206;
   --kk-bg: #161c23; --kk-in: #2b2f36; --kk-in-fg: #ececf0; --kk-own: #d9bd00; --kk-own-fg: #1b1b1b; --kk-time: #8e98a5; --kk-chip: rgb(255 255 255 / .12); --kk-chip-fg: #b0b4bc;
   --scrim: rgb(0 0 0 / .6);
@@ -258,7 +258,7 @@ button.conn:disabled { cursor: default; }
 .btn.text:hover, .dc-act:not(.main):not(.alt):hover, .dc-manual:hover { background: var(--hover); color: var(--fg); opacity: 1; }
 .btn.danger { background: transparent; color: var(--err); padding: 0 var(--sp-3); }
 .btn.danger:hover { background: color-mix(in srgb, var(--err) 12%, transparent); opacity: 1; }
-.btn.danger.fill { background: var(--err); color: #fff; padding: 0 var(--sp-3); }
+.btn.danger.fill { background: var(--err); color: var(--on-err); padding: 0 var(--sp-3); }
 .btns { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center; }
 /* 행 안 tier (docs/ui-spec.md 버튼, 설정 행): the button or field in the right slot of a row. 32px high, 13px; on a touch screen the box stays 32px and ::after widens the hit area to 44px. */
 .btn.inrow { position: relative; height: var(--btn-h-row); padding: 0 var(--sp-3); font-size: 13px; }

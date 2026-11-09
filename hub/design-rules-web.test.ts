@@ -304,6 +304,33 @@ describe("web/DESIGN.md rules", () => {
 		expect(off).toEqual([]);
 	});
 
+	test("text pairs of the tokens reach 4.5:1 in both themes", () => {
+		const rules = parseCss("01-tokens.css", realCss().find(([f]) => f === "01-tokens.css")![1]);
+		const theme = (scope: string) => {
+			const out = new Map<string, string>();
+			for (const r of rules) if (r.selector === scope) for (const [k, v] of r.decls) out.set(k, v);
+			return (name: string) => out.get(`--${name}`)!;
+		};
+		const rgb = (c: string) => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+		const lum = (c: string) => { const [r, g, b] = rgb(c).map(v => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!; };
+		const ratio = (a: string, b: string) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi! + 0.05) / (lo! + 0.05); };
+		const tint = (c: string, over: string, pct: number) => "#" + rgb(c).map((v, i) => Math.round(v * pct + rgb(over)[i]! * (1 - pct)).toString(16).padStart(2, "0")).join("");
+		const low: string[] = [];
+		const check = (what: string, fg: string, bg: string) => { const n = ratio(fg, bg); if (n < 4.5) low.push(`${what} ${fg}/${bg} ${n.toFixed(2)}`); };
+		for (const [name, t] of [["light", theme(":root")], ["dark", theme(':root[data-theme="dark"]')]] as const) {
+			for (const s of ["bg", "layer", "row-sel", "hover"]) check(`${name} fg-3 on ${s}`, t("fg-3"), t(s));
+			check(`${name} warn on bg`, t("warn"), t("bg"));
+			check(`${name} bg on warn`, t("bg"), t("warn"));
+			if (name === "dark") check(`${name} on-accent on accent`, t("on-accent"), t("accent")); // the light blue button (white on #3182f6, 3.7) is the brand blue and stays
+			check(`${name} on-err on err`, t("on-err"), t("err"));
+		}
+		const dark = theme(':root[data-theme="dark"]');
+		for (const s of ["layer", "row-sel"]) for (const pct of [0.12, 0.14]) check(`dark accent on a ${Math.round(pct * 100)}% accent tint over ${s}`, dark("accent"), tint(dark("accent"), dark(s), pct));
+		expect(low).toEqual([]);
+		const fill = parseCss("01-tokens.css", realCss().find(([f]) => f === "01-tokens.css")![1]).find(r => r.selector === ".btn.danger.fill")!;
+		expect(fill.decls.find(([k]) => k === "color")?.[1]).toBe("var(--on-err)");
+	});
+
 	const planted: [string, string, string][] = [
 		["stripe", "colored one-sided border", `.planted { border-left: 3px solid var(--accent); border-radius: var(--r-card); }`],
 		["stripe", "colored inset edge", `.planted { box-shadow: inset 3px 0 0 var(--warn); }`],

@@ -644,7 +644,7 @@ describe("the /pair page, drawn", () => {
 				expect(got.slice(2, 4)).toEqual(["arrive", "0.22s"]);
 				expect(got[4]).toBe(width > 639 ? "22px" : "20px");
 				expect(got[5]).toBe("36px");
-				expect(got[6]).toBe(theme === "light" ? "rgb(49, 130, 246)" : "rgb(76, 148, 255)");
+				expect(got[6]).toBe(theme === "light" ? "rgb(49, 130, 246)" : "rgb(108, 167, 255)");
 				await Bun.write(SHOTS + "/pair-" + width + "-" + theme + ".png", await v.screenshot());
 			}
 		}

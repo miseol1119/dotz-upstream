@@ -2362,11 +2362,11 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 | 제목 크기 | h1 `22px`(:14) | `--fs-page` 22px/`--lh-page` 30px(앱바 제목) |
 | 배경 | `Canvas`(시스템 색, :12) | `--bg` #f2f4f6(라이트) / #121214(다크) |
 | 글자색 | `CanvasText`(:12) | `--fg` #191f28(라이트) / #ececf0(다크) |
-| 보조 글자 | `opacity:.75`(p, :15) | `--fg-2` #4e5968 / #b0b4bc, `--fg-3` #6b7684 / #8e939c |
-| 주요 단추 배경/테두리 | `#2563eb`(:17) | `--accent` #3182f6(라이트) / #4c94ff(다크), 글자 `--on-accent` #ffffff |
+| 보조 글자 | `opacity:.75`(p, :15) | `--fg-2` #4e5968 / #b0b4bc, `--fg-3` #616b78 / #8e939c |
+| 주요 단추 배경/테두리 | `#2563eb`(:17) | `--accent` #3182f6(라이트) / #6ca7ff(다크), 글자 `--on-accent` #ffffff / #121214(다크) |
 | 주요 단추 글자 | `#fff`(:17) | `--on-accent` #ffffff |
 | 보조 단추/입력 테두리 | `#8886`(8자리 hex, 회색 약 53% 불투명, :16,18) | `--line` #e5e8eb / #2b2b31, `--line-2` #d1d6db / #3d3d45 |
-| 오류 글자 | `#dc2626`(:22) | `--err` #e42939(라이트) / #ff6369(다크) |
+| 오류 글자 | `#dc2626`(:22) | `--err` #e32435(라이트) / #ff6369(다크) |
 | 비활성 | `opacity:.5`(:19) | 전역 `button:disabled` opacity .4 (01-tokens.css:123) |
 | 단추/입력 모서리 | `10px`(:16) | `--r-ctl` 10px (같은 값) |
 | 단추/입력 안쪽 여백 | `12px`, 간격 `10px`(:16) | `--sp-3` 12px, `--sp-2` 8px, `--sp-15` 6px (10px에 정확히 맞는 토큰은 없음) |
@@ -2390,13 +2390,13 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 |---|---|---|
 | 글꼴 | `system-ui,sans-serif`(:61) | `--font` Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif |
 | 본문 크기/행간 | `15px/1.5`(:61) | `--fs-row` 15px / `--lh-row` 22px, `--fs-chat` 15px / `--lh-chat` 24px |
-| 시각 글자 | `11px`, `opacity:.6`(.t, :66) | `--fs-tag` 11px / `--lh-tag` 16px, `--fg-3` #6b7684 / #8e939c |
+| 시각 글자 | `11px`, `opacity:.6`(.t, :66) | `--fs-tag` 11px / `--lh-tag` 16px, `--fg-3` #616b78 / #8e939c |
 | 머리줄 글자 | 굵기 `600`, small `400`, `opacity:.7`(:62) | `--fg` / `--fg-3`(위와 같음) |
 | 배경/글자 | `Canvas`, `CanvasText`(:61, textarea :67) | `--bg` #f2f4f6 / #121214, `--fg` #191f28 / #ececf0, 카드 `--card` #ffffff / #1d1d21 |
 | 머리줄/입력줄 구분선 | `#8884`(회색 약 27% 불투명, :62,67) | `--line` #e5e8eb / #2b2b31 |
-| 내 말풍선 | 배경 `#2f6fed`, 글자 `#fff`(:65) | `--accent` #3182f6 / #4c94ff, `--on-accent` #ffffff (앱 채팅 말풍선 토큰은 이 범위에서 읽지 않음) |
+| 내 말풍선 | 배경 `#2f6fed`, 글자 `#fff`(:65) | `--accent` #3182f6 / #6ca7ff, `--on-accent` #ffffff / #121214 (앱 채팅 말풍선 토큰은 이 범위에서 읽지 않음) |
 | 상대 말풍선 | 배경 `#8882`(회색 약 13% 불투명, :65) | `--layer` #f2f4f6 / #26262b |
-| 오류 글자 | `#d33`(:66) | `--err` #e42939 / #ff6369 (이 페이지는 /pair의 `#dc2626`과도 값이 달라요) |
+| 오류 글자 | `#d33`(:66) | `--err` #e32435 / #ff6369 (이 페이지는 /pair의 `#dc2626`과도 값이 달라요) |
 | 말풍선 모서리 | `14px`(:64) | `--r-menu` 14px (같은 값), 앱의 `--r-card` 18px, `--r-sheet` 20px |
 | 입력창/단추 모서리 | `10px`(:67,68) | `--r-ctl` 10px (같은 값) |
 | 입력 테두리 | `1px solid #8886`(:67) | `--line-2` #d1d6db / #3d3d45 (앱 필드는 테두리 없는 채움, `--ff-ring`은 포커스 때만) |
@@ -2460,12 +2460,12 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 | `--line-2` | `#d1d6db` | `#3d3d45` | 17 / 다크 80 | 33회: css/16-result-card.css x8, css/03-base.css x3, css/15-draft-original.css x3 외 12개 파일; 토큰 파일 내 파생 2회 |
 | `--fg` | `#191f28` | `#ececf0` | 18 / 다크 81 | 197회: css/16-result-card.css x25, css/04-files.css x23, css/03-base.css x22 외 27개 파일; 토큰 파일 내 파생 9회 |
 | `--fg-2` | `#4e5968` | `#b0b4bc` | 18 / 다크 81 | 253회: css/16-result-card.css x32, css/04-files.css x28, css/05-log.css x21 외 29개 파일; 토큰 파일 내 파생 9회 |
-| `--fg-3` | `#6b7684` | `#8e939c` | 18 / 다크 81 | 326회: css/05-log.css x39, css/16-result-card.css x31, css/04-files.css x19 외 30개 파일; 토큰 파일 내 파생 3회 |
-| `--accent` | `#3182f6` | `#4c94ff` | 19 / 다크 82 | 154회: css/03-base.css x14, css/17-kakao.css x12, css/05-log.css x11 외 25개 파일; 토큰 파일 내 파생 8회 |
+| `--fg-3` | `#616b78` | `#8e939c` | 18 / 다크 81 | 326회: css/05-log.css x39, css/16-result-card.css x31, css/04-files.css x19 외 30개 파일; 토큰 파일 내 파생 3회 |
+| `--accent` | `#3182f6` | `#6ca7ff` | 19 / 다크 82 | 154회: css/03-base.css x14, css/17-kakao.css x12, css/05-log.css x11 외 25개 파일; 토큰 파일 내 파생 8회 |
 | `--on-accent` | `#ffffff` | `#ffffff` | 19 / 다크 82 | 9회: css/03-base.css x4, css/09-notices.css x1, css/15-reply.css x1 외 3개 파일; 토큰 파일 내 파생 2회 |
 | `--ok` | `#0a8754` | `#3ecf8e` | 20 / 다크 83 | 34회: css/20-monitoring.css x4, css/20-projects.css x4, css/02-cards-lists-tags.css x3 외 12개 파일 |
-| `--warn` | `#b85e00` | `#f5a524` | 20 / 다크 83 | 58회: css/04-files.css x8, css/03-base.css x6, css/20-monitoring.css x6 외 12개 파일; 토큰 파일 내 파생 6회 |
-| `--err` | `#e42939` | `#ff6369` | 20 / 다크 83 | 67회: css/05-log.css x14, css/04-files.css x8, css/20-monitoring.css x7 외 15개 파일; 토큰 파일 내 파생 5회 |
+| `--warn` | `#ae5900` | `#f5a524` | 20 / 다크 83 | 58회: css/04-files.css x8, css/03-base.css x6, css/20-monitoring.css x6 외 12개 파일; 토큰 파일 내 파생 6회 |
+| `--err` | `#e32435` | `#ff6369` | 20 / 다크 83 | 67회: css/05-log.css x14, css/04-files.css x8, css/20-monitoring.css x7 외 15개 파일; 토큰 파일 내 파생 5회 |
 | `--unreplied` | `#c2410c` | `#ff9a4d` | 22 / 다크 84 | 9회: css/02-cards-lists-tags.css x4, css/17-kakao.css x3, css/05-log.css x1 외 1개 파일 |
 | `--on-unreplied` | `#ffffff` | `#1b1206` | 22 / 다크 84 | 1회: css/17-kakao.css x1 |
 | `--kk-bg` | `#dbe5ee` | `#161c23` | 24 / 다크 85 | 1회: css/17-kakao.css x1 |
