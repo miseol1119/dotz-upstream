@@ -11,7 +11,11 @@ const intgHidden = t => INTG.available.some(a => a.off && intgHas(a, t));
 // 미답장 (hub/unreplied.ts): the orange pill (reading never clears it).
 const unrepPill = (text = "미답장") => el("span", { class: "tag unreplied", text });
 
-async function loadIntegrations() {
+// Callers that ask while a request is out share it (opening a mail thread asks from the thread, the unread sync and the list at once).
+let intgFlight = null;
+const loadIntegrations = () => intgFlight || (intgFlight = intgFetch().finally(() => { intgFlight = null; }));
+async function intgFetch() {
+  clearTimeout(INTG.timer);   // a refetch queued by intgWatch is this one
   try {
     const r = await api("/api/integrations");
     INTG.items = Array.isArray(r.items) ? r.items : []; INTG.loaded = true;
