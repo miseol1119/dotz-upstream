@@ -688,7 +688,7 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 		}
 		// The same marks on many mails, {keys, on}: one write of each store and one broadcast (open pages only reload on it, the target is not read), however many mails.
 		if (req.method === "POST" && url.pathname === "/api/mail/fyi") {
-			const b = await body(req).catch(() => ({})) as { keys?: unknown; on?: unknown };
+			const b = await body(req).catch(error => { if (error instanceof BodyError) throw error; return {}; }) as { keys?: unknown; on?: unknown };
 			if (typeof b.on !== "boolean") return json({ error: "on must be true or false" }, 400);
 			if (!Array.isArray(b.keys) || !b.keys.length || b.keys.length > mailKeep() || b.keys.some(k => typeof k !== "string" || !/^[a-z0-9._-]+$/.test(k))) return json({ error: "keys must be an array of mail keys" }, 400);
 			const keys = [...new Set(b.keys as string[])], found = new Set(setMailsFyi(keys, b.on));
@@ -702,14 +702,14 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 		if (req.method === "POST" && url.pathname === "/api/mail/delete-original") return originalDeleteRoute(req, peer, await body(req), mailOriginal);   // the owner's 삭제 with the switch on
 		// 읽음 / 안 읽음 / 보관 / 별표 on a mail: dotz changes at once and the real mailbox follows; 휴지통 stays in dotz (hub/mail-sync.ts has the contract).
 		if (req.method === "POST" && url.pathname === "/api/mail/actions") {
-			const b = await body(req).catch(() => ({})) as { keys?: unknown; action?: unknown };
+			const b = await body(req).catch(error => { if (error instanceof BodyError) throw error; return {}; }) as { keys?: unknown; action?: unknown };
 			if (!isMailAction(b.action)) return json({ error: "action must be read, unread, archive, unarchive, trash, star or unstar" }, 400);
 			if (!Array.isArray(b.keys) || b.keys.some(k => typeof k !== "string")) return json({ error: "keys must be an array of mail keys" }, 400);
 			return json({ ok: true, results: await mailActions((b.keys as string[]).slice(0, 200), b.action, mailSyncDeps) });
 		}
 		const mailActOne = req.method === "POST" && /^\/api\/mail\/([a-z0-9._-]+)\/action$/.exec(url.pathname);
 		if (mailActOne) {
-			const b = await body(req).catch(() => ({})) as { action?: unknown };
+			const b = await body(req).catch(error => { if (error instanceof BodyError) throw error; return {}; }) as { action?: unknown };
 			if (!isMailAction(b.action)) return json({ error: "action must be read, unread, archive, unarchive, trash, star or unstar" }, 400);
 			const res = await mailAction(mailActOne[1]!, b.action, mailSyncDeps);
 			return res.ok ? json(res) : json({ error: res.note }, 404);
@@ -729,7 +729,7 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 			if (!deps?.requestDraft) return json({ error: "이 설치에는 답장 초안 기능이 없어요" }, 503);
 			const target = mailTarget(key);
 			// What the owner typed in the 초안 작성 box (empty: the draft is made on its own).
-			const instruction = String((await body(req).catch(() => ({})) as { instruction?: unknown }).instruction ?? "").trim().slice(0, 500);
+			const instruction = String((await body(req).catch(error => { if (error instanceof BodyError) throw error; return {}; }) as { instruction?: unknown }).instruction ?? "").trim().slice(0, 500);
 			void deps.requestDraft({ ...(r.account ? { account: r.account } : {}), key, ...(instruction ? { instruction } : {}), target, ...(r.thread ? { thread: r.thread } : {}), ...(r.msg ? { messageId: r.msg } : {}), source: r.source, id: r.id, subject: r.subject, from: r.from, ...(r.to ? { to: r.to } : {}), ...(r.cc ? { cc: r.cc } : {}), ...(r.summary ? { summary: r.summary } : {}), ...(r.attachments?.some(a => !a.inline) ? { attachments: r.attachments.filter(a => !a.inline).map(a => ({ name: a.name, size: a.size })) } : {}), ...(r.replyFiles ? { replyFiles: r.replyFiles } : {}) })
 				.then(res => { if (res !== "offered") return deps.send(target, "답장 초안을 만들지 못했어요. 잠시 뒤 다시 눌러 주세요"); })
 				.catch(e => log(`mail ${key}: requested draft failed: ${(e as Error).message}`));
@@ -762,6 +762,7 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 				if (d) await recordSentByDotz({ id: d.id, source: d.source, to: d.to, cc: d.cc, subject: d.subject, body: d.body, files: stagedFiles(d.id) }, { compose: made.key });
 				return json(made);
 			} catch (error) {
+				if (error instanceof BodyError) throw error;
 				return json({ error: (error as Error).message }, error instanceof MailError ? error.status : 500);
 			}
 		}
@@ -781,6 +782,7 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 			try {
 				return json(await postMail(await body(req), mailDeps()));
 			} catch (error) {
+				if (error instanceof BodyError) throw error;
 				return json({ error: (error as Error).message }, error instanceof MailError ? error.status : 500);
 			}
 		}

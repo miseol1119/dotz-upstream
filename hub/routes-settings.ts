@@ -13,7 +13,7 @@ import { featureCatalog } from "./features.ts";
 import { mailboxRoute } from "./routes-mailbox.ts";
 import { harnessGraph, readHarnessFile } from "./harness.ts";
 import { lastReport, RUNTIME_IDS, runtimesView, startVerify, UseRefused, useRuntime, verifyState, type UseRole } from "./runtime/verify.ts";
-import { json, body, terminals } from "./routes-util.ts";
+import { json, body, terminals, BodyError } from "./routes-util.ts";
 import { budgetSettings, deleteAdminKey, monthlyLimitOf, saveAdminKey, saveMonthlyLimit } from "./api-budget.ts";
 import { postSettings, savePostSettings } from "./discord-post.ts";
 import { discordConnectionRoute } from "./discord-connection.ts";
@@ -245,7 +245,7 @@ export async function routeSettings(req: Request, url: URL, parts: string[]): Pr
 			if (parts[2] === "resume") resumeNow("web 재개 (POST /api/orchestrator/resume)");
 			else if (parts[2] === "restart") restartOrchestrator("web restart (POST /api/orchestrator/restart)");
 			else {
-				const t = String(((await body(req).catch(() => ({}))) as { target?: unknown }).target ?? "").trim();
+				const t = String(((await body(req).catch(error => { if (error instanceof BodyError) throw error; return {}; })) as { target?: unknown }).target ?? "").trim();
 				if (t) convs.cancelFor(t);
 				else cancelByOwner();
 			}
