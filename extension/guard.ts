@@ -31,7 +31,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { broadSearchProblem, expandShellVars, shellText } from "./guard-shell.ts";
 export { shellText };
 import { callRules, expandCellVars, OMO_PROJECTS, readPaths, workerTrail } from "./guard-notes.ts";
-import { dataDir, type GuardConfig, GUARD_DEFAULTS, installedOriginal, isMain, loadGuardConfig, logOnce, stateDir, statePath as stateFile, SUB_COMPACT_STOP, SUB_COMPACT_WRAP_UP } from "./guard-config.ts";
+import { dataDir, type GuardConfig, GUARD_DEFAULTS, installedOriginal, isMain, laneShareReason, loadGuardConfig, logOnce, stateDir, statePath as stateFile, SUB_COMPACT_STOP, SUB_COMPACT_WRAP_UP } from "./guard-config.ts";
 
 // Active configuration: the defaults until installGuard() loads <DOTZ_DIR>/config.json. The exported checks take their
 // limits as a parameter that defaults to it, so tests pass their own.
@@ -395,28 +395,31 @@ function contextTokens(ctx: any): number {
 export const stateOwner = (): string | undefined => process.env.DOTZ_LANE || process.env.DOTZ_CONV || undefined;
 
 // The files every session reads at start and only the main session writes (state.json, owner rules, lessons, owner memory):
-// a conversation's session hands a change to them to main, so two sessions never write one at once.
+// a conversation's session hands a change to them to main, and a lane (DOTZ_LANE) puts it in its report's "<bot> 몫:" line
+// (hub/forline.ts), so two sessions never write one at once (2026-11-10: a lane wrote memory/owner.md).
 const SHARED_FILES = ["state.json", "RULES.md", "LESSONS.md"];
 const WRITE_TOOLS = new Set(["write", "edit", "multiedit", "apply_patch", "ast_edit", "notebook_edit"]);
 const SHELL_WRITES = /\b(write(File|FileSync)?|appendFile(Sync)?|Bun\.write|writeAtomic|rename(Sync)?|unlink(Sync)?|rm|mv|cp|tee|sed\s+-i|truncate)\b|>{1,2}/;
-export function sharedWriteBlock(tool: string, input: any, data = dataDir(), conv = process.env.DOTZ_CONV): string | undefined {
-	if (!conv) return undefined;
+// A relative path resolves in the session's folder (cwd): a lane's worktree may hold its own RULES.md or state.json.
+export function sharedWriteBlock(tool: string, input: any, data = dataDir(), conv = process.env.DOTZ_CONV, lane = process.env.DOTZ_LANE, cwd = data): string | undefined {
+	if (!conv && !lane) return undefined;
 	const shared = [...SHARED_FILES.map(f => join(data, f)), join(data, "memory") + "/"];
 	const hits = (p: string) => {
-		const abs = p.startsWith("~/") ? join(homedir(), p.slice(2)) : resolve(data, p);
+		const abs = p.startsWith("~/") ? join(homedir(), p.slice(2)) : resolve(cwd, p);
 		return shared.some(s => (s.endsWith("/") ? abs.startsWith(s) : abs === s));
 	};
-	const reason = `orchestrator-guard: this session answers only its own conversation (${conv}); state.json, RULES.md, LESSONS.md and owner memory are written by the main session. Hand the change over with dotz_conv send main.`;
+	let writes = false;
 	if (WRITE_TOOLS.has(tool)) {
 		const paths = [input?.path, input?.file_path, ...(Array.isArray(input?.paths) ? input.paths : [])].filter((p): p is string => typeof p === "string");
-		if (paths.some(hits)) return reason;
-		if (tool === "apply_patch" && typeof input?.input === "string" && shared.some(s => input.input.includes(s))) return reason;
-		return undefined;
+		writes = paths.some(hits) || (tool === "apply_patch" && typeof input?.input === "string" && shared.some(s => input.input.includes(s)));
+	} else if (tool === "bash" || tool === "eval") {
+		const text = shellText(input);
+		const named = shared.some(s => text.includes(s)) || SHARED_FILES.some(f => text.includes(`.dotz/${f}`)) || text.includes(".dotz/memory/");
+		writes = named && SHELL_WRITES.test(text);
 	}
-	if (tool !== "bash" && tool !== "eval") return undefined;
-	const text = shellText(input);
-	const named = shared.some(s => text.includes(s)) || SHARED_FILES.some(f => text.includes(`.dotz/${f}`)) || text.includes(".dotz/memory/");
-	return named && SHELL_WRITES.test(text) ? reason : undefined;
+	if (!writes) return undefined;
+	if (lane) return laneShareReason(data);
+	return `orchestrator-guard: this session answers only its own conversation (${conv}); state.json, RULES.md, LESSONS.md and owner memory are written by the main session. Hand the change over with dotz_conv send main.`;
 }
 
 function statePath(cwd: string, lane?: string): string {
@@ -1003,7 +1006,7 @@ export function installGuard(pi: any, config: GuardConfig = loadGuardConfig()): 
 		}
 		const laneMerge = tool === "bash" ? laneMergeBlock(expandShellVars(String(event?.input?.command ?? ""))) : undefined;
 		if (laneMerge) return { block: true, reason: laneMerge };
-		const shared = sharedWriteBlock(tool, event?.input);
+		const shared = sharedWriteBlock(tool, event?.input, dataDir(), process.env.DOTZ_CONV, process.env.DOTZ_LANE, ctx?.cwd);
 		if (shared) {
 			debug({ phase: "shared-write-block", tool });
 			return { block: true, reason: shared };

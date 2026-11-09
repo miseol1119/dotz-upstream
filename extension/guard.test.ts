@@ -427,6 +427,61 @@ test("the worker state is keyed by DOTZ_CONV, and shared files are written only 
 	}
 });
 
+// A lane (DOTZ_LANE) hands the same files to main with its report's "<bot> 몫:" line (2026-11-10: a lane wrote memory/owner.md).
+const LANE_KO = "orchestrator-guard: state.json, RULES.md, LESSONS.md와 오너 메모는 메인 세션만 써요. 바꿀 내용을 보고에 '땅콩 몫:' 줄로 적으세요.";
+test("a lane's writes to state.json, RULES.md, LESSONS.md and owner memory are refused with its own hand-off text; a conversation keeps its text; main writes them", () => {
+	const data = mkdtempSync(join(tmpdir(), "dotz-lane-share-"));
+	try {
+		writeFileSync(join(data, "config.json"), JSON.stringify({ identity: { name: "땅콩", language: "ko" } }));
+		for (const p of [join(data, "state.json"), join(data, "RULES.md"), join(data, "LESSONS.md"), join(data, "memory", "owner.md")]) {
+			const calls: [string, any][] = [["write", { path: p, content: "x" }], ["edit", { path: p, edits: [] }], ["bash", { command: `echo x >> ${p}` }]];
+			for (const [tool, input] of calls) {
+				expect(sharedWriteBlock(tool, input, data, "", "split-panes")).toBe(LANE_KO);
+				expect(sharedWriteBlock(tool, input, data, "mail:acme-1", "")).toContain("dotz_conv send main");
+				expect(sharedWriteBlock(tool, input, data, "", "")).toBeUndefined();
+			}
+		}
+		// Another install's name and language.
+		writeFileSync(join(data, "config.json"), JSON.stringify({ identity: { name: "Pip", language: "en" } }));
+		expect(sharedWriteBlock("write", { path: join(data, "RULES.md") }, data, "", "ktx")).toContain('"For Pip:"');
+	} finally {
+		rmSync(data, { recursive: true, force: true });
+	}
+});
+
+test("through the installed hook a lane is refused on the shared files but writes its report, project files and worktree", async () => {
+	const data = mkdtempSync(join(tmpdir(), "dotz-lane-own-"));
+	const worktree = mkdtempSync(join(tmpdir(), "dotz-lane-wt-"));
+	const saved = { ...process.env };
+	try {
+		writeFileSync(join(data, "config.json"), JSON.stringify({ identity: { name: "땅콩", language: "ko" } }));
+		process.env.DOTZ_DIR = data;
+		delete process.env.DOTZ_CONV;
+		process.env.DOTZ_LANE = "split-panes";
+		const { pi, handlers } = fakePi(join(dir, "agent-empty"));
+		installGuard(pi, noGate);
+		const ctx = { agent: { kind: "main" }, cwd: worktree };
+		const call = (toolName: string, input: any) => handlers.tool_call[0]({ toolName, input }, ctx);
+		const owner = await call("write", { path: join(data, "memory", "owner.md"), content: "x" });
+		expect(owner?.block).toBe(true);
+		expect(owner?.reason).toBe(LANE_KO);
+		expect((await call("bash", { command: `echo '{}' > ${join(data, "state.json")}` }))?.reason).toBe(LANE_KO);
+		// Its own files: the report, project folders, and its worktree (a relative path is in the lane's folder, not the data dir).
+		expect((await call("write", { path: join(data, "lanes", "split-panes", "report.md"), content: "x" }))?.block).toBeUndefined();
+		expect((await call("edit", { path: join(data, "projects", "acme", "README.md"), edits: [] }))?.block).toBeUndefined();
+		expect((await call("write", { path: join(worktree, "web", "app.js"), content: "x" }))?.block).toBeUndefined();
+		expect((await call("write", { path: "RULES.md", content: "x" }))?.block).toBeUndefined();
+		expect((await call("bash", { command: `echo x > ${join(data, "lanes", "split-panes", "report.md")}` }))?.block).toBeUndefined();
+		// Main (neither variable set) writes the shared files.
+		delete process.env.DOTZ_LANE;
+		expect((await call("write", { path: join(data, "memory", "owner.md"), content: "x" }))?.block).toBeUndefined();
+	} finally {
+		process.env = saved;
+		rmSync(data, { recursive: true, force: true });
+		rmSync(worktree, { recursive: true, force: true });
+	}
+});
+
 test("project footer: a channel with a project gets its README and RULES.md paths; chat and unknown folders get none", () => {
 	const data = mkdtempSync(join(tmpdir(), "dotz-proj-"));
 	try {

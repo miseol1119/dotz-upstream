@@ -115,6 +115,24 @@ export function loadGuardConfig(dir = dataDir()): GuardConfig {
 	}
 }
 
+// A lane's refusal for a shared data file (guard.ts sharedWriteBlock): it names the report's hand-off line (the lane footer's
+// "<bot> 몫:" / "For <bot>:") in the install's name and language, read as extension/index.ts reads them.
+export function laneShareReason(dir = dataDir()): string {
+	let id: any = {};
+	try {
+		id = JSON.parse(readFileSync(join(dir, "config.json"), "utf8")).identity ?? {};
+	} catch {
+		// No readable config: the default name, and the language from IDENTITY.md.
+	}
+	const name = String(id.name ?? "").trim() || "dotz";
+	const lang = typeof id.language === "string" ? id.language.trim() : "";
+	const identity = join(dir, "identity", "IDENTITY.md");
+	const ko = lang ? /^ko(?:[-_]|$)/i.test(lang) : /[\uAC00-\uD7AF]/.test(existsSync(identity) ? readFileSync(identity, "utf8") : "");
+	return ko
+		? `orchestrator-guard: state.json, RULES.md, LESSONS.md와 오너 메모는 메인 세션만 써요. 바꿀 내용을 보고에 '${name} 몫:' 줄로 적으세요.`
+		: `orchestrator-guard: state.json, RULES.md, LESSONS.md and owner memory are written by the main session only. Put the change in your report's "For ${name}:" line.`;
+}
+
 // omp's own agent directory (PI_CODING_AGENT_DIR / profile aware) when the host exposes it, else the default.
 export function agentDir(pi: any): string {
 	try {
