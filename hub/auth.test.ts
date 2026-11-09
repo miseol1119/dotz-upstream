@@ -3,7 +3,9 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DATA_DIR, paths } from "./config.ts";
 import * as discord from "./discord.ts";
-import { authRoute, pendingAuth, setFormLink } from "./auth.ts";
+import { authRoute, interaction, pendingAuth, setFormLink } from "./auth.ts";
+import { HUB_TOKEN } from "./config.ts";
+import { msg } from "./i18n.ts";
 import { normalizeValue } from "./authfields.ts";
 import { asksPersonalInChat } from "./personal-ask.ts";
 import { readSecretFile, setSecretKey, systemKey } from "./secretbox.ts";
@@ -199,6 +201,87 @@ test("Discord carries a button that opens the web form and never a value input",
 		discord.status.enabled = wasEnabled;
 		setFormLink(() => undefined);
 	}
+});
+
+type Sent = { content: string; components: { components: { style: number; url?: string; custom_id?: string }[] }[] };
+// Posts a request with Discord on (postRich mocked) and returns its id and what Discord got.
+async function discordAsk(body: Record<string, unknown>, link: string | undefined): Promise<{ id: string; sent: Sent }> {
+	const sent: Sent[] = [];
+	const post = spyOn(discord, "postRich").mockImplementation((async (_t: string, payload: any) => {
+		sent.push(payload);
+		return { channelId: "c1", messageId: "m1" };
+	}) as never);
+	const wasEnabled = discord.status.enabled;
+	discord.status.enabled = true;
+	setFormLink(() => link);
+	try {
+		const r = await call("/api/auth", "POST", { purpose: "로그인", target: "chat", ...body });
+		expect(r.status).toBe(200);
+		return { id: ((await r.json()) as { id: string }).id, sent: sent[0]! };
+	} finally {
+		post.mockRestore();
+		discord.status.enabled = wasEnabled;
+		setFormLink(() => undefined);
+	}
+}
+
+for (const kind of ["secret", "otp"] as const) {
+	test(`${kind}: the request is answered only in the web app: Discord gets a link button and cancel, never an input or modal`, async () => {
+		const { id, sent } = await discordAsk({ site: `web-only-${kind}`, kind }, "https://mac.example.ts.net");
+		const buttons = sent.components[0]!.components;
+		expect(buttons).toHaveLength(2);
+		expect(buttons[0]).toMatchObject({ style: 5, url: "https://mac.example.ts.net/" });
+		expect(buttons[0]!.custom_id).toBeUndefined();
+		expect(buttons[1]!.custom_id).toBe(`dotz-auth:${id}:cancel`);
+		expect(sent.content).toContain(msg().auth.formHint);
+		await call(`/api/auth/${id}`, "DELETE");
+		// No web address known: only cancel, and the text says to open the app.
+		const bare = await discordAsk({ site: `web-only-${kind}-nolink`, kind }, undefined);
+		expect(bare.sent.components[0]!.components.map(b => b.custom_id)).toEqual([`dotz-auth:${bare.id}:cancel`]);
+		expect(bare.sent.content).toContain(msg().auth.formHintNoLink);
+		await call(`/api/auth/${bare.id}`, "DELETE");
+	});
+}
+
+test("a Discord modal submit or input click from an old message stores nothing and is told to use the web app", async () => {
+	const replies: { type: number; data: any }[] = [];
+	const cb = spyOn(discord, "interactionCallback").mockImplementation((async (_d: unknown, type: number, data: unknown) => {
+		replies.push({ type, data });
+	}) as never);
+	try {
+		const id = await secretAsk("old-modal");
+		const owner = { member: { user: { id: "1" } }, id: "i1", token: "t1" };
+		await interaction({ ...owner, type: 5, data: { custom_id: `dotz-auth:${id}`, components: [{ components: [{ custom_id: "username", value: "dummy-user" }] }, { components: [{ custom_id: "password", value: "dummy-pass-9" }] }] } });
+		await interaction({ ...owner, type: 3, data: { custom_id: `dotz-auth:${id}:input` } });
+		expect(replies).toEqual([
+			{ type: 4, data: expect.objectContaining({ content: msg().auth.webOnly, flags: 64 }) },
+			{ type: 4, data: expect.objectContaining({ content: msg().auth.webOnly, flags: 64 }) },
+		]);
+		expect(existsSync(join(DATA_DIR, "secrets", "old-modal"))).toBe(false);
+		const view = (await (await call(`/api/auth/${id}`)).json()) as { status: string };
+		expect(view.status).toBe("pending");
+		await call(`/api/auth/${id}`, "DELETE");
+	} finally {
+		cb.mockRestore();
+	}
+});
+
+test("the web form still stores a secret encrypted in a 0600 file, and an otp is taken once", async () => {
+	const id = await secretAsk("web-secret");
+	expect((await call(`/api/auth/${id}`, "POST", { action: "submit", values: { username: "dummy-user", password: "dummy-pass-7" } })).status).toBe(200);
+	const view = (await (await call(`/api/auth/${id}`)).json()) as { status: string; path: string };
+	expect(view.status).toBe("entered");
+	expect(mode(view.path)).toBe(0o600);
+	expect(readFileSync(view.path, "utf8")).not.toContain("dummy-pass-7");
+	expect(JSON.parse(readSecretFile(view.path)).password).toBe("dummy-pass-7");
+
+	const otp = ((await (await call("/api/auth", "POST", { site: "web-otp", kind: "otp", purpose: "code", target: "chat" })).json()) as { id: string }).id;
+	expect((await call(`/api/auth/${otp}`, "POST", { action: "submit", values: { code: "481516" } })).status).toBe(200);
+	const take = () => authRoute(new Request(`http://local/api/auth/${otp}/take`, { headers: { "x-dotz-token": HUB_TOKEN } }), new URL(`http://local/api/auth/${otp}/take`))!;
+	const first = await take();
+	expect(first.status).toBe(200);
+	expect(await first.text()).toBe("481516");
+	expect((await take()).status).toBe(410);
 });
 
 test("a chat message that asks for card, address or phone is flagged; the form pointer and plain talk are not", () => {

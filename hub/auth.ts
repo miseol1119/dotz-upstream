@@ -1,7 +1,7 @@
-// Web-login auth requests answered from Discord or the web app: the gateway posts a Discord message with buttons (when
-// Discord is set up), a button opens a modal, and the submitted value is delivered by INTERACTION_CREATE to this process
-// only. The same pending request also shows in the web app (GET /api/state `auth`), answered by POST /api/auth/<id>, so a
-// login asked for before Discord is connected (the Discord bot setup itself) no longer dead-ends. It is written to a 0600 secrets file (secret),
+// Web-login auth requests: values are typed only in the web app (GET /api/state `auth`, answered by POST /api/auth/<id>), so a
+// password or code never passes through Discord's servers. When Discord is set up the gateway also posts a message there
+// whose buttons open the web app, approve or cancel; no Discord button or modal ever carries a value. It works before
+// Discord is connected (the Discord bot setup itself). It is written to a 0600 secrets file (secret),
 // held in memory until it is taken once (otp) or not kept at all (approve). Values are never logged, put in events, state
 // or any prompt: log lines carry id, site, kind and status only. See hub/main.ts for the /api/auth* routes.
 import { randomBytes, timingSafeEqual } from "node:crypto";
@@ -92,7 +92,7 @@ function contentOf(r: AuthRequest): string {
 	const m = msg().auth;
 	const head = `${MARKS[r.status]} ${m.titles[r.kind]} (${m.site}: ${r.site})`;
 	const tail = r.status === "pending" ? m.expires(clock.format(r.expiresAt)) : m.statuses[r.status];
-	const hint = r.kind === "form" ? `\n${formLink() ? m.formHint : m.formHintNoLink}` : "";
+	const hint = r.kind !== "approve" ? `\n${formLink() ? m.formHint : m.formHintNoLink}` : "";
 	return `${head}\n${r.purpose}${hint}\n${tail}`.slice(0, 1900);
 }
 
@@ -101,7 +101,7 @@ function componentsOf(r: AuthRequest) {
 	const off = r.status !== "pending";
 	const button = (action: string, label: string, style: number) => ({ type: 2, style, label, custom_id: `${PREFIX}:${r.id}:${action}`, disabled: off });
 	const url = formLink();
-	const first = r.kind === "approve" ? button("approve", m.approve, 3) : r.kind !== "form" ? button("input", m.input, 1) : url ? { type: 2, style: 5, label: m.openForm, url: `${url}/`, disabled: off } : undefined;
+	const first = r.kind === "approve" ? button("approve", m.approve, 3) : url ? { type: 2, style: 5, label: m.openForm, url: `${url}/`, disabled: off } : undefined;
 	return [{ type: 1, components: [first, button("cancel", m.cancel, 2)].filter(Boolean) }];
 }
 
@@ -127,7 +127,7 @@ function storeFailed(r: AuthRequest, e: unknown): string {
 	return r.error;
 }
 
-// A request is finished once, whoever finishes it: the timer, an owner click, a modal submit or DELETE.
+// A request is finished once, whoever finishes it: the timer, an owner click, a web answer or DELETE.
 function settle(r: AuthRequest, status: Status): void {
 	if (r.status !== "pending") return;
 	r.status = status;
@@ -163,27 +163,6 @@ function waitChange(r: AuthRequest, seconds: number, signal: AbortSignal): Promi
 const ephemeral = (content: string) => ({ content, flags: 64, allowed_mentions: { parse: [] } });
 const reply = (d: discord.Interaction, type: number, data?: unknown) => discord.interactionCallback(d, type, data);
 
-function modalOf(r: AuthRequest) {
-	const m = msg().auth;
-	return {
-		custom_id: `${PREFIX}:${r.id}`,
-		title: m.modalTitle(r.site).slice(0, 45),
-		components: r.fields.map(f => ({ type: 1, components: [{ type: 4, custom_id: f, label: m.labels[f], style: 1, required: true, min_length: 1, max_length: 1000 }] })),
-	};
-}
-
-// Takes the values of a modal submit; undefined unless every requested field arrived non-empty.
-function submitted(d: discord.Interaction, fields: Field[]): Record<string, string> | undefined {
-	const got: Record<string, string> = {};
-	for (const row of d.data?.components ?? []) for (const c of row.components ?? []) if (typeof c.custom_id === "string" && typeof c.value === "string") got[c.custom_id] = c.value;
-	const out: Record<string, string> = {};
-	for (const f of fields) {
-		if (!got[f]) return undefined;
-		out[f] = got[f];
-	}
-	return out;
-}
-
 function store(r: AuthRequest, values: Record<string, string>): void {
 	if (r.form) {
 		const dir = r.remember ? SECRETS_DIR : ONCE_DIR;
@@ -209,7 +188,8 @@ function store(r: AuthRequest, values: Record<string, string>): void {
 	}
 }
 
-async function interaction(d: discord.Interaction): Promise<void> {
+// Exported for tests; the gateway reaches it through discord.setInteractionHandler below.
+export async function interaction(d: discord.Interaction): Promise<void> {
 	const cid = String(d?.data?.custom_id ?? "");
 	if (cid.startsWith(`${ASK_PREFIX}:`)) return askInteraction(d, { owner: OWNER, reply });
 	if (!cid.startsWith(`${PREFIX}:`)) return;
@@ -223,26 +203,15 @@ async function interaction(d: discord.Interaction): Promise<void> {
 	const r = reqs.get(id);
 	if (!r || r.status !== "pending") return reply(d, 4, ephemeral(m.finished));
 	if (d.type === 3) {
-		if (action === "input" && r.kind === "form") return reply(d, 4, ephemeral(m.formWebOnly));
-		if (action === "input" && r.kind !== "approve") return reply(d, 9, modalOf(r));
+		// "input" is the button of a message posted before values moved to the web app.
+		if (action === "input") return reply(d, 4, ephemeral(m.webOnly));
 		if (action === "approve" && r.kind === "approve") settle(r, "approved");
 		else if (action === "cancel") settle(r, "cancelled");
 		else return reply(d, 4, ephemeral(m.finished));
 		return reply(d, 7, { content: contentOf(r), components: componentsOf(r) });
 	}
-	if (d.type === 5 && action === undefined && (r.kind === "secret" || r.kind === "otp")) {
-		const values = submitted(d, r.fields);
-		if (!values) return reply(d, 4, ephemeral(m.incomplete));
-		try {
-			store(r, values);
-		} catch (e) {
-			return reply(d, 4, ephemeral(`${m.storeFailed} (${storeFailed(r, e)})`));
-		}
-		settle(r, "entered");
-		await reply(d, 4, ephemeral(m.received));
-		refresh(r);
-		return;
-	}
+	// A modal opened from an old message: its value is dropped unread, so a password never goes the Discord way.
+	if (d.type === 5) return reply(d, 4, ephemeral(m.webOnly));
 	return reply(d, 4, ephemeral(m.finished));
 }
 
