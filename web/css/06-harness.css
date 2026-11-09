@@ -151,7 +151,7 @@ textarea.fi { display: block; height: auto; padding: var(--sp-2) var(--sp-3); li
 .btn.tonal[aria-pressed="true"] { background: var(--active); color: var(--accent); }
 [data-hm-refresh] { min-width: 112px; }
 .hm-bd { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-top: var(--sp-05); }
-.bd { display: inline-flex; align-items: center; height: 16px; padding: 0 var(--sp-15); border-radius: 4px; font: 500 10.5px/14px var(--font); white-space: nowrap; }
+.bd { display: inline-flex; align-items: center; height: 16px; padding: 0 var(--sp-15); border-radius: 4px; font: 500 var(--fs-tag)/var(--lh-tag) var(--font); white-space: nowrap; }
 .bd.f { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .bd.a { background: var(--layer); color: var(--fg-2); }
 .tag.st.enforced { background: var(--accent); color: var(--bg); }

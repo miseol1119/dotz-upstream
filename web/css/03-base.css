@@ -134,7 +134,7 @@ dialog.dlg.cf .dbody { margin-top: var(--sp-2); }
 dialog.dlg.cl .dtitle { flex: 1; min-width: 0; }
 .dact { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-5); }
 .dact:empty { display: none; }
-.dtitle { margin: 0; font: 700 18px/26px var(--font); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.dtitle { margin: 0; font: 700 var(--fs-page-sm)/var(--lh-page-sm) var(--font); letter-spacing: -.01em; overflow-wrap: anywhere; }
 .dbody { display: flex; flex-direction: column; gap: var(--sp-3); color: var(--fg-2); }
 .dbody p { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
 dialog.pal { width: min(560px, calc(100vw - 24px)); margin: 12vh auto auto; padding: 0; max-height: min(480px, calc(100dvh - 24px)); }

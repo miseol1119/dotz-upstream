@@ -286,6 +286,24 @@ describe("web/DESIGN.md rules", () => {
 		expect(hits.filter(([, w, h]) => w < 44 || h < 44).map(([id, w, h]) => `${id} ${w}x${h}`)).toEqual([]);
 	});
 
+	test("the bell count, a chat title and a dialog title draw on the Type scale", async () => {
+		const v = await openPage();
+		await run(v, `go("chat", "main")`);
+		await waitFor(v, `document.querySelector("#appbar.cvconv") && CV.placed`);
+		await run(v, `const n = document.querySelector("#bell-n"); n.hidden = false; n.textContent = "3"`);
+		await painted(v);
+		const sizes = await ev<Record<string, number>>(v, `(() => {
+			const dt = document.createElement("h2"); dt.className = "dtitle"; dt.textContent = "제목"; document.body.append(dt);
+			const px = e => parseFloat(getComputedStyle(e).fontSize);
+			const out = { "#bell-n": px(document.querySelector("#bell-n")), "#title": px(document.querySelector("#title")), ".dtitle": px(dt) };
+			dt.remove();
+			return out;
+		})()`);
+		// DESIGN.md Type: 11 to 16 for tags, meta, rows and card titles, 20 to 22 for page and sheet titles
+		const off = Object.entries(sizes).filter(([, px]) => !(px >= 11 && px <= 16 || px >= 20 && px <= 22)).map(([el, px]) => `${el} ${px}px`);
+		expect(off).toEqual([]);
+	});
+
 	const planted: [string, string, string][] = [
 		["stripe", "colored one-sided border", `.planted { border-left: 3px solid var(--accent); border-radius: var(--r-card); }`],
 		["stripe", "colored inset edge", `.planted { box-shadow: inset 3px 0 0 var(--warn); }`],

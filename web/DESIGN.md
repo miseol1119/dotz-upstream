@@ -41,12 +41,15 @@ Pretendard, then the system Korean face (`Apple SD Gothic Neo`). No Inter/Geist.
 | Role | Size / line | Weight |
 |---|---|---|
 | Page title (app bar) | 22/30 (phone 20/28) | 700 |
+| Dialog / sheet title (`.dtitle`, `.fs-t`) | 20/28 | 700 |
+| Open chat title on a phone (up to two lines) | 16/22 (card title step) | 700 |
 | Big value | 20/28 | 700 |
 | Card title | 16/22 | 600 |
 | Section label | 14/20 | 600, `--fg-2` |
 | Body / list row | 14/22, rows 15/22 | 400 / 500 |
 | Chat body | 15/24 | 400 |
 | Meta | 12/16 | 400, `--fg-3` |
+| Tag, count badge (`.bd`, `#bell-n`) | 11/16 (`--fs-tag`, the floor) | 500-600 |
 
 Korean wraps at phrase boundaries (`word-break: keep-all` on body, long tokens still break), like Netflix subtitles. Short copy text (settings descriptions, notes, empty states, cards, dialogs) is also cut by meaning (`01-phrase-wrap.js`), never chat or agent prose (`#tl`, `.md`, a question and its option text in a sheet), which flows with real newlines only at paragraph ends: a line breaks at a sentence end or ` · ` first, then after a comma, then after a connective (…고, …면, …지만), and never inside brackets, quotes, or a one-syllable word and the word after it.
 

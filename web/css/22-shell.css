@@ -82,7 +82,7 @@ body { display: flow-root; }
 
 /* the notice bell: the count sits on its top-right corner, as the prototype's .ib .bd */
 .bellbtn { position: relative; }
-#bell-n { position: absolute; top: 1px; right: 1px; min-width: 16px; height: 16px; padding: 0 var(--sp-1); border-radius: 8px; background: var(--warn); color: var(--bg); font-size: 10.5px; line-height: 16px; font-weight: 600; text-align: center; }
+#bell-n { position: absolute; top: 1px; right: 1px; min-width: 16px; height: 16px; padding: 0 var(--sp-1); border-radius: 8px; background: var(--warn); color: var(--bg); font-size: var(--fs-tag); line-height: var(--lh-tag); font-weight: 600; text-align: center; }
 #bell-n[hidden] { display: none; }
 
 @media (max-width: 1023px) {

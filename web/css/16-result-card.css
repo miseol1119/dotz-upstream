@@ -83,7 +83,7 @@
 .mb-txt details > summary:hover { background: var(--hover); color: var(--fg); }
 .mb-txt details > div { margin-top: var(--sp-2); padding-left: var(--sp-3); border-left: 3px solid var(--line-2); font-size: 14px; line-height: 22px; }
 .rc-rawbody .md th { background: var(--layer); }
-@media (max-width: 1099px) { .appbar.cvconv h1 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; font-size: 17px; line-height: 22px; overflow-wrap: anywhere; } }
+@media (max-width: 1099px) { .appbar.cvconv h1 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; font-size: var(--fs-card); line-height: var(--lh-card); overflow-wrap: anywhere; } }
 /* mail row (30-monitoring.js monConvNode): a compact result card that is one tap target (role=button); in the original view (11-todo-strip.js) its files */
 #mon-tl > .bm.rc.mr { gap: var(--sp-05); padding: var(--sp-2) var(--sp-4); cursor: pointer; }
 /* Rows off screen are not styled or painted until they scroll near, so adding a page of mail costs what the visible rows do. */
