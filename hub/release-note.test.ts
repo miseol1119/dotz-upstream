@@ -78,6 +78,12 @@ describe("buildReleaseNote", () => {
 		for (const item of items) expect(item).not.toMatch(/[,;:]\s*\.?$/);
 	});
 
+	test("a 왜: inside a sentence is text; only a label at the start of a line starts a part", () => {
+		const body = "왜: 줄바꿈으로 감싼 왜: 본문은 첫 문장이 첫 줄에서 잘렸어요.\n어떻게: 첫 문단을 한 줄로 이어 붙여요.";
+		const items = note([{ subject: "이유 문장이 끊기지 않아요", body, files: ["hub/a.ts"] }]).split("\n").filter(l => l.startsWith("- "));
+		expect(items).toEqual(["- 이유 문장이 끊기지 않아요. 줄바꿈으로 감싼 왜: 본문은 첫 문장이 첫 줄에서 잘렸어요."]);
+	});
+
 	test("nothing to report still gives a note", () => {
 		expect(note(FIXTURE.slice(0, 2))).toContain("이번 버전에는 바뀐 기능이 없어요.");
 	});

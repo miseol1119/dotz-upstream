@@ -12,7 +12,9 @@ const OTHER = "그 밖의 변경";
 const NOT_A_CHANGE = /^(?:release: |Merge )/;
 const INTERNAL_SUBJECT = /^내부 정리\s*:/;
 const TICKET = /\s*\(#\d+\)$/;
-const LABEL_SPLIT = /(?:^|\s)(왜|어떻게)\s*:\s*/m;
+// A one-line subject can only carry its labels inline; in a body only a label at the start of a line starts a part, so a 왜: inside a sentence stays text.
+const SUBJECT_LABEL = /(?:^|\s)(왜|어떻게)\s*:\s*/;
+const BODY_LABEL = /^[ \t]*(왜|어떻게)[ \t]*:\s*/m;
 // A reason that quotes, names a file or runs long reads like the conversation behind the change, not a patch note.
 const NOT_A_REASON = /["“”`]|[\w.-]+\/[\w.-]+\.\w+/;
 const REASON_MAX = 160;
@@ -59,9 +61,9 @@ function firstSentence(text: string): string {
 
 // One or two sentences: what changed, then why. Labelled parts may sit in the body or, from a one-line commit, in the subject itself.
 function noteItem({ subject, body = "" }: NoteCommit): string {
-	const inline = subject.split(LABEL_SPLIT);
+	const inline = subject.split(SUBJECT_LABEL);
 	const what = inline[0].replace(TICKET, "").trim();
-	const labelled = [...inline.slice(1), ...body.split(LABEL_SPLIT).slice(1)];
+	const labelled = [...inline.slice(1), ...body.split(BODY_LABEL).slice(1)];
 	const parts = (label: string) => labelled.flatMap((part, i) => (i % 2 === 0 && part === label ? [labelled[i + 1] ?? ""] : []));
 	const reason = [...parts("왜"), ...parts("어떻게")].map(firstSentence).find(s => s && s.length <= REASON_MAX && !NOT_A_REASON.test(s));
 	if (!reason) return what;
