@@ -2,10 +2,12 @@ import type { Conversation } from "./conversations.ts";
 
 // One page of GET /api/conversations (docs/web-app-design.md 대화 목록). The sessions and project channels (few) always come with the first page;
 // the mail rows (thousands) come `limit` at a time in the list's order, newest message first, and `next` is the cursor of the older ones.
-// A mail that owes a reply or holds a draft also comes with the first page wherever it sits (the 메일 · 카카오톡 card is drawn from them, web/js/31-conversations.js
-// convWaiting), and the later pages leave those rows out, so the cursor walk meets every row once.
+// The first page also carries the newest few mails that owe a reply or hold a draft and are older than it (the 메일 · 카카오톡 card is drawn from them,
+// web/js/31-conversations.js convWaiting). The later pages are the plain cursor walk, so such a row may come twice; the web keys rows by target (convApply).
 export const CONV_PAGE = 100;
 export const CONV_PAGE_MAX = 500;
+/** How many owed mails older than the first page ride along with it: the card shows 5 rows at most (convWaiting ends with `.slice(0, 5)`), so more would never be drawn. */
+export const CONV_OWED_EXTRA = 5;
 
 type MailCard = { dir?: string; archived?: true; read?: boolean; reply?: string; unreplied?: true; source?: string };
 export type ConvRow = Conversation & { mail?: MailCard };
@@ -47,7 +49,7 @@ export function countRows(rows: readonly ConvRow[]): ConvCounts {
 	return { rows: rows.length, mail: { total: mail.length, unread, filters, sources } };
 }
 
-/** The answer to a query: `target=<t>` (repeat it, at most 50) those rows only; `all=1` every row; `before=<cursor>` the next `limit` mail rows after it; otherwise the first page with the counts and the owed mails older than it.
+/** The answer to a query: `target=<t>` (repeat it, at most 50) those rows only; `all=1` every row; `before=<cursor>` the next `limit` mail rows after it; otherwise the first page with the counts and the newest CONV_OWED_EXTRA owed mails older than it.
  *  The page is decided from `rows`, whose `mail` holds only the cheap fields (the counts and the order need no more); `build` makes the full row of a mail row that goes out, so a long mailbox costs a card per row sent, not per mail. */
 export function conversationPage(rows: readonly ConvRow[], q: URLSearchParams, build: (row: ConvRow) => ConvRow = row => row): { status: number; body: Record<string, unknown> } {
 	const full = (list: readonly ConvRow[]): ConvRow[] => list.map(r => (r.mail ? build(r) : r));
@@ -59,10 +61,9 @@ export function conversationPage(rows: readonly ConvRow[], q: URLSearchParams, b
 	const before = q.get("before");
 	if (before !== null && !/^[^|]*\|.+$/.test(before)) return { status: 400, body: { error: "before is a cursor from a page's next" } };
 	const mails = rows.filter(r => r.mail).sort(order);
-	// Past the first page the owed rows are not repeated: the first page carried them all.
-	const left = before === null ? mails : mails.filter(olderThan(before)).filter(r => !owes(r));
-	const shown = left.slice(0, limit), rest = left.slice(limit), more = rest.some(r => !owes(r));
+	const left = before === null ? mails : mails.filter(olderThan(before));
+	const shown = left.slice(0, limit), rest = left.slice(limit), more = rest.length > 0;
 	const page = { limit, more, ...(more ? { next: cursorOf(shown[shown.length - 1]!) } : {}) };
 	if (before !== null) return { status: 200, body: { items: full(shown), page } };
-	return { status: 200, body: { items: full([...rows.filter(r => !r.mail), ...shown, ...rest.filter(owes)].sort(order)), page, counts: countRows(rows) } };
+	return { status: 200, body: { items: full([...rows.filter(r => !r.mail), ...shown, ...rest.filter(owes).slice(0, CONV_OWED_EXTRA)].sort(order)), page, counts: countRows(rows) } };
 }

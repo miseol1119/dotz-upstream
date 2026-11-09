@@ -26,9 +26,10 @@ let posts: { path: string; body: any }[] = [];
 let composeFails = false;
 let pageOf = 0;
 let holdPages: Promise<void> | null = null;   // the later pages wait for it (a test looks at the screen with the first page only)
-// The hub's contract for a paged answer (hub/conversations-page.ts): an owed mail older than the first page comes with it, and the later pages leave it out.
+// The hub's contract for a paged answer (hub/conversations-page.ts): the first page carries the newest 5 owed mails older than it, and the later pages are the plain cursor walk, so an owed mail comes twice.
 const owes = (m: Mail) => m.dir !== "out" && !m.archived && (m.reply === "draft" || m.unreplied === true);
 const conversationAsks: string[] = [];
+const delivered: string[] = [];   // the targets of every row the paged answers sent, in order
 
 const card = (m: Mail) => ({ subject: m.subject, from: m.from, to: m.to, cc: m.cc, source: "acme", at: m.at, summary: m.summary, dir: m.dir, read: m.read, archived: !!m.archived, starred: !!m.starred, trashOriginal: m.trashOriginal, can: m.can, reply: m.reply, unreplied: m.unreplied, attachments: m.attachments });
 const history = (m: Mail) => [{ kind: "mail", ts: m.at, conv: `mail:${m.key}`, target: `mail:${m.key}`, mail: m.key, subject: m.subject, from: m.from, to: m.to, cc: m.cc, dir: m.dir, source: "acme", html: false, attachments: m.attachments, text: `[mail] ${m.subject}\n\n${m.summary}\n\n원문\n안녕하세요.\n점검 결과를 보내 드립니다.\n확인 부탁드립니다.` }];
@@ -51,10 +52,12 @@ const hub = fakeHub({
 		if (p === "/api/conversations") {
 			const row = (m: Mail) => ({ target: `mail:${m.key}`, unread: m.read || m.dir ? 0 : 1, read: null, mail: card(m), last: { ts: m.at, text: m.subject, from: "bot" } });
 			if (!pageOf) return json({ items: mails.map(row) });
-			const before = url.searchParams.get("before"), byAge = [...mails].sort((x, y) => (x.at < y.at ? 1 : -1)), pool = before === null ? byAge : byAge.filter(m => !owes(m)), from = before === null ? 0 : pool.findIndex(m => `mail:${m.key}` === before.slice(before.indexOf("|") + 1)) + 1, shown = pool.slice(from, from + pageOf), rest = pool.slice(from + pageOf), more = rest.some(m => !owes(m));
+			const before = url.searchParams.get("before"), byAge = [...mails].sort((x, y) => (x.at < y.at ? 1 : -1)), from = before === null ? 0 : byAge.findIndex(m => `mail:${m.key}` === before.slice(before.indexOf("|") + 1)) + 1, shown = byAge.slice(from, from + pageOf), rest = byAge.slice(from + pageOf), more = rest.length > 0;
 			conversationAsks.push(url.search);
 			if (before !== null && holdPages) await holdPages;
-			return json({ items: [...shown, ...(before === null ? rest.filter(owes) : [])].map(row), page: { limit: pageOf, more, ...(more ? { next: `${shown[shown.length - 1]!.at}|mail:${shown[shown.length - 1]!.key}` } : {}) } });
+			const sent = [...shown, ...(before === null ? rest.filter(owes).slice(0, 5) : [])];
+			delivered.push(...sent.map(m => `mail:${m.key}`));
+			return json({ items: sent.map(row), page: { limit: pageOf, more, ...(more ? { next: `${shown[shown.length - 1]!.at}|mail:${shown[shown.length - 1]!.key}` } : {}) } });
 		}
 		if (p === "/api/history") { const t = url.searchParams.get("target") ?? "", m = mails.find(x => `mail:${x.key}` === t); return json({ target: t, events: m ? history(m) : [] }); }
 		if (p === "/api/read" && req.method === "POST") { const b = (await req.json()) as { target: string }; const m = mails.find(x => `mail:${x.key}` === b.target); if (m) m.read = true; return json({ ok: true, moved: true }); }
@@ -151,9 +154,9 @@ describe("the list in pages", () => {
 		} finally { pageOf = 0; }
 	}, 30_000);
 
-	test("a mail that owes a reply and is older than the first page is in the 메일 · 카카오톡 card before any later page arrives, and shows once after", async () => {
+	test("a mail that owes a reply and is older than the first page is in the 메일 · 카카오톡 card before any later page arrives, and shows once after the later page sends it again", async () => {
 		mails.push({ key: "fx-owed", subject: "오래된 답장 대기 메일", from: "Han <han@example.com>", at: ago(200), summary: "견적 답을 기다려요.", read: true, can: CAN, reply: "needs", unreplied: true });
-		pageOf = 3; conversationAsks.length = 0;
+		pageOf = 3; conversationAsks.length = 0; delivered.length = 0;
 		let release!: () => void;
 		holdPages = new Promise<void>(r => { release = r; });
 		try {
@@ -162,7 +165,8 @@ describe("the list in pages", () => {
 			expect(await ev<string[]>(v, `convWaiting().map(r => r.name)`)).toContain("오래된 답장 대기 메일");
 			await ev<boolean>(v, `CVP.more === true`).then(more => expect(more).toBe(true));
 			release();
-			await waitFor(v, `document.querySelectorAll("#mon-tl > .mr").length === 7`);
+			await waitFor(v, `CVP.more === false && document.querySelectorAll("#mon-tl > .mr").length === 7`);
+			expect(delivered.filter(t => t === "mail:fx-owed").length).toBeGreaterThanOrEqual(2);   // the first page's extra, and its own later page
 			const shown = await titles(v);
 			expect(shown.filter(t => t === "오래된 답장 대기 메일").length).toBe(1);
 			expect(new Set(shown).size).toBe(shown.length);

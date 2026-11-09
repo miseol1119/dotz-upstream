@@ -8,7 +8,7 @@ import { makeRoute } from "./routes.ts";
 // GET /api/conversations answers one page of the mail rows (the newest first) with a cursor for the older ones, and the counts of every row.
 // The sessions and project channels are few and always come with the first page; `all=1` is the way to ask for every row at once.
 // A mail that waits for a reply (or holds a draft) is on the first page wherever it sits in the order: the 메일 · 카카오톡 card is drawn from it.
-// Such a row older than the page rides along on the first page and is left out of the later pages, so the cursor walk meets every row once.
+// Only the newest 5 such rows older than the page ride along on the first page (the card shows 5 at most); the later pages are the plain cursor walk, so such a row may come twice.
 const env = setupEnv();
 afterAll(env.cleanup);
 const route = makeRoute({ busyNow: () => [], restartGateway: () => "", restartGatewayNow: () => "" });
@@ -68,24 +68,23 @@ describe("대화 목록 페이지", () => {
 		expect(got.length).toBe(all.slice(0, 100).length + all.slice(100).filter(owes).length);
 	});
 
-	test("the cursor walks every mail row exactly once, newest first", async () => {
+	test("the cursor walks every mail row at least once, newest first, and a later page is the plain walk", async () => {
 		const full = (await list("?all=1")).items.filter(isMail).map(r => r.target);
-		const seen: string[] = [];
+		const seen: string[] = [], later: string[] = [];
 		let a = await list("?limit=40");
 		seen.push(...a.items.filter(isMail).map(r => r.target));
 		let pages = 1;
 		while (a.page?.more) {
 			a = await list(`?limit=40&before=${encodeURIComponent(a.page.next!)}`);
 			expect(a.items.every(isMail)).toBe(true);
-			expect(a.items.some(owes)).toBe(false);   // an owed row was sent with the first page
-			seen.push(...a.items.map(r => r.target));
+			expect(a.items.length).toBeLessThanOrEqual(40);
+			later.push(...a.items.map(r => r.target));
 			pages++;
 		}
-		const full0 = (await list("?all=1")).items.filter(isMail), older = full0.slice(40).filter(r => !owes(r)).length;
-		expect(pages).toBe(1 + Math.ceil(older / 40));
-		expect(seen.length).toBe(MAILS);
-		expect(new Set(seen).size).toBe(MAILS);
-		expect([...seen].sort()).toEqual([...full].sort());
+		expect(pages).toBe(Math.ceil(MAILS / 40));
+		expect(later.length).toBe(MAILS - 40);
+		expect(new Set(later).size).toBe(later.length);
+		expect([...new Set([...seen, ...later])].sort()).toEqual([...full].sort());
 		const stamps = (await list("?all=1")).items.filter(isMail).map(r => r.last?.ts ?? "");
 		expect(stamps).toEqual([...stamps].sort().reverse());
 	});
@@ -125,5 +124,51 @@ describe("대화 목록 페이지", () => {
 		expect(bad.status).toBe(400);
 		expect((await list("?limit=100000")).items.filter(isMail).length).toBeLessThanOrEqual(500);
 		expect((await list("?limit=abc")).items.filter(isMail).length).toBe(101);   // the default 100, and the one older owed mail
+	});
+});
+
+// The first page must stay small however many mails owe a reply: 5 extras at most, the newest ones. Seeded last, the tests above count the 130 mails.
+describe("hundreds of owed mails older than the first page", () => {
+	const OLD = 300;
+	test("seeds 300 owed mails older than the newest 100", async () => {
+		for (let i = 0; i < OLD; i++) {
+			clock = T0 - (i + 1) * 60_000;
+			await postMail({ source: "home", id: `ow${i}`, subject: `밀린 ${i}`, from: `Old${i} <old${i}@example.com>`, needsReply: true }, deps);
+		}
+		const mails = (await list("?all=1")).items.filter(isMail);
+		expect(mails.length).toBe(MAILS + OLD);
+		expect(mails.slice(100).filter(owes).length).toBe(OLD + 1);
+	}, 60_000);
+
+	test("the first page has at most 100 + 5 mail rows, and the 5 extras are the newest owed ones", async () => {
+		const all = (await list("?all=1")).items.filter(isMail);
+		const first = await list();
+		const got = first.items.filter(isMail).map(r => r.target), page = all.slice(0, 100).map(r => r.target);
+		expect(got.length).toBeLessThanOrEqual(100 + 5);
+		for (const t of page) expect(got).toContain(t);
+		const extras = got.filter(t => !page.includes(t));
+		expect(extras).toEqual(all.slice(100).filter(owes).slice(0, 5).map(r => r.target));
+		expect(extras.length).toBe(5);
+		expect(first.page?.more).toBe(true);
+		expect(first.counts?.mail.total).toBe(MAILS + OLD);
+	});
+
+	test("the cursor walk from the first page meets every mail row at least once, and the later pages are plain", async () => {
+		const full = (await list("?all=1")).items.filter(isMail).map(r => r.target);
+		let a = await list();
+		const seen = new Set(a.items.filter(isMail).map(r => r.target)), later: string[] = [];
+		let pages = 1;
+		while (a.page?.more) {
+			expect(pages).toBeLessThan(20);
+			a = await list(`?before=${encodeURIComponent(a.page.next!)}`);
+			expect(a.items.length).toBeLessThanOrEqual(100);
+			later.push(...a.items.map(r => r.target));
+			pages++;
+		}
+		for (const t of later) seen.add(t);
+		expect(pages).toBe(Math.ceil(full.length / 100));
+		expect(later.length).toBe(full.length - 100);
+		expect(new Set(later).size).toBe(later.length);
+		expect([...seen].sort()).toEqual([...full].sort());
 	});
 });
