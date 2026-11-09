@@ -219,6 +219,9 @@ function toast(msg, bad, action, ms) {
   document.querySelectorAll(".snack").forEach(n => n.remove());
   const n = el("div", { class: `snack${bad ? " bad" : ""}${action ? " act" : ""}`, role: "status" }, el("span", { text: noticeKo(msg, { ...NK, error: !!bad }) }), action ? el("button", { type: "button", class: "sa", text: action.label, onclick: () => { toastGone(n); action.onclick(); } }) : null);
   (document.querySelector("dialog[open]:not([data-leaving])") || document.body).append(n);
+  // A conversation has its composer at the bottom instead of the tab bar: the toast rises above it, a token gap clear of its top edge.
+  const bar = document.querySelector("#composer"), r = bar && bar.getBoundingClientRect();
+  if (r && r.height > 0 && r.top > innerHeight / 2) n.style.setProperty("--snack-b", `${Math.round(innerHeight - r.top + parseFloat(getComputedStyle(n).getPropertyValue("--sp-2")))}px`);
   clearTimeout(toastTimer);
   motionIn(n, "rise");
   toastTimer = setTimeout(() => toastGone(n), ms || (bad || action ? 6000 : 3500));
