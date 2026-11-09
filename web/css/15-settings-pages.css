@@ -57,7 +57,7 @@
 #accounts .prow-lim .k { flex: none; min-width: 64px; }
 #accounts .prow-lim .bar { flex: 1; max-width: 160px; margin-top: 0; }
 /* 사용량과 월 한도 */
-#usage .lim .kv b { font-weight: 700; }
+#usage .lim .kv b { font-weight: 500; }
 #usage .lim .bar { margin-top: var(--sp-15); }
 #usage .lim > .sup { margin-top: var(--sp-1); }
 #usage > .list + :is(.grid, .sec) { margin-top: var(--sp-3); }

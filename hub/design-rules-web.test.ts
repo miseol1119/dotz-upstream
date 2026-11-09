@@ -320,6 +320,22 @@ describe("web/DESIGN.md rules", () => {
 		expect(Object.entries(ratios).filter(([, r]) => !(r >= 1.3)).map(([s, r]) => `${s} ${r}`)).toEqual([]);
 	});
 
+	test("the usage card keeps its title as the one bold text, the limit values stay lighter", async () => {
+		const v = await openPage();
+		const bold = await ev<string[]>(v, `(() => {
+			const host = document.createElement("div");
+			host.id = "usage";
+			const lim = '<div class="lim"><div class="kv"><span class="k">a</span><b>64% 남음</b></div></div>';
+			host.innerHTML = '<div class="card"><div class="ch"><h3>Claude 구독</h3></div>' + lim + lim + '</div>';
+			document.body.append(host);
+			const out = [...host.querySelectorAll("h3, b")].filter(e => parseInt(getComputedStyle(e).fontWeight) >= 600).map(e => e.tagName.toLowerCase());
+			host.remove();
+			return out;
+		})()`);
+		// docs/ui-principles.md 1 and docs/ui-spec.md 카드: one bold text in a card
+		expect(bold).toEqual(["h3"]);
+	});
+
 	test("text pairs of the tokens reach 4.5:1 in both themes", () => {
 		const rules = parseCss("01-tokens.css", realCss().find(([f]) => f === "01-tokens.css")![1]);
 		const theme = (scope: string) => {
