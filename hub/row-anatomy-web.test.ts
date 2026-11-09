@@ -166,16 +166,15 @@ for (const width of [390, 1280])
 	}, 60_000);
 
 // The check itself can fail: a marker put after the status (the 홈 결과 N mistake) and a two-line marker are both caught.
+// Each plant is measured in the same evaluate, so a home repaint between the two calls cannot wipe it first.
 test("a marker after the status, or one that makes a home row two lines, is reported", async () => {
 	const v = await open(1280);
 	const s = SURFACES[0];
 	await v.evaluate(`(${s.go}, 0)`);
 	await waitFor(v, s.ready);
-	await v.evaluate(`(() => { const row = [...document.querySelectorAll(${JSON.stringify(s.rows)})].find(r => !r.querySelector(".hrx-n")); const m = el("span", { class: "hrx-n", text: "결과 2" }); m.style.flex = "none"; row.querySelector(".hs").after(m); return 0; })()`);
-	const after = JSON.parse((await v.evaluate(MEASURE(s))) as string) as string[];
+	const after = JSON.parse((await v.evaluate(`(() => { const row = [...document.querySelectorAll(${JSON.stringify(s.rows)})].find(r => !r.querySelector(".hrx-n")); const m = el("span", { class: "hrx-n", text: "결과 2" }); m.style.flex = "none"; row.querySelector(".hs").after(m); return ${MEASURE(s)}; })()`)) as string) as string[];
 	expect(after.some(x => x.startsWith("end-not-last"))).toBe(true);
 	expect(after.some(x => x.startsWith("right-edge"))).toBe(true);
-	await v.evaluate(`(() => { for (const m of document.querySelectorAll(".hrx-n")) m.remove(); const row = document.querySelector(${JSON.stringify(s.rows)}); row.querySelector(".hb").append(el("span", { class: "hrx-n", text: "결과 2" })); row.querySelector(".hb .hrx-n").style.display = "block"; return 0; })()`);
-	const tall = JSON.parse((await v.evaluate(MEASURE(s))) as string) as string[];
+	const tall = JSON.parse((await v.evaluate(`(() => { for (const m of document.querySelectorAll(".hrx-n")) m.remove(); const row = document.querySelector(${JSON.stringify(s.rows)}); row.querySelector(".hb").append(el("span", { class: "hrx-n", text: "결과 2" })); row.querySelector(".hb .hrx-n").style.display = "block"; return ${MEASURE(s)}; })()`)) as string) as string[];
 	expect(tall.some(x => x.startsWith("dense-height") || x.startsWith("dense-seed"))).toBe(true);
 }, 60_000);
