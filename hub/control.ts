@@ -151,9 +151,7 @@ export function setContextModel(model: string, values: { window?: number | null;
 	return setContextLimits(model, values, nativeWindows.get(parseSelector(model).model) ?? 0);
 }
 
-// Model pickers never offer Haiku (owner: never) or Fable (only on the owner's explicit ask; still settable by name).
-const HIDDEN_MODEL = /haiku|fable/i;
-export const pickable = (list: ModelInfo[]): ModelInfo[] => list.filter(m => !HIDDEN_MODEL.test(m.selector) && !HIDDEN_MODEL.test(m.name ?? ""));
+// Pickers offer every model the connected providers list (Haiku and Fable included): picking one is the owner's choice.
 // Pickers show one entry per model as "<Family> <version>" taken from the id, not the provider's free-text name
 // ("claude-sonnet-4-20250514" and "claude-sonnet-4-0" are both "Sonnet 4"; "claude-3-5-sonnet-20241022" is "Sonnet 3.5").
 // Per family+version the undated alias wins, else the newest snapshot (`keep` wins over both). Opus, Sonnet, then other
@@ -174,7 +172,7 @@ const FAMILY_ORDER = ["Opus", "Sonnet"];
 export function modelChoices(list: ModelInfo[], keep?: string): ModelChoice[] {
 	const rank = (m: ModelInfo): number => (m.selector === keep ? Infinity : DATED.test(m.selector) ? Number(m.selector.match(DATED)![1]) : 1e9);
 	const best = new Map<string, ModelChoice>();
-	for (const m of pickable(list)) {
+	for (const m of list) {
 		const idn = modelIdentity(m.selector);
 		const c: ModelChoice = { ...m, ...(idn ? { name: `${idn.family} ${idn.version}`, family: idn.family, version: idn.version } : {}), older: false };
 		const key = idn ? `${m.provider}|${idn.family}|${idn.version}` : `${m.provider}|${m.name}`;

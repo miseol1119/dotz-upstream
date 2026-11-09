@@ -2,6 +2,7 @@ import { type Lane, setStatus, dir, laneWorkerModel, ownerNotes, hooks, pendingF
 import { HARNESS_NAMES, runtimeFor } from "./runtime/index.ts";
 import { msg } from "./i18n.ts";
 import { HUB_TOKEN, log, chainAfter, compactAtFor, fallbackChain, parseSelector, lanesCompactAt, lanesKeepRecent } from "./config.ts";
+import { isExpensive } from "./lanegates.ts";
 import { markSteers, steerContract, steerToken } from "./steer-mark.ts";
 import { hubChain, Chain, keyedWorker, Reverter, workerKeyEnv } from "./fallback.ts";
 import { pauseExhausted } from "./lanefailover.ts";
@@ -59,6 +60,12 @@ function startFailed(lane: Lane, why: string, resume: boolean): void {
 	if (resume) report(lane, `[fail] 세션 프로세스를 다시 띄우지 못했어요: ${why}. 원인(작업 폴더, 하네스, 모델)을 고쳐 다시 띄우세요.`, true);
 }
 
+// The lane's guard counts Fable as owner-asked when the lane was launched with owner_asked_for_fable, or when the lane or its task
+// workers run a Fable model the owner picked (a model picker, /model, or the lanes/workers defaults). A launch that names Fable is
+// refused without the ask (hub/routes-lanes.ts), and a worker switch the lane recorded itself (workerByLane) is not the owner's pick.
+export const ownerAsked = (lane: Pick<Lane, "fableOk" | "model" | "workerModel" | "workerByLane">): boolean =>
+	Boolean(lane.fableOk) || isExpensive(parseSelector(lane.model).model) || (!lane.workerByLane && isExpensive(parseSelector(laneWorkerModel(lane)).model));
+
 export function spawn(lane: Lane, resume: boolean): boolean {
 	if (resume) {
 		const wrong = runtimeMismatch(lane);
@@ -76,7 +83,7 @@ export function spawn(lane: Lane, resume: boolean): boolean {
 	lane.chain = driven ? new Chain(lane.model, driven, parseSelector(lane.model).thinking) : undefined;
 	lane.capped = undefined;
 	let spawnModel = lane.model;
-	const env: Record<string, string> = { DOTZ_LANE: lane.name, ...(lane.fableOk ? { DOTZ_OWNER_ASKED_FABLE: "1" } : {}) };
+	const env: Record<string, string> = { DOTZ_LANE: lane.name, ...(ownerAsked(lane) ? { DOTZ_OWNER_ASKED_FABLE: "1" } : {}) };
 	if (lane.chain) {
 		const until = lane.chain.exhaustedUntil();
 		if (until !== undefined) {

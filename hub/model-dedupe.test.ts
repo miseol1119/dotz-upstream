@@ -26,8 +26,15 @@ test("one '<Family> <version>' per model from the id: alias over snapshot, Opus/
 		"Sonnet 4.5=claude-sonnet-4-5",
 		"Sonnet 4=claude-sonnet-4-0",
 		"Sonnet 3.5=claude-3-5-sonnet-20241022 (older)",
+		"Haiku 4.5=claude-haiku-4-5",
 		"Mythos 5=claude-mythos-5",
 	]);
+});
+
+test("every model the providers offer is pickable, Haiku and Fable included", () => {
+	const out = view(modelChoices([m("claude-opus-5-5", "Claude Opus 5.5"), m("claude-haiku-5-5", "Claude Haiku 5.5"), m("claude-fable-5-1", "Claude Fable 5.1")]));
+	expect(out).toContain("Haiku 5.5=claude-haiku-5-5");
+	expect(out).toContain("Fable 5.1=claude-fable-5-1");
 });
 
 test("the kept selection wins over its alias", () => {

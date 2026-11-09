@@ -38,7 +38,7 @@ function modelPickItems(avail, val) {
 }
 function modelItems(key, curModel, filter = providerFilter) {
   const val = (pending[key] || {}).model ?? curModel;
-  // Pickers list M.pickable (no Haiku, no Fable); a target already on a hidden model still shows it under "현재".
+  // Pickers list M.pickable (every connected model, one per version); a target on a model outside it still shows it under "현재".
   const avail = M.pickable || M.available || [];
   const shown = avail.filter(a => !filter || a.provider === filter);
   const items = [];

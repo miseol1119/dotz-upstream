@@ -270,6 +270,7 @@ export async function setLaneModel(name: string, selector: string): Promise<"liv
 export function setLaneWorkerModel(name: string, selector: string | undefined, byLane = false): "live" | "next-start" {
 	const lane = known(name);
 	lane.workerModel = selector;
+	lane.workerByLane = byLane && selector ? true : undefined;
 	persist(lane);
 	const next = laneWorkerModel(lane), was = lane.activeWorkerModel;
 	if (lane.proc) {

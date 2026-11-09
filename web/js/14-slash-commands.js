@@ -4,8 +4,8 @@ const SL_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max", "a
 const slLanes = () => ((S && S.lanes) || []).filter(laneAlive).map(l => [l.name, `세션 · ${statusKo(l.status)}`]);
 const slProcs = () => [["orchestrator", botName], ...slLanes()];
 const slModelTargets = () => [["orchestrator", botName], ["lanes", "세션 기본값"], ["workers", "서브에이전트"], ...slLanes()];
-// Current models only: no Haiku, no Fable, no dated snapshots; newest versions first.
-const slModels = () => ((M && M.available) || []).filter(m => !/haiku|fable/i.test(`${m.selector} ${m.name || ""}`) && !/-\d{8}$/.test(m.selector)).sort((a, b) => b.selector.localeCompare(a.selector, "en", { numeric: true })).map(m => [m.selector, m.name || ""]);
+// Every connected model except dated snapshots; newest versions first.
+const slModels = () => ((M && M.available) || []).filter(m => !/-\d{8}$/.test(m.selector)).sort((a, b) => b.selector.localeCompare(a.selector, "en", { numeric: true })).map(m => [m.selector, m.name || ""]);
 const slProviders = () => ((P && P.providers) || []).map(p => [p.id, p.name || ""]);
 const slAccounts = () => [["auto", "자동으로 고르기"], ...((ACC && ACC.accounts) || []).map(a => [a.name, a.label || a.alias || ""])];
 // dup: a 도구 row of the palette does the same job, so the palette shows this one only after "/" (one row per job); the composer always lists it.
