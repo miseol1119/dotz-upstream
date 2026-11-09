@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { MailSearch } from "../../../hub/comments/mail-match.ts";
 import { type AppRaw, readAppsFile } from "../../../hub/integrations.ts";
-import { loadPlugins, pluginNeedsAccount, pluginReply, pluginRepliesWithFiles, pluginsLoaded } from "../../../hub/plugins.ts";
+import { loadPlugins, pluginNeedsAccount, pluginReply, pluginRepliesWithFiles, pluginsLoaded, pluginsReply } from "../../../hub/plugins.ts";
 import { dataDir } from "./settings.ts";
 import { recipientList } from "./recipients.ts";
 import { stagedFiles } from "./staged.ts";
@@ -179,7 +179,8 @@ export async function sendWith(rec: DraftRec, run: Runner): Promise<SendOutcome>
 	}
 	const site = webmailSite(rec.source);
 	if (!site) {
-		if (rec.compose) return fail(MANUAL);
+		// With no plugin that sends replies the answer is the same whoever's mailbox it is: no `zele whoami` (a CLI that can take seconds) to find out.
+		if (rec.compose || !pluginsReply()) return fail(MANUAL);
 		// A plugin that did not ask for an account (needsAccount) may not send through zele at all: it gets what is on record and refuses the rest itself.
 		const mailbox = account ?? zeleAccountOf(rec) ?? addressedLogin(rec, await zeleLogins(run));
 		const sent = await pluginReply({ source: rec.source, id: rec.mailId, ...(mailbox ? { account: mailbox } : {}), to: rec.to, ...(cc.length ? { cc: cc.join(", ") } : {}), ...(rec.mode === "all" ? { all: true } : {}), ...(rec.subject ? { subject: rec.subject } : {}), body: rec.body, attachments: files.map(f => ({ name: f.name, path: f.path, size: f.size })) });

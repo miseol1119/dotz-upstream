@@ -273,4 +273,6 @@ export async function pluginMailThread(mail: MailThreadRequest): Promise<MailThr
 export const pluginMailActions = (source: string): string[] => each("mailActions", l => l.plugin.mailActions?.(source))?.value ?? [];
 
 export const pluginRepliesWithFiles = (source: string): boolean => each("repliesWithFiles", l => l.plugin.repliesWithFiles?.(source) || undefined) !== undefined;
+/** Whether any loaded plugin can send a mail reply at all (pluginReply has someone to ask). */
+export const pluginsReply = (): boolean => each("reply", l => (l.plugin.reply ? true : undefined)) !== undefined;
 export const pluginNeedsAccount = (source: string): boolean => each("needsAccount", l => l.plugin.needsAccount?.(source) || undefined) !== undefined;
