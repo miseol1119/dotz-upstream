@@ -172,9 +172,8 @@ function trPaint() {
   const head = fsHead([el("span", { class: "fs-ey" }, `${TR.label} · 빠른 처리`), el("h2", { class: "fs-t tr-pos" }, TR.list ? `목록 ${n}건` : pos, el("span", { class: "tr-sum", text: ` · 처리 ${handled}건` })), bar], { close: () => TR.h && TR.h.close() });
   const tog = el("button", { class: "btn text sm tr-tog", type: "button", "aria-pressed": String(TR.list), onclick: () => { TR.list = !TR.list; trPaint(); } }, icon("list"), el("span", { text: TR.list ? "한 장씩" : "목록" }));
   $(".fs-hb", head).prepend(tog);
-  if (TR.list) clear(box).append(head, ...trListView());
-  else if (TR.i >= n) clear(box).append(head, ...trDoneView());
-  else clear(box).append(head, ...trOneView(TR.items[TR.i]));
+  // a paint that shows other cards (moved on, or the list changed) goes through even while a card's text is being typed in
+  if (!paintKeep(box, [head, ...(TR.list ? trListView() : TR.i >= n ? trDoneView() : trOneView(TR.items[TR.i]))], trPaint, TR.list ? TR.items.map(trK).join() : TR.i < n ? trK(TR.items[TR.i]) : "")) return;
   const t = $(".tr-note", box) || null;
   if (t && TR.noting) t.focus({ preventScroll: true });
 }

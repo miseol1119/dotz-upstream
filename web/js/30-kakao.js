@@ -1062,12 +1062,12 @@ function kkPaintFoot() {
   const making = !!KK.open && KK.drafting === KK.open;
   // A new draft on its way (no card to say "고치는 중…" yet): the place where its card will be says so.
   const wait = making && !KK.reviseCode ? [el("div", { class: "kk-mk", role: "status", text: "답장 초안을 만드는 중이에요…" })] : [];
-  clear(kkDrafts).append(...(ask ? [ask] : []), ...wait, ...KK.drafts.filter(d => !edit || d.code !== edit.code).map(kkDraftCard));
+  const drawn = paintKeep(kkDrafts, [...(ask ? [ask] : []), ...wait, ...KK.drafts.filter(d => !edit || d.code !== edit.code).map(kkDraftCard)], kkPaintFoot);
   kkDrafts.hidden = !kkDrafts.firstChild;
   // A draft that lands while the room is open (the owner's request came back) is brought into view: the card sits under the request bar, below the chat window.
   const codes = KK.drafts.map(d => d.code);
-  if (KK.droom === KK.open && codes.some(c => !KK.dsig.includes(c))) requestAnimationFrame(() => kkDrafts.scrollIntoView({ block: "nearest" }));
-  KK.dsig = codes; KK.droom = KK.open;
+  if (drawn && KK.droom === KK.open && codes.some(c => !KK.dsig.includes(c))) requestAnimationFrame(() => kkDrafts.scrollIntoView({ block: "nearest" }));
+  if (drawn) { KK.dsig = codes; KK.droom = KK.open; }
   if (hadRv) { const i = $(".kk-rv", kkDrafts); if (i) i.focus({ preventScroll: true }); }
   kkEditBar.hidden = !edit;
   kkDraftBtn.disabled = making;

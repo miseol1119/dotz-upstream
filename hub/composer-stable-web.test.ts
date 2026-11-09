@@ -104,11 +104,11 @@ describe("typing on the phone composer while the page updates", () => {
 
 	// A decision answered with a reason is typed into the sheet's own field (the dock sheet for an [ask] in a conversation, the notice sheet from
 	// 알림). A live update must not redraw that field: a new node takes the focus from the old one, and a phone closes and reopens its keyboard.
+	const now = () => new Date().toISOString();
+	const note = async () => JSON.parse((await view.evaluate(`JSON.stringify({ same: document.activeElement === window.__note, conn: window.__note.isConnected, value: window.__note.value })`)) as string) as { same: boolean; conn: boolean; value: string };
+	const markNote = () => view.evaluate(`(() => { window.__note = document.activeElement; })()`);
+	const noteFocused = `document.activeElement && document.activeElement.classList.contains("dc-note")`;
 	test("the reason typed in a decision sheet keeps its field through a live progress update and a new notice", async () => {
-		const now = () => new Date().toISOString();
-		const note = async () => JSON.parse((await view.evaluate(`JSON.stringify({ same: document.activeElement === window.__note, conn: window.__note.isConnected, value: window.__note.value })`)) as string) as { same: boolean; conn: boolean; value: string };
-		const markNote = () => view.evaluate(`(() => { window.__note = document.activeElement; })()`);
-		const noteFocused = `document.activeElement && document.activeElement.classList.contains("dc-note")`;
 		// the dock sheet: an [ask] in the main conversation, opened over the screen, option 2 (안 됨) asks for the reason
 		send({ kind: "out", target: "main", source: "orchestrator", text: "[ask] 폰에서 확인해 주세요\n결정: 폰에서 확인해 주세요\n1) 확인됨\n2) 안 됨", ts: now() });
 		await waitFor(`decisionOf("main")`);
@@ -133,6 +133,40 @@ describe("typing on the phone composer while the page updates", () => {
 		await waitFor(`ntById(9102)`);
 		expect(await note()).toEqual({ same: true, conn: true, value: "글자가 잘려요" });
 		await view.evaluate(`ntSheetClose(false)`);
+	}, 30_000);
+
+	// An update that does change the open sheet (here its title) waits while the reason is typed, and is drawn once the owner leaves the field.
+	test("a notice update that changes the open sheet keeps the reason field being typed in, and lands after the field is left", async () => {
+		const item = { id: 9201, kind: "decision", title: "배포를 확인해 주세요", text: "폰에서 확인해 주세요", ts: now(), decision: { state: "open", to: "main", options: [{ n: 1, label: "확인됨" }, { n: 2, label: "안 됨" }] } };
+		send({ kind: "notice", item });
+		await waitFor(`ntById(9201)`);
+		await view.evaluate(`noticeSheetOpen(9201)`);
+		await waitFor(`NS.node`);
+		await view.evaluate(`ntAnswer(ntById(9201), ntById(9201).decision.options[1])`);
+		await waitFor(noteFocused);
+		await view.type("글자가 잘려요");
+		await markNote();
+		send({ kind: "notice", item: { ...item, title: "배포를 다시 확인해 주세요" } });
+		await waitFor(`ntById(9201).title === "배포를 다시 확인해 주세요"`);
+		expect(await note()).toEqual({ same: true, conn: true, value: "글자가 잘려요" });
+		await view.evaluate(`document.activeElement.blur()`);
+		await waitFor(`document.querySelector("#ds-t").textContent === "배포를 다시 확인해 주세요"`);
+		await view.evaluate(`ntSheetClose(false)`);
+	}, 30_000);
+
+	// A new message redraws a question's card inside its message; the reason field it draws there must not take the composer's focus.
+	test("a new message leaves the focus in the composer being typed in, even when a question's reason field is drawn", async () => {
+		send({ kind: "out", target: "main", source: "orchestrator", text: "[ask] 화면을 확인해 주세요\n결정: 화면을 확인해 주세요\n1) 확인됨\n2) 안 됨", ts: now() });
+		await waitFor(`DC.cur && DC.cur.question.includes("화면을")`);
+		// the tap on 2 (안 됨) leaves the composer, as a tap on a button does, and the card's reason field opens with the focus
+		await view.evaluate(`(() => { document.activeElement.blur(); pickOption(DC.cur, 0, DC.cur.blocks[0].options.find(o => o.n === 2)); })()`);
+		await waitFor(noteFocused);
+		await view.click("#text");
+		await waitFor(`document.activeElement === window.__ta`);
+		await view.type("안녕");
+		send({ kind: "out", target: "main", source: "orchestrator", text: "다른 답변", ts: now() });
+		await waitFor(`!!document.querySelector("#timeline .dc-note") && document.querySelector("#timeline").textContent.includes("다른 답변")`);
+		expect(JSON.parse(await view.evaluate(`JSON.stringify({ same: document.activeElement === window.__ta, value: ta.value })`) as string)).toEqual({ same: true, value: "안녕" });
 	}, 30_000);
 
 	test("the app height follows the same viewport the layout uses, so a lagging window.innerHeight cannot shrink the page twice", async () => {

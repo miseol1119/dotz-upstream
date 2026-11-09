@@ -165,14 +165,20 @@ describe("댓글 on a phone (390x844)", async () => {
 		await v.press("Backspace");
 		await v.press("ArrowLeft");
 		await v.press("ArrowLeft");
+		await run(v, `window.__in = document.querySelector("#cm .rq-edit input")`);
 		await run(v, `cmPaintAll()`);   // what the timer or a live event does to the open thread
 		sends = [{ id: "send:cm:youtube:c2", commentId: "cm:youtube:c2", text: "곧 올릴게요", state: "failed", reason: "403", at: at(22, 4, 0) }];
 		await run(v, `cmReload()`);
-		await waitFor(v, `document.querySelector('#cm [data-k="retry"]')`);
-		const s = await q<{ value: string; focused: boolean; caret: number | null; go: boolean }>(v, `const i = document.querySelector("#cm .rq-edit input");
-			return { value: i.value, focused: document.activeElement === i, caret: i.selectionStart, go: !document.querySelector('#cm [data-k="revise-go"]').disabled }`);
-		expect(s).toEqual({ value: "shorter pleas", focused: true, caret: 11, go: true });
+		await waitFor(v, `CM.view && CM.view.sends.some(s => s.state === "failed")`);
+		// the field being typed in is never replaced (a phone would drop and raise its keyboard): the same node keeps text, focus and caret
+		const s = await q<{ same: boolean; value: string; focused: boolean; caret: number | null; go: boolean }>(v, `const i = document.querySelector("#cm .rq-edit input");
+			return { same: i === window.__in, value: i.value, focused: document.activeElement === i, caret: i.selectionStart, go: !document.querySelector('#cm [data-k="revise-go"]').disabled }`);
+		expect(s).toEqual({ same: true, value: "shorter pleas", focused: true, caret: 11, go: true });
 		await v.type("X");   // still typing into the same field, at the caret
+		expect(await q<string>(v, `return document.querySelector("#cm .rq-edit input").value`)).toBe("shorter pleXas");
+		// leaving the field draws what arrived meanwhile (the failed reply's 다시 보내기); the text stays
+		await run(v, `document.activeElement.blur()`);
+		await waitFor(v, `document.querySelector('#cm [data-k="retry"]')`);
 		expect(await q<string>(v, `return document.querySelector("#cm .rq-edit input").value`)).toBe("shorter pleXas");
 		await run(v, `document.querySelector('#cm [data-k="revise-cancel"]').click()`);
 		await run(v, `document.querySelector('#cm [data-k="edit"]').click()`);

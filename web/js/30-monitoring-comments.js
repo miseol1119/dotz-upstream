@@ -314,7 +314,7 @@ function cmPaintChat(stick) {
   const a = document.activeElement, typing = a && a.matches(".rq-edit input") && cmIn.contains(a) ? [a.selectionStart, a.selectionEnd, a.selectionDirection] : null;
   const nodes = [cmPostCard(v.thread, v.source.kind), ...cmThreadNodes(v)];
   const keep = cmTl.scrollTop;
-  clear(cmIn).append(...nodes);
+  if (!paintKeep(cmIn, nodes, () => { CM.chatSig = ""; cmPaintChat(); })) return;
   cmTl.scrollTop = stick && !typing ? cmTl.scrollHeight : keep;
   const inp = typing && $(".rq-edit input", cmIn);
   if (inp) { inp.focus({ preventScroll: true }); inp.setSelectionRange(...typing); }

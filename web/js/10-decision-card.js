@@ -75,7 +75,7 @@ function parseChoices(text) {
 const isChoiceMsg = pc => pc.blocks.some(b => b.options.length > 1);
 const isHeadedChoice = pc => pc.blocks.some(b => b.headed && b.options.length > 1);
 const choiceAsks = (e, tone, pc) => tone === "ask" || isHeadedChoice(pc) || (e.kind === "out" && e.source === "gateway" && e.target === "alert" && isChoiceMsg(pc));
-const DC = { cur: null, picks: {}, step: {}, fold: {}, st: {}, edit: {}, note: {}, files: {}, fbusy: {} };   // files: uploads picked in 직접 수정 (sent as the answer's `files`), fbusy: one is going up
+const DC = { cur: null, picks: {}, step: {}, fold: {}, st: {}, edit: {}, fresh: "", note: {}, files: {}, fbusy: {} };   // files: uploads picked in 직접 수정 (sent as the answer's `files`), fbusy: one is going up
 // A draft waiting for send approval (hub/draft-approval.ts): the notice carries it, the sheet shows it above 보내기 / 고치기 / 보내지 않기.
 const DRAFT_EDIT = "고치기", DRAFT_OWN = "어떻게 보낼지 직접 입력";
 // The draft options that carry the owner's text: 고치기 (what to change) and the send mode 직접 입력 (how to send). Mirrors hub draftNeedsText.
@@ -167,7 +167,8 @@ function pickOption(dc, bi, opt, note) {
   const asIs = dc.draft && (dc.draft.attachIssues || []).length && dc.blocks[bi] && dc.blocks[bi].options.find(o => o.label === "이대로 보내기");
   if (asIs && opt.label === "보내기" && !opt.sure) { ask("첨부를 확인해 주세요", `${dc.draft.attachIssues.join(" · ")}. 이대로 보낼까요?`, "이대로 보내기").then(ok => { if (ok) pickOption(dc, bi, { ...asIs, sure: true }, note); }); return; }
   if (dc.draft && (dc.draft.warning || (dc.draft.attachments || []).length) && opt.label === "보내기" && !opt.sure) { drfSure(dc.draft, dc.t).then(ok => { if (ok) pickOption(dc, bi, { ...opt, sure: true }, note); }); return; }
-  if (!note && needsNote(dc, opt)) { DC.edit[dc.key] = { bi, opt }; paintDecision(); return; }
+  // fresh: the paint that draws the field this tap opened gives it the focus, once; a later live repaint never takes the focus
+  if (!note && needsNote(dc, opt)) { DC.edit[dc.key] = { bi, opt }; DC.fresh = dc.key; paintDecision(); return; }
   const p = DC.picks[dc.key] || [];
   DC.picks[dc.key] = p;
   p[bi] = note ? { ...opt, note } : opt;
@@ -496,8 +497,8 @@ function renderSheet(box, dc, picks, step) {
     }
   }
   if (st) foot.append(el("div", { class: "dc-st", role: "status", text: dcStText(dc, st) }));
-  if (org) { col.append(body, foot); clear(box).append(head, org.bar, el("div", { class: "od-stage" }, org.orig, col)); }
-  else clear(box).append(head, ...(body ? [body] : []), foot);
+  if (org) col.append(body, foot);
+  if (!paintKeep(box, org ? [head, org.bar, el("div", { class: "od-stage" }, org.orig, col)] : [head, ...(body ? [body] : []), foot], dcAgain(box))) return;
   if (body) body.scrollTop = top;
   const nn = $(".dc-note", box);
   if (nn && (refocus || (edit && !oldNote))) { nn.focus({ preventScroll: true }); nn.setSelectionRange(caret || nn.value.length, caret || nn.value.length); }
@@ -508,9 +509,9 @@ function choiceRow(dc, step, o, picks, st) {
     el("span", { class: "dc-tx" }, el("span", { class: "dc-lb" }, o.label), o.desc ? el("span", { class: "dc-ds", text: dcDesc(o) }) : null));
 }
 const dcDesc = o => o.desc.replace(/`/g, "");   // one plain line under the name: code marks would show raw
+const dcAgain = box => () => (box === DK.box ? dkPaint() : paintDecision());   // the paint that owns a decision box, for a held repaint (paintKeep)
 function renderDecision(box, dc, picks, step) {
   if (dc.close) { renderSheet(box, dc, picks, step); return; }
-  const hadNote = !!$(".dc-note", box);
   // Folded per conversation, not per question (owner 2026-11-04: the arrow did not lower it): the bot re-asks what is left as a new
   // message, and a fold kept on the old question let the next one cover the conversation again.
   const st = DC.st[dc.key] || "", fold = !!DC.fold[dc.t], old = $(".dc-body", box), top = old && box.dataset.key === dc.key ? old.scrollTop : 0;
@@ -541,10 +542,10 @@ function renderDecision(box, dc, picks, step) {
     }
   }
   if (st) kids.push(el("div", { class: "dc-st", role: "status", text: dcStText(dc, st) }));
-  clear(box).append(...kids);
+  if (!paintKeep(box, kids, dcAgain(box))) return;
   box.classList.toggle("fold", fold);
   const nb = $(".dc-body", box); if (nb) nb.scrollTop = top;
-  const nn = $(".dc-note", box); if (nn && !hadNote) nn.focus({ preventScroll: true });   // the field a tap just opened takes the focus
+  const nn = $(".dc-note", box); if (nn && DC.fresh === dc.key) { DC.fresh = ""; nn.focus({ preventScroll: true }); }   // the field a tap just opened takes the focus
 }
 // In-message rows follow the same state: tappable only while their question is the pending one.
 // Otherwise they follow the message's own decision notice (hub/notices.ts keeps it open until answered, however much was posted
@@ -636,22 +637,27 @@ function paintInline(box, live) {
   const i = DCI.get(box), dc = inlineDc(i, live), picks = dc ? DC.picks[dc.key] || [] : closedPicks(i), st = dc ? DC.st[dc.key] || "" : "closed";
   const docked = !!dc && dc === live && dc.at === i.e.ts, edit = dc && !docked ? DC.edit[dc.key] : null, sig = [dc ? dc.key : "", st, picks.map(p => (p ? p.n : 0)).join(), edit ? edit.opt.n : "", docked].join("|");
   if (box.dataset.sig === sig) return;
-  box.dataset.sig = sig;
-  clear(box);
   // Answered: the owner's message is drawn as the record of it (dc-rec), options live only in the card.
-  box.hidden = !dc && picks.some(Boolean);
-  if (box.hidden) return;
-  // While the card is docked its rows are there: the message keeps the question, one set of buttons on screen.
-  if (docked) box.append(...i.blocks.map(b => mdNode(draftQ(b.title), "md dc-q")));
-  else if (dc && i.blocks.length > 1) box.append(...multiNodes(dc, picks, st));
-  else for (const [bi, b] of i.blocks.entries()) box.append(...[b.title ? mdNode(draftQ(b.title), "md dc-q") : null, ...b.options.map(o => choiceRow(dc || { key: "" }, bi, o, picks, st))].filter(Boolean));
-  if (!dc && !picks.some(Boolean)) box.append(el("div", { class: "dc-ds", text: "지난 결정이에요" }));
-  // No docked card to type in (a session's mid-turn question): what to change is asked here.
-  if (edit) {
-    const note = el("textarea", { class: "dc-note", rows: 2, placeholder: "내용을 적어 주세요" });
-    box.append(note, el("button", { class: "btn dc-send", type: "button", onclick: () => note.value.trim() && pickOption(dc, edit.bi, edit.opt, note.value.trim()) }, "보내기"));
-    note.focus({ preventScroll: true });
+  const hide = !dc && picks.some(Boolean), kids = [];
+  let note = null;
+  if (!hide) {
+    // While the card is docked its rows are there: the message keeps the question, one set of buttons on screen.
+    if (docked) kids.push(...i.blocks.map(b => mdNode(draftQ(b.title), "md dc-q")));
+    else if (dc && i.blocks.length > 1) kids.push(...multiNodes(dc, picks, st));
+    else for (const [bi, b] of i.blocks.entries()) kids.push(...[b.title ? mdNode(draftQ(b.title), "md dc-q") : null, ...b.options.map(o => choiceRow(dc || { key: "" }, bi, o, picks, st))].filter(Boolean));
+    if (!dc && !picks.some(Boolean)) kids.push(el("div", { class: "dc-ds", text: "지난 결정이에요" }));
+    // No docked card to type in (a session's mid-turn question): what to change is asked here. Its text outlives a repaint (DC.note).
+    if (edit) {
+      note = el("textarea", { class: "dc-note", rows: 2, placeholder: "내용을 적어 주세요", oninput: () => { DC.note[dc.key] = note.value; } });
+      note.value = DC.note[dc.key] || "";
+      kids.push(note, el("button", { class: "btn dc-send", type: "button", onclick: () => note.value.trim() && pickOption(dc, edit.bi, edit.opt, note.value.trim()) }, "보내기"));
+    }
   }
+  if (!paintKeep(box, kids, paintDecision)) return;
+  box.dataset.sig = sig;
+  box.hidden = hide;
+  // The field a tap just opened takes the focus; a repaint for a new message never takes it from the field the owner types in.
+  if (note && DC.fresh === dc.key) { DC.fresh = ""; note.focus({ preventScroll: true }); }
 }
 function paintDecision() {
   const box = $("#dcard");

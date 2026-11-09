@@ -111,4 +111,17 @@ describe("review queue", async () => {
 		expect(reqs).toHaveLength(1);
 		expect(reqs[0]!.body).toEqual({ items: [{ ref: "Dxyz789", to: "main", n: 2, label: "고치기", note: "더 짧게" }] });
 	});
+
+	// A repaint is held while a field is typed in, but never one that moves to another card: the next press must answer the card on screen.
+	test("Cmd+Enter in a card's text sends it and draws the next card, so the next press answers the card on screen", async () => {
+		await boot(v);
+		const press = () => run(v, `const t = document.querySelector(".tr-ta"); t.focus(); t.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true }))`);
+		await press();
+		await waitFor(v, `document.querySelector(".tr-pos").firstChild.textContent === "2/3" && document.querySelector(".tr-ta").value === "준비 중이에요."`);
+		await arrived(1);
+		await press();
+		await waitFor(v, `document.querySelector(".tr-pos").firstChild.textContent === "3/3"`);
+		await arrived(2);
+		expect(reqs.map(r => (r.body!.items as { ref: string }[])[0]!.ref)).toEqual(["Dxyz789", "Dabc234"]);
+	});
 });

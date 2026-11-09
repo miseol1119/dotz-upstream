@@ -46,9 +46,10 @@ const openManual = async (v: View, id: string) => {
 	await v.evaluate(`(document.querySelector(".fs-ft .dc-manual").click(), 0)`);
 	await waitFor(v, `document.querySelector(".fs-ft .dc-note") && document.querySelector(".fs-ft .dc-fl .dr-add")`);
 };
-// Picks files the way the file dialog would: sets the hidden input's list and fires its change event.
+// Picks files the way the tap on 파일 추가 and the file dialog would: the tap takes the focus off the text field, then the hidden input gets
+// its list and fires its change event.
 const pick = (v: View, ...names: string[]) =>
-	v.evaluate(`(() => { const i = document.querySelector(".fs-ft .dc-fl input[type=file]"), dt = new DataTransfer(); for (const n of ${JSON.stringify(names)}) dt.items.add(new File(["내용-" + n], n, { type: n.endsWith(".pdf") ? "application/pdf" : "text/plain" })); i.files = dt.files; i.dispatchEvent(new Event("change")); return 0; })()`);
+	v.evaluate(`(() => { document.querySelector(".fs-ft .dc-fl .dr-add").focus(); const i = document.querySelector(".fs-ft .dc-fl input[type=file]"), dt = new DataTransfer(); for (const n of ${JSON.stringify(names)}) dt.items.add(new File(["내용-" + n], n, { type: n.endsWith(".pdf") ? "application/pdf" : "text/plain" })); i.files = dt.files; i.dispatchEvent(new Event("change")); return 0; })()`);
 const type = (v: View, text: string) => v.evaluate(`(() => { const t = document.querySelector(".fs-ft .dc-note"); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event("input", { bubbles: true })); return 0; })()`);
 const box = async (v: View, sel: string) =>
 	JSON.parse(await v.evaluate(`JSON.stringify((() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top), r: Math.round(r.right), b: Math.round(r.bottom) }; })())`)) as { l: number; t: number; r: number; b: number } | null;

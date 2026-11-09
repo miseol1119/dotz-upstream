@@ -659,7 +659,7 @@ function ntSheetPaint() {
   }
   kids.push(foot);
   const box = NS.h.box, top = $(".fs-body", box) ? $(".fs-body", box).scrollTop : 0;
-  clear(box).append(...kids);
+  if (!paintKeep(box, kids, ntSheetPaint)) return;
   $(".fs-body", box).scrollTop = top;
   const again = keep ? box.querySelector(`[data-k="${keep}"]`) : null;
   if (again) again.focus({ preventScroll: true });

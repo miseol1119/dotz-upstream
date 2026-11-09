@@ -16,6 +16,32 @@ function el(tag, props, ...kids) {
   return n;
 }
 const clear = n => { while (n.firstChild) n.removeChild(n.firstChild); return n; };
+// The text field the owner is typing in (on a phone its keyboard is up), or null.
+function typingIn() {
+  const a = document.activeElement;
+  return a && (a.isContentEditable || a.matches("textarea, input:not([type=button], [type=checkbox], [type=radio], [type=range], [type=file], [type=submit], [type=reset], [type=color])")) ? a : null;
+}
+// A live repaint that rebuilds the field being typed in drops a phone's keyboard (the focused node leaves the page) and the refocus raises
+// it again. So `box` takes `kids` unless it holds that field and the new paint keeps it (same kind of field, still editable); a paint that
+// ends the field (sent, closed) goes through, and so does one whose `subject` (what the field belongs to, e.g. the card on screen) changed.
+// A held box stays as it is and `again` repaints once the field is left, after the tap that left it, so that tap's click still lands on
+// the button it pressed. Returns false when held.
+const HELD = new WeakMap(), SUBJ = new WeakMap();
+let ptrDown = false;
+addEventListener("pointerdown", () => { ptrDown = true; }, true);
+for (const t of ["pointerup", "pointercancel"]) addEventListener(t, () => { ptrDown = false; }, true);
+function afterTap(fn) {
+  if (!ptrDown) { setTimeout(fn); return; }
+  const go = () => { removeEventListener("pointerup", go, true); removeEventListener("pointercancel", go, true); setTimeout(fn); };
+  addEventListener("pointerup", go, true); addEventListener("pointercancel", go, true);
+}
+function paintKeep(box, kids, again, subject = "") {
+  const a = typingIn(), same = f => f.tagName === a.tagName && f.className === a.className && f.dataset.k === a.dataset.k && !f.disabled && !f.readOnly;
+  if (!a || !box.contains(a) || (SUBJ.get(box) || "") !== subject || !kids.some(k => k instanceof Element && (same(k) || [...k.getElementsByTagName(a.tagName)].some(same)))) { clear(box).append(...kids); SUBJ.set(box, subject); return true; }
+  if (!HELD.has(a)) a.addEventListener("focusout", () => afterTap(() => { const h = HELD.get(a); HELD.delete(a); delete h.box.dataset.sig; h.again(); }), { once: true });
+  HELD.set(a, { box, again });
+  return false;
+}
 const enc = encodeURIComponent;
 // The one right-hand slot of a settings row (.li > .li-end, docs/ui-spec.md 설정 행): a 행 안 button, a switch, a field or a value.
 const liEnd = (...kids) => el("span", { class: "li-end" }, ...kids);
