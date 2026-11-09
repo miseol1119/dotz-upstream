@@ -365,9 +365,13 @@ describe("web/DESIGN.md rules", () => {
 		const tint = (c: string, over: string, pct: number) => "#" + rgb(c).map((v, i) => Math.round(v * pct + rgb(over)[i]! * (1 - pct)).toString(16).padStart(2, "0")).join("");
 		const low: string[] = [];
 		const check = (what: string, fg: string, bg: string) => { const n = ratio(fg, bg); if (n < 4.5) low.push(`${what} ${fg}/${bg} ${n.toFixed(2)}`); };
+		const warnTag = parseCss("02-cards-lists-tags.css", realCss().find(([f]) => f === "02-cards-lists-tags.css")![1]).find(r => r.selector === ".tag.warn")!;
+		const warnInk = /var\(--([\w-]+)\)/.exec(warnTag.decls.find(([k]) => k === "color")![1])![1]!;
 		for (const [name, t] of [["light", theme(":root")], ["dark", theme(':root[data-theme="dark"]')]] as const) {
 			for (const s of ["bg", "layer", "row-sel", "hover"]) check(`${name} fg-3 on ${s}`, t("fg-3"), t(s));
 			check(`${name} warn on bg`, t("warn"), t("bg"));
+			// the .tag.warn word sits right on whichever surface holds its row, hovered or selected too (web/DESIGN.md 상태·필터·화면 탭): its text token has to clear 4.5 on every one
+			for (const s of ["bg", "layer", "card", "card-hover", "hover", "row-sel"]) check(`${name} .tag.warn text on ${s}`, t(warnInk), t(s));
 			check(`${name} bg on warn`, t("bg"), t("warn"));
 			if (name === "dark") check(`${name} on-accent on accent`, t("on-accent"), t("accent")); // the light blue button (white on #3182f6, 3.7) is the brand blue and stays
 			check(`${name} on-err on err`, t("on-err"), t("err"));

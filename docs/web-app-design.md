@@ -2474,6 +2474,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 | `--on-accent` | `#ffffff` | `#ffffff` | 19 / 다크 82 | 9회: css/03-base.css x4, css/09-notices.css x1, css/15-reply.css x1 외 3개 파일; 토큰 파일 내 파생 2회 |
 | `--ok` | `#0a8754` | `#3ecf8e` | 20 / 다크 83 | 34회: css/20-monitoring.css x4, css/20-projects.css x4, css/02-cards-lists-tags.css x3 외 12개 파일 |
 | `--warn` | `#ae5900` | `#f5a524` | 20 / 다크 83 | 58회: css/04-files.css x8, css/03-base.css x6, css/20-monitoring.css x6 외 12개 파일; 토큰 파일 내 파생 6회 |
+| `--warn-ink` | `#8f4900` | `#f5a524` | 라이트 20 / 다크 83 | 1회: css/02-cards-lists-tags.css `.tag.warn` 글자. `--warn`을 같은 색상으로 어둡게 한 값으로, 호버·고른 줄을 포함한 모든 면 위에서 4.5:1(점은 `--warn` 그대로) |
 | `--err` | `#e32435` | `#ff6369` | 20 / 다크 83 | 67회: css/05-log.css x14, css/04-files.css x8, css/20-monitoring.css x7 외 15개 파일; 토큰 파일 내 파생 5회 |
 | `--unreplied` | `#c2410c` | `#ff9a4d` | 22 / 다크 84 | 9회: css/02-cards-lists-tags.css x4, css/17-kakao.css x3, css/05-log.css x1 외 1개 파일 |
 | `--on-unreplied` | `#ffffff` | `#1b1206` | 22 / 다크 84 | 1회: css/17-kakao.css x1 |

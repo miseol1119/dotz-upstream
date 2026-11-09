@@ -26,6 +26,7 @@ borderless white cards, one sparing blue accent, big bold titles, short copy. Li
 | `--accent` | `#3182f6` | `#6ca7ff` | primary button, send, selected / in-use, progress. Nothing else (dark is lighter so its text reaches 4.5:1 on its own 14% tint) |
 | `--on-accent` / `--on-err` | `#ffffff` / `#ffffff` | `#121214` / `#121214` | text on a solid accent or danger fill (dark ink on the lighter dark colors, 4.5:1) |
 | `--ok` / `--warn` / `--err` | `#0a8754` / `#ae5900` / `#e32435` | `#3ecf8e` / `#f5a524` / `#ff6369` | status dots and short status words only |
+| `--warn-ink` | `#8f4900` | `#f5a524` | text of the `.tag.warn` status word only (its dot stays `--warn`): `--warn` darkened, 4.5:1 on every surface, hovered and selected rows too |
 
 Rules: one accent per screen; status colors never decorate; no colored stripes on rounded surfaces; selection is a
 fill (`--card` on the canvas, `--fg` chip), not a border.

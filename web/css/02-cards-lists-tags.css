@@ -26,7 +26,7 @@ code.path-short { display: inline-block; max-width: 100%; vertical-align: bottom
    Blue words stay --fg-2 (--accent text is under 4.5:1 on white); the dot carries the blue. */
 .tag { --tone: var(--fg-3); display: inline-flex; align-items: center; gap: var(--sp-15); flex: none; height: var(--tag-h); padding: 0; background: none; color: var(--fg-3); font-size: var(--fs-tag); line-height: var(--lh-tag); font-weight: 500; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .tag.ok { --tone: var(--ok); color: var(--ok); font-weight: 600; }
-.tag.warn { --tone: var(--warn); color: var(--warn); font-weight: 600; }
+.tag.warn { --tone: var(--warn); color: var(--warn-ink); font-weight: 600; }
 .tag.err { --tone: var(--err); color: var(--err); font-weight: 600; }
 .tag.pri { --tone: var(--accent); color: var(--fg-2); font-weight: 600; }
 .tag.unreplied { --tone: var(--unreplied); color: var(--unreplied); font-weight: 600; }

@@ -17,7 +17,9 @@
   --line: #e5e8eb; --line-2: #d1d6db;
   --fg: #191f28; --fg-2: #4e5968; --fg-3: #616b78;
   --accent: #3182f6; --on-accent: #ffffff;
-  --ok: #0a8754; --warn: #ae5900; --err: #e32435; --on-err: #ffffff;
+  --ok: #0a8754; --warn: #ae5900; --err: #e32435;
+  /* text of the .tag.warn status word: --warn darkened (same hue) so it clears 4.5:1 on every light surface, hovered and selected rows too (4.15 with --warn itself); its dot stays --warn */
+  --warn-ink: #8f4900; --on-err: #ffffff;
   /* 미답장 (waiting for the owner's reply): orange fill + its text colour, 5.2:1 on white (light), 8:1 on the dark card (dark) */
   --unreplied: #c2410c; --on-unreplied: #ffffff;
   /* KakaoTalk chat (30-kakao.js): the room's backdrop, incoming / own bubbles, time and date chip */
@@ -82,7 +84,7 @@
   --line: #2b2b31; --line-2: #3d3d45;
   --fg: #ececf0; --fg-2: #b0b4bc; --fg-3: #8e939c;
   --accent: #6ca7ff; --on-accent: #121214;
-  --ok: #3ecf8e; --warn: #f5a524; --err: #ff6369; --on-err: #121214;
+  --ok: #3ecf8e; --warn: #f5a524; --err: #ff6369; --warn-ink: #f5a524; --on-err: #121214;
   --unreplied: #ff9a4d; --on-unreplied: #1b1206;
   --kk-bg: #161c23; --kk-in: #2b2f36; --kk-in-fg: #ececf0; --kk-own: #d9bd00; --kk-own-fg: #1b1b1b; --kk-time: #8e98a5; --kk-chip: rgb(255 255 255 / .12); --kk-chip-fg: #b0b4bc;
   --seg-track: var(--layer); --seg-on: var(--line-2);
