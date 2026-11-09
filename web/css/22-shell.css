@@ -166,3 +166,11 @@ body { display: flow-root; }
   .appbar h1.pdot, .appbar h1.p-need { padding-right: 0; }
   .appbar h1.pdot::after, .appbar h1.p-need::after { content: none; }
 }
+
+/* phone / touch: an app bar icon button keeps its drawn size and answers a tap over --btn-hit (the back arrow, 4px from the screen edge, grows inward); search and bell sit 44px apart, the pitch two such targets need */
+@media (pointer: coarse), (max-width: 639px) {
+  .appbar .cmdk { margin-right: var(--sp-1); }
+  .appbar .ib { position: relative; }
+  .appbar .ib::after { content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, var(--btn-hit)); height: max(100%, var(--btn-hit)); transform: translate(-50%, -50%); }
+  .appbar #back::after { left: 0; transform: translateY(-50%); }
+}

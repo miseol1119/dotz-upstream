@@ -245,6 +245,12 @@ async function openPage(): Promise<View> {
 	await waitFor(v, `!!document.querySelector("#nav .ni")`);
 	return v;
 }
+// Visible app bar icon buttons and the size of the area that answers a tap on them: elementFromPoint walked out from the center along both axes.
+const APPBAR_HITS = `[...document.querySelectorAll(".appbar .ib")].filter(e => e.getBoundingClientRect().width > 0).map(e => {
+	const b = e.getBoundingClientRect(), cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+	const reach = (dx, dy) => { let n = 0; while (n < 30 && e.contains(document.elementFromPoint(cx + dx * (n + 1), cy + dy * (n + 1)))) n++; return n; };
+	return [e.id || e.className, reach(-1, 0) + reach(1, 0) + 1, reach(0, -1) + reach(0, 1) + 1];
+})`;
 async function auditAccent(v: View, screen: string): Promise<string[]> {
 	await painted(v);
 	const fills = await ev<string[]>(v, ACCENT_FILLS);
@@ -265,6 +271,19 @@ describe("web/DESIGN.md rules", () => {
 			found.push(...await auditAccent(v, screen));
 		}
 		expect(found).toEqual([]);
+	});
+
+	test("app bar icon buttons answer a tap over 44px on a phone", async () => {
+		const v = await openPage();
+		const hits: [string, number, number][] = [];
+		for (const screen of SCREENS) {
+			await run(v, `go(${JSON.stringify(screen)})`);
+			await waitFor(v, `!document.querySelector("#v-${screen}").hidden`);
+			await painted(v);
+			hits.push(...await ev<[string, number, number][]>(v, APPBAR_HITS));
+		}
+		expect(hits.length).toBeGreaterThan(0);
+		expect(hits.filter(([, w, h]) => w < 44 || h < 44).map(([id, w, h]) => `${id} ${w}x${h}`)).toEqual([]);
 	});
 
 	const planted: [string, string, string][] = [
