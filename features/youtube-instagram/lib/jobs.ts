@@ -85,10 +85,15 @@ export function listJobs(): Job[] {
 	return jobs.sort((a, b) => a.created.localeCompare(b.created) || a.id.localeCompare(b.id));
 }
 
+// Jobs made in the same minute share the stamp and differ by 16 random bits; a draw that names a job already on disk is drawn again,
+// so a new job never overwrites an older one.
 function newId(ctx: Ctx): string {
 	const stamp = ctx.now().toISOString().replace(/\D/g, "").slice(0, 12);
-	const rand = Array.from(crypto.getRandomValues(new Uint8Array(2)), b => b.toString(16).padStart(2, "0")).join("");
-	return `j-${stamp}-${rand}`;
+	for (;;) {
+		const rand = Array.from(crypto.getRandomValues(new Uint8Array(2)), b => b.toString(16).padStart(2, "0")).join("");
+		const id = `j-${stamp}-${rand}`;
+		if (!getJob(id)) return id;
+	}
 }
 
 // Boundary check of a job body written by the orchestrator; fills the owner's defaults (targets, privacy).
