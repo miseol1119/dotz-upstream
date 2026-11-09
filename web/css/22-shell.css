@@ -202,8 +202,7 @@ body { display: flow-root; }
   #cbar { padding-block: var(--sp-15); margin-block: calc(var(--sp-15) * -1); }
   .hm-chips { row-gap: var(--sp-2); padding-bottom: var(--sp-05); }
   .pmv-edit::after { left: 0; width: 100%; height: var(--btn-hit); transform: none; }
-  .mtop .mtop-b:first-child::after { left: 0; transform: translateY(-50%); }
-  .mtop .mtop-b:last-child::after { left: auto; right: 0; transform: translateY(-50%); }
+  .mtop .mtop-b::after { left: 0; width: 100%; transform: translateY(-50%); }   /* nine buttons in the bar leave under 37px each: an area wider than the button would take a strip of its neighbour */
   .pmv-title::after { top: calc(var(--sp-3) * -1); }
   .pmv-purpose::after { top: calc(var(--sp-1) * -1); }
   .pmv-hrow { padding-top: var(--sp-15); }
