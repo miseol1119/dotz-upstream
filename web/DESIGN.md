@@ -3,6 +3,13 @@
 `web/index.html` + modules in `web/css/*.css` and `web/js/*.js` (served joined as `/app.css`, `/app.js`), tokens in `:root` / `:root[data-theme="dark"]`. Tone: Toss Securities - gray page,
 borderless white cards, one sparing blue accent, big bold titles, short copy. Light and dark keep the same hierarchy.
 
+## 판단 기준 (before adding anything)
+
+- A new element joins the existing pattern of its surface: look at its neighbours (same list, card, screen) and match their position, size, weight, colour and rhythm.
+- Anchors the eye scans (left icons, titles, the right-edge status or time) never move.
+- Dense surfaces (홈, lists) get the most compact form; detail screens get the full one.
+- Judging a screenshot: compare the changed rows or blocks with the unchanged ones beside them, not only whether the new thing appears.
+
 ## Color
 
 | Token | Light | Dark | Use |
@@ -77,6 +84,17 @@ instant change. The product has no motion on/off setting: the system setting is 
 ## Per-form spec
 
 Heights, padding, gaps, type steps and don'ts for each display form (list row, card, settings row, sheet, button, badge, empty, toast, chips, field, progress) live in `docs/ui-spec.md`. Height tokens: `--row-h` 44 (rows), `--menu-h` 30 / `--menu-h-sheet` 44 (menu items), `--sheet-h` 44 (sheet items), `--btn-h` 36 (`.btn`), `--btn-h-sm` 32 (`.btn.sm`), `--btn-h-row` 28 (`.btn.inrow`, 40px touch target via padding); settings row = `.li` + `.li-end`; row-level add action = `.sec.sec-act` > `.btn.tonal.sm`. Screens use these; no one-off heights.
+
+## 목록 줄 구성 (row anatomy)
+
+The one layout for a row in any list or home card (home cards, 작업내역, projects, monitoring, mail, notices). `hub/row-anatomy-web.test.ts` measures it.
+
+- Left: the leading dot or icon, then the title with its subtitle under it.
+- Right edge: the row's status or time, always last and at the same x on every row of the list. Row actions (✕, ⋯, a chevron) sit after it in a fixed slot every row keeps.
+- Any extra marker (count, badge, attachment, 결과 N) goes immediately before the status or time, never after it.
+- On dense surfaces (home cards, lists) a marker is one line at meta size and colour (`--fs-meta`, `--fg-3`/`--fg-2`); a row with a marker is as tall as one without. Full chips only on a detail screen or after the row is expanded.
+- A card is as tall as its content; it never stretches to its neighbour's height.
+- An embedded block (chart, list, code) uses the app's `--accent` and neutral tokens and the card title size (16/22) for its title.
 
 ## Shape and space
 
