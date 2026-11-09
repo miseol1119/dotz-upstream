@@ -141,6 +141,19 @@ test("the account's plan rides on its usage report and /api/quota: OmO's signed-
 	expect("plan" in buildQuota([{ ...r, plan: undefined }], ["anthropic"]).providers[0]!).toBe(false);
 });
 
+test("the limits text rounds the time left down, in Korean, like the usage screen: 6일 23시간 never 7일", () => {
+	const now = Date.parse("2030-01-01T00:00:00Z");
+	const limits = limitsOf({ five_hour: { utilization: 40, resets_at: "2030-01-01T03:12:30Z" }, seven_day: { utilization: 70, resets_at: "2030-01-07T23:59:30Z" } });
+	const text = limitsText({ provider: "anthropic", account: "a", via: "omo-pinned", limits, fetchedAt: now - 90_000, problem: "failed", retryAt: now + 3_570_000 }, now);
+	expect(text).toContain("6일 23시간 뒤 초기화");
+	expect(text).toContain("3시간 12분 뒤 초기화");
+	expect(text).toContain("59분 뒤 다시 조회");
+	expect(text).toContain("아래는 1분 전 값");
+	expect(text).not.toContain("7일");
+	const done = limitsText({ provider: "anthropic", account: "a", via: "omo-pinned", limits, fetchedAt: now }, Date.parse("2030-01-08T00:00:00Z"));
+	expect(done).toContain("초기화 중");
+});
+
 test("limitsOf skips windows the answer leaves null", () => {
 	expect(limitsOf({ five_hour: { utilization: 12.34, resets_at: null }, seven_day: null }).map(l => [l.id, l.amount.used])).toEqual([["anthropic:5h", 12.3]]);
 });

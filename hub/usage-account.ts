@@ -261,11 +261,15 @@ export class AccountUsage {
 	}
 }
 
+// A length of time rounded down to its two largest units, as the web usage screen shows it (web/js/01-core.js leftText):
+// 6일 23시간 59분 reads 6일 23시간, never 7일; then 3시간 12분, then 59분. Under a minute is "1분 미만".
 const span = (ms: number): string => {
-	const m = Math.max(0, Math.round(ms / 60_000));
+	const m = Math.floor(ms / 60_000);
+	if (m < 1) return "1분 미만";
 	const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
-	return d ? `${d}d${h}h` : h ? `${h}h${mm}m` : `${mm}m`;
+	return d ? `${d}일${h ? ` ${h}시간` : ""}` : h ? `${h}시간${mm ? ` ${mm}분` : ""}` : `${mm}분`;
 };
+const resetIn = (ms: number): string => (ms <= 0 ? "초기화 중" : `${span(ms)} 뒤 초기화`);
 const VIA: Record<AccountReport["via"], string> = { "omo-pinned": "OmO 고정 계정", "omo-sticky": "dotz가 유지하는 계정", "omo-pool": "OmO 계정 풀", omp: "omp 로그인" };
 const PROBLEM: Record<AccountProblem, string> = { expired: "토큰 만료 - OmO가 다음 요청 때 갱신해요", rate_limited: "사용량 조회가 429로 막힘", failed: "사용량 조회 실패" };
 
@@ -274,7 +278,7 @@ const PROBLEM: Record<AccountProblem, string> = { expired: "토큰 만료 - OmO�
 export function limitsText(r: AccountReport, now: number, labelOf: (name: string) => string = n => n): string {
 	const name = labelOf(r.account);
 	const head = [`계정: ${name} (${VIA[r.via]})`, ...(name !== r.account ? [`-# 계정 id: ${r.account}`] : [])].join("\n");
-	const note = r.problem ? `${PROBLEM[r.problem]}${r.retryAt ? ` · ${span(r.retryAt - now)} 뒤 다시 조회` : ""}${r.limits.length && r.fetchedAt ? ` · 아래는 ${span(now - r.fetchedAt)} 전 값` : ""}` : undefined;
-	const lines = r.limits.map(l => `${l.label.padEnd(22)}${l.amount.used.toFixed(1)}% used${l.window.resetsAt ? ` · resets in ${span(l.window.resetsAt - now)}` : ""}`);
+	const note = r.problem ? `${PROBLEM[r.problem]}${r.retryAt ? ` · ${span(r.retryAt - now)} 뒤 다시 조회` : ""}${r.limits.length && r.fetchedAt ? ` · 아래는 ${now - r.fetchedAt < 60_000 ? "방금" : `${span(now - r.fetchedAt)} 전`} 값` : ""}` : undefined;
+	const lines = r.limits.map(l => `${l.label.padEnd(22)}${l.amount.used.toFixed(1)}% used${l.window.resetsAt ? ` · ${resetIn(l.window.resetsAt - now)}` : ""}`);
 	return [head, ...(note ? [note] : []), ...(lines.length ? ["```", ...lines, "```"] : r.problem ? [] : ["(한도 정보 없음)"])].join("\n");
 }
