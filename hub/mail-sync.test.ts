@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { setupEnv } from "../features/reply-drafts/test/helpers.ts";
 import { HUB_TOKEN } from "./config.ts";
-import { deleteMail, mailByKey, mailKey, postMail, type MailDeps } from "./mail.ts";
+import { deleteMail, mailByKey, mailKey, postMail, recordMail, type MailDeps } from "./mail.ts";
 import { applyMailboxFlags, canOf, mailAction, mailActions, MAIL_ACTIONS, type MailAction, type SyncDeps } from "./mail-sync.ts";
 import { makeRoute } from "./routes.ts";
 import { emit } from "./events.ts";
@@ -165,6 +165,17 @@ describe("the routes", () => {
 		expect(st).toEqual({ ok: true, changed: 1 });
 		expect(mailByKey(z)).toBeUndefined();
 		expect((await call("DELETE", `/api/mail/${key}`)).status).toBe(200);
+	});
+
+	test("안 읽음 action on an old mail whose message is no longer in the event log still counts it unread, and 읽음 clears it", async () => {
+		const key = `fx-old${uid("")}`;
+		recordMail({ key, source: "fx", id: key.slice(3), subject: "오래된 메일", from: "Kim <kim@example.com>", to: "me@example.com", at: "2026-10-01T00:00:00.000Z", reply: "needs" });
+		const cardOf = async () => ((await (await call("GET", "/api/conversations")).json()) as { items: Array<{ target: string; unread: number; mail?: Record<string, any> }> }).items.find(i => i.target === `mail:${key}`)!;
+		expect((await cardOf()).mail!.read).toBe(true);
+		expect((await call("POST", `/api/mail/${key}/action`, { action: "unread" })).status).toBe(200);
+		expect(await cardOf()).toMatchObject({ unread: 1, mail: { read: false } });
+		await call("POST", `/api/mail/${key}/action`, { action: "read" });
+		expect(await cardOf()).toMatchObject({ unread: 0, mail: { read: true } });
 	});
 });
 

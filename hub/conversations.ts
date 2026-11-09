@@ -92,6 +92,11 @@ export function unreadOf(target: string): number {
 	const read = [unreadFrom(target), lane?.endedAt].reduce<string | null>((a, b) => (b && (!a || b > a) ? b : a), null);
 	let n = 0;
 	for (const ts of incoming.get(target)?.values() ?? []) if (!read || ts > read) n++;
+	// An old mail whose message is no longer in the log tail has nothing to count; 안 읽음 on it (hub/reads.ts markUnread) put the owner's own position before it, and that counts it once.
+	if (!n && target.startsWith("mail:") && !incoming.get(target)?.size) {
+		const own = readOf(target), m = mailByKey(target.slice(5));
+		if (own && m && m.dir !== "out" && m.at > own) n = 1;
+	}
 	return n;
 }
 
