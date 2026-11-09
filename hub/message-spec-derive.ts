@@ -257,6 +257,17 @@ function rowsOf(code: string): SpecElement {
 	return mk("Rows", { ...(title ? { title } : {}), rows });
 }
 
+// A fence tagged chart holds a ztd-charts JSON spec, drawn by the gateway (hub/chart.ts). Text that is not a JSON object stays a json code block with a short note.
+const CHART_NOTE = "차트 형식이 맞지 않아 JSON으로 보여 드려요";
+function chartOf(code: string): SpecElement[] {
+	const spec = code.trim();
+	let json: unknown;
+	try { json = JSON.parse(spec); } catch { json = null; }
+	if (!json || typeof json !== "object" || Array.isArray(json)) return [mk("Code", { code: spec, lang: "json" }), mk("Meta", { text: CHART_NOTE })];
+	const title = (json as { card?: { title?: unknown } }).card?.title;
+	return [mk("Chart", { spec, ...(typeof title === "string" && title.trim() ? { title } : {}) })];
+}
+
 // relayed: another computer's text (42-relay-chat.js) keeps `[file]` lines as text and draws every fence as a plain code block.
 const FENCE_SPLIT = /(?:^|\n)[ \t]{0,3}```([^\n`]*)\n?([\s\S]*?)(?:```[ \t]*(?=\n|$)|$)/;
 function parse(source: string, shape: boolean, relayed: boolean, bot: string): SpecElement[] | null {
@@ -268,6 +279,7 @@ function parse(source: string, shape: boolean, relayed: boolean, bot: string): S
 		if (i + 2 >= parts.length) break;
 		const lang = parts[i + 1]!, code = parts[i + 2]!;
 		if (!relayed && lang.trim() === "목록") out.push(rowsOf(code));
+		else if (!relayed && lang.trim() === "chart" && code.trim()) out.push(...chartOf(code));
 		else out.push(mk("Code", { code: code.replace(/\n$/, ""), ...(!relayed && lang ? { lang } : {}) }));
 	}
 	return out;
@@ -281,7 +293,7 @@ export function deriveSpec(text: string, bot = ""): MessageSpec | null {
 	try {
 		if (typeof text !== "string" || !text.trim()) return null;
 		const els = parse(text, true, false, bot);
-		if (!els || els.every(e => PLAIN_TYPES.has(e.type))) return null;
+		if (!els || els.every(e => PLAIN_TYPES.has(e.type) && e.props.text !== CHART_NOTE)) return null;
 		const spec = specOfElements(els);
 		return validateSpec(spec).ok ? spec : null;
 	} catch {

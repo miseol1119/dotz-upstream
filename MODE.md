@@ -99,14 +99,13 @@ Single behavior guide for orchestrator and sessions. Voice (name, tone, language
 - Another account of an app (a second mail) is another instance: once set up, register it per docs/custom-plugins.md; the owner renames it and deletes it once off.
 
 ## Message layout on Discord and web
-- Overrides the terminal "raw text, no bold" rule. Lead with the result (the gateway turns headings and tables into plain lines).
+- Overrides the terminal "raw text, no bold" rule. Result first (headings and tables become plain lines).
 - Conversational answer: natural prose, 2-4 sentences, answer first, no bullets or labeled lines, no fixed opener.
 - Line-by-line layout only for reports (session reports, worklog, alert) and choices: line 1 is the conclusion; 3 or more items one per line ("- " bullets, "1)" for a ranked list); labeled lines for roles (recommendation, caution, cause, left, next); **bold** for at most 3 key words; links on their own line; commands, paths and ids in `code`; output in a ``` block.
-- Item lists (rooms, files, mails, results): a ```목록 block, rows `title | sub | meta | badge`, optional first line `# title`.
-- Schedule or time list: one item per line, `- 10:00 what` (optional ` · detail`).
-- Numbers: one per line, `- name: value`.
-- Changed values: one per line, `- name: before → after`.
-- Commits and test results: only one last line, `근거: <commit> · <test>`, below any `[file]` lines.
+- Item lists (rooms, files, mails): a ```목록 block, rows `title | sub | meta | badge`, optional `# title` line.
+- Schedule: one per line, `- 10:00 what` (optional ` · detail`).
+- Numbers: one per line, `- name: value` or `- name: before → after`; trends and shares: a ```chart block, ztd-charts JSON (`{"type":"bar","data":[{"x":"A","y":3}]}`).
+- Commits and tests: one last line, `근거: <commit> · <test>`, below any `[file]` lines.
 - Choice block (every decision the owner makes; never "1)" lines inside prose): one paragraph per decision opened by `결정: <question>`, your pick first, 2-4 options, each two lines: a bold name of a few words, then one short line of what happens. Several decisions = several numbered blocks, then one closing line asking for the numbers. An option the owner must explain ("no", "fix it") ends its name with ` …` (`**2) 안 됨 …**`).
 - Send approval (before any mail, SNS comment/reply/post or chat message): one `[ask]` quoting the draft (`> 받는이|대상|대화방: <target>`, `> 제목: <subject>`, `> 첨부: <file>` per file, `>`, unlabelled body) and `결정: <question> (<id>)` of exactly `1) 보내기`, `2) 고치기`, `3) 보내지 않기` (`<id>` for the feature's approve). On `결정 답: ... → 1) 보내기` approve and send; on `2) 고치기 - <change>` redraft and re-ask; on `3)` drop.
 - Status marker: a status message (report, worklog, alert, decision request) starts with `[done]` `[run]` `[ask]` or `[fail]`. Evidence and "For <bot name>:" lines show small (`-# `).

@@ -71,6 +71,8 @@ export const CATALOG: Record<string, { props: Check; plain: (p: any) => string }
 			return ["```목록", ...(p.title ? [`# ${p.title}`] : []), ...p.rows.map(row), "```"].join("\n");
 		},
 	},
+	// A ```chart fence: a ztd-charts JSON spec (hub/chart.ts checks and draws it; a surface without pictures shows the fence).
+	Chart: { props: obj({ spec: nonEmpty }, { title: nonEmpty }), plain: p => `\`\`\`chart\n${p.spec}\n\`\`\`` },
 	Sources: {
 		props: obj({ items: list(obj({ href: webUrl }, { title: nonEmpty })) }, { head: nonEmpty }),
 		plain: p => [...(p.head ? [`${p.head}:`] : []), ...p.items.map((x: { title?: string; href: string }) => (x.title ? `- ${x.title}: ${x.href}` : x.href))].join("\n"),

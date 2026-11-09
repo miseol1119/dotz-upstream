@@ -19,6 +19,7 @@ Paths only; each file's header comment says what it does. Tests sit next to thei
 - orchestrator: `hub/orchestrator.ts` (start prompt, handover and status record `hub/orchestrator-parts.ts`), `hub/context.ts`, `hub/fallback.ts`, `hub/rate-alert.ts`, `hub/outlang.ts`, `hub/tone.ts`
 - text: `hub/i18n.ts` (+ catalogs `hub/i18n-en.ts`, `hub/i18n-ko.ts`), `hub/language.ts`, `hub/prompt-budget.ts`
 - message shapes: `hub/message-spec.ts` (the fixed component catalog and its validator), `hub/message-spec-derive.ts` (text to spec: the one reader of an answer's shapes, and the dotz-spec fence), `hub/gen-message-spec-web.ts` (writes `web/js/01-message-spec.js`, the page's copy of both; `web/js/02-answer-shapes.js` draws the spec)
+- in-message charts: `hub/chart.ts` (a ```chart fence of ztd-charts JSON checked and drawn on demand: SVG in both themes for the web via `POST /api/chart`, a PNG attachment for Discord; ztd-charts and resvg load lazily, never on the start path; drawings cached under `<data dir>/charts`), drawn on the page by `web/js/02-chart.js`.
 
 ## Lanes (sessions)
 

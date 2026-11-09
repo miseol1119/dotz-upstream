@@ -44,6 +44,11 @@ dialog.dlg.shell .dact { display: none; }
 }
 
 /* a 목록 fence (02-basic-markdown.js listBlockHtml): list rows like a messenger's chat list */
+/* a ```chart fence (web/js/02-chart.js): the gateway's drawing in the app's theme, one <img> per theme */
+.md .ans-chart { margin: var(--sp-3) 0 var(--sp-4); min-height: var(--sp-12); }
+.md .ans-chart img { display: block; width: 100%; max-width: 720px; height: auto; }
+.md .ans-chart .ans-chart-dark, :root[data-theme="dark"] .md .ans-chart .ans-chart-light { display: none; }
+:root[data-theme="dark"] .md .ans-chart .ans-chart-dark { display: block; }
 .md .mlist { margin: var(--sp-3) 0 var(--sp-4); border: 1px solid var(--line-2); border-radius: 12px; background: var(--card); overflow: hidden; }
 .md .mlist-h { padding: var(--sp-3) var(--sp-4) var(--sp-15); color: var(--fg-3); font: 600 13px/18px var(--font); }
 .md .mlist-row { display: flex; align-items: center; gap: var(--sp-3); min-height: 48px; padding: var(--row-py) var(--sp-4); }

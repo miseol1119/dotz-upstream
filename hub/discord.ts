@@ -15,7 +15,7 @@ import { threadForReply, threadTitle } from "./threads.ts";
 import { type Body, buildPayloads, buildSingle, mentionsOff, noEmoji, reference } from "./discord-format.ts";
 
 export { buildPayloads, buildSingle, chunks, noEmoji, readable } from "./discord-format.ts";
-import { attach, type Attach, fileLines, linkLine, planFiles, withNotes } from "./discord-files.ts";
+import { attach, type Attach, chartFiles, fileLines, linkLine, planFiles, withNotes } from "./discord-files.ts";
 export { attach, fileLines, setFileLink, setFileResolver } from "./discord-files.ts";
 
 // An answer longer than this goes out as a few messages cut at paragraph breaks: a wall of text reads badly on a phone.
@@ -595,7 +595,7 @@ export async function send(
 	if (!id) return { delivered: false, reason: `unknown target ${target}` };
 	const ids: string[] = [];
 	sentAt.set(target, Date.now());
-	const { text: bare, files: paths } = fileLines(text);
+	const { text: bare, files: paths } = await chartFiles(fileLines(text));
 	const bodies = buildPayloads(bare, replyTo, SOFT_LIMIT, opts?.ping && OWNER && !pushReachesOwner() ? OWNER : undefined);
 	if (paths.length && !bodies.length) bodies.push({ content: "", allowed_mentions: mentionsOff, ...reference(replyTo) });
 	// The files go with the last part, planned only when that part is still to be sent (a retry may have sent it already).

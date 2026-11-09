@@ -63,6 +63,9 @@ const CATALOG = {
 `);
     }
   },
+  Chart: { props: obj({ spec: nonEmpty }, { title: nonEmpty }), plain: (p) => `\`\`\`chart
+${p.spec}
+\`\`\`` },
   Sources: {
     props: obj({ items: list(obj({ href: webUrl }, { title: nonEmpty })) }, { head: nonEmpty }),
     plain: (p) => [...p.head ? [`${p.head}:`] : [], ...p.items.map((x) => x.title ? `- ${x.title}: ${x.href}` : x.href)].join(`
@@ -456,6 +459,20 @@ function rowsOf(code) {
   });
   return mk("Rows", { ...title ? { title } : {}, rows });
 }
+const CHART_NOTE = "차트 형식이 맞지 않아 JSON으로 보여 드려요";
+function chartOf(code) {
+  const spec = code.trim();
+  let json;
+  try {
+    json = JSON.parse(spec);
+  } catch {
+    json = null;
+  }
+  if (!json || typeof json !== "object" || Array.isArray(json))
+    return [mk("Code", { code: spec, lang: "json" }), mk("Meta", { text: CHART_NOTE })];
+  const title = json.card?.title;
+  return [mk("Chart", { spec, ...typeof title === "string" && title.trim() ? { title } : {} })];
+}
 const FENCE_SPLIT = /(?:^|\n)[ \t]{0,3}```([^\n`]*)\n?([\s\S]*?)(?:```[ \t]*(?=\n|$)|$)/;
 function parse(source, shape, relayed, bot) {
   const text = source.replace(REC_MARK, "$1");
@@ -469,6 +486,8 @@ function parse(source, shape, relayed, bot) {
     const lang = parts[i + 1], code = parts[i + 2];
     if (!relayed && lang.trim() === "목록")
       out.push(rowsOf(code));
+    else if (!relayed && lang.trim() === "chart" && code.trim())
+      out.push(...chartOf(code));
     else
       out.push(mk("Code", { code: code.replace(/\n$/, ""), ...!relayed && lang ? { lang } : {} }));
   }
@@ -480,7 +499,7 @@ function deriveSpec(text, bot = "") {
     if (typeof text !== "string" || !text.trim())
       return null;
     const els = parse(text, true, false, bot);
-    if (!els || els.every((e) => PLAIN_TYPES.has(e.type)))
+    if (!els || els.every((e) => PLAIN_TYPES.has(e.type) && e.props.text !== CHART_NOTE))
       return null;
     const spec = specOfElements(els);
     return validateSpec(spec).ok ? spec : null;

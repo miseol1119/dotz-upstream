@@ -48,11 +48,14 @@
 | `Section` | 묶음 보고의 한 부분 | `**제목**` 아래 라벨 줄 |
 | `Table` | 표 | 마크다운 표 |
 | `Rows` | 항목 목록 | ` ```목록 ` 블록 |
+| `Chart` | 그림으로 보면 쉬운 숫자 | ` ```chart ` 블록 (ztd-charts JSON) |
 | `Sources` | 출처 링크 | `- 이름: URL` |
 | `Quote`, `Meta`, `Evidence` | 인용, 작은 줄, 근거 | `> `, `-# `, `근거: a · b` |
 | `Code`, `Rule` | 코드 블록, 구분선 | 펜스, `---` |
 | `Choice` | 선택지 표시 | `결정:` 블록 |
 | `Files` | 첨부 | `[file] 경로` |
+
+` ```chart ` 블록은 [ztd-charts](https://github.com/Junhan2/ztd-charts) 스펙이에요. 글에서 읽을 때는 JSON 객체인지만 보고, 게이트웨이(`hub/chart.ts`)가 ztd 검증기로 확인한 뒤 웹에는 앱 테마(밝게/어둡게)에 맞는 SVG를, Discord에는 PNG 첨부를 보내요. 데이터는 블록 안에 있어야 하고(`data.url`은 받지 않아요), 검증을 못 넘으면 그림 대신 JSON 코드 블록과 짧은 안내 한 줄이 보여요. 차트 모듈은 처음 그릴 때만 불러와서 게이트웨이 시작 시간과 메모리는 그대로예요. 그림은 `<data dir>/charts`에 해시로 저장하고 30MB를 넘으면 오래된 것부터 지워요.
 
 ## 지키는 것
 

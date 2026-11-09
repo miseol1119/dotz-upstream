@@ -2,6 +2,8 @@
 // discord.ts unchanged; discord.ts re-exports the public functions. No Discord I/O here.
 import { statSync } from "node:fs";
 import { basename } from "node:path";
+import { isChartFile } from "./chart.ts";
+export { chartFiles } from "./chart.ts";
 import { cfg } from "./config.ts";
 import type { Body } from "./discord-format.ts";
 
@@ -49,7 +51,7 @@ export function planFiles(paths: string[]): { files: Attach[]; notes: string[] }
 	for (const input of paths) {
 		let f: Attach;
 		try {
-			const path = resolveFile(input);
+			const path = isChartFile(input) ? input : resolveFile(input);
 			f = { path, name: basename(path), size: statSync(path).size };
 		} catch (error) {
 			notes.push(`-# ${basename(input)}: ${(error as Error).message}`);

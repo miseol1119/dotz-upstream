@@ -94,6 +94,7 @@ import { kakaoRoute } from "./kakao/gateway.ts";
 import { defaultOnboardDeps, onboardingService, setOnboardDeps } from "./onboarding.ts";
 import { saveWebAccessInput } from "./onboarding-web-access.ts";
 import { createSetupGate } from "../firstrun/setup-gate.ts";
+import { chartRoute } from "./chart.ts";
 
 const BOOT_ID = Date.now().toString(36);
 setAppName(NAME);
@@ -547,6 +548,7 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 			}
 		}
 		if (url.pathname === "/api/health") return json({ ok: true });
+		if (req.method === "POST" && url.pathname === "/api/chart") return chartRoute(req);
 		if (url.pathname === "/api/peers" && (req.method === "GET" || req.method === "DELETE")) return req.method === "GET" ? json([...(await listPeers()), ...(await relayRows())]) : forgetRoute(url);
 		// Send lease of another gateway (hub/send-lease.ts): claim, release or record a sent id before an app message goes out.
 		if (req.method === "POST" && url.pathname === "/api/peer/lease") return json(handleLease((await body(req)) as LeaseReq, Date.now()));

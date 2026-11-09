@@ -67,6 +67,7 @@ const SPEC_HTML = {
   Section: p => `<div class="rc-sh"><span>${inline(p.title)}</span></div>${p.rows.map(r => `<div class="rc-row ans-li"><span class="rc-k">${inline(r.key)}</span>${r.count ? `<span class="ans-n">${esc(r.count)}</span>` : ""}<span class="rc-w">${specValue(r)}</span></div>`).join("")}`,
   Table: specTableHtml,
   Rows: specRowsHtml,
+  Chart: (p, c) => c.relayed ? `<pre><code>${esc(p.spec)}</code></pre>` : `<figure class="ans-chart" data-chart="${esc(p.spec)}" aria-label="${esc(p.title || "차트")}"></figure>`,
   Sources: p => sourceListHtml({ head: p.head, items: p.items }),
   Quote: p => `<blockquote>${p.lines.map(inline).join("<br>")}</blockquote>`,
   Meta: p => `<p class="meta">${inline(p.text)}</p>`,
