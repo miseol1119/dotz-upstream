@@ -1,7 +1,7 @@
 /* ---------- 분할 창: the screen (docs/split-panes.md) ----------
    #split sits in #views from the second pane on, on a wide screen only: [list column][tree of panes]. The active pane holds the real #v-chat / #v-project
    (go() finds the sections by id), the list column holds convSide / #v-projects. Back to one pane or a narrow window: every node goes where it was and #split goes. */
-let PNV = { el: null, side: null, tree: null, sig: "", order: null };
+let PNV = { el: null, side: null, tree: null, sig: "", order: null, list: "chat" };
 
 function paneRoot() {
   if (PNV.el) return PNV.el;
@@ -79,8 +79,9 @@ function paneDraw() {
   paneRelease();
   const kind = paneFind(PN.active).kind, sec = $(kind === "project" ? "#v-project" : kind === "view" ? `#v-${current}` : "#v-chat");
   sec.classList.add("in-pane");
-  PNV.side.replaceChildren(...(kind === "project" ? [$("#v-projects")] : kind === "chat" ? [convSide] : []));
-  PNV.el.classList.toggle("no-side", kind === "view");
+  // A screen keeps the list that was there, so focusing it does not move every pane sideways.
+  if (kind !== "view") PNV.list = kind;
+  PNV.side.replaceChildren(PNV.list === "project" ? $("#v-projects") : convSide);
   PNV.tree.replaceChildren(paneNode(PN.root, sec));
   paneMirrorsPlace();
   if (chat) paneLand(at, stick);

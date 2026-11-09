@@ -26,10 +26,7 @@
 #split #v-chat.in-pane > * { grid-column: 1; }
 #split #cv-head { padding-right: calc(var(--sp-8) + var(--sp-4)); }
 #split #v-project.in-pane { flex: 1; min-height: 0; max-width: none; margin: 0; padding: var(--sp-4); overflow-y: auto; }
-/* a screen in a pane (home, 모니터링, 설정 ...): no list column, the screen scrolls inside its card */
-#split.no-side { grid-template-columns: minmax(0, 1fr); }
-#split.no-side > .pane-side { display: none; }
-#split.no-side > .pane-tree { grid-column: 1; }
+/* a screen in a pane (home, 모니터링, 설정 ...) scrolls inside its card */
 #split .view.in-pane:not(#v-chat):not(#v-project) { flex: 1; min-height: 0; height: auto; max-width: none; margin: 0; padding: var(--sp-4); overflow-y: auto; }
 
 .pane-mir { flex: 1; display: flex; flex-direction: column; min-height: 0; }

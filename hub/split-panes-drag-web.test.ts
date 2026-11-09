@@ -105,10 +105,10 @@ test("tabs of the menu drop as panes (채팅 = the main conversation, 홈 = the 
 	expect(await ids(v)).toEqual(["lane:가나", "main"]);
 
 	await drag(v, `#nav .ni[data-view="home"]`, PANE("main"), 0.5, 0.97);
-	await waitFor(v, `paneCount() === 3 && current === "home" && !!$("#split.no-side .pane.on > .pane-hd")`);
+	await waitFor(v, `paneCount() === 3 && current === "home" && !!$("#split .pane.on > .pane-hd") && $("#split .pane-side").contains(convSide)`);
 	expect(await ev(v, `[paneList().map(p => p.kind + ":" + p.t), $("#split .pane.on > .pane-hd .cv-hd-t").textContent, $("#split .pane.on #home-cards") !== null]`)).toEqual([["chat:lane:가나", "chat:main", "view:home"], "홈", true]);
 	await run(v, `paneFocus(paneList()[0].id)`);
-	await waitFor(v, `current === "chat" && !$("#split").classList.contains("no-side") && $("#v-home").parentNode === $("#views")`);
+	await waitFor(v, `current === "chat" && $("#v-home").parentNode === $("#views") && !!$("#split .pane[data-kind='view'] .pane-mir")`);
 });
 
 test("with four panes an edge is no split: the ghost says the drop replaces the pane", async () => {
