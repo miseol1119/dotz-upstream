@@ -92,8 +92,11 @@ function decisionGroup(t) {
   if (dcGone(t)) return null;
   const open = NT.items.filter(n => ntOpenDec(n) && !n.pc && !n.decision.draft && !n.decision.assumed && n.decision.options.length && n.decision.to === t && n.decision.reply_to);
   if (!open.length) return null;
-  const at = open.map(n => n.decision.reply_to).sort().pop(), mine = open.filter(n => n.decision.reply_to === at);
-  return { key: `${t}|g:${at}`, t, sig: `g:${at}`, at, each: true, lone: mine.every(n => n.decision.group === 1), question: mine.length === 1 ? ntPlain(mine[0].title) : "", blocks: mine.map(n => ({ title: ntPlain(n.title), options: n.decision.options, nd: n })) };
+  const at = open.map(n => n.decision.reply_to).sort().pop(), mine = open.filter(n => n.decision.reply_to === at), lone = mine.every(n => n.decision.group === 1);
+  // A lone question keeps the key its message gave it (decisionOne): a later message hands the card over to here, and the reason being typed
+  // (DC.edit/note, per key) stays, so its field is not rebuilt and the phone keyboard does not go down.
+  const m = lone && ts(t).msgs.find(e => e.ts === at && !e.update_key);
+  return { key: m ? `${t}|${hashOf(parseTone(noHandoff(String(m.text ?? ""))).text.trim())}` : `${t}|g:${at}`, t, sig: `g:${at}`, at, each: true, lone, question: mine.length === 1 ? ntPlain(mine[0].title) : "", blocks: mine.map(n => ({ title: ntPlain(n.title), options: n.decision.options, nd: n })) };
 }
 function decisionOf(t) {
   if (isRelayT(t)) return null;   // another computer's text never becomes a card to answer here

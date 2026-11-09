@@ -169,6 +169,22 @@ describe("typing on the phone composer while the page updates", () => {
 		expect(JSON.parse(await view.evaluate(`JSON.stringify({ same: document.activeElement === window.__ta, value: ta.value })`) as string)).toEqual({ same: true, value: "안녕" });
 	}, 30_000);
 
+	// A plain message after a question hands its card from the message (decisionOne) to the question's open notice (decisionGroup). The reason
+	// being typed in the docked card stays: on Android Chrome the field was rebuilt and the keyboard went down for good.
+	test("the reason typed in the docked card keeps its field when a later message hands the question to its notice", async () => {
+		const at = now();
+		send({ kind: "out", target: "main", source: "orchestrator", text: "[ask] 버튼을 확인해 주세요\n결정: 버튼을 확인해 주세요\n1) 확인됨\n2) 안 됨", ts: at });
+		send({ kind: "notice", item: { id: 9301, kind: "decision", title: "버튼을 확인해 주세요", text: "버튼을 확인해 주세요", ts: at, decision: { state: "open", to: "main", reply_to: at, group: 1, options: [{ n: 1, label: "확인됨" }, { n: 2, label: "안 됨" }] } } });
+		await waitFor(`ntById(9301) && DC.cur && DC.cur.question.includes("버튼을")`);
+		await view.evaluate(`(() => { document.activeElement.blur(); pickOption(DC.cur, 0, DC.cur.blocks[0].options.find(o => o.n === 2)); })()`);
+		await waitFor(`document.activeElement && document.activeElement.matches("#dcard .dc-note")`);
+		await view.type("버튼이 안 보여");
+		await markNote();
+		send({ kind: "out", target: "main", source: "gateway", text: "다른 일도 끝났어요", ts: now() });
+		await waitFor(`ts("main").msgs.some(m => m.text === "다른 일도 끝났어요") && !decisionOne("main") && DC.cur && DC.cur.each`);
+		expect(await note()).toEqual({ same: true, conn: true, value: "버튼이 안 보여" });
+	}, 30_000);
+
 	test("the app height follows the same viewport the layout uses, so a lagging window.innerHeight cannot shrink the page twice", async () => {
 		await view.resize(390, 544);   // the keyboard has already resized the page (resizes-content)
 		await view.evaluate(`Object.defineProperty(window, "innerHeight", { configurable: true, get: () => 844 }), 0`);   // a frame where innerHeight lags
