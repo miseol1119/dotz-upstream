@@ -54,4 +54,5 @@ body.pn-drag.pn-no, body.pn-drag.pn-no * { cursor: not-allowed !important; }
 .pn-ghost > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pn-gh { color: var(--fg-3); font: 400 var(--fs-meta)/var(--lh-meta) var(--font); }
 .pn-ghost.no > .pn-gt { color: var(--fg-3); }
-.pn-zone { position: fixed; z-index: 2099; border-radius: var(--r-card); background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: var(--ff-ring); pointer-events: none; }
+/* the zone glides from edge to edge and pane to pane like the board's placeholder (05-log.css .bph); 01-tokens.css turns it off with reduced motion */
+.pn-zone { position: fixed; z-index: 2099; border-radius: var(--r-card); background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: var(--ff-ring); pointer-events: none; transition: left var(--m-fast) var(--m-ease), top var(--m-fast) var(--m-ease), width var(--m-fast) var(--m-ease), height var(--m-fast) var(--m-ease); }

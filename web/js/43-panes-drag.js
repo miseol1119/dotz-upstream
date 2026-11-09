@@ -104,8 +104,8 @@ function paneDragMove(ev) {
   }
   ev.preventDefault();
   getSelection().removeAllRanges();
-  const gw = PD.ghost.offsetWidth, flip = ev.clientX + 12 + gw > innerWidth;
-  Object.assign(PD.ghost.style, { left: `${flip ? ev.clientX - 12 - gw : ev.clientX + 12}px`, top: `${ev.clientY + 12}px` });
+  const gw = PD.ghost.offsetWidth, gh = PD.ghost.offsetHeight, flip = ev.clientX + 12 + gw > innerWidth, up = ev.clientY + 12 + gh > innerHeight;
+  Object.assign(PD.ghost.style, { left: `${flip ? ev.clientX - 12 - gw : ev.clientX + 12}px`, top: `${up ? ev.clientY - 12 - gh : ev.clientY + 12}px` });
   paneDragAim(ev.clientX, ev.clientY);
 }
 // back: the drag ends without a drop, so the ghost goes back to where it was picked up.
@@ -126,10 +126,9 @@ function paneDragEnd(back) {
 function paneDragUp(ev) {
   if (!PD) return;
   if (PD.on && !PD.dead) paneDragAim(ev.clientX, ev.clientY);
-  const { src, hit, on, dead } = PD, zone = PD.zone && PD.zone.getBoundingClientRect();
-  const drop = on && !dead && hit;
+  const { src, hit, on, dead } = PD, drop = on && !dead && hit;
   paneDragEnd(!drop);
-  if (drop) paneDropMoving(src, hit, zone);
+  if (drop) paneDropMoving(src, hit);
 }
 // Escape drops the drag but keeps listening until the button is up, so the click that follows is still swallowed.
 function paneDragKey(ev) {

@@ -380,11 +380,11 @@ describe("web/DESIGN.md rules", () => {
 	});
 
 	test("only transform and opacity move in a transition", () => {
-		// docs/ui-spec.md Motion: transform and opacity only. A progress bar grows in width; the board cards and the original-draft panel are placed by script or by layout, so they move their box.
+		// docs/ui-spec.md Motion: transform and opacity only. A progress bar grows in width; the board cards, the split panes' drop zone and the original-draft panel are placed by script or by layout, so they move their box.
 		const BOX = ["left", "top", "width", "height"];
 		const EXCEPT: Record<string, string[]> = {
 			".bar i": ["width"], ".tr-bar > span": ["width"],
-			".bi": [...BOX, "box-shadow"], ".bi.bdrag": ["box-shadow"], ".board.narrow .bi": ["box-shadow"], ".board.narrow .bi.bdrag": ["box-shadow"], ".bph": BOX,
+			".bi": [...BOX, "box-shadow"], ".bi.bdrag": ["box-shadow"], ".board.narrow .bi": ["box-shadow"], ".board.narrow .bi.bdrag": ["box-shadow"], ".bph": BOX, ".pn-zone": BOX,
 			".fs-card.tall.od-host": ["width"], ".od-cwrap .od-orig": ["flex-basis", "margin"],
 		};
 		const found: string[] = [];

@@ -77,6 +77,8 @@ Quiet screen: nothing moves without a cause, nothing loops or decorates. Causes 
 - the same thing changes state in place (보내기 -> 보냈어요, a task finishing): `motionSwap(el, change)`
 - something leaves (sheet, dismissed row): `await motionOut(el)`, then remove it
 - a count changes: `rollCount(el, n)` rolls only the changed digit
+- a split pane is dragged (`web/js/43-panes-motion.js`): the ghost lifts in (`--m-fast`), the drop zone glides (`--m-fast`, a script-placed box like the board's `.bph`),
+  a new pane grows its flex share from 0 (`--m-base`, its text reflows, nothing is stretched), a replaced pane is `motionSwap`, a cancel sends the ghost back (`--m-base`)
 
 `prefers-reduced-motion: reduce` turns every transition and animation off (pseudo-elements included) and makes each helper an
 instant change. The product has no motion on/off setting: the system setting is the only switch.
