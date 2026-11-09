@@ -88,34 +88,32 @@ test("a full set takes no fifth pane: an edge drop is a middle drop", async () =
 	expect(await ev(v, `paneCount()`)).toBe(4);
 });
 
-test("tabs of the menu drop as panes (채팅 = the main conversation, 홈 = the home screen with a head); a row a pane cannot hold says so and draws no zone", async () => {
+test("a menu tab is only pressed, never dragged; `앱 관리` says a pane cannot hold it; the 모니터링 screen is an app pane with a head", async () => {
 	const v = await open();
 	await run(v, `go("chat", "lane:가나")`);
 	await waitFor(v, `target === "lane:가나" && CV.placed`);
-	// a KakaoTalk room row (30-kakao.js kk-row): no conversation of dotz behind it. On the body, where no list repaint takes it away.
-	await run(v, `document.body.append(el("button", { class: "cv-row pv kk-row", type: "button", "data-chat": "r1", id: "kk-test", style: "position: fixed; left: 300px; top: 300px; width: 200px" }, el("span", { class: "cv-b" }, el("span", { class: "cv-n", text: "가족방" }))))`);
-	await drag(v, "#kk-test", ONE, 0.95, 0.5, false);
+	await drag(v, `#nav .ni[data-view="home"]`, ONE, 0.95, 0.5, false);
+	expect(await ev(v, `[!!PD, !!document.querySelector(".pn-ghost, .pn-zone"), current]`)).toEqual([false, false, "chat"]);
+	await run(v, `document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, button: 0 }))`);
+
+	// 앱 관리 (30-monitoring.js monRows add-app) opens a sheet. On the body, where no list repaint takes it away.
+	await run(v, `document.body.append(el("button", { class: "cv-row pv", type: "button", "data-k": "add-app", id: "add-test", style: "position: fixed; left: 300px; top: 300px; width: 200px" }, el("span", { class: "cv-b" }, el("span", { class: "cv-n", text: "앱 관리" }))))`);
+	await drag(v, "#add-test", ONE, 0.95, 0.5, false);
 	await waitFor(v, `!!document.querySelector(".pn-ghost.no")`);
-	expect(await ev(v, `[$(".pn-ghost .pn-gt").textContent, $(".pn-ghost .pn-gh").textContent, !!document.querySelector(".pn-zone"), document.body.classList.contains("pn-no")]`)).toEqual(["가족방", "칸에 넣을 수 없어요", false, true]);
-	await run(v, `document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, button: 0 })); $("#kk-test").remove()`);
+	expect(await ev(v, `[$(".pn-ghost .pn-gt").textContent, $(".pn-ghost .pn-gh").textContent, !!document.querySelector(".pn-zone"), document.body.classList.contains("pn-no")]`)).toEqual(["앱 관리", "칸에 넣을 수 없어요", false, true]);
+	await run(v, `document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, button: 0 })); $("#add-test").remove()`);
 	await waitFor(v, `!document.querySelector(".pn-ghost")`);
 	expect(await ev(v, `[paneCount(), current]`)).toEqual([0, "chat"]);
 
-	await drag(v, `#nav .ni[data-view="chat"]`, ONE, 0.95, 0.5, false);
-	await waitFor(v, `PD && PD.hit && PD.hit.side === "right"`);
-	expect(await ev(v, `$(".pn-ghost .pn-gh").textContent`)).toBe("오른쪽에 새 칸");
-	await run(v, `{ const r = PD.hit.r; document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.right - 4, clientY: r.top + r.height / 2, pointerId: 1, button: 0 })); }`);
-	await waitFor(v, `paneCount() === 2 && document.querySelectorAll("#split .pane").length === 2 && CV.placed`);
-	expect(await ids(v)).toEqual(["lane:가나", "main"]);
-	await waitFor(v, SETTLED);
-
-	await drag(v, `#nav .ni[data-view="home"]`, PANE("main"), 0.5, 0.97);
-	await waitFor(v, `paneCount() === 3 && current === "home" && !!$("#split .pane.on > .pane-hd") && $("#split .pane-side").contains(convSide)`);
-	expect(await ev(v, `[paneList().map(p => p.kind + ":" + p.t), $("#split .pane.on > .pane-hd .cv-hd-t").textContent, $("#split .pane.on #home-cards") !== null]`)).toEqual([["chat:lane:가나", "chat:main", "view:home"], "홈", true]);
+	await split(v, "main");
+	await run(v, `paneSplit("list", "app", "bottom")`);
+	await waitFor(v, `paneCount() === 3 && current === "monitoring" && !!$("#split .pane.on > .pane-hd") && $("#split .pane.on").contains($("#v-monitoring")) && $("#split .pane-side").contains(convSide)`);
+	expect(await ev(v, `[paneList().map(p => p.kind + ":" + p.t), $("#split .pane.on > .pane-hd .cv-hd-t").textContent]`)).toEqual([["chat:lane:가나", "chat:main", "app:list"], "모니터링"]);
 	await run(v, `paneFocus(paneList()[0].id)`);
-	await waitFor(v, `current === "chat" && $("#v-home").parentNode === $("#views") && !!$("#split .pane[data-kind='view'] .pane-mir")`);
+	await waitFor(v, `current === "chat" && $("#v-monitoring").parentNode === $("#views") && !!$("#split .pane[data-kind='app'] .pane-mir")`);
+	await run(v, `go("monitoring")`);
+	await waitFor(v, `current === "monitoring" && paneList().find(p => p.active).kind === "app"`);
 });
-
 test("a drop opens the new pane by growing it from nothing and a cancel sends the ghost back; with reduced motion both are instant", async () => {
 	const v = await open();
 	await split(v, "lane:가나");

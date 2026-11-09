@@ -16,7 +16,7 @@ function paneRoot() {
 function paneSync() {
   if (!PNV.el && paneCount() < 2) return;
   if (paneCount() < 2 || narrowChat()) { paneTeardown(); return; }
-  const show = current === "chat" || current === "project" || paneViewIn();
+  const show = current === "chat" || current === "project" || paneAppIn();
   if (show) paneAdopt();
   paneRoot().hidden = !show;
   if (!show) return;
@@ -27,27 +27,27 @@ function paneSync() {
 }
 // The active screen's head follows the screen without a redraw (a 모니터링 item opened inside it).
 function paneHeadSync() {
-  const a = paneFind(PN.active), n = a.kind === "view" && PNV.el.querySelector(".pane.on > .pane-hd .cv-hd-t"), name = n && paneName(a);
+  const a = paneFind(PN.active), n = a.kind === "app" && PNV.el.querySelector(".pane.on > .pane-hd .cv-hd-t"), name = n && paneName(a);
   if (n && n.lastChild.textContent !== name) { n.lastChild.textContent = name; n.title = name; }
 }
 matchMedia("(max-width: 1099px)").addEventListener("change", paneSync);
 
-// A screen that is neither a conversation nor a project is in the split only while a pane holds screens: the active pane, or one showing this screen.
-// Otherwise (the active pane is a conversation and 홈 is pressed) the screen takes the whole page as before and the panes wait.
-const paneViewOf = name => paneLeaves().find(p => p.kind === "view" && paneViewName(p.t) === name) || null;
-const paneViewIn = () => PANE_VIEWS.has(current) && (paneFind(PN.active).kind === "view" || !!paneViewOf(current));
+// 모니터링 is in the split only while a pane holds it (the active one or another); otherwise it takes the whole page as before and the panes wait.
+const paneAppOf = () => paneLeaves().find(p => p.kind === "app") || null;
+const paneAppIn = () => current === "monitoring" && (paneFind(PN.active).kind === "app" || !!paneAppOf());
 
 // What the active pane shows is whatever the page shows: go() and openTarget() change its content (a target open in another pane activates that pane instead).
 function paneAdopt() {
   const a = paneFind(PN.active), h = paneHere();
   if (!a || (a.kind === h.kind && a.t === h.t)) return;
-  const dup = paneOpenIn(h.kind, h.t) || (h.kind === "view" && paneViewOf(paneViewName(h.t)));
+  // Moving inside 모니터링 stays in the active app pane; coming to it from a conversation goes to an app pane.
+  const dup = paneOpenIn(h.kind, h.t) || (h.kind === "app" && a.kind !== "app" && paneAppOf());
   if (dup) { PN.active = dup.id; dup.t = h.t; dup.dot = ""; paneForget(dup.id); }
   else Object.assign(a, { kind: h.kind, t: h.t, at: null, stick: true, dot: "" });
   paneForget(a.id);
   panePersist();
 }
-const paneShape = n => (paneLeaf(n) ? [n.id, n.kind, n.id !== PN.active ? n.t : n.kind === "view" ? paneViewName(n.t) : ""] : [n.dir, paneShape(n.a), paneShape(n.b)]);
+const paneShape = n => (paneLeaf(n) ? [n.id, n.kind, n.id === PN.active ? "" : n.t] : [n.dir, paneShape(n.a), paneShape(n.b)]);
 const paneSig = () => JSON.stringify([PN.active, paneShape(PN.root)]);
 
 function paneHome(n) {
@@ -57,7 +57,7 @@ function paneHome(n) {
   views.insertBefore(n, next || null);
 }
 function paneRelease() {
-  for (const n of new Set([$("#v-chat"), $("#v-project"), $("#v-projects"), ...$("#views").querySelectorAll(".view.in-pane")])) {
+  for (const n of [$("#v-chat"), $("#v-project"), $("#v-projects"), $("#v-monitoring")]) {
     n.classList.remove("in-pane");
     if (n.parentNode !== $("#views")) paneHome(n);
   }
@@ -77,10 +77,10 @@ function paneTeardown() {
 function paneDraw() {
   const chat = current === "chat", at = chat ? chatAnchor() : null, stick = chatStick;
   paneRelease();
-  const kind = paneFind(PN.active).kind, sec = $(kind === "project" ? "#v-project" : kind === "view" ? `#v-${current}` : "#v-chat");
+  const kind = paneFind(PN.active).kind, sec = $(kind === "project" ? "#v-project" : kind === "app" ? "#v-monitoring" : "#v-chat");
   sec.classList.add("in-pane");
-  // A screen keeps the list that was there, so focusing it does not move every pane sideways.
-  if (kind !== "view") PNV.list = kind;
+  // 모니터링 keeps the list that was there, so focusing it does not move every pane sideways.
+  if (kind !== "app") PNV.list = kind;
   PNV.side.replaceChildren(PNV.list === "project" ? $("#v-projects") : convSide);
   PNV.tree.replaceChildren(paneNode(PN.root, sec));
   paneMirrorsPlace();
@@ -104,7 +104,7 @@ function paneShare(n, box) {
 function paneLeafEl(p, sec) {
   const on = p.id === PN.active;
   const x = el("button", { class: "ib pane-x", type: "button", "aria-label": "창 닫기", title: "창 닫기", onclick: () => paneClose(p.id) }, icon("close"));
-  const kids = !on ? [paneMirror(p)] : p.kind === "view" ? [paneHeadEl(p).head, sec] : [sec, x];
+  const kids = !on ? [paneMirror(p)] : p.kind === "app" ? [paneHeadEl(p).head, sec] : [sec, x];
   const box = el("div", { class: `pane${on ? " on" : ""}`, "data-id": p.id, "data-kind": p.kind }, ...kids);
   box.addEventListener("pointerdown", ev => {
     if (ev.button !== 0 || p.id === PN.active || ev.target.closest(".pane-x")) return;

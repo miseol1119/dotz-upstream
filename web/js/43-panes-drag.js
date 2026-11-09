@@ -1,5 +1,5 @@
 /* ---------- 분할 창: dragging (docs/split-panes.md 배치) ----------
-   A tab of the menu, a row of any list (conversations, sessions, projects, mail, 모니터링) or a pane's head is pulled over a pane: after 6px a ghost of the title follows
+   A row of any list (conversations, sessions, projects, mail, 모니터링) or a pane's head is pulled over a pane: after 6px a ghost of the title follows
    the pointer and the hovered zone (the outer quarter at an edge, or the middle) is drawn over that pane. A row with nothing a pane can show says so in its ghost
    and draws no zone. Pointer events on the document, so nothing is added to the rows; Escape cancels. The motion is 43-panes-motion.js. */
 const PD_MOVE = 6;
@@ -12,19 +12,12 @@ function paneRowItem(row) {
   if (t) return validTarget(t) ? { kind: "chat", t } : null;
   if (k.startsWith("w:")) return validTarget(k.slice(2)) ? { kind: "chat", t: k.slice(2) } : null;
   const it = k && k !== "add-app" && monItems().find(i => i.key === k), c = it ? monChatOf(it) : "";
-  return c && validTarget(c) ? { kind: "chat", t: c } : it ? { kind: "view", t: `monitoring|${k}` } : null;
+  return c && validTarget(c) ? { kind: "chat", t: c } : it ? { kind: "app", t: k } : null;
 }
 const paneRowLabel = row => (row.querySelector(".cv-n, .pl-n") || {}).textContent || (row.getAttribute("aria-label") || row.textContent).split(" · ")[0].trim();
-// A tab of the menu: 채팅 is the main conversation, 프로젝트 the project page last open, the rest their screen.
-function paneTabItem(view, label) {
-  if (view === "chat") return { kind: "chat", t: MAIN, label: targetName(MAIN) };
-  if (view === "projects") return { kind: "project", t: ppCur && PRJ && PRJ.projects.some(p => p.key === ppCur) ? ppCur : "builtin:custom", label };
-  return PANE_VIEWS.has(view) ? { kind: "view", t: view, label } : { no: true, label };
-}
-// What a pressed tab or row would put in a pane: {kind, t, label}, {no: true, label} when a pane cannot hold it, null when it is not a tab or a row.
+// What a pressed row would put in a pane: {kind, t, label}, {no: true, label} when a pane cannot hold it, null when it is not a row.
+// The menu's tabs are not rows: they are only pressed (owner 78c482b1).
 function paneDragItem(t) {
-  const nav = t.closest("#nav .ni[data-view]");
-  if (nav) return paneTabItem(nav.dataset.view, nav.querySelector(".nl").textContent);
   const pj = t.closest(".pl-row[data-key]");
   if (pj) return PRJ && PRJ.projects.some(p => p.key === pj.dataset.key) ? { kind: "project", t: pj.dataset.key, label: paneRowLabel(pj) } : null;
   const row = t.closest(".cv-row, .hr[data-t], .mr[data-t]");
@@ -38,7 +31,7 @@ function paneDragSource(ev) {
   const hd = t.closest(".pane-hd, #cv-head, .pmv-head"), pane = hd && !t.closest("button, a, input, textarea, select, [contenteditable]") && hd.closest(".pane");
   if (pane && PNV.el && PNV.el.contains(pane)) return { pane: pane.dataset.id, label: paneName(paneFind(pane.dataset.id)), el: hd };
   const it = paneDragItem(t);
-  return it && { ...it, el: t.closest("#nav .ni, .pl-row, .cv-row, .hr, .mr") };
+  return it && { ...it, el: t.closest(".pl-row, .cv-row, .hr, .mr") };
 }
 document.addEventListener("pointerdown", ev => {
   const src = paneDragSource(ev);
@@ -51,7 +44,7 @@ document.addEventListener("pointerdown", ev => {
 function paneDragBoxes() {
   if (paneCount() > 1 && PNV.el && !PNV.el.hidden) return [...PNV.el.querySelectorAll(".pane")].map(n => ({ id: n.dataset.id, r: n.getBoundingClientRect() }));
   if (current === "project") return [{ id: "", r: $("#v-project").getBoundingClientRect() }];
-  if (PANE_VIEWS.has(current)) return [{ id: "", r: $(`#v-${current}`).getBoundingClientRect() }];
+  if (current === "monitoring") return [{ id: "", r: $("#v-monitoring").getBoundingClientRect() }];
   if (current !== "chat") return [];
   const a = $("#cv-head").getBoundingClientRect(), b = $("#composer").getBoundingClientRect();
   return [{ id: "", r: new DOMRect(a.left, a.top, a.width, b.bottom - a.top) }];

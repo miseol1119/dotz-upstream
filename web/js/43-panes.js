@@ -1,5 +1,5 @@
 /* ---------- 분할 창 (docs/split-panes.md): the model ----------
-   Panes are leaves {id, kind: "chat"|"project"|"view", t, at, stick, dot} (a view's t is a screen of `views`, 2026-11-09: "home", "settings", "monitoring|<item>") of a tree whose branches are {dir: "row"|"col", a, b, r} (r = a's share, 0.2..0.8);
+   Panes are leaves {id, kind: "chat"|"project"|"app", t, at, stick, dot} (an app pane is 모니터링: t is "list" or an item key, owner 78c482b1) of a tree whose branches are {dir: "row"|"col", a, b, r} (r = a's share, 0.2..0.8);
    one is active and holds the real section. The screen is 43-panes-view.js, the inactive panes are 43-panes-mirror.js. With one pane (or none) nothing here touches the page. */
 const PANE_KEY = "dotz-panes", PANE_MAX = 4;
 let PN = { root: null, active: "", seq: 0 };
@@ -10,13 +10,11 @@ function paneList() { return paneLeaves().map(p => ({ id: p.id, kind: p.kind, t:
 const paneFind = id => paneLeaves().find(p => p.id === id) || null;
 const paneOpenIn = (kind, t) => paneLeaves().find(p => p.kind === kind && p.t === t) || null;
 const paneNew = (kind, t) => ({ id: `p${++PN.seq}`, kind, t, at: null, stick: true, dot: "" });
-// The screens a pane can hold besides a conversation and a project page; a view pane's t is the screen and, for 모니터링, the open item.
-const PANE_VIEWS = new Set(views.filter(v => !["chat", "activity", "project", "projects", "cardform"].includes(v)));
-const paneViewName = t => String(t).split("|")[0];
-const paneViewKey = () => (current === "monitoring" && !MON.list && MON.sel ? `monitoring|${MON.sel}` : current);
-// What the page shows now, as a pane's content (the terminal view counts as the chat).
-const paneHere = () => (current === "project" ? { kind: "project", t: ppCur } : PANE_VIEWS.has(current) ? { kind: "view", t: paneViewKey() } : { kind: "chat", t: target });
-const paneGo = (kind, t) => (kind === "view" ? go(paneViewName(t), String(t).split("|")[1]) : go(kind, t));
+// The 모니터링 screen as a pane's content: its list, or the item open in it.
+const paneAppKey = () => (MON.list || !MON.sel ? "list" : MON.sel);
+// What the page shows now, as a pane's content (the terminal view and the other screens count as the chat).
+const paneHere = () => (current === "project" ? { kind: "project", t: ppCur } : current === "monitoring" ? { kind: "app", t: paneAppKey() } : { kind: "chat", t: target });
+const paneGo = (kind, t) => (kind === "app" ? go("monitoring", t) : go(kind, t));
 function paneParent(n, p) {
   if (paneLeaf(n)) return null;
   return n.a === p || n.b === p ? n : paneParent(n.a, p) || paneParent(n.b, p);
@@ -104,7 +102,7 @@ function paneClose(id) {
 // A saved layout {root, active, seq} as a live tree: panes whose target is gone or already shown are dropped, at most PANE_MAX stay. null when nothing is left.
 function panePrune(d) {
   if (!d || !d.root) return null;
-  const ok = p => p && (p.kind === "chat" ? validTarget(p.t) : p.kind === "view" ? PANE_VIEWS.has(paneViewName(p.t)) : p.kind === "project" && typeof p.t === "string" && (p.t.startsWith("builtin:") || !PRJ || PRJ.projects.some(x => x.key === p.t)));
+  const ok = p => p && (p.kind === "chat" ? validTarget(p.t) : p.kind === "app" ? typeof p.t === "string" && !!p.t : p.kind === "project" && typeof p.t === "string" && (p.t.startsWith("builtin:") || !PRJ || PRJ.projects.some(x => x.key === p.t)));
   const seen = new Set();
   let left = PANE_MAX;
   const prune = n => {
