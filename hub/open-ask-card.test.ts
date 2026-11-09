@@ -26,6 +26,10 @@ test("later bot messages and a peer gateway's message leave the [ask] open; the 
 	emit("inbox", { ts: ts(), source: "web", ...PEER_STATUS });
 	send("[done] 진행 메시지를 고쳤어요.", "web");
 	expect(states()).toEqual(["open", "open"]);
-	emit("inbox", { ts: ts(), kind: "message", source: "web", channel: "web", author: "ddotz@github", text: "1번으로 해" });
+	emit("inbox", { ts: ts(), kind: "message", source: "web", channel: "web", author: "owner@github", text: "1번으로 해" });
 	expect(states()).toEqual(["answered", "answered"]);
+});
+
+test("the fixture's account is a neutral sample, not a login of a real install", () => {
+	expect(PEER_STATUS.author).toBe("owner@github");
 });
