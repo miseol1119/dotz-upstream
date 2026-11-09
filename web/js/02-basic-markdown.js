@@ -298,7 +298,46 @@ function cfPlace(d) {
   const below = CF_PT.y + gap, top = below + r.height <= vh - gap ? below : Math.max(gap, CF_PT.y - r.height - gap);
   Object.assign(d.style, { margin: "0", right: "auto", bottom: "auto", left: `${Math.round(left)}px`, top: `${Math.round(top)}px` });
 }
+// A confirm asked while a sheet or box is open is shown inside it and gives it back after the answer: one window at a time (docs/ui-spec.md 대화창).
+function openSheet() {
+  const d = document.querySelector("dialog[open]:not([data-leaving]):not(.cf)");
+  if (d) return { host: d, onEnd: f => d.addEventListener("close", f, { once: true }) };
+  const top = FS[FS.length - 1];
+  return top ? { host: top.box, onEnd: f => top.ends.push(f) } : null;
+}
+function confirmInSheet({ host, onEnd }, { title, body, actions, onclose }) {
+  const sheet = host.classList.contains("fs-card"), from = document.activeElement, kept = [...host.children].map(n => [n, n.hidden]);
+  let over = false;
+  const back = () => h.close();
+  const name = el("h2", { class: "dtitle", text: title });
+  const head = sheet ? fsHead([name], { close: back }) : el("div", { class: "dhd" }, name, el("button", { type: "button", class: "ib dx", "aria-label": "닫기", onclick: back }, icon("close")));
+  const bodyBox = el("div", { class: sheet ? "dbody fs-body" : "dbody" }, body), actBox = el("div", { class: sheet ? "dact fs-ft row" : "dact" });
+  const noCancel = ev => ev.preventDefault();
+  const esc = ev => { if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); h.close(); } };
+  const watch = new MutationObserver(() => { if (!head.isConnected) end(false); });   // the sheet repainted itself: the question is gone with it
+  function end(restore) {
+    if (over) return;
+    over = true; watch.disconnect(); removeEventListener("keydown", esc, true); host.removeEventListener("cancel", noCancel);
+    if (restore && host.isConnected) {
+      motionSwap(host, () => { head.remove(); bodyBox.remove(); actBox.remove(); for (const [n, hid] of kept) n.hidden = hid; });
+      if (from && from.isConnected) from.focus({ preventScroll: true });
+    }
+    if (onclose) onclose();
+  }
+  const h = { node: host, body: bodyBox, close: () => end(true), setActions };
+  function setActions(list) {
+    clear(actBox).append(...list.map(a => el("button", { type: "button", class: `btn ${a.kind || "text"}`, disabled: a.disabled, onclick: ev => a.onclick && a.onclick(h.close, ev.currentTarget) }, a.label)));
+  }
+  setActions(actions);
+  motionSwap(host, () => { for (const [n] of kept) n.hidden = true; host.append(head, bodyBox, actBox); });
+  watch.observe(host, { childList: true });
+  addEventListener("keydown", esc, true); host.addEventListener("cancel", noCancel);
+  onEnd(() => end(false));
+  const first = actBox.querySelector(".btn:last-child"); if (first) first.focus({ preventScroll: true });
+  return h;
+}
 function dialog({ title, body, actions = [], onclose, wide, classic, confirm }) {
+  if (confirm) { const sheet = openSheet(); if (sheet) return confirmInSheet(sheet, { title, body, actions, onclose }); }
   const small = classic || confirm;
   const d = el("dialog", { class: `dlg${wide ? " wide" : ""}${confirm ? " cf" : classic ? " cl" : " fs-card"}` });
   const bodyBox = el("div", { class: small ? "dbody" : "dbody fs-body" }, body);

@@ -25,10 +25,11 @@ function fsOpen({ label, labelledby, cls = "", onClose }) {
     else if (!ev.shiftKey && at === last) { ev.preventDefault(); first.focus(); }
   };
   const h = {
-    node, box,
+    node, box, ends: [],   // ends: run once when the overlay closes (a confirm shown inside it, 02-basic-markdown.js)
     close(restore = true) {
       if (closed) return;
       closed = true;
+      h.ends.splice(0).forEach(f => f());
       // State is released at once. Only the owner's own close (X, Esc, backdrop; restore) leaves the sheet and fades it out; the next card opens
       // later in the DOM, so it sits over the leaving one. A programmatic close (restore false) goes at once.
       ovDone(ov); FS.splice(FS.indexOf(h), 1);

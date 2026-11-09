@@ -67,7 +67,7 @@ const open = async (width: number, height: number, theme: "light" | "dark" = "li
 };
 const click = (v: View, sel: string) => run(v, `document.querySelector(${JSON.stringify(sel)}).click()`);
 const top = `[...document.querySelectorAll("dialog[open]")].at(-1)`;
-const press = (v: View, label: string) => run(v, `[...${top}.querySelectorAll(".btn")].find(b => b.textContent === ${JSON.stringify(label)}).click()`);
+const press = (v: View, label: string) => run(v, `[...${top}.querySelectorAll(".btn")].filter(b => b.offsetParent).find(b => b.textContent === ${JSON.stringify(label)}).click()`);
 
 describe("연결된 기기 설정 화면", () => {
 	test("the list shows each device with its dates, and 이 기기 on the current one", async () => {
@@ -113,17 +113,17 @@ describe("연결된 기기 설정 화면", () => {
 		await click(v, '#devices [data-dev="cred-mac"]');
 		await waitFor(v, `document.querySelector('dialog[open] input[name="dev-name"]')`);
 		await press(v, "해제");
-		await waitFor(v, `document.querySelectorAll("dialog[open]").length === 2`);
+		await waitFor(v, `document.querySelectorAll("dialog[open]").length === 1 && ${top}.textContent.includes("기기 해제")`);
 		expect(await ev<string>(v, `${top}.textContent`)).toContain("로그아웃");
 		await press(v, "취소");
-		await waitFor(v, `document.querySelectorAll("dialog[open]").length === 1`);
+		await waitFor(v, `document.querySelectorAll("dialog[open]").length === 1 && !${top}.textContent.includes("기기 해제")`);
 		await press(v, "닫기");
 		await waitFor(v, `document.querySelectorAll("dialog[open]").length === 0`);
 		expect(calls).toEqual([]);
 		await click(v, '#devices [data-dev="cred/old"]');
 		await waitFor(v, `document.querySelector('dialog[open] input[name="dev-name"]')`);
 		await press(v, "해제");
-		await waitFor(v, `document.querySelectorAll("dialog[open]").length === 2`);
+		await waitFor(v, `document.querySelectorAll("dialog[open]").length === 1 && ${top}.textContent.includes("기기 해제")`);
 		expect(await ev<string>(v, `${top}.textContent`)).not.toContain("로그아웃");
 		await press(v, "해제");
 		await waitFor(v, `document.querySelectorAll("#devices [data-dev]").length === 2`);
