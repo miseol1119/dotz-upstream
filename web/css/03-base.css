@@ -53,7 +53,7 @@
 .fb-item.in-use { background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
 .fb-item.drag { position: relative; z-index: 5; cursor: grabbing; box-shadow: var(--float); opacity: .94; }
 .fb-item.over { outline: 2px dashed var(--fg-3); outline-offset: 2px; }
-.fb-n { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 11px; background: var(--card); color: var(--fg-2); font: 600 12px/1 var(--font); }
+.fb-n { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 11px; background: var(--card); color: var(--fg-2); font: 600 var(--fs-meta)/var(--lh-meta) var(--font); }
 .fb-item.in-use .fb-n { background: var(--accent); color: var(--on-accent); }
 .fb-body { flex: 1 1 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-2); padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: inherit; }
 .fb-body .nm { min-width: 0; font: 600 14px/20px var(--font); overflow-wrap: anywhere; }

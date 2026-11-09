@@ -1,7 +1,7 @@
 /* result card (11-resultcard.js): a mail or a monitoring result - header, title, labelled sections, the original folded */
 .tl-in > .bm.rc, #mon-tl > .bm.rc { display: flex; flex-direction: column; gap: var(--sp-3); }
 .rc-hd { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; color: var(--fg-3); font-size: 12px; line-height: 16px; }
-.rc-src { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); font-size: 13px; font-weight: 600; }
+.rc-src { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); font-size: 13px; line-height: 18px; font-weight: 600; }
 .rc-time { flex: none; margin-left: auto; white-space: nowrap; }
 .rc-title { color: var(--fg); font-size: 18px; line-height: 26px; font-weight: 700; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .rc-sec { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }

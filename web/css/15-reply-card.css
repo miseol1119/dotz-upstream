@@ -2,7 +2,7 @@
 /* 머리: 한 줄 (받는 사람 + 출처), 상태는 오른쪽 (owner 2026-11-03: 머리줄은 한 줄, 초안이 주인공) */
 .rq-hd { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; min-height: 20px; color: var(--fg-3); font-size: var(--fs-meta); line-height: var(--lh-meta); }
 .rq-meta { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-2); font-weight: 400; }
-.rq-meta .rq-wt { color: var(--fg); font-size: 13px; font-weight: 600; }
+.rq-meta .rq-wt { color: var(--fg); font-size: 13px; line-height: 18px; font-weight: 600; }
 .rq-meta .rq-src { color: var(--fg-3); font-weight: 400; }
 .rq-hd .rc-time { flex: none; }
 .rq-lb { margin-top: var(--sp-2); color: var(--fg-3); font: 500 var(--fs-meta)/var(--lh-meta) var(--font); }

@@ -24,7 +24,7 @@ button.hm-sh { cursor: pointer; }
 .hm-sh .t { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); min-width: 0; font: 600 16px/22px var(--font); letter-spacing: -.01em; }
 .hm-sh .l { min-width: 0; word-break: keep-all; overflow-wrap: anywhere; }
 .hm-sh .s { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--fg-2); font-size: 13px; line-height: 19px; word-break: keep-all; overflow-wrap: anywhere; }
-.hm-no { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--layer); color: var(--fg-2); font: 600 12px/1 var(--font); letter-spacing: 0; }
+.hm-no { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--layer); color: var(--fg-2); font: 600 var(--fs-meta)/var(--lh-meta) var(--font); letter-spacing: 0; }
 .hm-ct { margin-left: auto; font-variant-numeric: tabular-nums; }
 .hm-list { display: flex; flex-direction: column; gap: var(--sp-3); min-height: 0; max-height: var(--hm-list-h); margin: 0 calc(var(--sp-2) * -1); padding: 0 var(--sp-2) var(--sp-05); overflow-y: auto; overscroll-behavior: contain; }
 .hm-list.fix { height: var(--hm-list-h); }

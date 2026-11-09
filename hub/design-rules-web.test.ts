@@ -304,6 +304,22 @@ describe("web/DESIGN.md rules", () => {
 		expect(off).toEqual([]);
 	});
 
+	test("the source line, reply name, initials, step numbers and model picker keep a line height of 1.3 or more", async () => {
+		const v = await openPage();
+		const ratios = await ev<Record<string, number>>(v, `(() => {
+			const host = document.createElement("div");
+			host.id = "models";
+			host.innerHTML = '<div class="rc-hd"><span class="rc-src">a</span></div><div class="rq-hd rq-who"><span class="rq-meta"><b class="rq-wt">a</b></span></div><span class="kk-av">지</span><span class="hm-no">1</span><div class="fb-item"><span class="fb-n">1</span></div><div class="col mt"><div class="mt-top"><div class="mt-filter"><div class="tf"><button class="sel"><span class="val">a</span></button></div></div></div></div>';
+			document.body.append(host);
+			const ratio = s => { const c = getComputedStyle(host.querySelector(s)); return parseFloat(c.lineHeight) / parseFloat(c.fontSize); };
+			const out = Object.fromEntries([".rc-src", ".rq-wt", ".kk-av", ".hm-no", ".fb-n", ".sel .val"].map(s => [s, Math.round(ratio(s) * 100) / 100]));
+			host.remove();
+			return out;
+		})()`);
+		// docs/ui-spec.md: line height at least 1.3 times the text size (DESIGN.md Type pairs, e.g. 13/18, 12/16)
+		expect(Object.entries(ratios).filter(([, r]) => !(r >= 1.3)).map(([s, r]) => `${s} ${r}`)).toEqual([]);
+	});
+
 	test("text pairs of the tokens reach 4.5:1 in both themes", () => {
 		const rules = parseCss("01-tokens.css", realCss().find(([f]) => f === "01-tokens.css")![1]);
 		const theme = (scope: string) => {

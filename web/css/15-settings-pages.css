@@ -23,7 +23,7 @@
 #models .fb-sub, #models .mt-list > :is(.mt-note, .mt-apply) { border-top: 1px solid var(--line); }
 #models .mt-pick .tf { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 #models .mt-pick .tf > .lb { font: 500 var(--fs-row)/var(--lh-row) var(--font); color: var(--fg); }
-#models :is(.mt-pick, .mt-filter) .sel { height: var(--ctl-h); min-height: 0; font-size: var(--fs-row); }
+#models :is(.mt-pick, .mt-filter) .sel { height: var(--ctl-h); min-height: 0; font-size: var(--fs-row); line-height: var(--lh-row); }
 #models .mt-pick .sel { --ff-fill: var(--layer); flex: 1 1 auto; width: auto; min-width: 0; }
 #models .mt-pick:not(:has(.mt-eff)) .sel { flex: none; width: min(60%, 220px); }
 /* the pickers' values say what they are: their names stay on the button's aria-label */
@@ -39,7 +39,7 @@
 #models .fb-item.open, #models .fb-item.open:hover { background: var(--layer); }
 #models .fb-item > .fb-usage { padding-left: calc(var(--fb-n-w) + var(--sp-2)); margin-top: var(--sp-1); }
 #models .fb-item.in-use { background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
-#models .fb-n { width: var(--fb-n-w); height: auto; border-radius: 0; background: none; color: var(--fg-3); font-size: 13px; }
+#models .fb-n { width: var(--fb-n-w); height: auto; border-radius: 0; background: none; color: var(--fg-3); font-size: 13px; line-height: 18px; }
 #models .fb-item.in-use .fb-n { background: none; color: var(--accent); }
 #models .mt-fb-foot { padding: var(--sp-1) var(--sp-2); border-top: 1px solid var(--line); }
 #models .fbe { --ff-fill: var(--card); margin: 0; border-radius: 0; padding: var(--sp-3) var(--row-px); }

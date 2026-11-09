@@ -48,7 +48,7 @@
 .kk-auto[hidden] { display: none; }
 .kk-auto .cv-n { font: 600 15px/22px var(--font); }
 .kk-auto .cv-p { font-size: 12px; line-height: 16px; color: var(--fg-2); }
-.kk-av { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: hsl(var(--h) 45% 82%); color: hsl(var(--h) 45% 26%); font: 600 15px/1 var(--font); }
+.kk-av { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: hsl(var(--h) 45% 82%); color: hsl(var(--h) 45% 26%); font: 600 15px/var(--lh-row) var(--font); }
 .kk-av.sp { background: transparent; }
 :root[data-theme="dark"] .kk-av { background: hsl(var(--h) 22% 30%); color: hsl(var(--h) 45% 86%); }
 .kk-row .cv-m { flex-direction: column; align-items: flex-end; gap: var(--sp-1); }
