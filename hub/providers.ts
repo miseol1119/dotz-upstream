@@ -801,7 +801,7 @@ export async function rateLimitDelay(err: string, model: string, role: "orchestr
 // pause is a slow probe and the owner is told once); "transient" = overloaded/5xx/network (retry with backoff). Owner is
 // checked first because some billing errors arrive as a 429 (insufficient_quota). Patterns are checked against the
 // error rows of real OmO and omp sessions (~/.omo/agent/sessions): a failed OAuth refresh, a disabled provider and a model
-// the account cannot use are owner problems; WebSocket/SSE stream breaks are transient.
+// the account cannot use are owner problems; stream breaks (WebSocket/SSE, OmO's "Invalid ... event order") are transient.
 export type ProviderErrorKind = "rate" | "owner" | "transient";
 const OWNER_ERR_RE = /credit balance|provider is (?:not configured|disabled)|insufficient[_ ]?(?:quota|funds|credits?)|out of credits|requires more credits|billing|payment required|\b402\b|exceeded your current quota|\b401\b|\b403\b|unauthorized|forbidden|authentication[_ ](?:error|failed)|invalid[_ ]?api[_ ]?key|invalid x-api-key|no api key|oauth token|oauth refresh failed|token (?:has )?(?:expired|been revoked)|not logged in|\/login|not a valid model id|model is not supported when using/i;
 const RATE_ERR_RE = /429|rate_limit|usage limit|session limit/i;
@@ -809,7 +809,7 @@ const RATE_ERR_RE = /429|rate_limit|usage limit|session limit/i;
 // owner patterns: the message also names "/login" as a way to add another account.
 // also a pinned account on its limit: "Claude account 'x' for anthropic-subscription is blocked (rate limit) until <time>, and account fallback is off"
 const POOL_BLOCKED_RE = /accounts? for [\w-]+ (?:are|is) currently blocked \(rate limit|account '[^']+' for [\w-]+ is blocked \(rate limit\)|no credential slots available/i;
-const TRANSIENT_ERR_RE = /overloaded|\b5(?:00|02|03|04|29)\b|server error|internal error|bad gateway|service unavailable|gateway time-?out|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network|socket hang up|other side closed|connection (?:error|reset|closed|lost|ended)|websocket (?:error|closed)|error injected into sse stream|timed? ?out|terminated/i;
+const TRANSIENT_ERR_RE = /overloaded|\b5(?:00|02|03|04|29)\b|server error|internal error|bad gateway|service unavailable|gateway time-?out|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|network|socket hang up|other side closed|connection (?:error|reset|closed|lost|ended)|websocket (?:error|closed)|error injected into sse stream|timed? ?out|terminated|invalid (?:native tool call|assistant content) event order/i;
 export function classifyProviderError(err: string): ProviderErrorKind | undefined {
 	if (POOL_BLOCKED_RE.test(err)) return "rate";
 	if (OWNER_ERR_RE.test(err)) return "owner";

@@ -252,6 +252,27 @@ test("a second message refused while the first waits goes with it, and a restart
 	await advance(300);
 });
 
+// OmO ends a turn with these when the Claude stream restarts a message mid-turn (qa-golden, 2026-11-09 under heavy load):
+// the session itself is fine, so the lane picks the work up again instead of stopping on a lane error.
+test("a turn OmO ended on a broken stream event order is continued, not reported as a lane error", async () => {
+	const { transientBackoff } = await import("./providers.ts");
+	const { msg } = await import("./i18n.ts");
+	for (const err of ["Invalid native tool call event order", "Invalid assistant content event order"]) {
+		reports.length = 0;
+		const { lane, agent } = await working("event-order");
+		agent.push({ type: "assistant", text: "", stop: "error", error: { text: err, kind: fake.classifyError(err), compaction: false } });
+		agent.push({ type: "turn_end" });
+		await flush();
+		await advance(transientBackoff(0));
+		await flush();
+		expect(agent.sent.at(-1)).toStartWith(msg().laneTransient);
+		expect(lane.lastText).not.toContain("[lane error]");
+		expect(reports).toEqual([]);
+		l.stopLane("event-order");
+		await advance(300);
+	}
+});
+
 test(`the "For ${NAME}:" and "${NAME} 몫:" lines are dropped from the owner's text, nothing else`, () => {
 	expect(dropForLine(`[done] 끝났어요.\n\n${NAME} 몫: 없음`)).toBe("[done] 끝났어요.");
 	expect(dropForLine(`[done] 끝났어요.\n근거: 테스트 통과\n- For ${NAME}: 머지 확인\n`)).toBe("[done] 끝났어요.\n근거: 테스트 통과");
