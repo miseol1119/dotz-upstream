@@ -46,7 +46,7 @@
 .mxs-c .tx { min-width: 0; }
 .mxs-cx { display: grid; place-items: center; width: var(--sp-6); height: var(--sp-6); padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--fg-3); }
 .mxs-cx:hover { background: var(--active); color: var(--fg); }
-.mxs-cx .ic { width: 12px; height: 12px; }
+.mxs-cx .ic { width: 14px; height: 14px; }
 .mxs-c2 { background: transparent; color: var(--fg-2); box-shadow: inset 0 0 0 1px var(--line-2); }
 .mxs-c2:hover { background: var(--hover); }
 .mxs-c2 .ic { width: 14px; height: 14px; }

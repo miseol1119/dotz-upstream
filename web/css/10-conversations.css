@@ -93,7 +93,7 @@
 .cv-task .ct-pill.err { background: color-mix(in srgb, var(--err) 12%, var(--layer)); color: var(--err); }
 .cv-task .ct-pill.warn { background: color-mix(in srgb, var(--warn) 14%, var(--layer)); color: var(--warn); }
 .cv-task .ct-pill.off { background: var(--line-2); color: var(--fg-2); }
-.cv-task .ct-pill .ic { width: 12px; height: 12px; stroke-width: 2.4; }
+.cv-task .ct-pill .ic { width: 14px; height: 14px; stroke-width: 2; }
 .cv-task .ct-body { display: flex; gap: var(--sp-3); overflow-x: auto; scrollbar-width: none; }
 .cv-task .ct-file { display: flex; flex: 1 1 0; align-items: center; gap: var(--sp-15); min-width: 96px; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
 .cv-task .ct-file .ic { flex: none; width: 16px; height: 16px; color: var(--fg-2); }

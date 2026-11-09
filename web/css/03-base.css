@@ -14,7 +14,7 @@
 .mt-use-row .tag { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mt-use-act { flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--fg-2); }
 .mt-use-act:hover { background: var(--hover); color: var(--fg); }
-.mt-use-act .ic { width: 18px; height: 18px; }
+.mt-use-act .ic { width: 16px; height: 16px; }
 /* From 900px every row is one line: the label column takes the room, the model and tag shorten, the icon sits at the far right. */
 @media (min-width: 900px) {
   .mt-use-row { flex-wrap: nowrap; gap: 0 var(--sp-3); }
@@ -320,7 +320,7 @@ details.work[open] { padding: var(--sp-15) var(--sp-2) var(--sp-2); border-radiu
 .chatbox::after, .termbox::after { bottom: 0; height: 40px; background: linear-gradient(transparent, var(--bg)); }
 .chatbox.fade-t::before, .termbox.fade-t::before, .chatbox.fade-b::after, .termbox.fade-b::after { opacity: 1; }
 .chatbox > .jump, .termbox > .jump { position: absolute; left: 50%; right: auto; bottom: 14px; z-index: 2; transform: translateX(-50%); display: grid; place-items: center; width: 36px; height: 36px; min-height: 36px; min-width: 0; padding: 0; border: 1px solid var(--line-2); border-radius: 50%; background: var(--card); color: var(--fg); font-size: 0; line-height: 0; box-shadow: 0 2px 8px rgba(0, 0, 0, .08); }
-.chatbox > .jump svg, .termbox > .jump svg { display: block; width: 18px; height: 18px; margin: 0; }
+.chatbox > .jump svg, .termbox > .jump svg { display: block; width: 20px; height: 20px; margin: 0; }
 .chatbox > .jump[hidden], .termbox > .jump[hidden] { display: none; }
 /* Track B: attachments (composer tray, message files, lightbox), ended-lanes fold, target popovers */
 .sendrow.has-att { grid-template-areas: "at at" "ta ta" "bar send"; }
@@ -331,7 +331,7 @@ details.work[open] { padding: var(--sp-15) var(--sp-2) var(--sp-2); border-radiu
 .fatt.img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .fatt-v { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
 .fatt .fi-ic { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 4px; background: var(--card); color: var(--fg-2); }
-.fatt .fi-ic svg { width: 18px; height: 18px; }
+.fatt .fi-ic svg { width: 16px; height: 16px; }
 .fatt .fi-t { min-width: 0; display: flex; flex-direction: column; }
 .fatt .fi-n { font-size: 13px; line-height: 18px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fatt .fi-m { font-size: 12px; line-height: 16px; color: var(--fg-3); }
@@ -348,10 +348,10 @@ details.work[open] { padding: var(--sp-15) var(--sp-2) var(--sp-2); border-radiu
 .tag.img-no { flex: none; margin-top: var(--sp-1); }
 .fatt-n > .tag.img-no { margin-top: 0; }
 .fatt .ax { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: var(--fatt-x); height: var(--fatt-x); padding: 0; border: 0; border-radius: 10px; background: rgb(0 0 0 / .55); color: #fff; }
-.fatt .ax svg { width: 12px; height: 12px; }
+.fatt .ax svg { width: 14px; height: 14px; }
 .fatt:not(.img) .ax { background: transparent; color: var(--fg-3); top: 18px; }
 #c-attach { width: 30px; padding: 0; justify-content: center; }
-#c-attach svg { width: 18px; height: 18px; }
+#c-attach svg { width: 20px; height: 20px; }
 .composer.dropping .sendrow { background: color-mix(in srgb, var(--accent) 7%, var(--card)) !important; }
 .mfiles { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-15); max-width: 100%; }
 .bm .mfiles { justify-content: flex-start; margin-top: var(--sp-2); }

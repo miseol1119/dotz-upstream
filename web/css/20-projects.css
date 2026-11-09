@@ -8,7 +8,7 @@
 .pl { display: flex; flex-direction: column; gap: var(--sp-3); }
 .pl-top { display: flex; flex-direction: column; gap: var(--sp-2); }
 .pl-search { display: flex; align-items: center; gap: var(--sp-2); height: 36px; padding: 0 var(--sp-3); border-radius: var(--r-ctl); background: var(--card); color: var(--fg-3); }
-.pl-search .ic { width: 18px; height: 18px; }
+.pl-search .ic { width: 16px; height: 16px; }
 .cm-rule-q { flex: none; margin-bottom: var(--sp-3); background: var(--ff-fill); }
 .pl-search input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; color: var(--fg); font: inherit; outline: 0; }
 .pl-search input::placeholder { color: var(--fg-3); }
@@ -66,7 +66,7 @@
 .pmv-hrow .btn.tonal { background: var(--layer); }
 .pmv-hrow .btn.tonal:hover { background: var(--hover); }
 .pmv-hact .ib.pmv-more:hover { background: var(--card-hover); color: var(--fg); }
-.pmv-hact .ib.pmv-more .ic { width: 18px; height: 18px; }
+.pmv-hact .ib.pmv-more .ic { width: 20px; height: 20px; }
 
 /* ---- level 3: a section page (an overlay, full screen on a phone) ---- */
 .pdv-hd { flex: none; display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-5) var(--sp-15) var(--sp-2); }

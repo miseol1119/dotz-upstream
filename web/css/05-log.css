@@ -317,7 +317,7 @@ details.think .md { padding: var(--sp-1) var(--sp-2) var(--sp-2) var(--box-ind);
 .hm-n.sup { border-style: dashed; background: var(--bg); }
 .hm-n.sup:hover { background: var(--hover); }
 .hm-n .t { display: flex; align-items: center; gap: var(--sp-15); min-width: 0; font: 600 12.5px/18px var(--font); letter-spacing: -.01em; }
-.hm-n .t .ic { width: 13px; height: 13px; color: var(--fg-3); }
+.hm-n .t .ic { width: 14px; height: 14px; color: var(--fg-3); }
 .hm-n .l { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hm-n .s, .hm-n .lk { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--fg-2); font-size: 11.5px; line-height: 15px; overflow-wrap: anywhere; }
 .hm-n .lk { color: var(--fg-3); font-size: 11px; }

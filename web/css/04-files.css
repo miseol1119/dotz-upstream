@@ -9,7 +9,7 @@ two separate paths under their own chips and a long one ends in an ellipsis. */
 .fpath:hover, .lb-p:hover, .tv-p:hover { color: var(--fg-2); }
 .fbox > .fatt { padding-right: var(--sp-12); max-width: 260px; }
 .fdl { position: absolute; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 16px; color: var(--fg-2); text-decoration: none; }
-.fdl svg { width: 18px; height: 18px; }
+.fdl svg { width: 16px; height: 16px; }
 .fbox > .fatt + .fdl { top: 12px; right: 8px; }
 .fbox > .fatt + .fdl:hover { background: var(--card); color: var(--fg); }
 .fbox > .thumb + .fdl { top: 6px; right: 6px; background: rgb(0 0 0 / .55); color: #fff; }

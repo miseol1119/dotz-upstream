@@ -7,7 +7,7 @@
 :is(#settings, #notifications, #display, #update, #runtime, #models, #accounts, #usage, #context, #messengers, #discord, #jandi, #slack, #telegram, #devices, #webaccess) .li > .lead:has(> .ic) {
   display: grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; background: var(--layer); color: var(--fg-2);
 }
-:is(#settings, #notifications, #display, #update, #runtime, #messengers, #devices, #webaccess) .li > .lead:has(> .ic) .ic { width: 18px; height: 18px; }
+:is(#settings, #notifications, #display, #update, #runtime, #messengers, #devices, #webaccess) .li > .lead:has(> .ic) .ic { width: 16px; height: 16px; }
 :is(#notifications, #update, #runtime) .hs-sw::before { content: ""; position: absolute; inset: -12px -4px; }
 
 /* 모델 · 폴백: each target is a title and one list: its model and effort as rows with the picker on the right, then the numbered chain */

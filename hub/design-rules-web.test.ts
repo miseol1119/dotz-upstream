@@ -348,6 +348,20 @@ describe("web/DESIGN.md rules", () => {
 		expect(found).toEqual([]);
 	});
 
+	test("icons are drawn at 14, 16 or 20px with a 1.75 or 2 stroke", () => {
+		const found: string[] = [];
+		for (const [file, text] of realCss()) for (const r of parseCss(file, text)) {
+			// only rules whose drawn subject is the svg: ".lead:has(> .ic)" sizes the box around it
+			const bare = r.selector.replace(/:(?:has|is|not|where)\([^)]*\)/g, "");
+			if (!bare.split(",").some(s => /(?:^|[\s>+~])(?:svg(?:\.ic)?|\.ic)\b[^\s>+~]*$/.test(s.trim()))) continue;
+			for (const [k, v] of r.decls) {
+				if ((k === "width" || k === "height") && /^\d+(\.\d+)?px$/.test(v) && ![14, 16, 20].includes(parseFloat(v))) found.push(`${file} ${r.selector} ${k} ${v}`);
+				if (k === "stroke-width" && ![1.75, 2].includes(parseFloat(v))) found.push(`${file} ${r.selector} stroke-width ${v}`);
+			}
+		}
+		expect(found).toEqual([]);
+	});
+
 	const planted: [string, string, string][] = [
 		["stripe", "colored one-sided border", `.planted { border-left: 3px solid var(--accent); border-radius: var(--r-card); }`],
 		["stripe", "colored inset edge", `.planted { box-shadow: inset 3px 0 0 var(--warn); }`],

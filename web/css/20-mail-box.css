@@ -73,7 +73,7 @@ span.mr-star:not(.on) { opacity: .45; }
 
 .mbox-fab { position: fixed; z-index: 40; right: 24px; bottom: 24px; display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2); min-width: 56px; height: 56px; padding: 0 var(--sp-5); border: 0; border-radius: 28px; background: var(--accent); color: var(--on-accent); font: inherit; font-size: 15px; font-weight: 700; box-shadow: 0 2px 8px rgba(0, 0, 0, .16); cursor: pointer; }
 .mbox-fab:hover { filter: brightness(1.06); }
-.mbox-fab .ic { width: 22px; height: 22px; }
+.mbox-fab .ic { width: 20px; height: 20px; }
 /* A phone keeps the button above the compact tab bar (web/css/01-tokens.css .side: a 46px row), not on top of its tabs. */
 @media (max-width: 639px) { .mbox-fab { right: 16px; bottom: calc(72px + env(safe-area-inset-bottom)); width: 56px; height: 56px; padding: 0; } .mbox-fab-t { display: none; } }
 
@@ -101,7 +101,7 @@ textarea.mbox-ta { display: block; flex: 1; min-height: 160px; margin: var(--sp-
 .mbox-cs { flex: none; color: var(--fg-3); font-variant-numeric: tabular-nums; }
 .mbox-cx { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--fg-3); cursor: pointer; }
 .mbox-cx:hover { background: var(--active); color: var(--fg); }
-.mbox-cx .ic { width: 12px; height: 12px; }
+.mbox-cx .ic { width: 14px; height: 14px; }
 /* the send row (ui-spec .fs-ft): the one filled button on the right, the paperclip at the left, 8px between */
 .mbox-sf { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-2); flex: none; padding: var(--sp-3) var(--sp-4) var(--sp-4); }
 .mbox-sf .mbox-attach { order: -1; margin-right: auto; }

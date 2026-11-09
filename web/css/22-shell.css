@@ -50,7 +50,7 @@ body { display: flow-root; }
   .side-tog, .side-tog:hover { background: transparent; }
   .side-tog { position: absolute; left: calc(var(--side-w) - 14px); top: 16px; display: inline-grid; width: 28px; height: 28px; color: var(--fg-3); }
   .side-tog:hover { color: var(--fg); }
-  .side-tog .ic { width: 18px; height: 18px; }
+  .side-tog .ic { width: 16px; height: 16px; }
   .side-min .side-tog .ic { transform: scaleX(-1); }
   /* folded (:root.side-min, 04-state.js sideToggle): a 60px icon rail. Names go to the title and the aria-label, a tab's dot sits at its icon's bottom right, the usage row is a ring of the same share and color with the number inside */
   :root.side-min { --side-w: 60px; }
