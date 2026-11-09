@@ -114,6 +114,18 @@ test("a menu tab is only pressed, never dragged; `앱 관리` says a pane cannot
 	await run(v, `go("monitoring")`);
 	await waitFor(v, `current === "monitoring" && paneList().find(p => p.active).kind === "app"`);
 });
+test("a KakaoTalk room of the chat list drops as an in-app pane: 모니터링 opens on 카카오톡 with that room", async () => {
+	const v = await open();
+	// a 미답장 room of the chat list (31-conversations.js: k "w:kk:<chatId>"). On the body, where no list repaint takes it away.
+	await run(v, `document.body.append(el("button", { class: "cv-row pv", type: "button", "data-k": "w:kk:77", id: "kk-room", style: "position: fixed; left: 300px; top: 300px; width: 200px" }, el("span", { class: "cv-b" }, el("span", { class: "cv-n", text: "가족방" }))))`);
+	await drag(v, "#kk-room", ONE, 0.95, 0.5, false);
+	await waitFor(v, `PD && PD.hit && PD.hit.side === "right"`);
+	expect(await ev(v, `[PD.src.kind, PD.src.t, $(".pn-ghost .pn-gh").textContent]`)).toEqual(["app", "i:kakao#kk:77", "오른쪽에 새 칸"]);
+	await run(v, `{ const r = PD.hit.r; document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.right - 4, clientY: r.top + r.height / 2, pointerId: 1, button: 0 })); $("#kk-room").remove(); }`);
+	await waitFor(v, `paneCount() === 2 && current === "monitoring" && MON.sel === "i:kakao" && $("#split .pane.on").contains($("#v-monitoring"))`);
+	expect(await ev(v, `paneList().map(p => p.kind + ":" + p.t + (p.active ? "*" : ""))`)).toEqual(["chat:main", "app:i:kakao#kk:77*"]);
+});
+
 test("a drop opens the new pane by growing it from nothing and a cancel sends the ghost back; with reduced motion both are instant", async () => {
 	const v = await open();
 	await split(v, "lane:가나");

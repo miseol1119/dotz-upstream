@@ -26,7 +26,13 @@
 #split #v-chat.in-pane > * { grid-column: 1; }
 #split #cv-head { padding-right: calc(var(--sp-8) + var(--sp-4)); }
 #split #v-project.in-pane { flex: 1; min-height: 0; max-width: none; margin: 0; padding: var(--sp-4); overflow-y: auto; }
-/* a screen in a pane (home, 모니터링, 설정 ...) scrolls inside its card */
+/* 모니터링 in a pane scrolls inside its card. A pane is as narrow as the phone's column: an open room, thread or DM takes the whole pane the way it does
+   below 1100px (17-kakao.css), and the app bar's back closes it (30-kakao.js kkBack, 30-monitoring-comments.js cmBack). */
+#split .pane .kk.chat-open .kk-rooms { display: none; }
+/* 메일 쓰기 floats over its pane's corner, not the window's (20-mail-box.css .mbox-fab is fixed to the window) */
+#split .pane .mbox-fab { position: absolute; right: var(--sp-4); bottom: var(--sp-4); }
+/* the copy in an inactive pane has no ids, so what #v-monitoring.kk-on hides on the real screen is hidden here by class */
+.pane-pj > .view.kk-on > .chatbox { display: none; }
 #split .view.in-pane:not(#v-chat):not(#v-project) { flex: 1; min-height: 0; height: auto; max-width: none; margin: 0; padding: var(--sp-4); overflow-y: auto; }
 
 .pane-mir { flex: 1; display: flex; flex-direction: column; min-height: 0; }

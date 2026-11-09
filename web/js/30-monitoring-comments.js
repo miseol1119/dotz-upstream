@@ -217,7 +217,7 @@ async function cmReload(seq = CM.seq, scroll = false) {
 }
 function cmClose() { CM.open = null; CM.view = null; CM.seq++; CM.loading = false; CM.revising = ""; CM.note = {}; cmPaintAll(); convTitle(); }
 function cmBack() {
-  if (!(CM.vis && (CM.tab === "dm" ? DM.open : CM.open) && narrowChat() && current === "monitoring" && !MON.list)) return false;
+  if (!(CM.vis && (CM.tab === "dm" ? DM.open : CM.open) && (narrowChat() || paneMonIn()) && current === "monitoring" && !MON.list)) return false;
   if (CM.tab === "dm") { dmClose(); return true; }
   cmClose();
   return true;

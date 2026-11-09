@@ -1,5 +1,6 @@
 /* ---------- 분할 창 (docs/split-panes.md): the model ----------
-   Panes are leaves {id, kind: "chat"|"project"|"app", t, at, stick, dot} (an app pane is 모니터링: t is "list" or an item key, owner 78c482b1) of a tree whose branches are {dir: "row"|"col", a, b, r} (r = a's share, 0.2..0.8);
+   Panes are leaves {id, kind: "chat"|"project"|"app", t, at, stick, dot} (an app pane is 모니터링: t is "list", an item key, or an item key and
+   "#kk:<room>" / "#cm:<source>:<thread>:<title>" / "#dm:<id>:<peer>" for a room, thread or DM of an in-app app, owner 78c482b1) of a tree whose branches are {dir: "row"|"col", a, b, r} (r = a's share, 0.2..0.8);
    one is active and holds the real section. The screen is 43-panes-view.js, the inactive panes are 43-panes-mirror.js. With one pane (or none) nothing here touches the page. */
 const PANE_KEY = "dotz-panes", PANE_MAX = 4;
 let PN = { root: null, active: "", seq: 0 };
@@ -10,11 +11,37 @@ function paneList() { return paneLeaves().map(p => ({ id: p.id, kind: p.kind, t:
 const paneFind = id => paneLeaves().find(p => p.id === id) || null;
 const paneOpenIn = (kind, t) => paneLeaves().find(p => p.kind === kind && p.t === t) || null;
 const paneNew = (kind, t) => ({ id: `p${++PN.seq}`, kind, t, at: null, stick: true, dot: "" });
-// The 모니터링 screen as a pane's content: its list, or the item open in it.
-const paneAppKey = () => (MON.list || !MON.sel ? "list" : MON.sel);
+// The room, thread or DM open in an in-app app (30-kakao.js, 30-monitoring-comments*.js), as the part of an app pane's t after "#".
+function paneAppSub() {
+  const sel = monItems().find(i => i.key === MON.sel);
+  if (kkItem(sel) && KK.open) return `kk:${enc(KK.open)}`;
+  if (!sel || !cmAppOf(sel.key) || CM.app !== cmAppOf(sel.key)) return "";   // CM still holds the last app's thread until this item paints
+  return DM.open ? `dm:${enc(DM.open.id)}:${enc(DM.open.peer || "")}` : CM.open ? `cm:${enc(CM.open.source)}:${enc(CM.open.thread)}:${enc(CM.open.title || "")}` : "";
+}
+// The 모니터링 screen as a pane's content: its list, or the item open in it with its room, thread or DM.
+function paneAppKey() {
+  if (MON.list || !MON.sel) return "list";
+  const sub = paneAppSub();
+  return sub ? `${MON.sel}#${sub}` : MON.sel;
+}
+const paneAppParts = t => { const [key, sub = ""] = String(t).split("#"), [kind = "", a = "", b = "", c = ""] = sub.split(":").map(decodeURIComponent); return { key, kind, a, b, c }; };
+// Opens an app pane's item, then its room, thread or DM the way its row would.
+// Midway (the item open, its room not yet) the page is neither: the active pane does not follow it (paneAdopt) and takes t once it is there.
+function paneGoApp(t) {
+  const { key, kind, a, b, c } = paneAppParts(t);
+  PN.going = true;
+  try {
+    go("monitoring", key);
+    if (kind === "kk") kkOpen(a);
+    else if (kind === "cm") { cmTab("comments"); cmOpen(CM.threads.find(x => x.source === a && x.thread === b) || { source: a, thread: b, title: c }); }
+    else if (kind === "dm") { cmTab("dm"); dmOpen(DM.convs.find(c => c.id === a) || { id: a, peer: b }); }
+  } finally { PN.going = false; }
+  const p = paneFind(PN.active);
+  if (p && p.kind === "app") { p.t = t; paneHeadSync(); panePersist(); }
+}
 // What the page shows now, as a pane's content (the terminal view and the other screens count as the chat).
 const paneHere = () => (current === "project" ? { kind: "project", t: ppCur } : current === "monitoring" ? { kind: "app", t: paneAppKey() } : { kind: "chat", t: target });
-const paneGo = (kind, t) => (kind === "app" ? go("monitoring", t) : go(kind, t));
+const paneGo = (kind, t) => (kind === "app" ? paneGoApp(t) : go(kind, t));
 function paneParent(n, p) {
   if (paneLeaf(n)) return null;
   return n.a === p || n.b === p ? n : paneParent(n.a, p) || paneParent(n.b, p);

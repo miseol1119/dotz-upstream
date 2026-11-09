@@ -14,19 +14,28 @@ function paneLeave(p) {
     p.at = chatAnchor(); p.stick = chatStick;
     PNS.set(p.id, { n: tl.cloneNode(true), keys: new Set(ts(p.t).mk) });
   } else if (p.kind === "project" && current === "project" && ppCur === p.t) PNS.set(p.id, { n: $("#v-project").cloneNode(true) });
-  else if (p.kind === "app" && current === "monitoring") PNS.set(p.id, { n: $("#v-monitoring").cloneNode(true) });
+  else if (p.kind === "app" && current === "monitoring") {
+    // It keeps the room, thread or DM it ended on, unless another pane holds that one: then only its item (no app shown twice).
+    const k = paneAppKey(), dup = paneLeaves().some(x => x !== p && x.kind === "app" && x.t === k);
+    p.t = dup ? paneAppParts(k).key : k;
+    PNS.set(p.id, { n: $("#v-monitoring").cloneNode(true) });
+  }
   else PNS.delete(p.id);
 }
 
-// An app pane is named by its 모니터링 item, or 모니터링 for the list.
-function paneAppLabel(t) {
-  const it = t !== "list" && monItems().find(i => i.key === t);
-  return it ? it.name : "모니터링";
+// An app pane is named by its room, thread or DM, else its 모니터링 item, else 모니터링 (the list); the state line names what holds it.
+const paneAppItem = t => { const { key } = paneAppParts(t); return (key !== "list" && monItems().find(i => i.key === key)) || null; };
+function paneAppSubName(t) {
+  const { kind, a, b, c } = paneAppParts(t);
+  if (kind === "kk") return (KK.rooms.find(r => r.chatId === a) || {}).name || "대화방";
+  if (kind === "cm") return c || "댓글";
+  return kind === "dm" ? b || "DM" : "";
 }
+const paneAppLabel = t => paneAppSubName(t) || (paneAppItem(t) || {}).name || "모니터링";
 const paneName = p => (p.kind === "app" ? paneAppLabel(p.t) : p.t === "builtin:custom" ? "커스텀" : targetName(p.t));
 function paneState(p) {
   if (p.kind === "project") return "프로젝트";
-  if (p.kind === "app") return p.t === "list" ? "" : "모니터링";
+  if (p.kind === "app") return p.t === "list" ? "" : paneAppSubName(p.t) ? (paneAppItem(p.t) || {}).name || "모니터링" : "모니터링";
   const i = targetInfo(p.t);
   return isRelayT(p.t) ? RELAY.note[p.t] || "" : isFixedT(p.t) ? FIXED_DESC[p.t] : i.alive ? statusKo(i.status) : "종료됨";
 }

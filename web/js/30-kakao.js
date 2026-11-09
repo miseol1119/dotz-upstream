@@ -763,9 +763,9 @@ function kkClose() {
   KK.open = ""; KK.seq++; KK.loading = false; KK.roomErr = ""; KK.edit = null;
   kkPaintAll(); convTitle();
 }
-// Phone: the app bar's back arrow leaves the chat for the room list first (04-state.js #back).
+// Phone, or a split pane (43-panes-view.js paneMonIn): the app bar's back arrow leaves the chat for the room list first (04-state.js #back).
 function kkBack() {
-  if (!(KK.vis && KK.open && narrowChat() && current === "monitoring" && !MON.list)) return false;
+  if (!(KK.vis && KK.open && (narrowChat() || paneMonIn()) && current === "monitoring" && !MON.list)) return false;
   kkClose();
   return true;
 }

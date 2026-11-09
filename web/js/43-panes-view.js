@@ -35,11 +35,13 @@ matchMedia("(max-width: 1099px)").addEventListener("change", paneSync);
 // 모니터링 is in the split only while a pane holds it (the active one or another); otherwise it takes the whole page as before and the panes wait.
 const paneAppOf = () => paneLeaves().find(p => p.kind === "app") || null;
 const paneAppIn = () => current === "monitoring" && (paneFind(PN.active).kind === "app" || !!paneAppOf());
+// The real 모니터링 screen sits in a pane: as narrow as a phone's column, so its back arrow closes an open room first (30-kakao.js kkBack).
+const paneMonIn = () => $("#v-monitoring").classList.contains("in-pane");
 
 // What the active pane shows is whatever the page shows: go() and openTarget() change its content (a target open in another pane activates that pane instead).
 function paneAdopt() {
   const a = paneFind(PN.active), h = paneHere();
-  if (!a || (a.kind === h.kind && a.t === h.t)) return;
+  if (!a || PN.going || (a.kind === h.kind && a.t === h.t)) return;
   // Moving inside 모니터링 stays in the active app pane; coming to it from a conversation goes to an app pane.
   const dup = paneOpenIn(h.kind, h.t) || (h.kind === "app" && a.kind !== "app" && paneAppOf());
   if (dup) { PN.active = dup.id; dup.t = h.t; dup.dot = ""; paneForget(dup.id); }

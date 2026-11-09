@@ -5,12 +5,22 @@
 const PD_MOVE = 6;
 let PD = null;   // {src, x, y, on, dead, ghost, zone, hit, from}
 
-// What a list row opens: its conversation (data-t, a mail of the chat list w:<target>, a 모니터링 item that has one), or a 모니터링 item's own screen.
-// null for a row a pane cannot hold: a KakaoTalk room, a comment thread, 앱 관리 (a sheet).
+// The room, thread or DM row of an in-app app (30-kakao.js kkRow, 30-monitoring-comments.js cmRow, 30-monitoring-comments-dm.js dmRow): its app pane.
+function paneInAppItem(row) {
+  const { chat, thread, conv } = row.dataset;
+  if (chat) return { kind: "app", t: `${MON.sel}#kk:${enc(chat)}` };
+  const th = thread && CM.threads.find(x => x.thread === thread), c = conv && DM.convs.find(x => x.id === conv);
+  if (th) return { kind: "app", t: `${MON.sel}#cm:${enc(th.source)}:${enc(th.thread)}:${enc(th.title || "")}` };
+  return c ? { kind: "app", t: `${MON.sel}#dm:${enc(c.id)}:${enc(c.peer || "")}` } : null;
+}
+// What a list row opens: its conversation (data-t, a mail of the chat list w:<target>, a 모니터링 item that has one), a 모니터링 item's own screen,
+// or an in-app room, thread or DM. null for a row a pane cannot hold: 앱 관리 (a sheet).
 function paneRowItem(row) {
   const { t, k = "" } = row.dataset;
   if (t) return validTarget(t) ? { kind: "chat", t } : null;
+  if (k.startsWith("w:kk:")) return { kind: "app", t: `${KK_KEY}#kk:${enc(k.slice(5))}` };
   if (k.startsWith("w:")) return validTarget(k.slice(2)) ? { kind: "chat", t: k.slice(2) } : null;
+  if (!k && current === "monitoring" && MON.sel) return paneInAppItem(row);
   const it = k && k !== "add-app" && monItems().find(i => i.key === k), c = it ? monChatOf(it) : "";
   return c && validTarget(c) ? { kind: "chat", t: c } : it ? { kind: "app", t: k } : null;
 }
