@@ -138,7 +138,7 @@ const hcDot = tone => el("span", { class: `nt-dot tone-${tone || "none"}`, "aria
 // A generic title (작업 기록, 알림) says nothing in a card's row: the row shows the entry's first line instead.
 const hcLine = n => { const t = ntPlain(n.title); return !t || t === "작업 기록" || t === "작업내역" || t === "알림" ? ntPlain(String(n.text || "").split("\n")[0]) || t || "알림" : t; };
 // Each row opens its own item by kind (30-notices.js noticeOpen); a tap beside the rows still opens the card's conversation.
-const hcNotices = (list, cap) => el("div", { class: "hc-list", "data-cap": cap }, ...list.map(n => el("div", { class: "hc-row", role: "link", tabindex: "0", onclick: ev => { ev.stopPropagation(); noticeOpen(n); }, onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); noticeOpen(n); } } }, hcDot(n.tone), el("span", { class: "tb" }, el("span", { class: "t", text: hcLine(n) }), ntLaneNote(n) ? el("span", { class: "n", text: ntLaneNote(n) }) : null), el("span", { class: "m", text: ntWhen(n) }), ntNeeds(n) ? ntIgnoreBtn(n) : null, ...resultMarker(`n:${n.id}`, resultChips(n)))));
+const hcNotices = (list, cap) => el("div", { class: "hc-list", "data-cap": cap }, ...list.map(n => el("div", { class: "hc-row", role: "link", tabindex: "0", onclick: ev => { ev.stopPropagation(); noticeOpen(n); }, onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); noticeOpen(n); } } }, hcDot(n.tone), el("span", { class: "tb" }, el("span", { class: "t", text: hcLine(n) }), ntLaneNote(n) ? el("span", { class: "n", text: ntLaneNote(n) }) : null), ...resultMarker(`n:${n.id}`, resultChips(n)), el("span", { class: "m", text: ntWhen(n) }), ntNeeds(n) ? ntIgnoreBtn(n) : null)));
 // Gateway restarts are kept in the store (born read) but never shown on 홈 (owner 2026-10-19: restarts are not his news).
 const hcRecent = pick => NT.items.filter(n => pick(n) && !/^게이트웨이(?: 재시작했어요|를 다시 시작했어요)/.test(String(n.text || ""))).sort((a, b) => ntAt(b) - ntAt(a));
 // Only what is news: a question that waits is a row of 답변 필요 above, so it is not counted or listed here a second time; a gateway question it
@@ -335,7 +335,17 @@ const laneResult = t => NT.items.find(n => n.kind === "result" && n.key === t);
 function withResults(row, chips, key) {
   if (!chips) return row;
   if (!row.classList.replace("hr", "hrx-m")) return el("div", { class: "li-res" }, row, chips);
-  return el("div", { class: "hr hrx", "data-t": row.dataset.t }, row, ...(key ? resultMarker(key, chips) : [chips]));
+  const box = el("div", { class: "hr hrx", "data-t": row.dataset.t }, row);
+  return key ? markerFirst(box, row, resultMarker(key, chips)) : (box.append(chips), box);
+}
+// The count marker sits before the row's state word (owner 2026-11-09, "결과물이 완료나 시간 앞에"): the word leaves the tap area (.hrx-m) for the row's
+// end, after the marker, so it stays in one column with the rows without results; a tap on it still opens the row.
+function markerFirst(box, m, marker) {
+  const hs = m.querySelector(":scope > .hs");
+  if (!hs || !marker.length) { box.append(...marker); return box; }
+  hs.onclick = () => m.click();
+  box.append(marker[0], hs, ...marker.slice(1));
+  return box;
 }
 // 홈 shows how many results a finished row made, not the chips (owner 2026-11-09, "개수만 표시"): the marker (.hrx-n) puts the same chips under its row, one row
 // at a time, and a second press or Escape takes them away. `key` names the row, so the open one stays open when 홈 repaints.
@@ -354,10 +364,10 @@ function resultShow(b, chips, key) {
   for (const o of document.querySelectorAll('.hrx-n[aria-expanded="true"]')) resultHide(o);
   homeResOpen = key;
   b.setAttribute("aria-expanded", "true");
-  b.after(chips);
+  b.parentElement.append(chips);   // under the whole row, after its state word
 }
 function resultHide(b) {
-  const f = b.nextElementSibling;
+  const f = b.parentElement && b.parentElement.querySelector(":scope > .hrx-f");
   if (f && f.classList.contains("hrx-f")) f.remove();
   b.setAttribute("aria-expanded", "false");
   homeResOpen = "";
@@ -621,11 +631,11 @@ function workRow(w) {
   const state = run ? "작업 중" : stall ? "멈춤" : done ? "완료" : w.cancelled ? "중단됨" : rec ? "이어서 처리 중" : "실패";
   const line = run ? [workElapsed(w), w.model].filter(Boolean).join(" · ") : stall ? `${w.reason || "활동이 없어요"} · ${workAgo(w)}` : done ? `끝남 · ${workAgo(w)}` : `${workFailText(w)} · ${workAgo(w)}`;
   const act = w.cancelled ? ["다시 맡기기", b => workRetry(w.id, b)] : null;
-  return el("div", { class: "hr hrx", "data-work": w.id },
-    el("button", { class: "hrx-m", type: "button", onclick: () => workGo(w), "aria-label": `${w.description} · ${state} · ${run || stall || rec ? "대화로 가기" : "결과 보기"}` },
-      el("span", { class: `dot ${tone}` }),
-      el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: w.description })), el("span", { class: "ha", text: line })),
-      el("span", { class: `hs ${tone}`, text: state })),
-    ...(done ? resultMarker(`w:${w.id}`, resultChips(w)) : []),
+  const m = el("button", { class: "hrx-m", type: "button", onclick: () => workGo(w), "aria-label": `${w.description} · ${state} · ${run || stall || rec ? "대화로 가기" : "결과 보기"}` },
+    el("span", { class: `dot ${tone}` }),
+    el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: w.description })), el("span", { class: "ha", text: line })),
+    el("span", { class: `hs ${tone}`, text: state }));
+  const row = el("div", { class: "hr hrx", "data-work": w.id }, m,
     act ? el("button", { class: "btn text", type: "button", style: "flex:none;margin-right:var(--sp-2)", "data-act": "retry", onclick: ev => act[1](ev.currentTarget), text: act[0] }) : null);
+  return done ? markerFirst(row, m, resultMarker(`w:${w.id}`, resultChips(w))) : row;
 }

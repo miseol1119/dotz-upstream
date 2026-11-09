@@ -88,6 +88,20 @@ test("home: a row with results shows a one-line count marker and no chips; a row
 	expect(a).toBe(b!);
 });
 
+test("home: the marker comes before the row's 완료 or time, which stay in one column at the right with or without results", async () => {
+	const v = await boot();
+	const r = await q<Record<string, unknown>>(v, `${ROWS}
+		const st = x => x.querySelector(".hs, .m"), right = x => Math.round(st(x).getBoundingClientRect().right);
+		const rows = Object.values(made);
+		return { before: rows.map(x => !!(x.querySelector(".hrx-n").compareDocumentPosition(st(x)) & Node.DOCUMENT_POSITION_FOLLOWING)),
+			gap: rows.map(x => Math.round(st(x).getBoundingClientRect().left - x.querySelector(".hrx-n").getBoundingClientRect().right)),
+			made: rows.map(right), none: none.map(right), words: rows.map(x => st(x).textContent) };`);
+	expect(r.before).toEqual([true, true, true]);
+	expect(r.made).toEqual(r.none);
+	expect(r.gap).toEqual([4, 4, 8]);
+	expect((r.words as string[])[0]).toBe("완료");
+});
+
 test("home: the marker opens the row's three chips under it, one row at a time; a second click or Escape closes them", async () => {
 	const v = await boot();
 	const r = await q<Record<string, unknown>>(v, `${CHIPS} ${ROWS}

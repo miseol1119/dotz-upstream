@@ -155,7 +155,8 @@ body { display: flow-root; }
 #home-cards .card > .hn > .hr.hrx > .hrx-m { padding-left: var(--sp-5); }
 #home-cards .card > .hn > .hr.hrx > .hrx-m:last-child, #home-cards .card > .hn > .hr.hrx > .hrx-m:has(+ .hrx-f) { padding-right: var(--sp-5); }
 #home-cards .card > .hn > .hr.hrx > .hrx-f { padding-left: var(--sp-10); padding-right: var(--sp-5); }
-#home-cards .card > .hn > .hr.hrx > .btn, #home-cards .card > .hn > .hr.hrx > .hrx-n { margin-right: var(--sp-4); }
+#home-cards .card > .hn > .hr.hrx > .btn, #home-cards .card > .hn > .hr.hrx > .hrx-n:last-child { margin-right: var(--sp-4); }
+#home-cards .card > .hn > .hr.hrx > .hs { margin-right: var(--sp-5); }
 #home-cards .card > .hn:has(> .hc-none) { margin: 0; }
 @media (max-width: 1023px) { #v-home { padding: var(--sp-1) var(--sp-4) var(--sp-6); } }
 
