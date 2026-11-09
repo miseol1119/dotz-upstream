@@ -40,7 +40,9 @@ the old history at the same version until the next release, then treats the whol
 Every release is also a GitHub Release whose body is the note `hub/release-note.ts` builds from the commits since the previous tag, with
 no model call. It reads like a patch note: each commit is one line under a plain Korean topic (by the files it touches), its subject then
 the first sentence of its `왜:` (or else `어떻게:`) with the label dropped (in a body a label counts only at the start of a line), and the rest of the body is not used. A reason that quotes,
-names a file or runs past 160 characters is skipped. Release and merge commits are left out, and test-only commits and subjects starting `내부 정리:` collapse into one closing count.
+names a file or runs past 160 characters is skipped. An aside in brackets that names code (a file, a CSS selector, custom property or
+flag, a camelCase or snake_case name, a call, a path) goes whole, in the subject too, and a reason with a code name woven into the sentence is
+skipped, so the line is the subject alone. Release and merge commits are left out, and test-only commits and subjects starting `내부 정리:` collapse into one closing count.
 The note goes through
 `hub/public-scrub.ts`, the same scrub as GitHub posts: the pattern list, this machine's config and secrets when it has a data folder, and
 the `PRIVACY_TERMS` repo secret (one term per line) in Actions, where no data folder exists. It covers `<previous tag>..<tag>`, so commits

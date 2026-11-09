@@ -18,6 +18,20 @@ const BODY_LABEL = /^[ \t]*(왜|어떻게)[ \t]*:\s*/m;
 // A reason that quotes, names a file or runs long reads like the conversation behind the change, not a patch note.
 const NOT_A_REASON = /["“”`]|[\w.-]+\/[\w.-]+\.\w+/;
 const REASON_MAX = 160;
+// Code names a user cannot read: a file, a CSS selector, custom property or flag, a camelCase or snake_case name, a call, a path.
+// Product names stay: Discord, iCloud, macOS, Node.js, a slash command like /context, a ratio like 11/16.
+const CODE_NAME = new RegExp([
+	String.raw`(?<![\w.\/-])(?:[\w.-]+\/)*(?:[a-z0-9]|[A-Z0-9_]{2,}(?![a-z]))[\w.-]*\.(?:[cm]?[jt]sx?|css|html?|md|jsonl?|ya?ml|toml|sh|py|rs|go|swift|kt|sql|txt|log|lock|plist)(?![\w-]|\.\w)`,
+	String.raw`(?<![\w.)\]])[.#][a-z][\w-]*`,
+	String.raw`(?<![\w-])--[a-z][\w-]*`,
+	String.raw`\b[a-z][a-z0-9]+[A-Z][a-z]\w*`,
+	String.raw`\b[A-Za-z][A-Za-z0-9]*_\w*[A-Za-z0-9]`,
+	String.raw`\b[a-z_$][\w$]*(?:\.[\w$]+)*\([\w$.,'"]*\)`,
+	String.raw`(?<![\w.\/~-])(?:(?:~|\.{1,2})\/[\w.-]+|\/[A-Za-z_][\w.-]*(?=\/))`,
+].join("|"));
+// An aside in brackets that names code goes whole, so the sentence around it still reads; code woven into the sentence itself drops the sentence.
+const withoutCodeAsides = (text: string) => text.replace(/\s*\(([^()]*)\)/g, (aside, inside: string) => (CODE_NAME.test(inside) ? "" : aside));
+const plainReason = (s: string) => s.length <= REASON_MAX && /\p{L}{2}/u.test(s) && !NOT_A_REASON.test(s) && !CODE_NAME.test(s);
 const TEST_FILE = /\.test\.[jt]sx?$|(?:^|\/)(?:test|tests|fixtures)\//;
 // Plain Korean topics, by where a commit's files are; the first match per file wins and the commit goes to the topic with the most files.
 const TOPICS: [topic: string, re: RegExp][] = [
@@ -62,10 +76,10 @@ function firstSentence(text: string): string {
 // One or two sentences: what changed, then why. Labelled parts may sit in the body or, from a one-line commit, in the subject itself.
 function noteItem({ subject, body = "" }: NoteCommit): string {
 	const inline = subject.split(SUBJECT_LABEL);
-	const what = inline[0].replace(TICKET, "").trim();
+	const what = withoutCodeAsides(inline[0].replace(TICKET, "")).trim();
 	const labelled = [...inline.slice(1), ...body.split(BODY_LABEL).slice(1)];
 	const parts = (label: string) => labelled.flatMap((part, i) => (i % 2 === 0 && part === label ? [labelled[i + 1] ?? ""] : []));
-	const reason = [...parts("왜"), ...parts("어떻게")].map(firstSentence).find(s => s && s.length <= REASON_MAX && !NOT_A_REASON.test(s));
+	const reason = [...parts("왜"), ...parts("어떻게")].map(part => firstSentence(withoutCodeAsides(part))).find(plainReason);
 	if (!reason) return what;
 	return `${/[.!?]$/.test(what) ? what : `${what}.`} ${reason}`;
 }

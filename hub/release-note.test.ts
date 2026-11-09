@@ -84,6 +84,43 @@ describe("buildReleaseNote", () => {
 		expect(items).toEqual(["- 이유 문장이 끊기지 않아요. 줄바꿈으로 감싼 왜: 본문은 첫 문장이 첫 줄에서 잘렸어요."]);
 	});
 
+	test("a code name in brackets goes with its brackets, and the sentence around it stays", () => {
+		const items = note([
+			{ subject: "앱바 단추(.ib)가 넓어져요", body: "왜: 앱바 아이콘 단추(.ib)는 그려진 크기만큼만 눌렸어요.", files: ["web/a.js"] },
+			{ subject: "앱 목록을 한 번만 불러와요", body: "왜: 같은 앱 목록(GET /api/integrations)을 세 번 요청했어요.", files: ["web/a.js"] },
+			{ subject: "입구 검사를 더해요", body: "왜: 보안 검토(transport.md 1, 2, 7)에서 헤더를 위조할 수 있었어요.", files: ["web/a.js"] },
+			{ subject: "답이 사라지지 않아요", body: "왜: 대기열(hub/queue.ts)이 재시작 때 비었어요.", files: ["web/a.js"] },
+			{ subject: "글자가 더 잘 읽혀요", body: "왜: 보조 글자(--fg-3), 주황(--warn) 글자가 4.5:1에 못 미쳤어요.", files: ["web/a.js"] },
+			{ subject: "이유가 괄호뿐이에요", body: "왜: (transport.md).", files: ["web/a.js"] },
+			{ subject: "사용량 카드에서 제목만 굵게 보여요", body: "왜: 제목(Claude 구독)과 한도 값(64% 남음)이 모두 굵었어요.", files: ["web/a.js"] },
+		]).split("\n").filter(l => l.startsWith("- "));
+		expect(items).toEqual([
+			"- 앱바 단추가 넓어져요. 앱바 아이콘 단추는 그려진 크기만큼만 눌렸어요.",
+			"- 앱 목록을 한 번만 불러와요. 같은 앱 목록을 세 번 요청했어요.",
+			"- 입구 검사를 더해요. 보안 검토에서 헤더를 위조할 수 있었어요.",
+			"- 답이 사라지지 않아요. 대기열이 재시작 때 비었어요.",
+			"- 글자가 더 잘 읽혀요. 보조 글자, 주황 글자가 4.5:1에 못 미쳤어요.",
+			"- 이유가 괄호뿐이에요",
+			"- 사용량 카드에서 제목만 굵게 보여요. 제목(Claude 구독)과 한도 값(64% 남음)이 모두 굵었어요.",
+		]);
+	});
+
+	test("a reason woven around a code name gives way to the plain title, and product names are not code", () => {
+		const woven = [
+			"43-panes-drag.js에서 너비를 재요.",
+			".tag·.mon-ptag는 바탕 없이 점과 글자예요.",
+			"알림으로 연 세션은 ntKeep에 기억해 둬요.",
+			"설정은 dotz_watch로 넣어요.",
+			"열 때마다 refresh()를 세 번 불렀어요.",
+			"같은 목록을 /api/integrations에서 세 번 읽었어요.",
+			"숫자 배지는 --fs-tag 크기로 맞췄어요.",
+		];
+		const plain = "Discord와 Cloudflare, iCloud 메일, macOS의 Node.js 설치에서도 /context 결과와 11/16 크기 숫자를 글로만 봤어요.";
+		const commits = [...woven, plain].map((why, i) => ({ subject: `바뀐 점 ${i + 1}이에요`, body: `왜: ${why}`, files: ["web/a.js"] }));
+		const items = note(commits).split("\n").filter(l => l.startsWith("- "));
+		expect(items).toEqual([...woven.map((_, i) => `- 바뀐 점 ${i + 1}이에요`), `- 바뀐 점 ${woven.length + 1}이에요. ${plain}`]);
+	});
+
 	test("nothing to report still gives a note", () => {
 		expect(note(FIXTURE.slice(0, 2))).toContain("이번 버전에는 바뀐 기능이 없어요.");
 	});
