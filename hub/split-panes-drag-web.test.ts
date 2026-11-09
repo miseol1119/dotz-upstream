@@ -132,10 +132,10 @@ test("a drop opens the new pane by growing it from nothing and a cancel sends th
 	await waitFor(v, `!document.querySelector(".pn-ghost, .pn-zone")`);
 
 	await run(v, `{ const real = window.matchMedia.bind(window); window.matchMedia = q => q.includes("reduced-motion") ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : real(q); }`);
-	await drag(v, ROW("lane:마바"), PANE("main"), 0.97, 0.5, false);
-	await waitFor(v, `PD && PD.hit && PD.hit.side === "right"`);
+	await drag(v, ROW("lane:마바"), PANE("main"), 0.5, 0.97, false);
+	await waitFor(v, `PD && PD.hit && PD.hit.side === "bottom"`);
 	expect(await ev(v, `document.querySelector(".pn-ghost").getAnimations().length + document.querySelector(".pn-zone").getAnimations().length`)).toBe(0);
-	await run(v, `{ const r = PD.hit.r; document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.right - 4, clientY: r.top + r.height / 2, pointerId: 1, button: 0 })); }`);
+	await run(v, `{ const r = PD.hit.r; document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.left + r.width / 2, clientY: r.bottom - 4, pointerId: 1, button: 0 })); }`);
 	expect(await ev(v, `[paneCount(), [...document.querySelectorAll("#split .pane, #split .pane-row, #split .pane-col")].flatMap(n => n.getAnimations()).length, !!document.querySelector(".pn-ghost, .pn-zone")]`)).toEqual([4, 0, false]);
 });
 

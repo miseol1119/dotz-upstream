@@ -56,10 +56,13 @@ function paneDragBoxes() {
   const a = $("#cv-head").getBoundingClientRect(), b = $("#composer").getBoundingClientRect();
   return [{ id: "", r: new DOMRect(a.left, a.top, a.width, b.bottom - a.top) }];
 }
-// The nearest edge when the pointer is in the outer quarter of that side, else the middle; edges are off when they cannot add a pane.
+// The nearest edge when the pointer is in the outer quarter of that side, else the middle; edges are off when they cannot add a pane, and a side whose
+// two halves would be narrower than a pane may be (280px wide, 240px high, the divider's limits in 43-panes-view.js) is no edge either.
 function paneDragZone(r, x, y, edges) {
-  const nearest = [["left", (x - r.left) / r.width], ["right", (r.right - x) / r.width], ["top", (y - r.top) / r.height], ["bottom", (r.bottom - y) / r.height]].sort((a, b) => a[1] - b[1])[0];
-  return edges && nearest[1] < 0.25 ? nearest[0] : "center";
+  const gap = 16, wide = (r.width - gap) / 2 >= 280, tall = (r.height - gap) / 2 >= 240;
+  const near = [["left", (x - r.left) / r.width, wide], ["right", (r.right - x) / r.width, wide], ["top", (y - r.top) / r.height, tall], ["bottom", (r.bottom - y) / r.height, tall]]
+    .filter(e => e[2] && e[1] < 0.25).sort((a, b) => a[1] - b[1])[0];
+  return edges && near ? near[0] : "center";
 }
 // With four panes a row has no edge to split at: the whole pane is the zone and the drop replaces it (full: true says why).
 function paneDragAim(x, y) {
