@@ -83,12 +83,16 @@ const icon = (n, cls = "") => { const s = document.createElementNS("http://www.w
 const KST = { timeZone: "Asia/Seoul" };
 const kstTime = ts => { const d = new Date(ts); return isNaN(d) ? "" : d.toLocaleTimeString("ko-KR", KST); };
 const kstStamp = ts => { const d = new Date(ts); return isNaN(d) ? "" : d.toLocaleString("ko-KR", { ...KST, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }); };
+// A time left, rounded down to its two largest units (6일 23시간 59분 reads 6일 23시간, never 7일): 6일 23시간, 3시간 12분, 12분.
+function leftText(ms) {
+  const m = Math.floor(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
+  return d ? `${d}일${h ? ` ${h}시간` : ""}` : h ? `${h}시간${mm ? ` ${mm}분` : ""}` : `${mm}분`;
+}
+// When a usage window or budget resets (epoch ms): the time left until then, or that it is resetting now.
 function rel(ms) {
-  const d = ms - Date.now(), m = Math.round(Math.abs(d) / 60000);
-  if (d < 0 && m >= 1) return "초기화됨";
-  if (m < 1) return "곧 초기화";
-  const s = m < 60 ? `${m}분` : m < 48 * 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${Math.round(m / 1440)}일`;
-  return `${s} 후 초기화`;
+  const d = ms - Date.now();
+  if (d <= 0) return "초기화 중";
+  return d < 60000 ? "1분 안에 초기화" : `${leftText(d)} 후 초기화`;
 }
 const oneLine = s => String(s).replace(/\s+/g, " ").trim().slice(0, 160);
 // The one line a 생각 row shows: the model's thinking when it is Korean, else a Korean label (the raw English stays in the row's fold).

@@ -20,11 +20,11 @@ const RETRY_MS = 60_000;
 const REQUEST_TIMEOUT_MS = 15_000;
 const USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
 
-type SubscriptionAccount = { name: string; pinned: boolean; sticky?: boolean; token: string; expiresAt: number | null };
+type SubscriptionAccount = { name: string; pinned: boolean; sticky?: boolean; token: string; expiresAt: number | null; plan?: string };
 type AccountProblem = "expired" | "rate_limited" | "failed";
 type Limit = { id: string; label: string; window: { id: string; label: string; durationMs: number; resetsAt?: number }; amount: { used: number; limit: number; remaining: number; usedFraction: number; remainingFraction: number; unit: "percent" }; status: string };
 // Shaped like one `omp usage --json` report, plus whose numbers they are.
-export type AccountReport = { provider: "anthropic"; account: string; via: "omo-pinned" | "omo-sticky" | "omo-pool" | "omp"; limits: Limit[]; fetchedAt?: number; problem?: AccountProblem; retryAt?: number };
+export type AccountReport = { provider: "anthropic"; account: string; via: "omo-pinned" | "omo-sticky" | "omo-pool" | "omp"; limits: Limit[]; fetchedAt?: number; problem?: AccountProblem; retryAt?: number; plan?: string };
 
 type Json = Record<string, any>;
 const readJson = (file: string): Json | undefined => {
@@ -43,7 +43,7 @@ const readJson = (file: string): Json | undefined => {
 // background (a synchronous read blocked the gateway's event loop, and an expired token re-ran it on every call).
 const CLI_TOKEN_TTL_MS = 60_000;
 const EXPIRED_RECHECK_MS = 15_000;
-type CliCred = { access: string; expires?: number };
+type CliCred = { access: string; expires?: number; subscriptionType?: string; rateLimitTier?: string };
 const cliTokens = new Map<string, { at: number; cred?: CliCred }>();
 const keychainReads = new Map<string, Promise<void>>();
 const securityRead = (service: string): Promise<string | undefined> =>
@@ -60,7 +60,8 @@ export const cliTokensSettled = async (): Promise<void> => void (await Promise.a
 const parseCred = (raw: string | undefined): CliCred | undefined => {
 	try {
 		const o = JSON.parse(raw ?? "")?.claudeAiOauth;
-		if (typeof o?.accessToken === "string" && o.accessToken) return { access: o.accessToken, ...(typeof o.expiresAt === "number" ? { expires: o.expiresAt } : {}) };
+		if (typeof o?.accessToken === "string" && o.accessToken)
+			return { access: o.accessToken, ...(typeof o.expiresAt === "number" ? { expires: o.expiresAt } : {}), ...(typeof o.subscriptionType === "string" ? { subscriptionType: o.subscriptionType } : {}), ...(typeof o.rateLimitTier === "string" ? { rateLimitTier: o.rateLimitTier } : {}) };
 	} catch {}
 	return undefined;
 };
@@ -98,10 +99,24 @@ function tokenAccounts(file: string, now: number): { sub: Json | undefined; acco
 		if (typeof a.access === "string" && a.access) return [a];
 		if (a.store !== "claude-cli" || a.signInRequired) return [];
 		const cred = cliCredential(file, a.dirId, now);
-		return cred ? [{ ...a, access: cred.access, expires: cred.expires }] : [];
+		return cred ? [{ ...a, access: cred.access, expires: cred.expires, subscriptionType: cred.subscriptionType, rateLimitTier: cred.rateLimitTier }] : [];
 	});
 	return { sub, accounts };
 }
+
+// Pure: the plan an account is on, as Anthropic names it. `shown` is the name `claude auth status` printed when OmO signed the
+// account in (auth.json profile.subscriptionType: "Claude " + the server's plan display name, e.g. "Claude Ultra", or the CLI's own
+// "Claude Max"/"Claude Pro"); without it the CLI credential's subscriptionType ("pro", "max", ...) is named. A bare Max is told
+// apart by the credential's rateLimitTier (default_claude_max_5x / _20x). An unknown value is shown as it is, never guessed.
+const PLAN: Record<string, string> = { pro: "Pro", max: "Max", team: "Team", enterprise: "Enterprise" };
+export function planName(shown: unknown, type: unknown, tier: unknown): string | undefined {
+	const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+	const t = str(type);
+	const name = str(shown)?.replace(/^Claude\s+/i, "") || (t ? (PLAN[t.toLowerCase()] ?? t) : undefined);
+	const x = str(tier)?.match(/_max_(\d+)x$/i)?.[1];
+	return name === "Max" && x ? `Max ${x}x` : name;
+}
+const planOf = (a: Json): string | undefined => planName(a.profile?.subscriptionType, a.subscriptionType, a.rateLimitTier);
 
 // The runtime that runs a role, as hub/runtime/index.ts runtimeFor decides it (unknown names run OmO); kept here so the
 // usage path does not import the adapters (they import providers.ts).
@@ -150,13 +165,17 @@ export function subscriptionAccount(file = authFile(), now = Date.now(), prefer?
 	const usedName = hard && preferred ? preferred.name : usedAccount(wanted.name, accounts.map(a => a.name), n => !usable(accounts.find(a => a.name === n)!), n => last(accounts.find(a => a.name === n)!));
 	const chosen = accounts.find(a => a.name === usedName) ?? wanted;
 	const pinned = chosen === pin;
-	return { name: chosen.name, pinned, ...(preferred && chosen === preferred && !pinned ? { sticky: true } : {}), token: chosen.access, expiresAt: typeof chosen.expires === "number" ? chosen.expires : null };
+	const plan = planOf(chosen);
+	return { name: chosen.name, pinned, ...(preferred && chosen === preferred && !pinned ? { sticky: true } : {}), token: chosen.access, expiresAt: typeof chosen.expires === "number" ? chosen.expires : null, ...(plan ? { plan } : {}) };
 }
 
 // Every subscription account OmO holds, for the per-account usage numbers the owner's rules read (hub/account-rules.ts).
 export function subscriptionAccounts(file = authFile()): SubscriptionAccount[] {
 	const { sub, accounts } = tokenAccounts(file, Date.now());
-	return accounts.map(a => ({ name: a.name, pinned: sub?.pinned === a.name, token: a.access, expiresAt: typeof a.expires === "number" ? a.expires : null }));
+	return accounts.map(a => {
+		const plan = planOf(a);
+		return { name: a.name, pinned: sub?.pinned === a.name, token: a.access, expiresAt: typeof a.expires === "number" ? a.expires : null, ...(plan ? { plan } : {}) };
+	});
 }
 
 const WINDOWS: [key: string, id: string, label: string, windowId: string, durationMs: number][] = [
@@ -214,8 +233,9 @@ export class AccountUsage {
 		const held = this.last.get(acct.name);
 		if (held && t < held.next && !(force && t - held.at >= MIN_REFRESH_MS && held.report.problem !== "rate_limited")) return held.report;
 		const via = acct.pinned ? "omo-pinned" : acct.sticky ? "omo-sticky" : "omo-pool";
+		const plan = acct.plan ? { plan: acct.plan } : {};
 		// the last numbers stay, marked with what went wrong since
-		const keep = (problem: AccountProblem, wait: number, retryAt?: number): AccountReport => this.settle(acct.name, { provider: "anthropic", account: acct.name, via, limits: held?.report.limits ?? [], ...(held?.report.fetchedAt ? { fetchedAt: held.report.fetchedAt } : {}), problem, ...(retryAt ? { retryAt } : {}) }, t, wait);
+		const keep = (problem: AccountProblem, wait: number, retryAt?: number): AccountReport => this.settle(acct.name, { provider: "anthropic", account: acct.name, via, ...plan, limits: held?.report.limits ?? [], ...(held?.report.fetchedAt ? { fetchedAt: held.report.fetchedAt } : {}), problem, ...(retryAt ? { retryAt } : {}) }, t, wait);
 		if (acct.expiresAt !== null && acct.expiresAt <= t) return keep("expired", RETRY_MS);
 		const until = this.backoff.get(acct.name);
 		if (until !== undefined && t < until) return keep("rate_limited", until - t, until);
@@ -229,7 +249,7 @@ export class AccountUsage {
 				return keep("rate_limited", wait, t + wait);
 			}
 			if (!res.ok) return keep("failed", RETRY_MS);
-			return this.settle(acct.name, { provider: "anthropic", account: acct.name, via, limits: limitsOf(await res.json()), fetchedAt: t }, t, FRESH_MS);
+			return this.settle(acct.name, { provider: "anthropic", account: acct.name, via, ...plan, limits: limitsOf(await res.json()), fetchedAt: t }, t, FRESH_MS);
 		} catch {
 			return keep("failed", RETRY_MS);
 		}

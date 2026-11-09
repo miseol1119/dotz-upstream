@@ -5,8 +5,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { resetStickyForTest } from "./account-sticky.ts";
 import { setManual } from "./account-rules.ts";
-import { anthropicUsage, forgetAccountUsage, onQuota, QUOTA_REFRESH_MS, quota, refreshQuota, resetQuotaForTest } from "./providers.ts";
-import { AccountUsage, cliTokensSettled, limitsOf, limitsText, MIN_REFRESH_MS, resetCliTokensForTest, setKeychainReaderForTest, subscriptionAccount, subscriptionAccounts } from "./usage-account.ts";
+import { anthropicUsage, buildQuota, forgetAccountUsage, onQuota, QUOTA_REFRESH_MS, quota, refreshQuota, resetQuotaForTest } from "./providers.ts";
+import { AccountUsage, cliTokensSettled, limitsOf, limitsText, MIN_REFRESH_MS, planName, resetCliTokensForTest, setKeychainReaderForTest, subscriptionAccount, subscriptionAccounts } from "./usage-account.ts";
 
 const agentDir = process.env.OMO_CODING_AGENT_DIR!;
 const auth = (sub: Record<string, unknown>) => writeFileSync(join(agentDir, "auth.json"), JSON.stringify({ "anthropic-subscription": { type: "oauth", ...sub } }));
@@ -110,6 +110,35 @@ test("read only: an expired token is reported, never used; a 429 holds the accou
 	expect(after.problem).toBeUndefined();
 	expect(after.limits.map(l => l.id)).toEqual(["anthropic:5h", "anthropic:7d"]);
 	expect(calls).toBe(2);
+});
+
+test("planName names the plan Anthropic shows, tells Max 5x from 20x by the rate-limit tier, and passes an unknown value through", () => {
+	expect(planName("Claude Ultra", "max", "default_claude_max_20x")).toBe("Ultra");
+	expect(planName("Claude Max", "max", "default_claude_max_5x")).toBe("Max 5x");
+	expect(planName("Claude Max", undefined, undefined)).toBe("Max");
+	expect(planName("Claude Pro", "pro", "default_claude_ai")).toBe("Pro");
+	expect(planName(undefined, "max", "default_claude_max_20x")).toBe("Max 20x");
+	expect(planName(undefined, "pro", undefined)).toBe("Pro");
+	expect(planName(undefined, "team", undefined)).toBe("Team");
+	expect(planName("Claude Galaxy", "max", "default_claude_max_20x")).toBe("Galaxy");
+	expect(planName(undefined, "student_plus", undefined)).toBe("student_plus");
+	expect(planName(undefined, undefined, "default_claude_max_20x")).toBeUndefined();
+	expect(planName("", " ", undefined)).toBeUndefined();
+});
+
+test("the account's plan rides on its usage report and /api/quota: OmO's signed-in profile first, else the CLI credential", async () => {
+	const dirId = "e".repeat(32);
+	const dir = join(agentDir, "anthropic-subscription-claude", dirId);
+	mkdirSync(dir, { recursive: true });
+	writeFileSync(join(dir, ".credentials.json"), JSON.stringify({ claudeAiOauth: { accessToken: "tok-cli", expiresAt: FAR, subscriptionType: "max", rateLimitTier: "default_claude_max_5x" } }));
+	resetCliTokensForTest();
+	auth({ accounts: [{ name: "default", store: "claude-cli", dirId, profile: { subscriptionType: "Claude Ultra" } }, { name: "second", store: "claude-cli", dirId }, { name: "old", access: "tok-old", expires: FAR }] });
+	expect(subscriptionAccounts().map(a => [a.name, a.plan])).toEqual([["default", "Ultra"], ["second", "Max 5x"], ["old", undefined]]);
+	const u = new AccountUsage(async () => new Response(JSON.stringify(body(10, 20)), { status: 200 }));
+	const r = await u.report(subscriptionAccount(undefined, undefined, "default")!);
+	expect(r.plan).toBe("Ultra");
+	expect(buildQuota([r], ["anthropic"]).providers[0]!.plan).toBe("Ultra");
+	expect("plan" in buildQuota([{ ...r, plan: undefined }], ["anthropic"]).providers[0]!).toBe(false);
 });
 
 test("limitsOf skips windows the answer leaves null", () => {

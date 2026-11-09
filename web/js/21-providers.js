@@ -208,7 +208,8 @@ async function loadQuota(fresh) {
     el("button", { class: "btn text sm", type: "button", onclick: ev => busy(ev.currentTarget, () => loadQuota(true)) }, icon("refresh"), "새로고침")));
   const grid = el("div", { class: "grid" });
   for (const p of q.providers || []) {
-    const card = el("div", { class: "card" }, el("div", { class: "ch" }, el("h3", { text: providerName(p.provider) })));
+    // a subscription names its plan as Anthropic does (Pro, Max 5x, Max 20x, Ultra, ...; hub/usage-account.ts planName)
+    const card = el("div", { class: "card" }, el("div", { class: "ch" }, el("h3", { text: p.plan ? `${providerName(p.provider)} · ${p.plan}` : providerName(p.provider) })));
     for (const l of p.limits || []) {
       card.append(el("div", { class: "lim" },
         el("div", { class: "kv" }, el("span", { class: "k", text: limitName(l) }), el("b", { text: pctText(l) })),
