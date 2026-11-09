@@ -12,7 +12,7 @@ afterAll(() => { page?.view.close(); server.stop(true); });
 type Box = { top: number; bottom: number };
 type Shot = { kb: string; sheet: Box; body: Box; send: Box };
 
-test("the phone mail sheet ends where the keyboard begins, so the body's end and the send row stay above it", async () => {
+test("the phone mail sheet ends where the keyboard begins, so the body's end and the send row stay above it, the body whole above the send row", async () => {
 	page = await openPage(server, { width: 390, height: 699 });
 	const view = page.view;
 	await goScreen(page, "mail");
@@ -36,6 +36,8 @@ test("the phone mail sheet ends where the keyboard begins, so the body's end and
 	expect(flat.sheet).toEqual({ top: 0, bottom: 369 });
 	expect(flat.body.bottom).toBeLessThanOrEqual(369);
 	expect(flat.send.bottom).toBeLessThanOrEqual(369);
+	// the body shrinks to the room between the subject and the send row: its whole focus border shows, nothing runs under the row
+	expect(flat.body.bottom).toBeLessThanOrEqual(flat.send.top);
 
 	// iOS Safari pans the visible area down by 259: the sheet is that area exactly, its top under the status bar and its end at the keyboard
 	const pan = await keyboard(369, 259);
@@ -43,6 +45,7 @@ test("the phone mail sheet ends where the keyboard begins, so the body's end and
 	expect(pan.sheet).toEqual({ top: 259, bottom: 628 });
 	expect(pan.send.bottom).toBeLessThanOrEqual(628);
 	expect(pan.body.bottom).toBeLessThanOrEqual(628);
+	expect(pan.body.bottom).toBeLessThanOrEqual(pan.send.top);
 
 	// the keyboard goes down: the whole screen again
 	expect((await keyboard(699, 0)).sheet).toEqual({ top: 0, bottom: 699 });
