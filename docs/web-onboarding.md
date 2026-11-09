@@ -158,6 +158,9 @@ Linux의 화면 판별은 `DISPLAY` 또는 `WAYLAND_DISPLAY`, SSH 판별은 `SSH
 | ⌘. | 메인 대화 | `04-state.js` |
 | ⌘\ | 사이드바 접기 (1024px 이상) | `04-state.js` |
 | ⌘1 ~ ⌘6 | 탭 이동 (켜진 탭 순서) | `04-state.js` `navKeyHint` |
+| ⌥⌘\ (그 밖 Ctrl+Shift+\) | 칸 나누기 (1100px 이상) | `43-panes-keys.js` `paneTourKeys` |
+| ⌥⌘1 ~ ⌥⌘4 | 칸 이동 (1100px 이상) | `43-panes-keys.js` |
+| ⌥⌘W | 칸 닫기 (1100px 이상) | `43-panes-keys.js` |
 | Ctrl+` / ⌘` | 다음 컴퓨터, ⇧이면 이전 | `33-peers.js` |
 | Enter | 보내기, 일하는 중이면 지금 턴에 끼워 넣기 | `14-slash-commands.js` |
 | ⌘Enter | 다음 턴으로 미루기 | `14-slash-commands.js` |

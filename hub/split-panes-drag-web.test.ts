@@ -116,6 +116,15 @@ test("⌥⌘\\ splits, ⌥⌘1 and ⌥⌘W work the panes, and ⌘\\ alone still
 	expect(await ev(v, `paneCount()`)).toBe(1);
 });
 
+test("Ctrl+Shift+\\ splits without Alt, which AltGr layouts send as Ctrl+Alt; the screen tour lists the pane keys", async () => {
+	const v = await open();
+	await run(v, `document.dispatchEvent(new KeyboardEvent("keydown", { code: "Backslash", key: "|", ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }))`);
+	await waitFor(v, `paneCount() === 2 && document.querySelectorAll("#split .pane").length === 2`);
+	expect(await ids(v)).toEqual(["main", "worklog"]);
+	expect(await ev(v, `document.documentElement.classList.contains("side-min")`)).toBe(false);
+	expect(await ev(v, `introKeys().slice(-3).map(k => k[1])`)).toEqual(["칸 나누기", "칸 이동", "칸 닫기"]);
+});
+
 test("a saved layout comes back by name after the panes are closed, and the palette offers it", async () => {
 	const v = await open();
 	expect(await ev(v, `paneLayoutItems("").map(i => i.label)`)).toEqual([]);

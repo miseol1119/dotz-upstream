@@ -14,10 +14,10 @@ const introStops = () => {
   ];
   return introTouch() ? stops : [...stops, { keys: true, t: "단축키를 쓰면 더 빨라요" }];
 };
-// The keys come from the code that handles them: the palette button, MOD_KEYS and the tab numbers (04-state.js).
+// The keys come from the code that handles them: the palette button, MOD_KEYS and the tab numbers (04-state.js), the pane keys (43-panes-keys.js).
 const introKeys = () => {
   const mod = isMac ? "⌘" : "Ctrl+", tabs = navTabs();
-  return [[$("#cmdk kbd").textContent, "검색과 명령"], ...MOD_KEYS.filter(modKeyWide).map(k => [mod + k.key, k.label]), [`${navKeyHint(tabs[0][0])} ~ ${navKeyHint(tabs.at(-1)[0])}`, "탭 이동"]];
+  return [[$("#cmdk kbd").textContent, "검색과 명령"], ...MOD_KEYS.filter(modKeyWide).map(k => [mod + k.key, k.label]), [`${navKeyHint(tabs[0][0])} ~ ${navKeyHint(tabs.at(-1)[0])}`, "탭 이동"], ...paneTourKeys()];
 };
 let introEl = null, introAt = 0, introFrom = null;
 
