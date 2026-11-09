@@ -38,6 +38,7 @@ let SL = { items: [], idx: -1, hide: "" };
 // live sessions). A pick writes "@<title> " and is kept in MENTIONS; the message sends {kind, id, label} for every token still in the text
 // (hub/mentions.ts turns them into [지칭] lines), so "이거 멈춰" names one id.
 let MENTIONS = [];
+let sendCid = null;   // {text, id}: the id of the send in flight or failed, see sendChat
 function mnItems() {
   const work = w => ({ kind: "task", id: w.id, label: w.description || w.id, sub: `백그라운드 작업${w.model ? ` · ${w.model}` : ""}` });
   const convs = ((S && S.convs) || []).filter(c => convRunning(c));
@@ -267,11 +268,14 @@ async function sendChat(how) {
   const mode = how || (isWorking(t) ? "steer" : undefined), reply = rpTake();
   if (isSettingsT(t) && !TURN.has(t)) TURN.set(t, Date.now() - 5000);
   try {
-    const body = { text, ...(reply ? { reply } : {}), ...(lane ? { lane } : {}), ...(isProjT(t) ? { project: projOf(t) } : {}), ...(isMailT(t) ? { mail: mailOf(t) } : {}), ...(isSettingsT(t) ? { settings: settingsApp(t) } : {}), ...(isFixedT(t) ? { conv: t } : {}), ...(mode ? { mode } : {}), ...(files.length ? { files } : {}), ...(picks.length ? { elements: picks } : {}), ...(refs.length ? { refs } : {}) };
+    // One id per send, kept while it fails, so a retry of the same text is the same send to the hub (hub/routes.ts cid).
+    if (!sendCid || sendCid.text !== text) sendCid = { text, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 10) };
+    const body = { text, cid: sendCid.id, ...(reply ? { reply } : {}), ...(lane ? { lane } : {}), ...(isProjT(t) ? { project: projOf(t) } : {}), ...(isMailT(t) ? { mail: mailOf(t) } : {}), ...(isSettingsT(t) ? { settings: settingsApp(t) } : {}), ...(isFixedT(t) ? { conv: t } : {}), ...(mode ? { mode } : {}), ...(files.length ? { files } : {}), ...(picks.length ? { elements: picks } : {}), ...(refs.length ? { refs } : {}) };
     // A conversation of another computer gets the files uploaded there first (34-peer-monitoring.js pqUpload); a failed upload sends nothing.
     const owner = pqAct("/api/message", body);
     if (owner && owner.pc && files.length) body.files = (await pqUpload(owner.pc, sentAtt)).map((f, i) => ({ ...f, label: sentAtt[i].no }));
     const r = await api("/api/message", "POST", body);
+    sendCid = null;
     // A peer's conversation is not on this computer's event stream: its history is read again now, so the sent bubble shows at once.
     if (owner && owner.pc) loadTarget(t, true);
     scrollChat(true); scrollTerm(true);

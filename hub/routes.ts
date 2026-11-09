@@ -384,6 +384,12 @@ export async function applyMailStates(source: string, items: readonly MailSource
 	for (const target of new Set([...changed, ...flags])) broadcast({ kind: "mail_unreplied", target });
 	return new Set([...changed, ...flags]).size;
 }
+// The last web sends by client id, with the answer each got (POST /api/message `cid`). Set before the send so a double tap in flight is a retry too.
+const sentCids = new Map<string, unknown>();
+const rememberCid = (cid: string, answer: unknown): void => {
+	sentCids.set(cid, answer);
+	if (sentCids.size > 500) sentCids.delete(sentCids.keys().next().value as string);
+};
 const parseMailStates = (raw: unknown): { source: string; items: MailSourceState[] } | undefined => {
 	const b = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
 	if (typeof b.source !== "string" || !b.source.trim() || !Array.isArray(b.items)) return undefined;
@@ -837,6 +843,9 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 		}
 		if (req.method === "POST" && url.pathname === "/api/message") {
 			const b = await body(req);
+			// The web's id for one send (`cid`): the same id again is a retry, answered as the first was, stored once.
+			const cid = typeof b.cid === "string" && b.cid ? b.cid.slice(0, 80) : "";
+			if (cid && sentCids.has(cid)) return json(sentCids.get(cid));
 			let files: ReturnType<typeof ownerFiles>;
 			try {
 				files = ownerFiles(b.files);
@@ -877,13 +886,16 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 			// The queue sends to the main conversation when the turn ends; a project message goes in now (intake merges a burst).
 			if (mode === "queue" && !project && !mail && !conv && (lane ? lanes.has(lane) : !parseCommand(text) && !authHeld("web")) && (lane ? lanes.get(lane)?.status === "working" : orch.status === "working")) {
 				const item = enqueue(lane ? `lane:${lane}` : "main", [reply ? replyLine(reply) : "", text, files.length ? attachmentLines(files) : "", elements.length ? pickedLines(elements) : "", ...refs].filter(Boolean).join("\n"), login);
+				if (cid) rememberCid(cid, { ok: true, queued: item });
 				return json({ ok: true, queued: item });
 			}
+			if (cid) rememberCid(cid, { ok: true });
 			try {
 				// A decision answer from the chat card: the asking message (its ts) and the chosen option per block (intake.ts decisionLines).
 				const picks = Array.isArray(b.picks) ? b.picks.slice(0, 10).flatMap((p: any) => (p && Number.isFinite(Number(p.n)) ? [{ q: String(p.q ?? "").slice(0, 200), n: Number(p.n), label: String(p.label ?? "").slice(0, 120), ...(typeof p.note === "string" && p.note.trim() ? { note: p.note.replace(/\s+/g, " ").trim().slice(0, 500) } : {}) }] : [])) : [];
 				await sendWeb({ lane, project, mail, settings, conv: lane || project || mail || settings ? undefined : conv, channel, text, mode: mode === "queue" ? "default" : mode, login, files, ...(elements.length ? { elements } : {}), ...(refs.length ? { refs } : {}), ...(typeof b.reply_to === "string" && b.reply_to ? { replyTo: b.reply_to.slice(0, 40) } : {}), ...(reply ? { reply } : {}), ...(picks.length ? { picks } : {}), via: viaOf(b.via) });
 			} catch (error) {
+				sentCids.delete(cid);
 				return json({ error: (error as Error).message }, 409);
 			}
 			return json({ ok: true });
