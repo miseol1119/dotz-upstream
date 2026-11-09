@@ -54,10 +54,18 @@ function convNote(e, t, was) {
 }
 // A mail the hub listed before and no longer does was deleted (on another device, or by the mailbox's own sync): it leaves this page too, and a view
 // of it goes back to the list instead of answering "이 메일을 찾지 못했어요" on the next tap. A mail that only arrived live, or another computer's, is not touched.
+// The list comes a page of mails at a time (hub/conversations-page.ts): CVP.next is the cursor of the older ones (empty = all loaded), CVP.counts the hub's
+// counts over every mail, from the first page. A refresh of the first page only judges the mails inside its range; the older ones stay as loaded.
+const CVP = { next: "", more: false, counts: null, busy: null };
 let convHadMail = new Set();
-function convDropGone(items) {
-  const now = new Set(items.filter(it => it.mail).map(it => it.target)), gone = [...convHadMail].filter(t => !now.has(t) && !PQ.of.has(t));
-  convHadMail = now;
+const convInRange = (t, cursor) => {
+  if (!cursor) return true;
+  const at = cursor.indexOf("|"), ts0 = cursor.slice(0, at), last = CONV.get(t), ts1 = last ? last.ts : "";
+  return ts1 > ts0 || (ts1 === ts0 && t <= cursor.slice(at + 1));
+};
+function convDropGone(items, cursor, whole) {
+  const now = new Set(items.filter(it => it.mail).map(it => it.target)), gone = [...convHadMail].filter(t => !now.has(t) && !PQ.of.has(t) && (whole ? true : convInRange(t, cursor)));
+  convHadMail = whole ? now : new Set([...convHadMail].filter(t => !gone.includes(t)).concat([...now]));
   if (!gone.length) return;
   for (const t of gone) { MAILS.delete(t); CONV.delete(t); MBOX.sel.delete(t); ts(t).unread = 0; }
   if (current === "chat" && gone.includes(target)) go("monitoring", MON.sel || "i:mail");
@@ -84,23 +92,32 @@ function coalesced(fn) {
 }
 const mailLive = coalesced(() => Promise.allSettled([convLoad(), loadIntegrations()]));
 const monitorsLive = coalesced(() => loadMonitors());
+// The rows of one answer into the stores.
+function convApply(items) {
+  for (const it of items) {
+    const t = it.target, prev = CONV.get(t);
+    if (it.mail) MAILS.set(t, it.mail);
+    if (it.last && (!prev || prev.ts <= it.last.ts)) CONV.set(t, it.last);
+    else if (!CONV.has(t)) CONV.set(t, null);
+    let unread = it.unread | 0;
+    const local = READ[t], last = CONV.get(t);
+    // Our own read post may be ahead of what the server has answered with.
+    if (local && (!it.read || local > it.read)) { if (last && last.ts <= local) unread = 0; }
+    else READ[t] = it.read || null;
+    ts(t).unread = unread;
+  }
+}
 async function convLoadNow() {
   clearTimeout(convRetry);
   try {
-    const r = await api("/api/conversations");
-    for (const it of r.items || []) {
-      const t = it.target, prev = CONV.get(t);
-      if (it.mail) MAILS.set(t, it.mail);
-      if (it.last && (!prev || prev.ts <= it.last.ts)) CONV.set(t, it.last);
-      else if (!CONV.has(t)) CONV.set(t, null);
-      let unread = it.unread | 0;
-      const local = READ[t], last = CONV.get(t);
-      // Our own read post may be ahead of what the server has answered with.
-      if (local && (!it.read || local > it.read)) { if (last && last.ts <= local) unread = 0; }
-      else READ[t] = it.read || null;
-      ts(t).unread = unread;
-    }
-    convDropGone(r.items || []);
+    const r = await api("/api/conversations"), items = r.items || [], pg = r.page;
+    convApply(items);
+    if (r.counts) CVP.counts = r.counts;
+    // Keep the cursor of the furthest page loaded; a refresh of the first page must not walk it back.
+    if (!pg || !pg.more) { CVP.more = false; CVP.next = ""; }
+    else if (!CVP.next || !CVP.more) { CVP.more = true; CVP.next = pg.next; }
+    convDropGone(items, pg && pg.more ? pg.next : "", !pg || !pg.more);
+    await convPin(CV.key || (typeof monCtx === "string" ? monCtx : ""));
     CV.loaded = true; CV.failed = false;
     renderBars();
     if (convCapture() || (CV.key && !CV.placed)) renderAll();   // the first paint of an opening waits for this (chatReady)
@@ -111,6 +128,32 @@ async function convLoadNow() {
     if (CV.key && !CV.placed) renderAll();
   }
   convSchedule();
+}
+// A mail that is open but older than the pages loaded: asked for by its key, so its header and thread draw (hub: GET /api/conversations?target=).
+async function convPin(t) {
+  if (!CVP.more || !t || !isMailT(t) || MAILS.has(t)) return;
+  try {
+    const r = await api(`/api/conversations?target=${encodeURIComponent(t)}`);
+    convApply(r.items || []);
+    for (const it of r.items || []) if (it.mail) convHadMail.add(it.target);
+  } catch { /* the mail just draws without its header */ }
+}
+// The next page of mails (older ones), when the hub says there are more. The mail list asks for it as the owner scrolls to its end; one at a time.
+function convMore() {
+  if (!CVP.more || !CVP.next) return Promise.resolve();
+  if (CVP.busy) return CVP.busy;
+  const from = CVP.next;
+  CVP.busy = (async () => {
+    try {
+      const r = await api(`/api/conversations?before=${encodeURIComponent(from)}`), items = r.items || [];
+      convApply(items);
+      for (const it of items) if (it.mail) convHadMail.add(it.target);
+      const pg = r.page || {};
+      CVP.more = !!pg.more; CVP.next = pg.more ? pg.next : "";
+      renderBars();
+    } catch { /* the sentinel asks again at the next scroll */ }
+  })().finally(() => { CVP.busy = null; });
+  return CVP.busy;
 }
 // Another device (or this one) moved a read position.
 function convOnRead(e) {

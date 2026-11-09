@@ -264,10 +264,15 @@ function mbRowsPrune() {
   for (const t of [...MBOX.rows.keys()]) if (!MBOX.pass.has(t)) MBOX.rows.delete(t);
   MBOX.pass.clear();
 }
-function mbMore() { MBOX.drawn += MB_PAGE; MON.sig = ""; monSchedule(); }
+// A step draws MB_PAGE more of the loaded mails; when the hub has older ones, the next page is asked for too, and the list draws again when it lands.
+function mbMore() {
+  MBOX.drawn += MB_PAGE;
+  if (CVP.more) convMore().then(() => { MON.sig = ""; monSchedule(); });
+  MON.sig = ""; monSchedule();
+}
 // After the drawn rows: a sentinel that adds a page when it reaches the viewport, and the plain button for a browser without IntersectionObserver.
 function mbMoreNodes(left) {
-  const btn = moreRow(`${left}개 더 보기`, mbMore);
+  const btn = moreRow(left ? `${left}개 더 보기` : "메일 더 보기", mbMore);
   btn.dataset.mbMore = "1";
   return [el("div", { class: "mon-sentinel", "data-mb": "1", "aria-hidden": "true" }), btn];
 }

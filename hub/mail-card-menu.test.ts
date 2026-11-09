@@ -134,7 +134,7 @@ describe("a deleted mail leaves every list", () => {
 		emit("inbox", { ts: new Date().toISOString(), kind: "mail", source: "fx", channel: t, conv: t, mail: key, subject: "견적 문의", from: "Kim <kim@example.com>", text: "Kim · 견적 문의" });
 		const pm = createPeerMonitor({ name: () => "A", computers: async () => [], local: route, localHeaders: { "x-dotz-token": HUB_TOKEN } });
 		const lists = async () => {
-			const own = ((await (await call("GET", "/api/conversations")).json()) as { items: { target: string; mail?: unknown }[] }).items;
+			const own = ((await (await call("GET", "/api/conversations?all=1")).json()) as { items: { target: string; mail?: unknown }[] }).items;
 			const snap = (await (await pm.route(new Request("http://local/api/peer/monitoring"), new URL("http://local/api/peer/monitoring")))!.json()) as { conversations: { target: string }[] };
 			return { own: own.filter(c => c.target === t), peer: snap.conversations.filter(c => c.target === t) };
 		};

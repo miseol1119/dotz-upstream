@@ -25,7 +25,7 @@ test("a posted mail keeps a preview of its body and lists its files without path
 	const rec = mailByKey(key)!;
 	expect(rec.preview).toBe("안녕하세요.\n견적서를 첨부합니다.\n감사합니다.");
 	expect(rec.attachments!.map(a => [a.name, a.size])).toEqual([["견적서 2026.txt", Buffer.byteLength("견적 내용")], ["evil.zip", 7], ["a.png", 7]]);
-	const list = (await (await get("/api/conversations")).json()) as { items: { target: string; mail?: Record<string, any> }[] };
+	const list = (await (await get("/api/conversations?all=1")).json()) as { items: { target: string; mail?: Record<string, any> }[] };
 	const mail = list.items.find(i => i.target === posted.target)!.mail!;
 	expect(mail.attachments).toEqual(rec.attachments!.map(({ name, type, size }) => ({ name, type, size })));
 	expect(JSON.stringify(mail)).not.toContain("mail-files");

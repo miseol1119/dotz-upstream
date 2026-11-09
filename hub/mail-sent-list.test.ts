@@ -12,7 +12,7 @@ const env = setupEnv();
 afterAll(env.cleanup);
 const call = (method: string, path: string, body?: object) => route(new Request(`http://hub.test${path}`, { method, headers: { "x-dotz-token": HUB_TOKEN, "content-type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) }));
 const route = makeRoute({ busyNow: () => [], restartGateway: () => "", restartGatewayNow: () => "", mailDeps: () => deps });
-const rows = async () => ((await (await call("GET", "/api/conversations")).json()) as { items: Array<{ target: string; mail?: Record<string, any> }> }).items;
+const rows = async () => ((await (await call("GET", "/api/conversations?all=1")).json()) as { items: Array<{ target: string; mail?: Record<string, any> }> }).items;
 const rowOf = async (key: string) => (await rows()).find(i => i.target === `mail:${key}`)?.mail;
 
 let seq = 0;

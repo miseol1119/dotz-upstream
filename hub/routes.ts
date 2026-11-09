@@ -23,6 +23,7 @@ import { allWatches, approveWatch, runWatch } from "./watch.ts";
 import { watchConnection } from "./watch-status.ts";
 import { fieldsOf, isSettingsTarget } from "./app-settings.ts";
 import { watchOfSubject } from "./watch-settings.ts";
+import { conversationPage } from "./conversations-page.ts";
 import { markRead, markUnread } from "./reads.ts";
 import { shownEvent } from "./owner-text.ts";
 import { activityItems, broadcast, historyEvents, historyPage, ownerMessage, recentEvents, sentFiles, sseResponse } from "./events.ts";
@@ -651,8 +652,7 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 		}
 		if (req.method === "GET" && url.pathname === "/api/conversations") {
 			settleMailDrafts(listDrafts());   // a dropped draft takes its 초안 있음 off before the rows are drawn
-			const owed = new Set(unrepliedMailList().map(m => m.key));
-			const sent = sentMailRefs();
+			const owed = new Set(unrepliedMailList().map(m => m.key)), sent = sentMailRefs();
 			// Ended sessions are listed too: 답변 필요 stays on their row (their unread is 0, conversations.ts unreadOf) in the folded 끝난 세션 group (web/js/04-state.js endedGroup).
 			// A mail conversation is listed only while its mail is: a deleted mail (mail-deleted.json) keeps its log but leaves every list and count here and on the other computer (hub/peer-monitor.ts).
 			const lv = liveLanes(), trashable = originalDeletable(DATA_DIR, mailSyncDeps), place = boxPass(DATA_DIR);
@@ -661,7 +661,7 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 				const m = mailByKey(c.target.slice(5));
 				return m ? [{ ...c, mail: mailCard(m, owed.has(m.key), sent.has(m.key), { read: c.unread === 0, can: canOf(m.source, mailSyncDeps), trashOriginal: trashable(m), place }) }] : [];
 			});
-			return json({ items });
+			const page = conversationPage(items, url.searchParams); return json(page.body, page.status);
 		}
 		// One attached file of a mail: only files the mail's own record names, only inside the mail files folder (hub/mail.ts).
 		const mailFile = (req.method === "GET" || req.method === "HEAD") && /^\/api\/mail\/([a-z0-9._-]+)\/files\/(\d+)$/.exec(url.pathname);

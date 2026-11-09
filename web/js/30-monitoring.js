@@ -641,7 +641,7 @@ function monChronoNodes(it, names) {
   }
   if (cut && newestTop) nodes.push(...(it.mon ? [monOlderSentinel(it.key, cut, "end")] : []), monMoreBtn(it.key, cut, `이전 소식 ${cut}개 보기`));
   else if (cut) nodes.unshift(monOlderSentinel(it.key, cut), monMoreBtn(it.key, cut, `이전 소식 ${cut}개 보기`));
-  if (hidden && hidden.size) nodes.push(...mbMoreNodes(hidden.size));
+  if (hidden && (hidden.size || CVP.more)) nodes.push(...mbMoreNodes(hidden.size));
   if (withMails) mbRowsPrune();
   if (withMails) return MX.scr ? mxScreen() : [...mxTop(it), mailFilterBar(it.mails, it.notices.filter(ok)), mbList(held ? [] : it.mails.filter(t => MAILS.has(t) && mf[2](MAILS.get(t), t))), ...(nodes.length ? nodes : [el("div", { class: "empty", text: held ? "확인할 초안이 없어요" : "이 보기에 해당하는 메일이 없어요" })]), mbFab()];
   return nodes;

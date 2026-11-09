@@ -24,6 +24,8 @@ const fresh = (): Mail[] => [
 let mails: Mail[] = fresh();
 let posts: { path: string; body: any }[] = [];
 let composeFails = false;
+let pageOf = 0;
+const conversationAsks: string[] = [];
 
 const card = (m: Mail) => ({ subject: m.subject, from: m.from, to: m.to, cc: m.cc, source: "acme", at: m.at, summary: m.summary, dir: m.dir, read: m.read, archived: !!m.archived, starred: !!m.starred, trashOriginal: m.trashOriginal, can: m.can, reply: m.reply, attachments: m.attachments });
 const history = (m: Mail) => [{ kind: "mail", ts: m.at, conv: `mail:${m.key}`, target: `mail:${m.key}`, mail: m.key, subject: m.subject, from: m.from, to: m.to, cc: m.cc, dir: m.dir, source: "acme", html: false, attachments: m.attachments, text: `[mail] ${m.subject}\n\n${m.summary}\n\n원문\n안녕하세요.\n점검 결과를 보내 드립니다.\n확인 부탁드립니다.` }];
@@ -43,7 +45,13 @@ const hub = fakeHub({
 		}
 		if (p === "/api/notices") return json({ items: [], unread: 0 });
 		if (p === "/api/integrations") return json({ items: [{ key: "mail", label: "메일", icon: "mail", kind: "app", conv: ["mail:"], notices: [], unread: mails.filter(m => !m.read).length, needs: { drafts: 0, unread: 0, sentToday: 0, unreplied: 0 } }], available: [] });
-		if (p === "/api/conversations") return json({ items: mails.map(m => ({ target: `mail:${m.key}`, unread: m.read || m.dir ? 0 : 1, read: null, mail: card(m), last: { ts: m.at, text: m.subject, from: "bot" } })) });
+		if (p === "/api/conversations") {
+			const row = (m: Mail) => ({ target: `mail:${m.key}`, unread: m.read || m.dir ? 0 : 1, read: null, mail: card(m), last: { ts: m.at, text: m.subject, from: "bot" } });
+			if (!pageOf) return json({ items: mails.map(row) });
+			const before = url.searchParams.get("before"), byAge = [...mails].sort((x, y) => (x.at < y.at ? 1 : -1)), from = before === null ? 0 : byAge.findIndex(m => `mail:${m.key}` === before.slice(before.indexOf("|") + 1)) + 1, shown = byAge.slice(from, from + pageOf), more = from + pageOf < byAge.length;
+			conversationAsks.push(url.search);
+			return json({ items: shown.map(row), page: { limit: pageOf, more, ...(more ? { next: `${shown[shown.length - 1]!.at}|mail:${shown[shown.length - 1]!.key}` } : {}) } });
+		}
 		if (p === "/api/history") { const t = url.searchParams.get("target") ?? "", m = mails.find(x => `mail:${x.key}` === t); return json({ target: t, events: m ? history(m) : [] }); }
 		if (p === "/api/read" && req.method === "POST") { const b = (await req.json()) as { target: string }; const m = mails.find(x => `mail:${x.key}` === b.target); if (m) m.read = true; return json({ ok: true, moved: true }); }
 		if (p === "/api/upload" && req.method === "POST") { const f = (await req.formData()).get("file") as File; return json({ files: [{ name: f.name, path: `/uploads/${f.name}`, size: f.size, type: f.type }] }); }
@@ -125,6 +133,18 @@ describe("the list", () => {
 		await folder(v, "sent");
 		expect(await titles(v)).toEqual(["Re: 견적서 보내드립니다"]);
 		expect(await ev<string>(v, `document.querySelector("#mon-tl > .mr .rc-src").textContent`)).toBe("나 → Lee");
+	}, 30_000);
+});
+
+describe("the list in pages", () => {
+	test("a hub that answers a page of mails at a time gets the next page asked for when the list reaches its end, and every mail shows", async () => {
+		pageOf = 3; conversationAsks.length = 0;
+		try {
+			const v = await openList(1280, 800);
+			await waitFor(v, `document.querySelectorAll("#mon-tl > .mr").length === 6`);
+			expect(await titles(v)).toEqual(["월간 점검 보고서 확인 요청", "회의 일정 변경", "처리가 안 되는 메일", "회사 메일", "읽음 표시를 못 하는 메일함", "견적서 보내드립니다"]);
+			expect(conversationAsks.some(q => q.includes("before="))).toBe(true);
+		} finally { pageOf = 0; }
 	}, 30_000);
 });
 

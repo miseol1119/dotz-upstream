@@ -110,7 +110,7 @@ export function createPeerMonitor(deps: MonitorDeps): PeerMonitor {
 		}));
 	const read = async (path: string): Promise<any> => (await ask("GET", path)).json();
 
-	const PARTS = ["/api/monitors", "/api/notices?limit=100", "/api/integrations", "/api/conversations"];
+	const PARTS = ["/api/monitors", "/api/notices?limit=100", "/api/integrations", "/api/conversations?all=1"];
 	const build = (name: string, [m, n, i, c]: any[], r?: RepliesPart, bot?: string): Snapshot => {
 		const part = { name, ...(bot ? { bot } : {}), monitors: m?.items ?? [], notices: n?.items ?? [], integrations: i?.items ?? [], available: i?.available ?? [], conversations: (c?.items ?? []).filter(isConv), ...(deps.orchestrator ? { orchestrator: deps.orchestrator() } : {}), ...(deps.runs ? { runs: deps.runs() } : {}), ...(r ? { replies: r.items, ...(r.failed ? { failed: r.failed } : {}), ...(r.sent ? { sent: r.sent } : {}), ...(r.stops ? { stops: r.stops } : {}) } : {}) };
 		return { ...part, rev: createHash("sha1").update(JSON.stringify(part)).digest("hex").slice(0, 12) };

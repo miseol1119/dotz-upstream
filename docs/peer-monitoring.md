@@ -26,7 +26,7 @@ gateway that owns the item. That gateway executes it and records it.
 - No token file: reads still work through the owner's tailnet identity (the same way the computer switcher works).
   Forwarded actions and send leases need the token, so the item is read-only on the other computer.
 - An older peer answers 404 to `/api/peer/monitoring`. The hub then builds that peer's snapshot from its `/api/monitors`,
-  `/api/notices`, `/api/integrations` and `/api/conversations`, and marks it `legacy`.
+  `/api/notices`, `/api/integrations` and `/api/conversations?all=1` (every row, not one page), and marks it `legacy`.
 
 ## Reads (owning gateway answers, any gateway asks)
 

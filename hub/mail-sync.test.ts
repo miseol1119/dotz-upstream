@@ -154,11 +154,11 @@ describe("the routes", () => {
 		await call("POST", `/api/mail/${key}/action`, { action: "archive" });
 		const batch = await (await call("POST", "/api/mail/actions", { keys: [key, "fx-nope"], action: "unread" })).json() as { ok: boolean; results: unknown[] };
 		expect(batch.results).toEqual([{ key, ok: true, synced: false }, { key: "fx-nope", ok: false, synced: false, note: "이 메일을 찾지 못했어요" }]);
-		const card = ((await (await call("GET", "/api/conversations")).json()) as { items: Array<{ target: string; mail?: Record<string, any> }> }).items.find(i => i.target === `mail:${key}`)!.mail!;
+		const card = ((await (await call("GET", "/api/conversations?all=1")).json()) as { items: Array<{ target: string; mail?: Record<string, any> }> }).items.find(i => i.target === `mail:${key}`)!.mail!;
 		expect(card).toMatchObject({ read: false, archived: true, starred: true, can: [] });
 		expect(typeof card.base).toBe("string");
 		await call("POST", `/api/mail/${key}/action`, { action: "read" });
-		const again = ((await (await call("GET", "/api/conversations")).json()) as { items: Array<{ target: string; mail?: Record<string, any> }> }).items.find(i => i.target === `mail:${key}`)!.mail!;
+		const again = ((await (await call("GET", "/api/conversations?all=1")).json()) as { items: Array<{ target: string; mail?: Record<string, any> }> }).items.find(i => i.target === `mail:${key}`)!.mail!;
 		expect(again.read).toBe(true);
 		const z = await incoming("zele");
 		const st = await (await call("POST", "/api/mail/state", { source: "zele", items: [{ id: mailByKey(z)!.id, trashed: true }] })).json();
@@ -170,7 +170,7 @@ describe("the routes", () => {
 	test("안 읽음 action on an old mail whose message is no longer in the event log still counts it unread, and 읽음 clears it", async () => {
 		const key = `fx-old${uid("")}`;
 		recordMail({ key, source: "fx", id: key.slice(3), subject: "오래된 메일", from: "Kim <kim@example.com>", to: "me@example.com", at: "2026-10-01T00:00:00.000Z", reply: "needs" });
-		const cardOf = async () => ((await (await call("GET", "/api/conversations")).json()) as { items: Array<{ target: string; unread: number; mail?: Record<string, any> }> }).items.find(i => i.target === `mail:${key}`)!;
+		const cardOf = async () => ((await (await call("GET", "/api/conversations?all=1")).json()) as { items: Array<{ target: string; unread: number; mail?: Record<string, any> }> }).items.find(i => i.target === `mail:${key}`)!;
 		expect((await cardOf()).mail!.read).toBe(true);
 		expect((await call("POST", `/api/mail/${key}/action`, { action: "unread" })).status).toBe(200);
 		expect(await cardOf()).toMatchObject({ unread: 1, mail: { read: false } });

@@ -35,7 +35,7 @@ test("a posted HTML body is stored sanitized beside the mail, listed as a flag, 
 	expect(mailByKey(r.key)!.html).toBe(true);
 	expect(mailByKey(r.key)!.attachments![0]!.cid).toBe("logo");
 	expect(events.at(-1)!.html).toBe(true);
-	const list = (await (await get("/api/conversations")).json()) as { items: { target: string; mail?: Record<string, any> }[] };
+	const list = (await (await get("/api/conversations?all=1")).json()) as { items: { target: string; mail?: Record<string, any> }[] };
 	expect(list.items.find(i => i.target === r.target)!.mail!.html).toBe(true);
 	const res = await get(`/api/mail/${r.key}/body`);
 	const body = await res.text();
