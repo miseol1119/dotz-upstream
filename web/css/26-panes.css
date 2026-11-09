@@ -26,6 +26,11 @@
 #split #v-chat.in-pane > * { grid-column: 1; }
 #split #cv-head { padding-right: calc(var(--sp-8) + var(--sp-4)); }
 #split #v-project.in-pane { flex: 1; min-height: 0; max-width: none; margin: 0; padding: var(--sp-4); overflow-y: auto; }
+/* a screen in a pane (home, 모니터링, 설정 ...): no list column, the screen scrolls inside its card */
+#split.no-side { grid-template-columns: minmax(0, 1fr); }
+#split.no-side > .pane-side { display: none; }
+#split.no-side > .pane-tree { grid-column: 1; }
+#split .view.in-pane:not(#v-chat):not(#v-project) { flex: 1; min-height: 0; height: auto; max-width: none; margin: 0; padding: var(--sp-4); overflow-y: auto; }
 
 .pane-mir { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .pane-hd { flex: none; display: flex; align-items: center; gap: var(--sp-2); min-width: 0; padding: var(--sp-3) var(--sp-4); }
@@ -43,7 +48,13 @@
 .pane-pj { flex: 1; min-height: 0; overflow-y: auto; }
 .pane-pj > .view { max-width: none; margin: 0; padding: var(--sp-4); }
 
-/* dragging a row or a pane head (43-panes-drag.js): a ghost of the title at the pointer, the hovered zone drawn over its pane like the file drop (accent fill, --ff-ring edge) */
+/* dragging a tab, a row or a pane head (43-panes-drag.js): a ghost of the title at the pointer with what letting go does under it, the row it came from
+   in its hover look, the hovered zone drawn over its pane like the file drop (accent fill, --ff-ring edge). A row a pane cannot show: a muted ghost, no zone. */
 body.pn-drag, body.pn-drag * { cursor: grabbing !important; user-select: none; }
-.pn-ghost { position: fixed; z-index: 2100; max-width: 240px; padding: var(--sp-1) var(--sp-3); border-radius: var(--r-ctl); background: var(--card); box-shadow: var(--float); color: var(--fg); font: 500 var(--fs-sec)/var(--lh-sec) var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+body.pn-drag.pn-no, body.pn-drag.pn-no * { cursor: not-allowed !important; }
+.pn-src { background: var(--card-hover); }
+.pn-ghost { position: fixed; z-index: 2100; max-width: 240px; padding: var(--sp-1) var(--sp-3); border-radius: var(--r-ctl); background: var(--card); box-shadow: var(--float); color: var(--fg); font: 500 var(--fs-sec)/var(--lh-sec) var(--font); pointer-events: none; }
+.pn-ghost > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pn-gh { color: var(--fg-3); font: 400 var(--fs-meta)/var(--lh-meta) var(--font); }
+.pn-ghost.no > .pn-gt { color: var(--fg-3); }
 .pn-zone { position: fixed; z-index: 2099; border-radius: var(--r-card); background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: var(--ff-ring); pointer-events: none; }
