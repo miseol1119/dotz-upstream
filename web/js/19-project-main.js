@@ -387,10 +387,10 @@ const pmWorkRow = w => {
   const run = w.status === "running" && !w.queued, stall = w.status === "stalled", rec = workRecovering(w);
   const word = w.queued ? "순서 대기" : run ? "진행 중" : stall ? "멈춤" : w.status === "done" ? "완료" : w.cancelled ? "중단됨" : rec ? "이어서" : "실패";
   const tag = workTone(w);
-  return el("button", { class: "li tap", type: "button", onclick: () => workGo(w) },
+  return withResults(el("button", { class: "li tap", type: "button", onclick: () => workGo(w) },
     el("span", { class: "lead" }, el("span", { class: `dot ${tag}` })),
     el("span", { class: "tx" }, el("div", { class: "hd", text: friendlyLine(w.description) }), el("div", { class: "sup", text: w.queued ? "순서를 기다려요" : run ? `작업 중 · ${workElapsed(w)}` : `${stall ? `멈춤 · ${w.reason || "활동이 없어요"}` : w.status === "done" ? "끝남" : w.cancelled ? "중단됨" : rec ? "이어서 처리 중" : "실패 · 이어서 처리함"} · ${workAgo(w)}` })),
-    el("span", { class: "li-end" }, el("span", { class: `tag ${tag}`, text: word })));
+    el("span", { class: "li-end" }, el("span", { class: `tag ${tag}`, text: word }))), w.status === "done" ? resultChips(w) : null);
 };
 // 진행 중: sessions that are alive and background jobs that are running. 최근 세션: the ended ones, newest first.
 function pmDoing(live, running) {
@@ -398,7 +398,7 @@ function pmDoing(live, running) {
   return el("div", { class: "list srows" }, ...live.map(pmSessionRow), ...running.map(pmWorkRow));
 }
 function pmRecent(past, done) {
-  const items = [...past.map(r => ({ at: r.at, node: pmSessionRow(r, () => laneResultGo(r.name, r.at ? new Date(r.at).toISOString() : "")) })), ...done.map(w => ({ at: w.ended_at || w.started_at, node: pmWorkRow(w) }))].sort((a, b) => b.at - a.at).slice(0, 10);
+  const items = [...past.map(r => ({ at: r.at, node: withResults(pmSessionRow(r, () => laneResultGo(r.name, r.at ? new Date(r.at).toISOString() : "")), resultChips(laneResult(`lane:${r.name}`))) })), ...done.map(w => ({ at: w.ended_at || w.started_at, node: pmWorkRow(w) }))].sort((a, b) => b.at - a.at).slice(0, 10);
   return items.length ? el("div", { class: "list" }, ...items.map(x => x.node)) : emptyNode("아직 끝난 세션이 없어요");
 }
 
@@ -409,10 +409,15 @@ const pmLaneTitle = n => (((S && S.lanes) || []).find(l => l.name === n) || {}).
 function pmResultRow(r) {
   const tap = r.kind === "report" && r.lane;
   const tag = r.kind === "report" ? (r.tone === "fail" ? ["err", "안 됨"] : r.verified ? ["ok", "확인됨"] : ["", "보고만 함"]) : r.kind === "verify" ? (r.ok ? ["ok", "통과"] : ["err", "안 됨"]) : ["", "커밋"];
-  return el(tap ? "button" : "div", { class: `li${tap ? " tap" : ""}`, type: tap ? "button" : null, onclick: tap ? () => laneResultGo(r.lane, r.at) : null },
+  return withResults(el(tap ? "button" : "div", { class: `li${tap ? " tap" : ""}`, type: tap ? "button" : null, onclick: tap ? () => laneResultGo(r.lane, r.at) : null },
     el("span", { class: "tx" }, el("div", { class: `hd${r.kind === "note" ? " pmv-clamp pmv-wrap" : ""}`, title: r.title || null, text: r.title || PM_RES[r.kind] || "결과" }),
       el("div", { class: "sup", text: [PM_RES[r.kind] || r.kind, r.kind === "commit" ? r.hash : "", r.lane ? pmLaneTitle(r.lane) : "", kstHM(r.at)].filter(Boolean).join(" · ") })),
-    tag ? el("span", { class: `tag ${tag[0]}`, text: tag[1] }) : null);
+    tag ? el("span", { class: `tag ${tag[0]}`, text: tag[1] }) : null), r.kind === "report" && r.tone === "done" ? resultChips(pmOwnResult(r)) : null);
+}
+// A lane keeps one result notice, its last report's: an older report of the same lane is not given the newer one's chips.
+function pmOwnResult(r) {
+  const n = laneResult(`lane:${r.lane}`);
+  return n && Math.abs(ntAt(n) - Date.parse(r.at)) < 10 * 60e3 ? n : null;
 }
 function pmResults(D) {
   if (!D || !D.results) return emptyNode(PM.fail ? "불러오지 못했어요" : "불러오는 중…");

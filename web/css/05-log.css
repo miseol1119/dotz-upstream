@@ -334,3 +334,9 @@ details.think .md { padding: var(--sp-1) var(--sp-2) var(--sp-2) var(--box-ind);
 .hrx-f { flex: 0 0 100%; display: flex; flex-wrap: wrap; gap: var(--sp-15); min-width: 0; padding: 0 var(--sp-4) var(--sp-2) calc(var(--row-px) + var(--hr-dot) + var(--sp-3)); }
 .hrx-f .fatt { height: auto; min-height: 44px; max-width: 100%; text-decoration: none; cursor: pointer; }
 .hrx-f .fatt:hover { background: var(--hover); }
+/* the same chips under a list row (project 완료 / 결과) start where its text starts, and inside a home notice row under its text */
+.li-res > .hrx-f { padding-left: calc(var(--row-px) + var(--sp-4) + var(--sp-3)); }
+.li-res > .li:not(:has(> .lead)) + .hrx-f { padding-left: var(--row-px); }
+.hc-row .hrx-f { padding: var(--sp-1) 0 0; }
+.hc-row:has(.hrx-f) { align-items: flex-start; }
+.hc-row:has(.hrx-f) .nt-dot { margin-top: var(--sp-15); }

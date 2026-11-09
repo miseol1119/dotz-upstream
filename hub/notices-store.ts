@@ -1,6 +1,7 @@
 // The notice list: load, save, upsert, the event feed, settling, replay. A part of the notice store split out of hub/notices.ts, code unchanged.
 import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { log, now, paths, writeAtomic } from "./config.ts";
 import type { DraftApproval } from "./draft-approval.ts";
 import { askDefaults } from "./ask-options.ts";
@@ -13,7 +14,8 @@ import { resolveItem, type WatchItem } from "./watchitem.ts";
 import type { Decision, DecisionOpt, Notice, NoticeKind, NoticeTone } from "./notices-types.ts";
 import { appBlocked, appOf, closedHooks, decisionHooks, orchestratorUp, stampApp, summarizeWatch, unreadHooks, watchLabelOf } from "./notices-wiring.ts";
 import { BACKFILL_DAYS, DAY_MS, FOLD_MS, LOUD, MESSAGE_PREVIEW, NOTICE_CAP, REASK_MS, REPEATS_MAX, REPEAT_TEXT, RESTART_PREFIX, authorOf, clean, closedInfo, coveredByRead, hasChoice, hasExpired, isAsking, isOpenDecision, keepWatchNewest, laneTone, needsAnswer, originOf, refOf, systemTitle, twinOf, waitKind, waitsOf } from "./notices-rules.ts";
-import { GENERIC_TITLES, channelLanes, channelTitle, laneExists, laneOfNotice, laneTitle, launchTitles, noteLaunch, readChannelMap, stoppedSince } from "./notices-lanes.ts";
+import { GENERIC_TITLES, channelLanes, channelTitle, laneExists, laneOfNotice, laneTitle, launchTitles, noteLaunch, readChannelMap, recordedCwd, stoppedSince } from "./notices-lanes.ts";
+import { type ResultFile, type ResultLink, resultFiles, resultLinks } from "./result-refs.ts";
 import { broadcast, summary } from "./notices-read.ts";
 import { QUIET_MS, awaitingReply, isViewing, quietReplies, viewers } from "./notices-viewing.ts";
 import { decisionsOf, expiresAtOf, sending } from "./notices-decisions.ts";
@@ -64,7 +66,7 @@ function trim(): void {
 }
 
 // `repeat`: overwrites the alert it repeats (alert-gate), `fold`: a monitor report that joins the watch's newest row; both keep the old text in `repeats`.
-type Input = { kind: NoticeKind; tone: NoticeTone; title: string; text: string; open: string; key?: string; watch?: string; by?: string; ref?: string; item?: WatchItem; read?: boolean; unread?: boolean; src?: string; at?: string; msg?: string; repeat?: boolean; fold?: boolean };
+type Input = { kind: NoticeKind; tone: NoticeTone; title: string; text: string; open: string; files?: ResultFile[]; links?: ResultLink[]; key?: string; watch?: string; by?: string; ref?: string; item?: WatchItem; read?: boolean; unread?: boolean; src?: string; at?: string; msg?: string; repeat?: boolean; fold?: boolean };
 // The row a monitor report joins: the watch's newest row when it is under a day old, has the same tone and no card on either side, and neither is a
 // report with nothing new (log). One pass over the list.
 function foldTarget(i: Input, at: string): Notice | undefined {
@@ -109,6 +111,10 @@ export function upsert(i: Input): Notice {
 		old.updated = at;
 		if (i.msg) old.msg = i.msg;
 		else delete old.msg;
+		if (!replaying) for (const k of ["files", "links"] as const) {
+			if (i[k]) old[k] = i[k] as never;
+			else delete old[k];
+		}
 		if (i.by) old.by = i.by;
 		if (i.ref) old.ref = i.ref;
 		if (i.watch) old.watch = i.watch;
@@ -125,7 +131,7 @@ export function upsert(i: Input): Notice {
 		else if (!waits && old.handled === null) old.handled = at;
 		item = old;
 	} else {
-		item = { id: randomBytes(4).toString("hex"), ts: at, updated: at, kind: i.kind, tone: i.tone, title: i.title, text: i.text, open: i.open, src: i.src ?? i.open, at, ...(i.msg ? { msg: i.msg } : {}), ...(i.key ? { key: i.key } : {}), ...(i.watch ? { watch: i.watch } : {}), ...(i.by ? { by: i.by } : {}), ...(i.ref ? { ref: i.ref } : {}), ...(i.item ? { item: i.item } : {}), read: i.read === true };
+		item = { id: randomBytes(4).toString("hex"), ts: at, updated: at, kind: i.kind, tone: i.tone, title: i.title, text: i.text, open: i.open, src: i.src ?? i.open, at, ...(i.msg ? { msg: i.msg } : {}), ...(i.files ? { files: i.files } : {}), ...(i.links ? { links: i.links } : {}), ...(i.key ? { key: i.key } : {}), ...(i.watch ? { watch: i.watch } : {}), ...(i.by ? { by: i.by } : {}), ...(i.ref ? { ref: i.ref } : {}), ...(i.item ? { item: i.item } : {}), read: i.read === true };
 		if (waitKind(item)) item.handled = null;
 		if (!quiet) {
 			items.push(item);
@@ -146,6 +152,16 @@ export function upsert(i: Input): Notice {
 	return item;
 }
 
+// The files, commits and links a report names (hub/result-refs.ts), kept on its 작업내역 or session-result notice so its row shows them as
+// chips. Not while replaying: a rebuild would ask git about every old report at boot.
+const CODE_ROOT = join(import.meta.dir, "..");
+function resultsOf(raw: unknown, lane?: string): { files?: ResultFile[]; links?: ResultLink[] } {
+	const text = String(raw ?? "");
+	if (replaying || !/\[file\]|`[~/]|근거\s*:|https?:\/\//.test(text)) return {};
+	const files = resultFiles(text), links = resultLinks(text, [lane ? (recordedCwd(lane) ?? "") : "", CODE_ROOT]);
+	return { ...(files.length ? { files } : {}), ...(links.length ? { links } : {}) };
+}
+
 // `asks`: the post makes decision items (decisionsOf); an alert post then makes no item of its own, so one message is one notice.
 function fromOutbox(e: HubEvent, asks = false): void {
 	const target = String(e.target ?? "");
@@ -163,13 +179,13 @@ function fromOutbox(e: HubEvent, asks = false): void {
 	if (target === "worklog" || (restart && target === "web" && e.source === "gateway")) {
 		if (key?.startsWith("lane:")) {
 			const name = key.slice(5);
-			return void upsert({ kind: "result", tone, title: laneTitle(name), text, open: key, key, ...(by ? { by } : {}), ...(target === "worklog" ? { msg: target } : {}), at: e.ts });
+			return void upsert({ kind: "result", tone, title: laneTitle(name), text, open: key, key, ...(by ? { by } : {}), ...(target === "worklog" ? { msg: target } : {}), ...resultsOf(e.text, name), at: e.ts });
 		}
 		// The gateway's own status lines there (a restart, a model fallback, an account switch, a harness upgrade) are a record, not news: born read.
 		// A gateway [ask] / [fail] there still waits, and so does a daily digest with its own title (야간 정리, 토큰 점검).
 		const title = systemTitle(text, "작업 기록");
 		const status = e.source === "gateway" && tone !== "ask" && tone !== "fail" && title === "작업 기록";
-		return void upsert({ kind: "worklog", tone, title, text, open: target === "worklog" ? "worklog" : "main", key, read: restart || status, at: e.ts });
+		return void upsert({ kind: "worklog", tone, title, text, open: target === "worklog" ? "worklog" : "main", key, read: restart || status, ...resultsOf(e.text), at: e.ts });
 	}
 	if (target === "alert") {
 		if (asks) return;
@@ -195,7 +211,7 @@ function fromInbox(e: HubEvent): void {
 		const { text } = cleaned;
 		const tone = laneTone(e, cleaned.tone, text);
 		if (!name || !text || !LOUD.has(tone)) return;
-		return void upsert({ kind: "result", tone, title: laneTitle(name), text, open: `lane:${name}`, key: `lane:${name}`, by: `lane:${name}`, at: e.ts });
+		return void upsert({ kind: "result", tone, title: laneTitle(name), text, open: `lane:${name}`, key: `lane:${name}`, by: `lane:${name}`, ...resultsOf(e.text, name), at: e.ts });
 	}
 	if (e.kind === "watch") {
 		const recovered = /^recovered\b/.test(String(e.reason ?? ""));

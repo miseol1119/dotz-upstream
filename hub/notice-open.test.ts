@@ -137,8 +137,8 @@ describe("entry points use the shared handler", () => {
 		const el = (_t: string, p: Record<string, unknown>, ...kids: unknown[]) => ({ p, kids });
 		const block = between(web("js/08-home.js"), "const hcNotices", "// Gateway restarts");
 		// The x (무시) rides only on a row that waits on the owner (ntNeeds); here the decision row.
-		const hcNotices = new Function("el", "hcDot", "hcLine", "ntLaneNote", "ntWhen", "noticeOpen", "ntNeeds", "ntIgnoreBtn", `${block}; return hcNotices;`)(
-			el, () => null, (n: N) => n.title, () => "", () => "", (n: N) => opened.push(n), (n: N) => n.kind === "decision", (n: N) => ({ x: n.id })) as (l: N[]) => { kids: ({ x?: string } & { p: { onclick: (ev: unknown) => void; onkeydown: (ev: unknown) => void } })[] };
+		const hcNotices = new Function("el", "hcDot", "hcLine", "ntLaneNote", "ntWhen", "noticeOpen", "ntNeeds", "ntIgnoreBtn", "resultChips", `${block}; return hcNotices;`)(
+			el, () => null, (n: N) => n.title, () => "", () => "", (n: N) => opened.push(n), (n: N) => n.kind === "decision", (n: N) => ({ x: n.id }), () => null) as (l: N[]) => { kids: ({ x?: string } & { p: { onclick: (ev: unknown) => void; onkeydown: (ev: unknown) => void } })[] };
 		const list = [{ id: "a", kind: "decision", title: "결정" }, { id: "b", kind: "alert", title: "경고" }];
 		const rows = hcNotices(list).kids;
 		const ev = { stopPropagation: () => stop.push("s"), preventDefault: () => {}, key: "Enter" };

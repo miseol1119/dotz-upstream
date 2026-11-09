@@ -10,15 +10,23 @@ import { convNameOf, laneTitleOf, watchLabelOf } from "./notices-wiring.ts";
 export const launchTitles = new Map<string, string>();
 // A stopped lane is no longer in the live map: its title lives in the lane record the hub keeps (lanes/<name>/lane.json) and
 // in the title its lane_start event carries.
-export function recordedTitle(name: string): string | undefined {
+function laneRecord(name: string): Record<string, unknown> | undefined {
 	if (!/^[\w.-]+$/.test(name)) return undefined;
 	try {
-		const title = JSON.parse(readFileSync(join(paths.lanes, name, "lane.json"), "utf8"))?.title;
-		if (typeof title === "string" && title.trim()) return title.trim();
+		return JSON.parse(readFileSync(join(paths.lanes, name, "lane.json"), "utf8")) ?? undefined;
 	} catch {
-		// no record (or an unreadable one): fall through to the launch event
+		return undefined;   // no record (or an unreadable one): the caller falls back
 	}
+}
+export function recordedTitle(name: string): string | undefined {
+	const title = laneRecord(name)?.title;
+	if (typeof title === "string" && title.trim()) return title.trim();
 	return launchTitles.get(name);
+}
+// The folder a session works in, from its record: where the commits of its report live.
+export function recordedCwd(name: string): string | undefined {
+	const cwd = laneRecord(name)?.cwd;
+	return typeof cwd === "string" && cwd ? cwd : undefined;
 }
 export const noteLaunch = (e: HubEvent) => {
 	if (typeof e.lane === "string" && typeof e.title === "string" && e.title.trim()) launchTitles.set(e.lane, e.title.trim());

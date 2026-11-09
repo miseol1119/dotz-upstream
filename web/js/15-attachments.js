@@ -205,11 +205,11 @@ function fileChipRow(name, meta, extra) {
     onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); open(); } } }, ...fileChipKids(name, meta));
   return row;
 }
-const fileChipKids = (name, meta) => [el("span", { class: "fi-ic" }, icon("file")), el("span", { class: "fi-t" }, el("span", { class: "fi-n", text: name }), el("span", { class: "fi-m", text: meta }))];
+const fileChipKids = (name, meta, ic = "file") => [el("span", { class: "fi-ic" }, icon(ic)), el("span", { class: "fi-t" }, el("span", { class: "fi-n", text: name }), el("span", { class: "fi-m", text: meta }))];
 function fileChip(name, meta, extra = {}) {
   if (extra.row) return fileChipRow(name, meta, extra);
   return el(extra.href ? "a" : extra.onclick ? "button" : "div", { class: `fatt${extra.cls ? ` ${extra.cls}` : ""}`, ...(extra.href ? { href: extra.href, target: "_blank", rel: "noopener", title: `${name} · 열기` } : extra.onclick ? { type: "button", onclick: extra.onclick, title: `${name} · 열기` } : { title: name }) },
-    ...fileChipKids(name, meta), extra.x || null);
+    ...fileChipKids(name, meta, extra.icon), extra.x || null);
 }
 function renderAtt() {
   const box = $("#atray");

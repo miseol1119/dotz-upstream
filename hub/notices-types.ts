@@ -2,6 +2,7 @@
 import type { DecisionOption } from "./choices.ts";
 import type { DraftApproval } from "./draft-approval.ts";
 import type { WatchItem } from "./watchitem.ts";
+import type { ResultFile, ResultLink } from "./result-refs.ts";
 import { say } from "./notices-read.ts";
 
 // The web notification store: every worklog / alert / session result / watch / schedule post, kept in notices.json so the
@@ -36,6 +37,9 @@ export type Notice = {
 	// kind "watch": the app item the check pointed at (a `DOTZ_ITEM <app>:<id>` line) with the card to draw for it. A report that names an item stays in 감시 소식 whatever its words say.
 	item?: WatchItem;
 	read: boolean;
+	// The results its report names (hub/result-refs.ts): files, commits and links the row shows as chips.
+	files?: ResultFile[];
+	links?: ResultLink[];
 	// Swiped away / x in the bell: kept (so a session's next progress line does not bring it back) but never listed or counted.
 	dismissed?: boolean;
 	// The owner's x on a question (ignoreNotice): off the badge and 답변 필요 but kept in the history, marked as ignored; undoable.

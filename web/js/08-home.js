@@ -138,7 +138,7 @@ const hcDot = tone => el("span", { class: `nt-dot tone-${tone || "none"}`, "aria
 // A generic title (작업 기록, 알림) says nothing in a card's row: the row shows the entry's first line instead.
 const hcLine = n => { const t = ntPlain(n.title); return !t || t === "작업 기록" || t === "작업내역" || t === "알림" ? ntPlain(String(n.text || "").split("\n")[0]) || t || "알림" : t; };
 // Each row opens its own item by kind (30-notices.js noticeOpen); a tap beside the rows still opens the card's conversation.
-const hcNotices = (list, cap) => el("div", { class: "hc-list", "data-cap": cap }, ...list.map(n => el("div", { class: "hc-row", role: "link", tabindex: "0", onclick: ev => { ev.stopPropagation(); noticeOpen(n); }, onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); noticeOpen(n); } } }, hcDot(n.tone), el("span", { class: "tb" }, el("span", { class: "t", text: hcLine(n) }), ntLaneNote(n) ? el("span", { class: "n", text: ntLaneNote(n) }) : null), el("span", { class: "m", text: ntWhen(n) }), ntNeeds(n) ? ntIgnoreBtn(n) : null)));
+const hcNotices = (list, cap) => el("div", { class: "hc-list", "data-cap": cap }, ...list.map(n => el("div", { class: "hc-row", role: "link", tabindex: "0", onclick: ev => { ev.stopPropagation(); noticeOpen(n); }, onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); noticeOpen(n); } } }, hcDot(n.tone), el("span", { class: "tb" }, el("span", { class: "t", text: hcLine(n) }), ntLaneNote(n) ? el("span", { class: "n", text: ntLaneNote(n) }) : null, resultChips(n)), el("span", { class: "m", text: ntWhen(n) }), ntNeeds(n) ? ntIgnoreBtn(n) : null)));
 // Gateway restarts are kept in the store (born read) but never shown on 홈 (owner 2026-10-19: restarts are not his news).
 const hcRecent = pick => NT.items.filter(n => pick(n) && !/^게이트웨이(?: 재시작했어요|를 다시 시작했어요)/.test(String(n.text || ""))).sort((a, b) => ntAt(b) - ntAt(a));
 // Only what is news: a question that waits is a row of 답변 필요 above, so it is not counted or listed here a second time; a gateway question it
@@ -319,10 +319,22 @@ function hcSettled() {
   }
   return out;
 }
-// The result file of a finished task, one chip under its row (name + kind and size); a text file opens in the reader, another opens in a tab.
-function hcWorkFiles(w) {
-  const fs = w.status === "done" && Array.isArray(w.files) ? w.files.filter(f => f && f.path) : [];
-  return fs.length ? el("div", { class: "hrx-f" }, ...fs.map(f => { const name = f.name || String(f.path).split("/").pop(); return fileChip(name, fileMeta(name, f.size), VIEW_RE.test(name) ? { onclick: () => viewer(f.path, name, f.pc) } : { href: fileUrl(f.path, false, f.pc) }); })) : null;
+// What a finished job made, one chip each under its row (hub/result-refs.ts): a file (name + kind and size; a text file opens in the reader,
+// another in a tab), a commit (its page) and a link (a new tab). A job that names none gets nothing. `x`: a work item, a notice or a report.
+const linkName = u => { try { const x = new URL(u), p = x.pathname.split("/").filter(Boolean); return x.host.replace(/^www\./, "") + (p.length ? `/${p.slice(-2).join("/")}` : ""); } catch { return u; } };   // not a URL: its text as is
+function resultChips(x) {
+  const fs = x && Array.isArray(x.files) ? x.files.filter(f => f && f.path) : [], ls = x && Array.isArray(x.links) ? x.links.filter(l => l && /^https?:\/\//.test(l.url)) : [];
+  if (!fs.length && !ls.length) return null;
+  return el("div", { class: "hrx-f", onclick: ev => ev.stopPropagation(), onkeydown: ev => ev.stopPropagation() },   // a chip acts, not the row around it
+    ...fs.map(f => { const name = f.name || String(f.path).split("/").pop(); return fileChip(name, fileMeta(name, f.size), VIEW_RE.test(name) ? { onclick: () => viewer(f.path, name, f.pc) } : { href: fileUrl(f.path, false, f.pc) }); }),
+    ...ls.map(l => l.kind === "commit" ? fileChip(l.hash, "커밋", { href: l.url, icon: "code" }) : fileChip(linkName(l.url), "링크", { href: l.url, icon: "open" })));
+}
+// A finished row with its chips under it: a home row (.hr) takes a finished task's shape (workRow); a list row (.li) is wrapped as is.
+const laneResult = t => NT.items.find(n => n.kind === "result" && n.key === t);
+function withResults(row, chips) {
+  if (!chips) return row;
+  if (!row.classList.replace("hr", "hrx-m")) return el("div", { class: "li-res" }, row, chips);
+  return el("div", { class: "hr hrx", "data-t": row.dataset.t }, row, chips);
 }
 /* The prototype's home (site/prototype/s-work.js): a full-width column of the greeting, the one alert row and 답변 필요, then the
    two-column card grid. Every card keeps the product's data, links and empty states; the board (07-board.js) still moves and sizes them. */
@@ -399,7 +411,7 @@ function renderHomeNow() {
   const h = homeRunning(), { all, runT, waitT, convWork, runW, n: working } = h, restT = all.filter(t => !runT.includes(t) && !waitT.includes(t));
   const settled = hcSettled(), bg = [...runW, ...settled], over = workEnded().filter(w => !settled.includes(w)), todo = (S && S.waitlist) || [];
   const heldT = restT.filter(homeHeld), heldW = over.filter(homeWorkHeld), ended = over.filter(w => !homeWorkHeld(w)), doneT = restT.filter(t => !heldT.includes(t) && homeLaneDone(t));
-  const restRow = t => homeNowRow(t, targetState(t)[0], "");
+  const restRow = t => homeNowRow(t, targetState(t)[0], ""), doneRow = t => withResults(restRow(t), resultChips(laneResult(t)));
   // Above the grid, the prototype's full-width column: the greeting, the one alert row and 답변 필요. The replies the owner owes stay in
   // that card under its list, as the prototype's 답변 필요 rows do; each row still opens its own item.
   const running = el("div", { class: "hn", "data-k": "running", "data-cap": "running" }, ...waitT.map(t => homeNowRow(t, SESSION_WORD.wait[0], "att", true)), ...runT.map(t => homeNowRow(t, targetState(t)[0], "", true)), ...convWork.map(x => x.conv ? workRow(x) : homeConvRow(x)), ...bg.map(workRow),
@@ -429,7 +441,7 @@ function renderHomeNow() {
   add("notices:alert", homeAlertCard());
   add("now:running", el("div", { class: "card" }, hcHead("지금 진행 중", { n: working ? `${working}개 작업 중` : null }), running));
   if (heldT.length || heldW.length) add("now:waiting", el("div", { class: "card" }, hcHead("대기 중"), el("div", { class: "hn", "data-k": "waiting", "data-cap": "waiting" }, ...heldT.map(restRow), ...heldW.map(workRow))));
-  if (ended.length || doneT.length) add("now:ended", el("div", { class: "card" }, hcHead("최근 끝난 작업"), el("div", { class: "hn", "data-k": "ended-work", "data-cap": "ended-work" }, ...doneT.map(restRow), ...ended.map(workRow))));
+  if (ended.length || doneT.length) add("now:ended", el("div", { class: "card" }, hcHead("최근 끝난 작업"), el("div", { class: "hn", "data-k": "ended-work", "data-cap": "ended-work" }, ...doneT.map(doneRow), ...ended.map(workRow))));
   add("notices:watch", homeMonitorCard());
   add("notices:worklog", homeWorklogCard());
 
@@ -588,6 +600,6 @@ function workRow(w) {
       el("span", { class: `dot ${tone}` }),
       el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: w.description })), el("span", { class: "ha", text: line })),
       el("span", { class: `hs ${tone}`, text: state })),
-    hcWorkFiles(w),
+    done ? resultChips(w) : null,
     act ? el("button", { class: "btn text", type: "button", style: "flex:none;margin-right:var(--sp-2)", "data-act": "retry", onclick: ev => act[1](ev.currentTarget), text: act[0] }) : null);
 }
