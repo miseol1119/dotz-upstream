@@ -136,13 +136,15 @@ export async function start(g: Gateway): Promise<void> {
 export async function probe(g: Gateway, ms = 30_000): Promise<{ ok: boolean; text: string }> {
 	const p = Bun.spawn(sandboxArgv(g.l.profileFile, [process.execPath, join(g.repo, "hub", "test", "load-qa", "isolation-probe.ts")]), { cwd: g.l.cwd, env: g.l.env, stdout: "pipe", stderr: "pipe" });
 	// Both pipes are drained together: reading stdout to its end before stderr could stall the run for good on a busy machine.
-	// A probe that still hangs is killed here, so the caller gets a failed probe instead of a test timeout that also kills the gateway.
-	const kill = setTimeout(() => p.kill("SIGKILL"), ms);
-	const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+	// A probe that still hangs is killed and reported as failed at the deadline, without waiting for its pipes or exit: a test timeout would also kill the gateway.
+	let kill: Timer | undefined;
+	const deadline = new Promise<null>(resolve => { kill = setTimeout(() => { p.kill("SIGKILL"); resolve(null); }, ms); });
+	const done = Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+	const r = await Promise.race([done, deadline]);
 	clearTimeout(kill);
-	const text = `${out}${err}`;
+	const text = r ? `${r[0]}${r[1]}` : `[FAIL] the probe did not finish in ${ms} ms and was killed`;
 	writeFileSync(join(g.out, "isolation-probe.txt"), text);
-	return { ok: (await p.exited) === 0 && text.includes("[ok]") && !text.includes("[FAIL]"), text };
+	return { ok: r !== null && r[2] === 0 && text.includes("[ok]") && !text.includes("[FAIL]"), text };
 }
 
 type Json = Record<string, any>;

@@ -60,8 +60,8 @@ export function profile(o: ProfileOpts): string {
 		`(deny file-write* ${protectedPaths.map(p => `(subpath ${q(p)})`).join(" ")})`,
 		";; the owner's real state is not even readable",
 		`(deny file-read* ${protectedPaths.map(p => `(subpath ${q(p)})`).join(" ")})`,
-		";; tools that bypass PATH",
-		`(deny process-exec ${[...DENIED_EXEC, ...(o.extraDenyExec ?? [])].map(p => `(literal ${q(p)})`).join(" ")})`,
+		";; tools that bypass PATH; no-report: a reported exec denial can hold posix_spawn in the kernel for minutes while the Mac's violation reporting is backed up",
+		`(deny process-exec (with no-report) ${[...DENIED_EXEC, ...(o.extraDenyExec ?? [])].map(p => `(literal ${q(p)})`).join(" ")})`,
 	];
 	return `${lines.join("\n")}\n`;
 }
