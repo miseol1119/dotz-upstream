@@ -518,7 +518,7 @@ const realFiles = (atts: MailAttachment[]) => attachmentList({ attachments: atts
 const markInline = (atts: MailAttachment[], html: string | undefined): MailAttachment[] => atts.map(a => (a.cid && html && html.toLowerCase().includes(`cid:${a.cid.toLowerCase()}`) ? { ...a, inline: true as const } : a));
 
 /** The direction and reply state a row shows (`sent` = a dotz send of a draft for this mail is on record). */
-const mailStateOf = (m: MailRecord, sent: boolean) => {
+export const mailStateOf = (m: MailRecord, sent: boolean) => {
 	const reply = m.dir === "out" ? undefined : sent ? ("replied" as const) : replyOf(m);
 	return { ...(m.dir === "out" ? { dir: "out" as const } : {}), ...(reply ? { reply } : {}), ...(m.sentAt ? { sentAt: m.sentAt } : {}) };
 };

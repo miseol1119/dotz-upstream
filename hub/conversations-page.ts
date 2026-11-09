@@ -47,11 +47,13 @@ export function countRows(rows: readonly ConvRow[]): ConvCounts {
 	return { rows: rows.length, mail: { total: mail.length, unread, filters, sources } };
 }
 
-/** The answer to a query: `target=<t>` (repeat it, at most 50) those rows only; `all=1` every row; `before=<cursor>` the next `limit` mail rows after it; otherwise the first page with the counts and the owed mails older than it. */
-export function conversationPage(rows: readonly ConvRow[], q: URLSearchParams): { status: number; body: Record<string, unknown> } {
+/** The answer to a query: `target=<t>` (repeat it, at most 50) those rows only; `all=1` every row; `before=<cursor>` the next `limit` mail rows after it; otherwise the first page with the counts and the owed mails older than it.
+ *  The page is decided from `rows`, whose `mail` holds only the cheap fields (the counts and the order need no more); `build` makes the full row of a mail row that goes out, so a long mailbox costs a card per row sent, not per mail. */
+export function conversationPage(rows: readonly ConvRow[], q: URLSearchParams, build: (row: ConvRow) => ConvRow = row => row): { status: number; body: Record<string, unknown> } {
+	const full = (list: readonly ConvRow[]): ConvRow[] => list.map(r => (r.mail ? build(r) : r));
 	const want = new Set(q.getAll("target").slice(0, 50));
-	if (want.size) return { status: 200, body: { items: rows.filter(r => want.has(r.target)), page: { limit: want.size, more: false } } };
-	if (q.get("all") === "1") return { status: 200, body: { items: rows, page: { limit: rows.length, more: false }, counts: countRows(rows) } };
+	if (want.size) return { status: 200, body: { items: full(rows.filter(r => want.has(r.target))), page: { limit: want.size, more: false } } };
+	if (q.get("all") === "1") return { status: 200, body: { items: full(rows), page: { limit: rows.length, more: false }, counts: countRows(rows) } };
 	const asked = Math.floor(Number(q.get("limit")));
 	const limit = asked >= 1 ? Math.min(asked, CONV_PAGE_MAX) : CONV_PAGE;
 	const before = q.get("before");
@@ -61,6 +63,6 @@ export function conversationPage(rows: readonly ConvRow[], q: URLSearchParams): 
 	const left = before === null ? mails : mails.filter(olderThan(before)).filter(r => !owes(r));
 	const shown = left.slice(0, limit), rest = left.slice(limit), more = rest.some(r => !owes(r));
 	const page = { limit, more, ...(more ? { next: cursorOf(shown[shown.length - 1]!) } : {}) };
-	if (before !== null) return { status: 200, body: { items: shown, page } };
-	return { status: 200, body: { items: [...rows.filter(r => !r.mail), ...shown, ...rest.filter(owes)].sort(order), page, counts: countRows(rows) } };
+	if (before !== null) return { status: 200, body: { items: full(shown), page } };
+	return { status: 200, body: { items: full([...rows.filter(r => !r.mail), ...shown, ...rest.filter(owes)].sort(order)), page, counts: countRows(rows) } };
 }

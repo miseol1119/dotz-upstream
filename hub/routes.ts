@@ -24,6 +24,7 @@ import { watchConnection } from "./watch-status.ts";
 import { fieldsOf, isSettingsTarget } from "./app-settings.ts";
 import { watchOfSubject } from "./watch-settings.ts";
 import { conversationPage } from "./conversations-page.ts";
+import { lazyMailCard } from "./conversations-mail-card.ts";
 import { markRead, markUnread } from "./reads.ts";
 import { shownEvent } from "./owner-text.ts";
 import { activityItems, broadcast, historyEvents, historyPage, ownerMessage, recentEvents, sentFiles, sseResponse } from "./events.ts";
@@ -36,10 +37,9 @@ import { parseFollowup, triggerFollowup } from "./followup.ts";
 import { draftFileRoute } from "./draft-files.ts";
 import { draftRecipientsRoute } from "./draft-recipients.ts";
 import { stagedFiles } from "../features/reply-drafts/lib/staged.ts";
-import { composeMail, deleteMail, mailTargets, sentReplyRefs, unrepliedMails, mailKey, recordSentByDotz, mailOpened, MailError, syncMailStates, type MailSourceState, mailBodyRoute, settleMailDrafts, mailCard, mailByKey, mailByThread, mailFileRoute, mailTarget, postMail, setMailFyi, setMailNoReply, setMailsFyi, mailKeep, setMailSuggest, sentMailEvent, setMailReply, type MailDeps } from "./mail.ts";
+import { composeMail, deleteMail, mailTargets, sentReplyRefs, unrepliedMails, mailKey, recordSentByDotz, mailOpened, MailError, syncMailStates, type MailSourceState, mailBodyRoute, settleMailDrafts, mailCard, mailStateOf, mailByKey, mailByThread, mailFileRoute, mailTarget, postMail, setMailFyi, setMailNoReply, setMailsFyi, mailKeep, setMailSuggest, sentMailEvent, setMailReply, type MailDeps } from "./mail.ts";
 import { moveMailRoute } from "./mail-move.ts";
-import { boxPass } from "./routes-mailbox.ts";
-import { applyMailboxFlags, canOf, isMailAction, mailAction, mailActions, spawnExec, type SyncDeps } from "./mail-sync.ts";
+import { applyMailboxFlags, isMailAction, mailAction, mailActions, spawnExec, type SyncDeps } from "./mail-sync.ts";
 import { originalDeletable, originalDeleteRoute, originalDeps } from "./mail-delete.ts";
 import { manualDraft } from "./mail-manual.ts";
 import { askText } from "../features/reply-drafts/lib/flow.ts";
@@ -655,13 +655,13 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 			const owed = new Set(unrepliedMailList().map(m => m.key)), sent = sentMailRefs();
 			// Ended sessions are listed too: 답변 필요 stays on their row (their unread is 0, conversations.ts unreadOf) in the folded 끝난 세션 group (web/js/04-state.js endedGroup).
 			// A mail conversation is listed only while its mail is: a deleted mail (mail-deleted.json) keeps its log but leaves every list and count here and on the other computer (hub/peer-monitor.ts).
-			const lv = liveLanes(), trashable = originalDeletable(DATA_DIR, mailSyncDeps), place = boxPass(DATA_DIR);
+			const lv = liveLanes();   // the page is decided from the cheap fields of a mail; its full card is built only for the rows that go out (conversationPage `build`)
 			const items = conversationList([...[...lv.live, ...lv.ended].map(n => `lane:${n}`), ...Object.keys(discord.channels.work).map(id => `ch:${id}`), ...mailTargets()]).flatMap(c => {
 				if (!c.target.startsWith("mail:")) return [c];
 				const m = mailByKey(c.target.slice(5));
-				return m ? [{ ...c, mail: mailCard(m, owed.has(m.key), sent.has(m.key), { read: c.unread === 0, can: canOf(m.source, mailSyncDeps), trashOriginal: trashable(m), place }) }] : [];
+				return m ? [{ ...c, mail: { ...mailStateOf(m, sent.has(m.key)), read: c.unread === 0, ...(m.archived ? { archived: true as const } : {}), source: m.source, ...(owed.has(m.key) ? { unreplied: true as const } : {}) } }] : [];
 			});
-			const page = conversationPage(items, url.searchParams); return json(page.body, page.status);
+			const page = conversationPage(items, url.searchParams, lazyMailCard({ owed, sent, dataDir: DATA_DIR, syncDeps: mailSyncDeps })); return json(page.body, page.status);
 		}
 		// One attached file of a mail: only files the mail's own record names, only inside the mail files folder (hub/mail.ts).
 		const mailFile = (req.method === "GET" || req.method === "HEAD") && /^\/api\/mail\/([a-z0-9._-]+)\/files\/(\d+)$/.exec(url.pathname);
