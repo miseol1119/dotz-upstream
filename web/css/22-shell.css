@@ -141,8 +141,10 @@ body { display: flow-root; }
 .hneeds .hn > .hr { padding-left: var(--sp-5); padding-right: var(--sp-5); }
 
 /* the grid cards keep the prototype's card box: 20px padding, the header 8px above its list, rows to the card's edge; a row is as tall
-   as its taller card and both cards fill it (07-board.js rows mode) */
-#home-cards.rows .bi.fit > .card { height: 100%; overflow: visible; }
+   as its taller card (07-board.js rows mode) but each card is as tall as its content, so an empty card beside a long one leaves no blank
+   box (owner 2026-11-09); the wrapper follows the card so its hover shadow does too */
+#home-cards.rows .bi.fit { height: auto !important; }
+#home-cards.rows .bi.fit > .card { overflow: visible; }
 #home-cards.rows.measuring .bi > .card { height: auto !important; }
 #home-cards .card { padding: var(--sp-5); }
 #home-cards .card > .hn { margin: var(--sp-1) calc(var(--sp-5) * -1) calc(var(--sp-5) * -1); background: transparent; border-radius: 0 0 var(--r-card) var(--r-card); }
@@ -153,7 +155,7 @@ body { display: flow-root; }
 #home-cards .card > .hn > .hr.hrx > .hrx-m { padding-left: var(--sp-5); }
 #home-cards .card > .hn > .hr.hrx > .hrx-m:last-child, #home-cards .card > .hn > .hr.hrx > .hrx-m:has(+ .hrx-f) { padding-right: var(--sp-5); }
 #home-cards .card > .hn > .hr.hrx > .hrx-f { padding-left: var(--sp-10); padding-right: var(--sp-5); }
-#home-cards .card > .hn > .hr.hrx > .btn { margin-right: var(--sp-4); }
+#home-cards .card > .hn > .hr.hrx > .btn, #home-cards .card > .hn > .hr.hrx > .hrx-n { margin-right: var(--sp-4); }
 #home-cards .card > .hn:has(> .hc-none) { margin: 0; }
 @media (max-width: 1023px) { #v-home { padding: var(--sp-1) var(--sp-4) var(--sp-6); } }
 

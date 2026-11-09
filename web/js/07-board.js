@@ -147,7 +147,7 @@ function makeBoard(container, key, opts = {}) {
     const at = id => meta(id)?.pin ? -1 : idx.has(id) ? idx.get(id) : 1e6 + (curIdx.get(id) ?? 1e6);
     return [...lay].sort((a, b) => at(a.id) - at(b.id));
   }
-  // Rows mode (홈): the cards keep the prototype's two per row, the row as tall as its taller card and both cards filling it.
+  // Rows mode (홈): the cards keep the prototype's two per row, the row as tall as its taller card; each card stays as tall as its content (22-shell.css).
   function measureRows() {
     container.classList.add("measuring");
     const nat = new Map();

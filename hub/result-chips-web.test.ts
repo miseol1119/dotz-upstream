@@ -1,5 +1,6 @@
 // Result chips on finished rows (web/js/08-home.js resultChips, 19-project-main.js): a finished job that names a file, a commit and a link shows
-// three chips under its row (홈 작업내역, 최근 끝난 작업, the project's 완료 and 결과 rows), each opening its own target; one that names none shows nothing.
+// three chips under the project's 완료 and 결과 rows, each opening its own target; on 홈 (작업내역, 최근 끝난 작업) the row shows only a count marker
+// that opens the same chips under it (owner 2026-11-09). One that names none shows nothing.
 import { afterAll, expect, test } from "bun:test";
 import { sseResponse } from "./events.ts";
 import { appAsset, indexPage } from "./webapp.ts";
@@ -66,19 +67,60 @@ const expectThree = (c: { n: string; m: string; href: string | null; tab: string
 	expect(c![2]!.href).toBe(LINK.url);
 };
 
-test("home: a finished task, a finished session and a 작업내역 row with results show three chips; the others none", async () => {
+// The rows of 홈 that name results: a finished task and a finished session (최근 끝난 작업) and a 작업내역 row; then the same three without.
+const ROWS = `const ended = document.querySelector('[data-k="ended-work"]'), log = document.querySelector('.bi[data-id="notices:worklog"]');
+	const lane = n => ended.querySelector('[data-t="lane:' + n + '"]')?.closest(".hr"), work = id => ended.querySelector('[data-work="' + id + '"]');
+	const row = t => [...log.querySelectorAll(".hc-row")].find(x => x.textContent.includes(t));
+	const made = { work: work("st_made"), lane: lane("docs"), log: row("배포 마무리") }, none = [work("st_none"), lane("plain"), row("메일 정리")];
+	const mark = x => { const b = x.querySelector(".hrx-n"); return b ? { text: b.textContent.trim(), tag: b.tagName, exp: b.getAttribute("aria-expanded") } : null; };`;
+
+test("home: a row with results shows a one-line count marker and no chips; a row without shows neither", async () => {
 	const v = await boot();
-	const r = await q<Record<string, ReturnType<typeof Array.prototype.slice> | null>>(v, `${CHIPS}
-		const ended = document.querySelector('[data-k="ended-work"]'), log = document.querySelector('.bi[data-id="notices:worklog"]');
-		const lane = n => ended.querySelector('[data-t="lane:' + n + '"]'), work = id => ended.querySelector('[data-work="' + id + '"]');
-		const row = t => [...log.querySelectorAll(".hc-row")].find(x => x.textContent.includes(t));
-		return { work: chips(work("st_made")), workNone: chips(work("st_none")), lane: chips(lane("docs")?.closest(".hrx") ?? null), laneNone: chips(lane("plain")),
-			log: chips(row("배포 마무리")), logNone: chips(row("메일 정리")),
-			// chips wrap side by side across the row, not one per line in its text column
-			tops: [work("st_made"), row("배포 마무리")].map(x => [...x.querySelectorAll(".hrx-f .fatt")].map(c => Math.round(c.getBoundingClientRect().top))) };`);
-	for (const k of ["work", "lane", "log"]) expectThree(r[k] as never);
-	for (const [a, b, c] of r.tops as number[][]) { expect(b).toBe(a!); expect(c!).toBeGreaterThan(a!); }
-	expect([r.workNone, r.laneNone, r.logNone]).toEqual([[], [], []]);
+	const r = await q<Record<string, unknown>>(v, `${CHIPS} ${ROWS}
+		return { marks: Object.values(made).map(mark), chips: Object.values(made).map(chips), noneMarks: none.map(mark), noneChips: none.map(chips),
+			// the marker sits on the row's first line: the row is as tall as a row without results
+			tall: [made.work, none[0]].map(x => Math.round(x.getBoundingClientRect().height)) };`);
+	expect(r.marks).toEqual(Array(3).fill({ text: "결과 3", tag: "BUTTON", exp: "false" }));
+	expect(r.chips).toEqual([[], [], []]);
+	expect(r.noneMarks).toEqual([null, null, null]);
+	expect(r.noneChips).toEqual([[], [], []]);
+	const [a, b] = r.tall as number[];
+	expect(a).toBe(b!);
+});
+
+test("home: the marker opens the row's three chips under it, one row at a time; a second click or Escape closes them", async () => {
+	const v = await boot();
+	const r = await q<Record<string, unknown>>(v, `${CHIPS} ${ROWS}
+		const out = {}, at = location.hash;
+		for (const [k, x] of Object.entries(made)) { x.querySelector(".hrx-n").click(); out[k] = chips(x); out[k + "Exp"] = mark(x).exp; out[k + "Hash"] = location.hash === at; }
+		// one open at a time: opening the 작업내역 row closed the two before it
+		out.open = Object.values(made).map(x => mark(x).exp);
+		// chips wrap side by side across the row, not one per line in its text column
+		out.tops = [made.work, made.log].map(x => [...x.querySelectorAll(".hrx-f .fatt")].map(c => Math.round(c.getBoundingClientRect().top)));
+		made.log.querySelector(".hrx-n").click();
+		out.second = [mark(made.log).exp, chips(made.log)];
+		const b = made.work.querySelector(".hrx-n"); b.click(); b.focus();
+		b.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+		out.esc = [mark(made.work).exp, chips(made.work)];
+		return out;`);
+	for (const k of ["work", "lane", "log"]) { expectThree(r[k] as never); expect(r[`${k}Exp`]).toBe("true"); expect(r[`${k}Hash`]).toBe(true); }
+	expect(r.open).toEqual(["false", "false", "true"]);
+	for (const [a, b, c] of (r.tops as number[][]).filter(t => t.length)) { expect(b).toBe(a!); expect(c!).toBeGreaterThan(a!); }
+	expect(r.second).toEqual(["false", []]);
+	expect(r.esc).toEqual(["false", []]);
+});
+
+test("home: an empty card is as tall as its content, not as its neighbour", async () => {
+	const v = await boot();
+	// the board places the two cards side by side once it has measured them
+	await waitFor(v, `(() => { const t = id => document.querySelector('.bi[data-id="' + id + '"] > .card').getBoundingClientRect().top; return t("now:running") === t("now:ended"); })()`);
+	const h = await q<Record<string, number>>(v, `const card = id => document.querySelector('.bi[data-id="' + id + '"] > .card');
+		const body = c => Math.round([...c.children].reduce((m, n) => Math.max(m, n.getBoundingClientRect().bottom), 0) - c.getBoundingClientRect().top);
+		const run = card("now:running"), end = card("now:ended");
+		return { run: Math.round(run.getBoundingClientRect().height), runBody: body(run), end: Math.round(end.getBoundingClientRect().height), sameRow: Math.round(run.getBoundingClientRect().top - end.getBoundingClientRect().top) };`);
+	expect(h.sameRow).toBe(0);
+	expect(h.run).toBeLessThan(h.end!);
+	expect(h.run).toBeLessThanOrEqual(h.runBody! + 20);
 });
 
 test("project detail: a finished task's 완료 row and a session's result row show three chips; a row with none shows nothing", async () => {

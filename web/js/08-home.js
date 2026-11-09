@@ -138,7 +138,7 @@ const hcDot = tone => el("span", { class: `nt-dot tone-${tone || "none"}`, "aria
 // A generic title (작업 기록, 알림) says nothing in a card's row: the row shows the entry's first line instead.
 const hcLine = n => { const t = ntPlain(n.title); return !t || t === "작업 기록" || t === "작업내역" || t === "알림" ? ntPlain(String(n.text || "").split("\n")[0]) || t || "알림" : t; };
 // Each row opens its own item by kind (30-notices.js noticeOpen); a tap beside the rows still opens the card's conversation.
-const hcNotices = (list, cap) => el("div", { class: "hc-list", "data-cap": cap }, ...list.map(n => el("div", { class: "hc-row", role: "link", tabindex: "0", onclick: ev => { ev.stopPropagation(); noticeOpen(n); }, onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); noticeOpen(n); } } }, hcDot(n.tone), el("span", { class: "tb" }, el("span", { class: "t", text: hcLine(n) }), ntLaneNote(n) ? el("span", { class: "n", text: ntLaneNote(n) }) : null), el("span", { class: "m", text: ntWhen(n) }), ntNeeds(n) ? ntIgnoreBtn(n) : null, resultChips(n))));
+const hcNotices = (list, cap) => el("div", { class: "hc-list", "data-cap": cap }, ...list.map(n => el("div", { class: "hc-row", role: "link", tabindex: "0", onclick: ev => { ev.stopPropagation(); noticeOpen(n); }, onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); noticeOpen(n); } } }, hcDot(n.tone), el("span", { class: "tb" }, el("span", { class: "t", text: hcLine(n) }), ntLaneNote(n) ? el("span", { class: "n", text: ntLaneNote(n) }) : null), el("span", { class: "m", text: ntWhen(n) }), ntNeeds(n) ? ntIgnoreBtn(n) : null, ...resultMarker(`n:${n.id}`, resultChips(n)))));
 // Gateway restarts are kept in the store (born read) but never shown on 홈 (owner 2026-10-19: restarts are not his news).
 const hcRecent = pick => NT.items.filter(n => pick(n) && !/^게이트웨이(?: 재시작했어요|를 다시 시작했어요)/.test(String(n.text || ""))).sort((a, b) => ntAt(b) - ntAt(a));
 // Only what is news: a question that waits is a row of 답변 필요 above, so it is not counted or listed here a second time; a gateway question it
@@ -329,12 +329,38 @@ function resultChips(x) {
     ...fs.map(f => { const name = f.name || String(f.path).split("/").pop(); return fileChip(name, fileMeta(name, f.size), VIEW_RE.test(name) ? { onclick: () => viewer(f.path, name, f.pc) } : { href: fileUrl(f.path, false, f.pc) }); }),
     ...ls.map(l => l.kind === "commit" ? fileChip(l.hash, "커밋", { href: l.url, icon: "code" }) : fileChip(linkName(l.url), "링크", { href: l.url, icon: "open" })));
 }
-// A finished row with its chips under it: a home row (.hr) takes a finished task's shape (workRow); a list row (.li) is wrapped as is.
+// A finished row with its chips under it: a session row (.hr) takes a finished task's shape (workRow); a list row (.li) is wrapped as is.
+// `key`: a 홈 row, which shows the count marker instead (resultMarker).
 const laneResult = t => NT.items.find(n => n.kind === "result" && n.key === t);
-function withResults(row, chips) {
+function withResults(row, chips, key) {
   if (!chips) return row;
   if (!row.classList.replace("hr", "hrx-m")) return el("div", { class: "li-res" }, row, chips);
-  return el("div", { class: "hr hrx", "data-t": row.dataset.t }, row, chips);
+  return el("div", { class: "hr hrx", "data-t": row.dataset.t }, row, ...(key ? resultMarker(key, chips) : [chips]));
+}
+// 홈 shows how many results a finished row made, not the chips (owner 2026-11-09, "개수만 표시"): the marker (.hrx-n) puts the same chips under its row, one row
+// at a time, and a second press or Escape takes them away. `key` names the row, so the open one stays open when 홈 repaints.
+let homeResOpen = "";
+function resultMarker(key, chips) {
+  if (!chips) return [];
+  const n = chips.childElementCount, open = homeResOpen === key;
+  const b = el("button", { class: "hrx-n", type: "button", "aria-expanded": String(open), "aria-label": `결과 ${n}개 보기`,
+    onclick: ev => { ev.stopPropagation(); if (b.getAttribute("aria-expanded") === "true") resultHide(b); else resultShow(b, chips, key); },
+    onkeydown: ev => { if (ev.key !== "Escape") { ev.stopPropagation(); return; } if (b.getAttribute("aria-expanded") === "true") { ev.preventDefault(); ev.stopPropagation(); resultHide(b); } } },
+    icon("clip"), el("span", { text: `결과 ${n}` }));
+  chips.addEventListener("keydown", ev => { if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); resultHide(b); b.focus(); } }, true);
+  return open ? [b, chips] : [b];
+}
+function resultShow(b, chips, key) {
+  for (const o of document.querySelectorAll('.hrx-n[aria-expanded="true"]')) resultHide(o);
+  homeResOpen = key;
+  b.setAttribute("aria-expanded", "true");
+  b.after(chips);
+}
+function resultHide(b) {
+  const f = b.nextElementSibling;
+  if (f && f.classList.contains("hrx-f")) f.remove();
+  b.setAttribute("aria-expanded", "false");
+  homeResOpen = "";
 }
 /* The prototype's home (site/prototype/s-work.js): a full-width column of the greeting, the one alert row and 답변 필요, then the
    two-column card grid. Every card keeps the product's data, links and empty states; the board (07-board.js) still moves and sizes them. */
@@ -411,7 +437,7 @@ function renderHomeNow() {
   const h = homeRunning(), { all, runT, waitT, convWork, runW, n: working } = h, restT = all.filter(t => !runT.includes(t) && !waitT.includes(t));
   const settled = hcSettled(), bg = [...runW, ...settled], over = workEnded().filter(w => !settled.includes(w)), todo = (S && S.waitlist) || [];
   const heldT = restT.filter(homeHeld), heldW = over.filter(homeWorkHeld), ended = over.filter(w => !homeWorkHeld(w)), doneT = restT.filter(t => !heldT.includes(t) && homeLaneDone(t));
-  const restRow = t => homeNowRow(t, targetState(t)[0], ""), doneRow = t => withResults(restRow(t), resultChips(laneResult(t)));
+  const restRow = t => homeNowRow(t, targetState(t)[0], ""), doneRow = t => withResults(restRow(t), resultChips(laneResult(t)), `t:${t}`);
   // Above the grid, the prototype's full-width column: the greeting, the one alert row and 답변 필요. The replies the owner owes stay in
   // that card under its list, as the prototype's 답변 필요 rows do; each row still opens its own item.
   const running = el("div", { class: "hn", "data-k": "running", "data-cap": "running" }, ...waitT.map(t => homeNowRow(t, SESSION_WORD.wait[0], "att", true)), ...runT.map(t => homeNowRow(t, targetState(t)[0], "", true)), ...convWork.map(x => x.conv ? workRow(x) : homeConvRow(x)), ...bg.map(workRow),
@@ -600,6 +626,6 @@ function workRow(w) {
       el("span", { class: `dot ${tone}` }),
       el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: w.description })), el("span", { class: "ha", text: line })),
       el("span", { class: `hs ${tone}`, text: state })),
-    done ? resultChips(w) : null,
+    ...(done ? resultMarker(`w:${w.id}`, resultChips(w)) : []),
     act ? el("button", { class: "btn text", type: "button", style: "flex:none;margin-right:var(--sp-2)", "data-act": "retry", onclick: ev => act[1](ev.currentTarget), text: act[0] }) : null);
 }
