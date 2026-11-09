@@ -54,6 +54,7 @@ export type Watch = {
 		hash?: string; last?: string; fails: number; failAlertAt?: number; failSince?: number; recoveredAt?: number; lastRun?: string; lastOk?: string; lastChanged?: boolean; refreshedAt?: number;
 		kind?: string; kindFails?: number; nextAt?: number; paused?: string; approvalAskedAt?: number;
 		reloginAt?: number; lifeMs?: number; // the last sign-in the gateway did itself, and the shortest session it has seen live
+		rejected?: number; // sign-ins the site rejected since the login last held: after 2 the gateway never types it again (accounts lock)
 		twoFactor?: boolean; // the site asked for a second factor: its form is never submitted again without the owner's yes (a submit may send the push)
 	};
 };
@@ -209,18 +210,31 @@ async function sessionRun(w: Watch, approvedNow = false): Promise<{ code: number
 		learnLife(w.state);
 		if (!dedicated) return { code: 1, output: lost };
 		if (w.state.twoFactor && !approvedNow) return { code: 1, output: `DOTZ_FAIL approval\n${lost}\nthe site asks for a second factor; 다시 연결 sends it` };
-		const v = await signIn(s.login_url ?? s.url, { ...(approvedNow ? { allow2fa: true } : {}), ...(s.secret ? { secret: s.secret } : {}) });
 		const used = approvedNow ? "\nDOTZ_APPROVAL_USED" : "";
+		if ((w.state.rejected ?? 0) >= 2) return { code: 1, output: `DOTZ_FAIL password\n${lost}\nthe site rejected the login twice: the gateway does not sign in again (accounts lock). Tell the owner; it is kept again once he signs in himself in Aside${used}` };
+		// a secret removed after a rejection (or never stored) is not passed: the browser's saved password may still fill the form
+		const secretFile = s.secret ? join(DATA_DIR, "secrets", s.secret) : "";
+		const v = await signIn(s.login_url ?? s.url, { ...(approvedNow ? { allow2fa: true } : {}), ...(secretFile && existsSync(secretFile) ? { secret: s.secret } : {}) });
 		log(`watch ${w.name}: signed out, signing in again by itself: ${v}`);
 		if (v === "need-2fa") w.state.twoFactor = true;
 		if (v === "need-2fa") return { code: 1, output: `DOTZ_FAIL approval\n${lost}\nthe site asks for a second factor; 다시 연결 sends it${used}` };
 		if (v === "need-password") return { code: 1, output: `DOTZ_FAIL password\n${lost}\nno saved password filled the login form (Mac Passwords or dotz_auth)${used}` };
+		if (v === "rejected" || v === "rejected-secret") {
+			// One rejection stops the keeper (DOTZ_FAIL password pauses it with one notice); the rejected dotz_auth value is removed so nothing types it again.
+			const n = (w.state.rejected = (w.state.rejected ?? 0) + 1);
+			if (v === "rejected-secret") rmSync(secretFile, { force: true });
+			const what = v === "rejected-secret" ? `the username or password of the dotz_auth secret ${s.secret} (removed, never typed again)` : "the password the browser filled in (Mac Passwords)";
+			const next = n >= 2 ? "rejected twice: the gateway stops signing in (accounts lock). Tell the owner, do not ask again" : v === "rejected-secret" ? `ask the owner once for a new one (dotz_auth kind secret, site ${s.secret}, saying the last one was rejected), then 다시 연결` : "the owner corrects the saved password, then 다시 연결";
+			return { code: 1, output: `DOTZ_FAIL password\n${lost}\nthe site rejected ${what} (rejection ${n} of 2)\n${next}${used}` };
+		}
 		if (v === "failed") return { code: 1, output: `${lost}\nsigning in again did not finish${used}` };
 		const again = await checkSession(s, where);
 		if (again.state !== "ok") return { code: 1, output: `${lost}\nsigned in, but the check page still answers signed out${used}` };
 		w.state.reloginAt = Date.now();
+		w.state.rejected = undefined;
 		return { code: 0, output: `logged in (signed in again by the gateway)${used}` };
 	}
+	w.state.rejected = undefined;
 	const due = !w.state.refreshedAt || Date.now() - w.state.refreshedAt > sessionGapMs(w).refresh;
 	if (due) {
 		if (dedicated) {

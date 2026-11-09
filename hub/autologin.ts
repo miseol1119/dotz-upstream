@@ -4,10 +4,11 @@
 // when the form stays empty does it type the login kept with `dotz_auth` (a secrets file holding {"username","password"} JSON, fetched
 // once from localhost and never put in code or argv). Then it waits for the form to go away. A second factor (push, code, security key)
 // is never started without the owner's yes: without it the run stops at the factor and says so; with it (allow2fa, the owner's 다시 연결)
-// it waits for the push to be approved.
+// it waits for the push to be approved. A form still showing its password field when the wait ends is a rejected login ("rejected", or
+// "rejected-secret" when the dotz_auth value was typed): the caller stops there instead of typing the same value again (accounts lock).
 import { replInTab } from "./aside.ts";
 
-export type ReloginResult = "in" | "need-2fa" | "need-password" | "failed";
+export type ReloginResult = "in" | "need-2fa" | "need-password" | "rejected" | "rejected-secret" | "failed";
 export type ReloginOpts = { allow2fa?: boolean; secret?: string };
 export type Relogin = (url: string, o?: ReloginOpts) => Promise<ReloginResult>;
 
@@ -31,6 +32,7 @@ export function reloginBody(o: ReloginOpts = {}): string {
 await sleep(${FIRST_WAIT_MS});
 let s = await state();
 if (!s.pw) return s.otp || s.factor ? "need-2fa" : "in";
+let typed = false;
 if (!s.filled) {
 	${o.secret ? `let cred = null; try { cred = JSON.parse(secret); } catch {}
 	if (!cred || !cred.password) return "need-password";
@@ -38,7 +40,8 @@ if (!s.filled) {
 		const user = pg.locator('input[autocomplete=username], input[type=email], input[name*=user i], input[name*=id i], input[name*=email i], input[type=text]').first();
 		if (await user.count()) await user.fill(String(cred.username));
 	}
-	await pg.locator('input[type=password]').first().fill(String(cred.password));` : `return "need-password";`}
+	await pg.locator('input[type=password]').first().fill(String(cred.password));
+	typed = true;` : `return "need-password";`}
 }
 await pg.locator('input[type=password]').first().press("Enter");
 const end = Date.now() + ${wait};
@@ -49,10 +52,11 @@ while (Date.now() < end) {
 	if (!s.pw && !s.otp && !s.factor) return "in";
 	if (s.otp || s.factor) { factor = true; ${o.allow2fa ? "" : "break;"} }
 }
-return factor ? "need-2fa" : "failed";`;
+if (factor) return "need-2fa";
+return s.pw ? (typed ? "rejected-secret" : "rejected") : "failed";`;
 }
 
-const VERDICTS = new Set<ReloginResult>(["in", "need-2fa", "need-password", "failed"]);
+const VERDICTS = new Set<ReloginResult>(["in", "need-2fa", "need-password", "rejected", "rejected-secret", "failed"]);
 
 /** One sign-in attempt at `url` (the login form, or a page that sends a signed-out visitor to it). Never throws: a run that could not
  *  happen (Aside not answering, a timeout) is "failed". */

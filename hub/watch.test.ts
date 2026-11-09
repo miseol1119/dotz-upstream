@@ -1,6 +1,6 @@
 // dotz_watch robustness from the earlier secretary's launchd watchers: process-group SIGKILL deadline, per-kind retry, owner-approval gate.
 import { afterEach, beforeAll, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -347,6 +347,7 @@ const addLogin = (name: string, extra: Record<string, unknown> = {}) => addWatch
 
 test("a lost kept login is signed in again by the gateway: the login form and the secret are used, the check passes, nobody is told", async () => {
 	const calls = fakeSession(["lost", "ok"], ["in"]);
+	putSecret("site-login");
 	const w = addLogin("login-relog", { login_url: "https://site.example/login", secret: "site-login" });
 	await runWatch(w.name);
 	expect(calls).toEqual([{ url: "https://site.example/login", o: { secret: "site-login" } }]);
@@ -354,6 +355,38 @@ test("a lost kept login is signed in again by the gateway: the login form and th
 	expect([s.fails, !!s.lastOk, !!s.reloginAt]).toEqual([0, true, true]);
 	expect(notes).toEqual([]);
 	expect([w.approval_minutes, w.retry?.password]).toEqual([30, []]);
+});
+
+// a fake dotz_auth secret file (the scripted sign-in never reads it; only its presence counts)
+const secretFile = (name: string) => join(DATA_DIR, "secrets", name);
+function putSecret(name: string): void {
+	mkdirSync(join(DATA_DIR, "secrets"), { recursive: true });
+	writeFileSync(secretFile(name), "fixture\n");
+}
+
+test("a rejected dotz_auth login stops at once, its secret is removed, and a second rejection ends signing in for good", async () => {
+	const calls = fakeSession(["lost", "lost", "lost", "ok", "lost"], ["rejected-secret", "rejected", "in"]);
+	putSecret("bad-login");
+	const w = addLogin("login-rejected", { secret: "bad-login" });
+	await runWatch(w.name);
+	expect([existsSync(secretFile("bad-login")), state(w.name).paused, state(w.name).rejected]).toEqual([false, "password", 1]);
+	expect(notes.length).toBe(1);
+	await runWatch(w.name); // paused: the same value is never typed again by the 30-minute keeper
+	approveWatch(w.name); // 다시 연결 without a new value: the removed secret is not passed
+	await runWatch(w.name);
+	expect(calls.map(c => c.o.secret)).toEqual(["bad-login", undefined]);
+	expect(state(w.name).rejected).toBe(2);
+	putSecret("bad-login"); // the owner enters a new value and presses 다시 연결 again: two rejections already, nothing is typed
+	approveWatch(w.name);
+	await runWatch(w.name);
+	expect(calls.length).toBe(2);
+	expect(notes.at(-1)?.reason.startsWith("stopped after a password failure")).toBe(true);
+	approveWatch(w.name); // the owner signed in himself: the check passes, the count is cleared and the keeper may sign in again
+	await runWatch(w.name);
+	expect(state(w.name).rejected).toBeUndefined();
+	approveWatch(w.name);
+	await runWatch(w.name);
+	expect(calls.map(c => c.o.secret)).toEqual(["bad-login", undefined, "bad-login"]);
 });
 
 test("a login form nothing fills stops the login with one notice until the owner says 다시 연결", async () => {
