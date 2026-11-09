@@ -7,7 +7,8 @@ import { hasBoxes } from "../../../hub/mailbox.ts";
 import { threadText } from "../../../hub/zele.ts";
 import { ownAddresses } from "../../../hub/mail-state.ts";
 import { threadIdOf, webmailSite } from "./senders.ts";
-import { retryWanted, type StageOpts, type Want } from "./staged.ts";
+import { basename } from "node:path";
+import { retryWanted, stagedName, stageFiles, type StageOpts, type Want } from "./staged.ts";
 import { askText, attachFolder, buildDraft, callOf, candidatesFor, chosenFrom, draftTrace, mailAsksFile, settleDraft, stageForReply, traceLine, type DraftTrace } from "./flow.ts";
 import { anyRuleOn, mailInstanceOf, matchMail, ruleFileMissing, ruleInstruction, rulesOf, stageRuleFiles } from "./rules.ts";
 import { banWarnings, boxFolders, boxLines, boxRules, noAutoDraft } from "./box.ts";
@@ -18,7 +19,7 @@ import { addDraft, isDrafted, markDrafted } from "./store.ts";
 import { FairQueue } from "./fair-queue.ts";
 import type { Runner } from "./tone.ts";
 
-export type OfferMail = { account?: string; key: string; /** The card's first line instead of the usual one (hub/mail-unanswered.ts). */ headline?: string; /** false: the gateway judged the mail needs no reply (hub/mail.ts); only a draft rule drafts it then */ needs?: boolean; instruction?: string; messageId?: string; target: string; thread?: string; source: string; id: string; subject: string; from?: string; to?: string; cc?: string; summary?: string; body?: string; attachments?: { name: string; size?: number }[] };
+export type OfferMail = { account?: string; key: string; /** The card's first line instead of the usual one (hub/mail-unanswered.ts). */ headline?: string; /** false: the gateway judged the mail needs no reply (hub/mail.ts); only a draft rule drafts it then */ needs?: boolean; instruction?: string; messageId?: string; target: string; thread?: string; source: string; id: string; subject: string; from?: string; to?: string; cc?: string; summary?: string; body?: string; attachments?: { name: string; size?: number }[]; /** files the poster already chose for the reply (hub/mail.ts reply_files) */ replyFiles?: { path: string }[] };
 export type OfferDeps = BoxDeps & {
 	send: (target: string, text: string) => unknown;
 	call?: ModelCall;
@@ -251,10 +252,13 @@ async function offerOne(m: OfferMail, deps: OfferDeps, { body, history }: Reads,
 		const learned = Date.now();
 		// The files are picked BEFORE the words are written, so the draft is told which files ride on it (and that none fits) and its text agrees
 		// with the attachments. A rule that names its files stages those instead.
+		// Files the poster already chose (reply_files) ride on the reply as they are: the model is told so, and no 첨부 파일 폴더 pick runs.
+		const given = m.replyFiles?.map(f => f.path) ?? [];
+		if (given.length) item.files = given.map(p => stagedName(basename(p)));
 		const ruleFiles = !!rule?.files.length;
 		// The model chooses among candidates (the rule's files first, then the library matches); no model call picks them.
 		const asked = mailAsksFile(item);
-		const cands = ruleFiles || asked ? await candidatesFor(item, { source: m.source, ref: m.key }, rule, boxFolders(box), box?.alone).catch(e => (log(`reply draft: files for mail ${m.key} not matched: ${(e as Error).message}`), undefined)) : undefined;
+		const cands = !given.length && (ruleFiles || asked) ? await candidatesFor(item, { source: m.source, ref: m.key }, rule, boxFolders(box), box?.alone).catch(e => (log(`reply draft: files for mail ${m.key} not matched: ${(e as Error).message}`), undefined)) : undefined;
 		if (cands?.files.length) item.candidates = cands.files.map(f => f.rel);
 		else if (cands && asked) item.files = [];
 		const built = await buildDraft(item, { ...(box ? { box: box.id, instance } : {}), source: m.source, mailId: m.id, ref: m.key, ...(m.account ? { account: m.account } : {}), ...(m.attachments?.length ? { origAttachments: m.attachments.length } : {}) }, flow);
@@ -271,7 +275,11 @@ async function offerOne(m: OfferMail, deps: OfferDeps, { body, history }: Reads,
 		const warnings = [...built.warnings, ...banWarnings(box, built.rec)];
 		const chosen = chosenFrom(cands, built.files);
 		const notStaged = (e: Error): string[] => (log(`reply draft: files for mail ${m.key} not staged: ${e.message}`), []);
-		if (chosen) {
+		if (given.length) {
+			const want: Want[] = [];
+			warnings.push(...(await stageFiles(built.rec.id, given, want, flow.stage)));
+			if (want.length) built.rec.wantFiles = want;
+		} else if (chosen) {
 			// Exactly what the model chose; with no `files` in its answer (chosen undefined) the matching below is today's.
 			warnings.push(...(await stageForReply(built.rec, flow, Promise.resolve(chosen)).catch(notStaged)));
 			if (cands?.missing.length) warnings.push(ruleFileMissing(cands.missing));

@@ -2,10 +2,10 @@
 // (read-only preview/download). Uploads land under <data dir>/uploads/<day>/; the message carries their absolute paths.
 // Serving is read-only and limited to allowed roots, resolved through realpath so `..` and symlinks cannot leave them.
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync } from "node:fs";
+import { accessSync, constants, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync } from "node:fs";
 import { open, type FileHandle } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, extname, join, sep } from "node:path";
+import { basename, extname, isAbsolute, join, normalize, sep } from "node:path";
 import { cfg, DATA_DIR, HOME, writeAtomic } from "./config.ts";
 import { FILES, queueSnapshots, snapshotFor } from "./filesnap.ts";
 import { readMultipart } from "./upload-stream.ts";
@@ -26,6 +26,34 @@ const ORIGINAL_MAX = 300;
 const FILE_LABEL = /^(?:이미지|파일)\d{1,3}$/;
 
 // Keeps letters (any script), digits, dot, dash and underscore; never empty, never a dotfile, at most 120 chars.
+/** A file a mail poster already chose to go out WITH the reply (POST /api/mail `reply_files`), copied onto the reply draft from where it is. */
+export type ReplyFile = { path: string };
+// The draft's own cap (hub/draft-files.ts DRAFT_FILES_MAX) and the mail file cap (hub/mail.ts).
+const REPLY_FILES_MAX = 10, REPLY_FILE_MAX_BYTES = 1024 * 1024 * 1024;
+
+/** `reply_files` as posted: each an absolute path (no `..`) of a non-empty, readable regular file that is not itself a symlink. A bad entry
+ *  throws `err` naming it, so the poster learns it at once; none or an empty list is undefined. */
+export function replyFilesOf(v: unknown, err: (message: string) => Error): ReplyFile[] | undefined {
+	if (v === undefined || v === null) return undefined;
+	if (!Array.isArray(v)) throw err("reply_files must be an array");
+	if (v.length > REPLY_FILES_MAX) throw err(`reply_files: at most ${REPLY_FILES_MAX} files`);
+	if (!v.length) return undefined;
+	return v.map((f, i) => {
+		const path = f && typeof f === "object" ? (f as Record<string, unknown>).path : undefined;
+		if (typeof path !== "string" || !isAbsolute(path) || normalize(path) !== path) throw err(`reply_files[${i}].path must be an absolute path without ..`);
+		let st;
+		try {
+			st = lstatSync(path);
+			accessSync(path, constants.R_OK);
+		} catch {
+			throw err(`reply_files[${i}]: ${path} is not a readable file`);
+		}
+		if (!st.isFile()) throw err(`reply_files[${i}]: ${path} must be a regular file (not a folder or symlink)`);
+		if (!st.size || st.size > REPLY_FILE_MAX_BYTES) throw err(`reply_files[${i}]: size ${st.size} not accepted`);
+		return { path };
+	});
+}
+
 export function safeName(name: string): string {
 	const base = basename(String(name || "").replace(/\\/g, "/")).normalize("NFC");
 	const clean = base.replace(/[^\p{L}\p{N}._ -]+/gu, "_").replace(/\s+/g, " ").replace(/^[.\s]+/, "").trim();
