@@ -29,13 +29,20 @@ const notices = [
 ];
 const monitor = { name: "디스크 감시", watch: "disk", kind: "watch", every: "1시간마다", last_result: "ok", last_run: ts(300), next_run: ts(900) };
 const lane: { name: string; title: string; status: string; kind: string; live?: boolean } = { name: "a", title: "빌드 세션", status: "idle", kind: "work" };
+// A session the open page has not heard of yet (it started and ended while the phone slept), and one the owner deleted.
+const LATE_AT = ts(503), late = { name: "late", title: "막 끝난 세션", status: "exited", live: false, kind: "work" };
+const LATE = [{ ts: LATE_AT, kind: "lane_report", lane: "late", source: "lane:late", text: "[done] 정리 끝났어요" }];
+let lateKnown = false;
+notices.push(
+	{ ...base, id: "late", kind: "result", tone: "done", cls: "result", title: "막 끝난 세션", open: "lane:late", src: "lane:late", key: "lane:late", ts: LATE_AT, updated: LATE_AT, at: LATE_AT },
+);
 
 const hub = fakeHub({
-	state: () => ({ ...idleState(), lanes: [lane], notices_unread: notices.length }),
+	state: () => ({ ...idleState(), lanes: lateKnown ? [lane, late] : [lane], notices_unread: notices.length }),
 	api: (_req, url) => {
 		if (url.pathname === "/api/history") {
 			const t = url.searchParams.get("target"), before = url.searchParams.get("before");
-			const all = t === "main" ? MAIN : t === "lane:a" ? LANE : t === "mail:abc" ? MAIL : t === "alert" ? ALERTS : [];
+			const all = t === "main" ? MAIN : t === "lane:a" ? LANE : t === "lane:late" ? LATE : t === "mail:abc" ? MAIL : t === "alert" ? ALERTS : [];
 			const list = before ? all.filter(e => e.ts < before) : all;
 			return json({ target: t, events: list.slice(-Number(url.searchParams.get("limit") ?? 60) || -60) });
 		}
@@ -303,6 +310,17 @@ describe.each([["phone", 390], ["desktop", 1280]] as const)("%s", (_name, width)
 		} finally {
 			Object.assign(lane, { status: "idle" });
 			delete lane.live;
+		}
+	});
+
+	test("a session this page has not heard of yet still lands on its report", async () => {
+		const view = await open(width);
+		lateKnown = true;   // it started and ended after this page last read the state
+		try {
+			await tapOpen(view, pushOf("late"));
+			expect(await landed(view)).toEqual({ t: "lane:late", at: LATE_AT, seen: true });
+		} finally {
+			lateKnown = false;
 		}
 	});
 

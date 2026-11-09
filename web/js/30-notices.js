@@ -177,7 +177,10 @@ let ntJumpSeq = 0;
 let ntKeep = "";   // the session a tapped notice opened: it may end while its report is on screen, and the view then stays (refreshState)
 // `quiet`: a sheet is opening over the conversation and says what the notice is about itself, so a message that is gone needs no toast.
 async function ntJump(n, quiet = false) {
-  const seq = ++ntJumpSeq, at = n.at || n.updated || n.ts, t = ntGo(n.msg || n.src || n.open || "main");
+  const seq = ++ntJumpSeq, at = n.at || n.updated || n.ts, want = n.msg || n.src || n.open || "main";
+  // A session this page has not read yet (it began and ended while the page slept) is not gone: ask the gateway before ntGo sends the tap to the main chat.
+  if (isLaneT(want) && S && !S.lanes.some(l => `lane:${l.name}` === want)) { await refreshState(); if (seq !== ntJumpSeq) return; }
+  const t = ntGo(want);
   if (!t) return;
   chatUnpin();
   ntKeep = isLaneT(t) ? t : "";
