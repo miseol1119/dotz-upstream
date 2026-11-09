@@ -174,11 +174,13 @@ function ntFlash(node) {
   host._hl = setTimeout(() => host.classList.remove("nt-hl", "nt-bar"), 2300);
 }
 let ntJumpSeq = 0;
+let ntKeep = "";   // the session a tapped notice opened: it may end while its report is on screen, and the view then stays (refreshState)
 // `quiet`: a sheet is opening over the conversation and says what the notice is about itself, so a message that is gone needs no toast.
 async function ntJump(n, quiet = false) {
   const seq = ++ntJumpSeq, at = n.at || n.updated || n.ts, t = ntGo(n.msg || n.src || n.open || "main");
   if (!t) return;
   chatUnpin();
+  ntKeep = isLaneT(t) ? t : "";
   CV.jump = at;   // set after ntGo (a new opening resets it): the opening's first draw lands on this message, not on the "새 메시지" divider (chatOpen)
   try {
     const s = ts(t), stored = s.msgs.some(e => e.ts === at);

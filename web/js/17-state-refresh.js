@@ -37,8 +37,8 @@ async function refreshState() {
     webBuildCheck(S.web_build);
     ntSync(S);
     if (S.name && S.name !== botName) { botName = S.name; setBrand(); if (current === "home") $("#title").textContent = botName; if (ts(target).hLoaded) renderAll(); }
-    // A lane that exits disappears at once: the view falls back to the main assistant (it stays reachable from ⌘K).
-    if (isLaneT(target) && (!S.lanes.some(l => `lane:${l.name}` === target) || (PREV[target] && PREV[target] !== "exited" && targetInfo(target).status === "exited"))) setTarget(MAIN);
+    // A lane that exits disappears at once: the view falls back to the main assistant (it stays reachable from ⌘K), unless a tapped notice opened that session's report (ntKeep).
+    if (isLaneT(target) && (!S.lanes.some(l => `lane:${l.name}` === target) || (PREV[target] && PREV[target] !== "exited" && target !== ntKeep && targetInfo(target).status === "exited"))) setTarget(MAIN);
     if (isProjT(target) && !projTargets().includes(target)) setTarget(MAIN);   // its work channel was deleted
     noteStatus(); paintAuth(); paintDecision(); paintOrchError(); paintPause(); paintRunState();
     renderBars(); renderWorking(); paintSysLines(); updateComposerMeta(); dskPaint();

@@ -28,7 +28,7 @@ const notices = [
 	...Array.from({ length: 40 }, (_, i) => report(i)),
 ];
 const monitor = { name: "디스크 감시", watch: "disk", kind: "watch", every: "1시간마다", last_result: "ok", last_run: ts(300), next_run: ts(900) };
-const lane = { name: "a", title: "빌드 세션", status: "idle", kind: "work" };
+const lane: { name: string; title: string; status: string; kind: string; live?: boolean } = { name: "a", title: "빌드 세션", status: "idle", kind: "work" };
 
 const hub = fakeHub({
 	state: () => ({ ...idleState(), lanes: [lane], notices_unread: notices.length }),
@@ -288,6 +288,22 @@ describe.each([["phone", 390], ["desktop", 1280]] as const)("%s", (_name, width)
 		await run(`noticeOpenId("gap");`);
 		await waitFor(`$(".snack")`);
 		expect(await ev(`[target, $(".snack").textContent, !!tl.querySelector(".nt-hl")]`)).toEqual(["main", "그 메시지가 없어서 가까운 곳을 열었어요", false]);
+	});
+
+	test("a session that ends while its report is on screen stays on the report", async () => {
+		const view = await open(width);
+		const { run, waitFor } = on(view);
+		try {
+			await tapOpen(view, pushOf("rep"));
+			expect(await landed(view)).toEqual({ t: "lane:a", at: LANE_AT, seen: true });
+			Object.assign(lane, { status: "exited", live: false });
+			await run(`refreshState();`);
+			await waitFor(`S.lanes.some(l => l.status === "exited")`);
+			expect(await on(view).ev(`target`)).toBe("lane:a");
+		} finally {
+			Object.assign(lane, { status: "idle" });
+			delete lane.live;
+		}
 	});
 
 	test("a mail that is gone, and a report that is gone, say so", async () => {
