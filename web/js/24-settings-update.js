@@ -1,7 +1,10 @@
 /* ---------- settings: 업데이트 (hub/selfupdate.ts, /api/update*) ---------- */
 // Version on disk vs the version this gateway runs, the last check, the running/finished update job, and the restart that
 // applies it. After a restart request the page polls until the gateway answers with a new boot id.
-const UPD = { info: null, wait: null, timer: 0 };
+const UPD = { info: null, wait: null, timer: 0, at: 0 };
+// Opening settings reads both again only when the last read (boot, the 5 min tick, an update_available event) is older than that tick.
+const UPD_FRESH_MS = 5 * 60000;
+const updFresh = () => !!UPD.info && !UPD.info.error && !!HV.info && Date.now() - UPD.at < UPD_FRESH_MS;
 // 실행 하네스 (hub/harness-update.ts, /api/harness/update): the harness binary itself, checked beside dotz's own version.
 const HV = { info: null, timer: 0 };
 const updWhen = iso => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }); };
@@ -122,6 +125,7 @@ async function loadUpdate() {
   const [dotz, hv] = await Promise.all([api("/api/update").catch(e => ({ error: e.message })), api("/api/harness/update").catch(() => null)]);
   UPD.info = dotz;
   HV.info = hv;
+  UPD.at = Date.now();
   paintUpdBadge();
   if (UPD.info.flow && UB_ACTIVE.includes(UPD.info.flow.phase) && !UB.timer) updBarTick();
   if (UPD.info.job && UPD.info.job.status === "running") UPD.timer = setTimeout(loadUpdate, 1500);

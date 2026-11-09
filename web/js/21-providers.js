@@ -1,9 +1,11 @@
 /* ---------- providers ---------- */
 async function loadProviderData() {
   const r = await api("/api/providers");
-  P = { providers: r.providers || [], addable: Array.isArray(r.addable) ? r.addable : null };
+  P = { providers: r.providers || [], addable: Array.isArray(r.addable) ? r.addable : null, at: Date.now() };
   return P;
 }
+// Opening settings reads the providers again only when the last read is older than a minute.
+const provFresh = () => !!P && Date.now() - P.at < 60000;
 let provFail = false;
 async function loadProviders() {
   try { await loadProviderData(); provFail = false; }

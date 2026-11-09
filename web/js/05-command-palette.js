@@ -183,7 +183,7 @@ function go(name, tgt) {
   if (name === "monitoring" || mc) { renderMonitoring(); if (!monitorsFresh()) loadMonitors(); if (!noticesFresh()) loadNotices(); if (name === "monitoring" || !INTG.loaded) loadIntegrations(); }   // opening a conversation reads the app list kept fresh already; the read it sends asks again
   if (name === "project") pmOpen(tgt);
   if (name === "notices") nscOpen();
-  if (name === "settings") { loadUpdate(); renderSettings(); loadMessengerIndex(); loadProviderData().then(() => current === "settings" && renderSettings(), () => {}); loadRuntimes(); }
+  if (name === "settings") { if (!updFresh()) loadUpdate(); renderSettings(); loadMessengerIndex(); if (!provFresh()) loadProviderData().then(() => current === "settings" && renderSettings(), () => {}); loadRuntimes(); }
   if (name === "models") { renderModels(); loadModels(); loadProviderData().then(() => current === "models" && renderModels(), () => {}); }
   if (name === "accounts") { renderAccounts(); loadProviders(); loadAccounts(); if (!SQ) api("/api/quota").then(q => { noteQuota(q); if (current === "accounts") renderAccounts(); }, () => {}); }
   if (name === "messengers") { renderMessengers(); loadMessengerIndex(); }
