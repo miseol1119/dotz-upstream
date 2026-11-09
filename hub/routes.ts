@@ -77,7 +77,7 @@ import { convs, maxLiveView } from "./convsessions.ts";
 import { repostRefusal } from "./lanewire.ts";
 import { MAIN, primaryTarget } from "./session-key.ts";
 import { authHeld, parseReply, replyLine, sendWeb } from "./intake.ts";
-import { json, body, terminals } from "./routes-util.ts";
+import { json, body, terminals, BodyError } from "./routes-util.ts";
 import { ptyRoute } from "./pty.ts";
 import { desk } from "./remote-desktop.ts";
 import { projectFiles } from "./projectinfo.ts";
@@ -411,7 +411,7 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 			},
 		}),
 	);
-	const route = async (req: Request, srv?: Server<unknown>): Promise<Response> => {
+	const handle = async (req: Request, srv?: Server<unknown>): Promise<Response> => {
 		const url = new URL(req.url);
 		// The install files (manifest, service worker, icons) are public and secret-free, like any app store listing: a browser
 		// or OS fetch that carries no tailnet identity (icon or manifest fetch, SW update check) must still get them, or the
@@ -1009,6 +1009,8 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 		if (laneResponse) return laneResponse;
 		return new Response("not found", { status: 404 });
 	};
+	// A body that is not JSON is refused here, whichever route read it (hub/routes-util.ts body).
+	const route = (req: Request, srv?: Server<unknown>): Promise<Response> => handle(req, srv).catch(error => { if (error instanceof BodyError) return json({ error: error.message }, 400); throw error; });
 	const peers = createPeerMonitor({ name: () => resolveName(cfg.web?.machine_name, machineHost()), bot: () => NAME, local: route, localHeaders: { "x-dotz-token": HUB_TOKEN }, orchestrator: () => ({ status: orch.status, pauseKind: orch.pauseKind }), runs: () => Object.fromEntries(Object.entries(stateRuns()).filter(([k]) => k.startsWith("mail:"))) });
 	activatePeerMonitor(peers);
 	return route;
