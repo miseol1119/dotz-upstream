@@ -182,6 +182,7 @@ async function ntJump(n, quiet = false) {
   if (isLaneT(want) && S && !S.lanes.some(l => `lane:${l.name}` === want)) { await refreshState(); if (seq !== ntJumpSeq) return; }
   const t = ntGo(want);
   if (!t) return;
+  if (isLaneT(want) && t === MAIN) { toast("이 세션은 이미 지워졌어요"); return; }   // the main chat has no message of it: say so instead of landing on the nearest one
   chatUnpin();
   ntKeep = isLaneT(t) ? t : "";
   CV.jump = at;   // set after ntGo (a new opening resets it): the opening's first draw lands on this message, not on the "새 메시지" divider (chatOpen)

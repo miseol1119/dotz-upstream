@@ -35,6 +35,7 @@ const LATE = [{ ts: LATE_AT, kind: "lane_report", lane: "late", source: "lane:la
 let lateKnown = false;
 notices.push(
 	{ ...base, id: "late", kind: "result", tone: "done", cls: "result", title: "막 끝난 세션", open: "lane:late", src: "lane:late", key: "lane:late", ts: LATE_AT, updated: LATE_AT, at: LATE_AT },
+	{ ...base, id: "ghost", kind: "result", tone: "done", cls: "result", title: "지워진 세션", open: "lane:ghost", src: "lane:ghost", key: "lane:ghost", ts: LATE_AT, updated: LATE_AT, at: LATE_AT },
 );
 
 const hub = fakeHub({
@@ -322,6 +323,14 @@ describe.each([["phone", 390], ["desktop", 1280]] as const)("%s", (_name, width)
 		} finally {
 			lateKnown = false;
 		}
+	});
+
+	test("a session the owner deleted opens the main chat and says so, not an unrelated message", async () => {
+		const view = await open(width);
+		const { waitFor, ev } = on(view);
+		await tapOpen(view, pushOf("ghost"));
+		await waitFor(`$(".snack")`);
+		expect(await ev(`[target, $(".snack").textContent, !!tl.querySelector(".nt-hl")]`)).toEqual(["main", "이 세션은 이미 지워졌어요", false]);
 	});
 
 	test("a mail that is gone, and a report that is gone, say so", async () => {
