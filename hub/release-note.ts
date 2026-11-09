@@ -3,7 +3,8 @@
 import { scrub, type Term } from "./public-scrub.ts";
 
 export type NoteCommit = { subject: string; body?: string; files: string[] };
-export type NoteInput = { tag: string; commits: readonly NoteCommit[]; terms: readonly Term[] };
+// address: how this install's owner is addressed (config identity.address), only to drop a reason naming them; it never reaches the note.
+export type NoteInput = { tag: string; commits: readonly NoteCommit[]; terms: readonly Term[]; address?: string };
 
 export const NOTE_LOG_FORMAT = "%x1e%s%x1d%b%x1f";
 const NOTE_MAX = 120_000; // GitHub takes 125,000 characters in a release body
@@ -31,7 +32,23 @@ const CODE_NAME = new RegExp([
 ].join("|"));
 // An aside in brackets that names code goes whole, so the sentence around it still reads; code woven into the sentence itself drops the sentence.
 const withoutCodeAsides = (text: string) => text.replace(/\s*\(([^()]*)\)/g, (aside, inside: string) => (CODE_NAME.test(inside) ? "" : aside));
-const plainReason = (s: string) => s.length <= REASON_MAX && /\p{L}{2}/u.test(s) && !NOT_A_REASON.test(s) && !CODE_NAME.test(s);
+// A reason that retells the conversation behind the change: who asked (the owner, 사용자가 … 요청했다/원했다/말했다, someone who 요청했다) and what
+// was wished or settled in chat (~싶어 했다, ~기로 했다, 요청으로, 말한 대로). What the app does stays: 사용자가 고른 칸, 목록을 세 번 요청했어요.
+const RETOLD = new RegExp([
+	String.raw`(?<!\p{L})오너|\bowners?\b`,
+	String.raw`사용자(?:가|께서|는)\s.*(?<!\p{L})(?:요청|말|원|부탁)(?:했|하셨|해서)`,
+	String.raw`(?:가|이|께서)\s+요청(?:했|하셨)`,
+	String.raw`요청(?:으로|에\s*따라|대로|이\s*있었)`,
+	String.raw`싶어\s*(?:했|하셨)`,
+	String.raw`\p{L}기로\s*(?:했|하셨|정했|결정)`,
+	String.raw`(?<!\p{L})말(?:했|한|하셨|씀)`,
+].join("|"), "iu");
+// The address as a word of its own, bare or with a particle (형이, 형님께), never inside another word (형태, 모형).
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const addressWord = (address: string) =>
+	new RegExp(String.raw`(?<![\p{L}\p{N}])${escapeRe(address)}님?(?:께서|께|한테|에게|이랑|랑|처럼|이|가|은|는|을|를|의|도|만|와|과)?(?![\p{L}\p{N}])`, "iu");
+const plainReason = (s: string, owner: RegExp | null) =>
+	s.length <= REASON_MAX && /\p{L}{2}/u.test(s) && !NOT_A_REASON.test(s) && !CODE_NAME.test(s) && !RETOLD.test(s) && !owner?.test(s);
 const TEST_FILE = /\.test\.[jt]sx?$|(?:^|\/)(?:test|tests|fixtures)\//;
 // Plain Korean topics, by where a commit's files are; the first match per file wins and the commit goes to the topic with the most files.
 const TOPICS: [topic: string, re: RegExp][] = [
@@ -74,22 +91,23 @@ function firstSentence(text: string): string {
 }
 
 // One or two sentences: what changed, then why. Labelled parts may sit in the body or, from a one-line commit, in the subject itself.
-function noteItem({ subject, body = "" }: NoteCommit): string {
+function noteItem({ subject, body = "" }: NoteCommit, owner: RegExp | null): string {
 	const inline = subject.split(SUBJECT_LABEL);
 	const what = withoutCodeAsides(inline[0].replace(TICKET, "")).trim();
 	const labelled = [...inline.slice(1), ...body.split(BODY_LABEL).slice(1)];
 	const parts = (label: string) => labelled.flatMap((part, i) => (i % 2 === 0 && part === label ? [labelled[i + 1] ?? ""] : []));
-	const reason = [...parts("왜"), ...parts("어떻게")].map(part => firstSentence(withoutCodeAsides(part))).find(plainReason);
+	const reason = [...parts("왜"), ...parts("어떻게")].map(part => firstSentence(withoutCodeAsides(part))).find(s => plainReason(s, owner));
 	if (!reason) return what;
 	return `${/[.!?]$/.test(what) ? what : `${what}.`} ${reason}`;
 }
 
-export function buildReleaseNote({ tag, commits, terms }: NoteInput): string {
+export function buildReleaseNote({ tag, commits, terms, address = "" }: NoteInput): string {
+	const owner = address.trim() ? addressWord(address.trim()) : null;
 	const groups = new Map<string, string[]>();
 	for (const c of commits) {
 		if (NOT_A_CHANGE.test(c.subject)) continue;
 		const topic = INTERNAL_SUBJECT.test(c.subject) ? INTERNAL : topicOf(c.files);
-		groups.set(topic, [...(groups.get(topic) ?? []), noteItem(c)]);
+		groups.set(topic, [...(groups.get(topic) ?? []), noteItem(c, owner)]);
 	}
 	const order = [...TOPICS.map(([topic]) => topic), OTHER].filter(topic => groups.has(topic));
 	const sections = order.map(topic => `### ${topic}\n${groups.get(topic)!.map(subject => `- ${subject}`).join("\n")}`);

@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { writeAtomic } from "../firstrun/atomic.ts"; // not hub/config.ts: it needs a data dir at load, and CI has none
-import { releaseTerms, scrub, type Term } from "./public-scrub.ts";
+import { ownerAddress, releaseTerms, scrub, type Term } from "./public-scrub.ts";
 import { buildReleaseNote, NOTE_LOG_FORMAT, parseNoteCommits } from "./release-note.ts";
 
 export type Release = { readonly date: string; readonly n: number; readonly hotfix: number | null; readonly text: string };
@@ -174,12 +174,13 @@ export type PublishOptions = {
 	print?: (line: string) => void;
 	exec?: Exec;
 	terms?: readonly Term[];
+	address?: string; // how the owner is addressed; this install's config when not given
 };
 
-async function releaseNote(root: string, tag: string, base: string | null, rev: string, terms: readonly Term[]): Promise<string> {
+async function releaseNote(root: string, tag: string, base: string | null, rev: string, terms: readonly Term[], address: string): Promise<string> {
 	const log = await gitOutput(["log", "--no-merges", "--name-only", `--max-count=${NOTE_LOG_LIMIT}`, `--format=${NOTE_LOG_FORMAT}`, base ? `${base}..${rev}` : rev], root);
 	if (log.code !== 0) throw new Error(`릴리스 노트용 커밋을 읽지 못했어요: ${log.out}`);
-	return buildReleaseNote({ tag, commits: parseNoteCommits(log.out), terms });
+	return buildReleaseNote({ tag, commits: parseNoteCommits(log.out), terms, address });
 }
 
 // A GitHub Release per tag, with the note as its body. The tag is already out, so a failure here reports and leaves the note in the log.
@@ -242,7 +243,7 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 		print(opts.force ? "강제 릴리스를 낼 수 없어요." : "다음 버전을 낼 수 없어요.");
 		print(plan.reason);
 		const last = planForcedNext(tags);
-		if (opts.dryRun && last.ok) print(await releaseNote(root, "다음 버전", last.previous ? `v${last.previous.text}` : null, "HEAD", opts.terms ?? releaseTerms()));
+		if (opts.dryRun && last.ok) print(await releaseNote(root, "다음 버전", last.previous ? `v${last.previous.text}` : null, "HEAD", opts.terms ?? releaseTerms(), opts.address ?? ownerAddress()));
 		return 1;
 	}
 	const { version, previous } = plan;
@@ -251,13 +252,14 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 	const base = previous ? `v${previous.text}` : null;
 	const log = await gitOutput(["log", "--oneline", "--max-count=20", ...(base ? [`${base}..HEAD`] : ["HEAD"])], root);
 	const terms = opts.terms ?? releaseTerms();
+	const address = opts.address ?? ownerAddress();
 	const summary = scrub(summarizeChanges(log.out.split("\n").filter(Boolean), previous), terms).text;
 
 	print(`다음 ${opts.force ? "강제 " : ""}버전: ${tag}${previous ? ` (이전 ${base})` : " (첫 버전)"}`);
 	print(`변경 요약: ${summary}`);
 
 	if (opts.dryRun) {
-		print(await releaseNote(root, tag, base, "HEAD", terms));
+		print(await releaseNote(root, tag, base, "HEAD", terms, address));
 		print(`[--dry-run] 아무것도 쓰지 않았어요. 실제로 내보내면 VERSION을 ${version.text}로 쓰고, 커밋하고, 태그 ${tag}까지 origin/main과 함께 푸시한 뒤 위 노트로 GitHub Release를 만들어요.`);
 		return 0;
 	}
@@ -337,7 +339,7 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 	print(`푸시: origin ${tag}`);
 	print(`내보냈어요: ${tag} (${sha.out})`);
 	// After the rebase above: the note covers what the tag really holds, commits that landed during the run included.
-	return (await publishNote(root, tag, await releaseNote(root, tag, base, tag, terms), opts.exec ?? run, print)) ? 0 : 1;
+	return (await publishNote(root, tag, await releaseNote(root, tag, base, tag, terms, address), opts.exec ?? run, print)) ? 0 : 1;
 }
 
 type Exec = (cmd: readonly string[]) => Promise<{ code: number; out: string }>;

@@ -118,6 +118,17 @@ export function releaseTerms(env: Record<string, string | undefined> = process.e
 	return [...installTerms(env.DOTZ_DIR ?? join(homedir(), ".dotz")), ...listed.map(value => ({ value, label: "privacy list" }))];
 }
 
+// How this install's owner is addressed (config identity.address): too short and common a word to mask as a term, so the release note drops
+// a reason that names it instead. Empty without a data folder, as in CI.
+export function ownerAddress(env: Record<string, string | undefined> = process.env): string {
+	try {
+		const address = JSON.parse(fileText(join(env.DOTZ_DIR ?? join(homedir(), ".dotz"), "config.json")) || "{}").identity?.address;
+		return typeof address === "string" ? address.trim() : "";
+	} catch {
+		return ""; // a broken config is reported by the gateway
+	}
+}
+
 const FLAGS = String.raw`(?:-\S+(?:[ =]\S+)?\s+)*`;
 // A command's start: a line or a shell separator, or the opening quote of a shell string in eval code. A grep or a commit message that only mentions gh is no post.
 const START = String.raw`(?:^|[;&|(]|[:(=,$\[]\s*["'\x60]|\s-c\s+["'\x60])\s*(?:sudo\s+)?(?:(?:timeout\s+\S+|env|command|then|do|else|xargs(?:\s+-\S+)*|nohup|time|exec)\s+)*(?:[A-Za-z_]+=\S*\s+)*(?:[\w.~/-]*/)?`;

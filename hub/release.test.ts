@@ -195,7 +195,7 @@ describe("release note", () => {
 			calls.push({ cmd, body: readFileSync(cmd[cmd.length - 1], "utf8") });
 			return { code: 0, out: "https://github.com/ddotz/dotz/releases/tag/x" };
 		};
-		const code = await publishVersion({ auto: false, force, dryRun: false, cwd: root, now: kst("2026-11-06T13:00:00"), print: () => {}, exec, terms: [] });
+		const code = await publishVersion({ auto: false, force, dryRun: false, cwd: root, now: kst("2026-11-06T13:00:00"), print: () => {}, exec, terms: [], address: "" });
 		return { code, calls };
 	};
 
@@ -219,7 +219,7 @@ describe("release note", () => {
 		commit(root, "버튼 폭을 고칩니다");
 		const lines: string[] = [];
 		const exec = async () => { throw new Error("no exec in a dry run"); };
-		expect(await publishVersion({ auto: false, force: false, dryRun: true, cwd: root, now: kst("2026-11-06T13:00:00"), print: l => lines.push(l), exec, terms: [] })).toBe(0);
+		expect(await publishVersion({ auto: false, force: false, dryRun: true, cwd: root, now: kst("2026-11-06T13:00:00"), print: l => lines.push(l), exec, terms: [], address: "" })).toBe(0);
 		expect(lines.join("\n")).toContain("- 버튼 폭을 고칩니다");
 	});
 
@@ -229,7 +229,7 @@ describe("release note", () => {
 		for (const n of [1, 2, 3]) git(root, "tag", `v261106.${n}`);
 		git(root, "commit", "--allow-empty", "-q", "-m", "버튼 폭을 고칩니다", "-m", "왜: 글자가 잘렸어요.");
 		const lines: string[] = [];
-		expect(await publishVersion({ auto: false, force: false, dryRun: true, cwd: root, now: kst("2026-11-06T19:00:00"), print: l => lines.push(l), terms: [] })).toBe(1);
+		expect(await publishVersion({ auto: false, force: false, dryRun: true, cwd: root, now: kst("2026-11-06T19:00:00"), print: l => lines.push(l), terms: [], address: "" })).toBe(1);
 		const text = lines.join("\n");
 		expect(text).toContain("# dotz 다음 버전");
 		expect(text).toContain("- 버튼 폭을 고칩니다");
@@ -247,7 +247,7 @@ describe("release note", () => {
 		commit(root, "base");
 		git(root, "push", "-q", "origin", "main");
 		const lines: string[] = [];
-		const code = await publishVersion({ auto: false, force: false, dryRun: false, cwd: root, now: kst("2026-11-06T13:00:00"), print: l => lines.push(l), exec: async () => { throw new Error("gh is not installed"); }, terms: [] });
+		const code = await publishVersion({ auto: false, force: false, dryRun: false, cwd: root, now: kst("2026-11-06T13:00:00"), print: l => lines.push(l), exec: async () => { throw new Error("gh is not installed"); }, terms: [], address: "" });
 		expect(code).toBe(1);
 		expect(git(origin, "tag", "--list", "v*").trim()).toBe("v261106.1");
 		expect(lines.join("\n")).toContain("# dotz v261106.1");

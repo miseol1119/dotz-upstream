@@ -121,6 +121,38 @@ describe("buildReleaseNote", () => {
 		expect(items).toEqual([...woven.map((_, i) => `- 바뀐 점 ${i + 1}이에요`), `- 바뀐 점 ${woven.length + 1}이에요. ${plain}`]);
 	});
 
+	test("a reason that retells the conversation behind a change gives way to the plain title", () => {
+		const subject = "넓은 창에서 대화와 프로젝트를 2~4칸으로 나란히 열 수 있어요";
+		const body = "왜: 형이 tmux처럼 대화창을 나눠 보고 싶어 했고, 칸 단위로 화면 코드를 다시 짜기로 했어요.";
+		expect(note([{ subject, body, files: ["web/a.js"] }]).split("\n").filter(l => l.startsWith("- "))).toEqual([`- ${subject}`]);
+	});
+
+	test("a reason naming who asked or what was settled in chat is dropped, and one about what the app does stays", () => {
+		const retold = [
+			"오너가 칸을 나눠 보자고 했어요.",
+			"The owner asked for side-by-side panes.",
+			"사용자가 칸을 나눠 달라고 요청했어요.",
+			"사용자가 대화창을 나란히 보기를 원했어요.",
+			"사용자가 칸이 좁다고 말했어요.",
+			"대화창을 나눠 보고 싶어 했어요.",
+			"칸 단위로 화면을 다시 짜기로 했어요.",
+			"사용자 요청으로 칸 나누기를 더했어요.",
+			"칸 나누기는 디자인팀이 요청했어요.",
+			"지난번에 말한 대로 칸을 나눴어요.",
+		];
+		const product = ["사용자가 고른 칸이 유지돼요.", "사용자가 원하는 만큼 칸을 열 수 있어요."];
+		const commits = [...retold, ...product].map((why, i) => ({ subject: `바뀐 점 ${i + 1}이에요`, body: `왜: ${why}`, files: ["web/a.js"] }));
+		const items = note(commits).split("\n").filter(l => l.startsWith("- "));
+		expect(items).toEqual([...retold.map((_, i) => `- 바뀐 점 ${i + 1}이에요`), ...product.map((why, i) => `- 바뀐 점 ${retold.length + i + 1}이에요. ${why}`)]);
+	});
+
+	test("a reason naming how this install's owner is addressed is dropped, never a word that holds the address", () => {
+		const commits = ["형이 칸을 나눠 보자고 했어요.", "형님께 보낸 답이 비어 있었어요.", "칸 형태가 창 폭에 맞지 않았어요."].map((why, i) => ({ subject: `바뀐 점 ${i + 1}이에요`, body: `왜: ${why}`, files: ["web/a.js"] }));
+		const items = (address?: string) => buildReleaseNote({ tag: "v261110.1", commits, terms: [], address }).split("\n").filter(l => l.startsWith("- "));
+		expect(items("형")).toEqual(["- 바뀐 점 1이에요", "- 바뀐 점 2이에요", "- 바뀐 점 3이에요. 칸 형태가 창 폭에 맞지 않았어요."]);
+		expect(items()[0]).toBe("- 바뀐 점 1이에요. 형이 칸을 나눠 보자고 했어요.");
+	});
+
 	test("nothing to report still gives a note", () => {
 		expect(note(FIXTURE.slice(0, 2))).toContain("이번 버전에는 바뀐 기능이 없어요.");
 	});
