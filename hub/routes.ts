@@ -65,6 +65,7 @@ import { updateNow } from "./update-now.ts";
 import { harnessUpdateRoute } from "./harness-update.ts";
 import { appAsset, committedText, indexPage, setAppName, webBuild } from "./webapp.ts";
 import { forgetRoute, listPeers, ownLogin } from "./peers.ts";
+import { ambientWrite, entryHost, ownTailnetName, refuse, tokenOk } from "./entry-check.ts";
 import { peerProjects } from "./peer-projects.ts";
 import { relayRoute, relayRows } from "./relay-route.ts";
 import { handlePair, PAIR_PATH } from "./peer-pair.ts";
@@ -131,12 +132,12 @@ export const localLogin = createLocalLogin({ dir: DATA_DIR, confirm: number => c
 export const webAccess = createWebAccess({ dir: DATA_DIR, allow: ALLOW, notify: text => out("alert", text, undefined, { source: "gateway" }), onModeChange: () => localLogin.clear() });
 localLogin.keepMode(webAccess.mode());
 
-function authorized(req: Request, cfOk = false, devOk = false, peerIp?: string): boolean {
-	if (req.headers.get("x-dotz-token") === HUB_TOKEN) return true;
+function authorized(req: Request, cfOk = false, devOk = false, peerIp?: string, tailnet = false): boolean {
+	if (tokenOk(req)) return true;
 	if (localBrowser(req, peerIp) && localLogin.verify(req, webAccess.mode())) return true;
 	if (webAccess.devices() ? cloudflareGate({ device: devOk, accessConfigured: !!webAccess.cfAccess(), access: cfOk }) : cfOk) return true;
 	const login = (req.headers.get("tailscale-user-login") ?? "").toLowerCase();
-	if (login && ALLOW.has(login) && webAccess.mode() === "tailscale") return true;
+	if (login && tailnet && ALLOW.has(login) && webAccess.mode() === "tailscale") return true;
 	const seen = [...req.headers.keys()].filter(k => k.startsWith("tailscale-")).map(k => `${k}=${req.headers.get(k)}`).join(" ");
 	log(`denied ${new URL(req.url).pathname} ${seen || "(no tailscale identity headers)"} from ${req.headers.get("x-forwarded-for") ?? "unknown"}`);
 	return false;
@@ -283,7 +284,7 @@ const lastTurnStart = (items: ReturnType<typeof activityItems>): string | undefi
 const runningChildren = (source: string) =>
 	(subagentLists()[source] || []).filter(s => s.status === "running").map(s => ({ name: s.id, description: s.description || s.agent }));
 
-type RestartHooks = { busyNow: () => string[]; restartGateway: () => string; restartGatewayNow: () => string; mailDeps?: () => MailDeps; /** One mail reconcile round of at most `limit` mails (hub/mail-reconcile.ts); absent = not wired in this process. */ mailReconcile?: (limit: number) => Promise<{ checked: number; replied: number; notChecked: number; skipped: number }> };
+type RestartHooks = { /** This node's tailnet name (tests); default `tailscale status`. */ tailnetName?: () => Promise<string | undefined>; busyNow: () => string[]; restartGateway: () => string; restartGatewayNow: () => string; mailDeps?: () => MailDeps; /** One mail reconcile round of at most `limit` mails (hub/mail-reconcile.ts); absent = not wired in this process. */ mailReconcile?: (limit: number) => Promise<{ checked: number; replied: number; notChecked: number; skipped: number }> };
 const isMailTarget = (t: string) => /^mail:[a-z0-9._-]+$/.test(t);
 // Where a forwarded action came from (a machine name), as one short line; the event it makes carries it as `via`.
 const viaOf = (v: unknown): string | undefined => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, 40) || undefined : undefined);
@@ -402,7 +403,7 @@ const parseMailStates = (raw: unknown): { source: string; items: MailSourceState
 	return { source: b.source.trim().slice(0, 60), items };
 };
 
-export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps, mailReconcile }: RestartHooks): (req: Request, srv?: Server<unknown>) => Promise<Response> {
+export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGateway, restartGatewayNow, mailDeps, mailReconcile }: RestartHooks): (req: Request, srv?: Server<unknown>) => Promise<Response> {
 	const setupGate = createSetupGate({ dir: DATA_DIR, localHeaders: () => localLogin.sessionHeaders(), restart: () => void restartGatewayNow(), providers: routeSettings, log });
 	// Before any onboarding route can run: the real browser/exec, a gateway restart only after a flow changed config, and the live web-access switch.
 	setOnboardDeps(
@@ -415,6 +416,7 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 	);
 	const handle = async (req: Request, srv?: Server<unknown>): Promise<Response> => {
 		const url = new URL(req.url);
+		const tailnet = await entryHost(req, srv?.port ?? PORT, tailnetName, webAccess.hostname()); if (tailnet instanceof Response) return tailnet; // entry check (hub/entry-check.ts); true: this came through tailscale serve, so a tailnet login counts
 		// The install files (manifest, service worker, icons) are public and secret-free, like any app store listing: a browser
 		// or OS fetch that carries no tailnet identity (icon or manifest fetch, SW update check) must still get them, or the
 		// phone falls back to a plain shortcut. Everything else stays behind the identity check.
@@ -429,7 +431,7 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 		// The other gateways read this computer's chosen name here (hub/peers.ts); it is a display name, no secret, so it is public like the manifest.
 		if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/api/peer-info") return json({ name: resolveName(cfg.web?.machine_name, machineHost()) });
 		// Pairing gates itself: only a request from this node's own tailscale login gets a token (hub/peer-pair.ts), so it needs no owner check first.
-		if (req.method === "POST" && url.pathname === PAIR_PATH) return handlePair(req, { ownLogin });
+		if (req.method === "POST" && url.pathname === PAIR_PATH) return tailnet ? handlePair(req, { ownLogin }) : refuse("pairing outside the tailnet", req);
 		// A request with the peer header gets only the peer paths (hub/peer-auth.ts); a good one skips the owner check, a bad one never reaches it.
 		const devices = webAccess.devices();
 		const cfAccess = webAccess.cfAccess();
@@ -442,12 +444,13 @@ export function makeRoute({ busyNow, restartGateway, restartGatewayNow, mailDeps
 		if (peer === "none" && req.method === "POST" && url.pathname === "/local-login/request") return localLogin.request(req, url, webAccess.mode(), srv?.requestIP(req)?.address);
 		if (peer === "none" && req.method === "GET" && url.pathname === "/local-login/status") return localLogin.status(req, url, webAccess.mode(), srv?.requestIP(req)?.address);
 		if (peer === "none") { const r = await setupGate.route(req, url, srv?.requestIP(req)?.address); if (r) return r; }
-		if (peer === "none" && !authorized(req, !!cfAccess && (await cfAccess.verifyRequest(req)), !!devices && (await devices.verifySession(req)), srv?.requestIP(req)?.address)) return devices ? devices.denied(req, url) : webAccess.mode() === "local" ? localLogin.hint(req, srv?.requestIP(req)?.address) : new Response("forbidden", { status: 403 });
+		if (peer === "none" && !authorized(req, !!cfAccess && (await cfAccess.verifyRequest(req)), !!devices && (await devices.verifySession(req)), srv?.requestIP(req)?.address, tailnet)) return devices ? devices.denied(req, url) : webAccess.mode() === "local" ? localLogin.hint(req, srv?.requestIP(req)?.address) : new Response("forbidden", { status: 403 });
+		if (peer === "none") { const r = ambientWrite(req, url.pathname); if (r) return r; } // a cookie or tailnet login writes only from its own page
 		const deviceApi = peer === "none" ? await devices?.apiRoute(req, url) : undefined;
 		if (deviceApi) return deviceApi;
 		const accessApi = peer === "none" ? await webAccessRoute(req, url, webAccess) : undefined;
 		if (accessApi) return accessApi;
-		const loginLink = peer === "none" ? localLogin.loginLink(req, url, { port: PORT, tokenOk: req.headers.get("x-dotz-token") === HUB_TOKEN, local: localBrowser(req, srv?.requestIP(req)?.address) }) : undefined;
+		const loginLink = peer === "none" ? localLogin.loginLink(req, url, { port: PORT, tokenOk: tokenOk(req), local: localBrowser(req, srv?.requestIP(req)?.address) }) : undefined;
 		if (loginLink) return loginLink;
 		// 설정 → 웹 접속: Cloudflare starts the onboarding flow, 이 컴퓨터만 records the mode and is done at once. Neither answer carries a secret.
 		if (peer === "none" && url.pathname === "/api/web-access/onboard") {

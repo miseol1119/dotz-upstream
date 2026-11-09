@@ -46,7 +46,7 @@ export function peerTokens(): string[] {
 // The token to send to the peer at `url`: the one it issued to this gateway, else the shared one.
 export const peerTokenFor = (url: string): string | undefined => outToken(url) ?? peerToken();
 
-const same = (a: string, b: string) => {
+export const same = (a: string, b: string): boolean => {
 	const x = Buffer.from(a);
 	const y = Buffer.from(b);
 	return x.length === y.length && timingSafeEqual(x, y);

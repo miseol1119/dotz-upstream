@@ -233,6 +233,8 @@ export function createWebAccess(deps: WebAccessDeps) {
 		cfAccess: (): CfAccess | undefined => cf,
 		devices: (): Devices | undefined => dev,
 		mode: (): WebMode => state.mode,
+		/** The Cloudflare hostname while that mode is on, else "": a Host the gateway's entry check (hub/entry-check.ts) accepts. */
+		hostname: (): string => (state.mode === "cloudflare" ? state.hostname : ""),
 		/** The state at start-up (config.json or the saved web-access.json). */
 		start: (): Promise<void> => go(state),
 		stop: (): Promise<void> => stopTunnel(),

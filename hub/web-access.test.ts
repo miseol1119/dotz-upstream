@@ -16,7 +16,8 @@ const OWNER = "owner@example.com";
 const HOST = "dotz.example.com";
 const FILE = join(DATA, "web-access.json");
 const TOKEN_FILE = join(DATA, "secrets", "cloudflared-tunnel-token");
-const route = makeRoute({ busyNow: () => [], restartGateway: () => "", restartGatewayNow: () => "" });
+const TS = "mini.tailnet.ts.net";
+const route = makeRoute({ tailnetName: async () => TS, busyNow: () => [], restartGateway: () => "", restartGatewayNow: () => "" });
 
 const bin = mkdtempSync(join(tmpdir(), "dotz-wa-"));
 const fake = join(bin, "cloudflared");
@@ -51,7 +52,7 @@ describe("웹 접속", () => {
 		const v = await get();
 		expect(v).toMatchObject({ mode: "tailscale", token_set: false, cloudflared_found: true, devices: 0, tunnel: { state: "off" } });
 		expect(existsSync(FILE)).toBe(false);
-		expect((await call("/api/web-access", { headers: { "tailscale-user-login": OWNER } })).status).toBe(200);
+		expect((await call("/api/web-access", { headers: { "tailscale-user-login": OWNER, host: TS } })).status).toBe(200);
 		expect((await call("/api/web-access")).status).toBe(403);
 		expect((await call("/pair")).status).toBe(403);
 	});
@@ -76,7 +77,7 @@ describe("웹 접속", () => {
 		expect(existsSync(FILE)).toBe(false);
 		expect(existsSync(TOKEN_FILE)).toBe(false);
 		expect(await get()).toMatchObject({ mode: "tailscale", tunnel: { state: "off" } });
-		expect((await call("/api/web-access", { headers: { "tailscale-user-login": OWNER } })).status).toBe(200);
+		expect((await call("/api/web-access", { headers: { "tailscale-user-login": OWNER, host: TS } })).status).toBe(200);
 	});
 
 	test("PUT cloudflare starts the tunnel and the device gate; the token is stored 0600 and never comes back", async () => {
@@ -100,7 +101,7 @@ describe("웹 접속", () => {
 		expect([page.status, page.headers.get("location")]).toEqual([302, "/pair"]);
 		const api = await call("/api/state");
 		expect([api.status, api.headers.get("x-dotz-pair")]).toEqual([403, "1"]);
-		expect((await call("/api/web-access", { headers: { "tailscale-user-login": OWNER } })).status).toBe(403);
+		expect((await call("/api/web-access", { headers: { "tailscale-user-login": OWNER, host: TS } })).status).toBe(403);
 		expect((await call("/pair")).status).toBe(200);
 		expect((await call("/api/state", { headers: owner })).status).toBe(200);
 		expect(await get()).toMatchObject({ mode: "cloudflare", devices: 0 });
@@ -140,7 +141,7 @@ describe("웹 접속", () => {
 		const r = await mode("tailscale");
 		expect(await r.json()).toMatchObject({ mode: "tailscale", token_set: true, tunnel: { state: "off" } });
 		await flush();
-		expect((await call("/api/web-access", { headers: { "tailscale-user-login": OWNER } })).status).toBe(200);
+		expect((await call("/api/web-access", { headers: { "tailscale-user-login": OWNER, host: TS } })).status).toBe(200);
 		expect((await call("/api/state")).status).toBe(403);
 		expect((await call("/pair")).status).toBe(403);
 		expect(JSON.parse(readFileSync(FILE, "utf8")).mode).toBe("tailscale");

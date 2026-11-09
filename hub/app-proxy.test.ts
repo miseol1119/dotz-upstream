@@ -41,9 +41,9 @@ const gateway = Bun.serve({ port: 0, hostname: "127.0.0.1", websocket: appProxyS
 const base = `http://127.0.0.1:${gateway.port}`;
 const call = (path: string, opts: RequestInit & { auth?: boolean } = {}) => {
 	const { auth, ...init } = opts;
-	return route(new Request(`${base}${path}`, { ...init, headers: auth === false ? {} : { ...(init.headers as Record<string, string> | undefined), "x-dotz-token": HUB_TOKEN } }));
+	return route(new Request(`${base}${path}`, { ...init, headers: auth === false ? {} : { ...(init.headers as Record<string, string> | undefined), "x-dotz-token": HUB_TOKEN } }), gateway);
 };
-const callAs = (path: string, init?: RequestInit) => route(new Request(`${base}${path}`, init));
+const callAs = (path: string, init?: RequestInit) => route(new Request(`${base}${path}`, init), gateway);
 
 beforeAll(() => {
 	put("rw", { label: "리라이트 앱", kind: "tool", icon: "file", web: { url: `http://127.0.0.1:${port}`, mode: "rewrite" } });

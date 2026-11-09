@@ -56,6 +56,17 @@ Cloudflare를 처음 쓰면 기기를 하나 연결해야 합니다. 새 주소�
 | cloudflared 로그인 인증서 | `~/.cloudflared/cert.pem` | 0600 |
 | 온보딩 진행 상태(비밀 없음) | `~/.dotz/onboarding/web-access.json` | 0600 |
 
+## 입구 검사
+
+게이트웨이는 모든 요청을 로그인 확인 전에 한 번 더 걸러요(`hub/entry-check.ts`).
+
+- Host가 게이트웨이 자기 이름일 때만 받아요: `127.0.0.1`·`localhost`·`[::1]`에 게이트웨이 포트, 이 컴퓨터의 tailnet 이름(포트 없이 또는 `web.tailscale_https_port`), Cloudflare 방식일 때 그 주소, `web.public_url`의 호스트. 다른 Host는 403이에요.
+- Tailscale 로그인 헤더는 Host가 이 컴퓨터의 tailnet 이름일 때(= `tailscale serve`를 거쳐 온 요청)만 믿어요. 루프백 주소로 온 같은 헤더는 무시하고, 피어 페어링도 같은 조건이에요.
+- 토큰 없이 들어온 쓰기 요청(Tailscale 로그인, `dotz_local` 쿠키, Cloudflare 기기 세션)은 웹앱 자기 페이지에서 보낸 것이어야 해요: `Sec-Fetch-Site`가 `same-origin`이나 `none`, 그 헤더가 없으면 `Origin`이 같은 주소. 둘 다 없는 요청은 브라우저가 보낸 것이 아니라서(피어 게이트웨이의 푸시 릴레이) 통과해요. `/api/` 쓰기는 JSON 본문만 받고, 파일 올리기(`/api/upload`)만 multipart를 받아요. `x-dotz-token`이나 피어 토큰이 있는 요청은 해당하지 않아요.
+- 거절할 때마다 `hub.log`에 이유, Host, Origin을 한 줄 남겨요(같은 이유는 10초에 한 줄, 토큰 값은 남기지 않아요).
+
+앞단에 다른 프록시를 둬서 Host가 바뀌는 바람에 들어가지 못하게 되면 `config.json`에 `"web": { "entry_check": false }`를 넣고 게이트웨이를 다시 시작해요. 이전 동작으로 돌아가요. 프록시가 원래 Host를 넘기게 고친 뒤에는 다시 지워 주세요.
+
 ## 복구와 되돌리기
 
 - 화면의 **직접 입력**을 열면 주소, 팀 이름, AUD, 터널 토큰을 직접 넣을 수 있습니다. Cloudflare 화면이 바뀌어 자동화가 실패했을 때의 복구 경로입니다.

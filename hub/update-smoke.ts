@@ -5,13 +5,12 @@
 // off tailscale, zele, peer discovery and the scheduled checks, and HOME points at the temp dir. No WebView, no test suite: the whole
 // suite is the developer's gate before pushing (hub/update-gate-run.ts, docs/development.md).
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // The bun test preload replaces Date.now and setTimeout with a manual clock (hub/runtime/test-clock.ts): time here is Bun.nanoseconds.
 const ms = () => Bun.nanoseconds() / 1e6;
-// The web app and API answer only a tailnet login on web.allow_logins (hub/routes.ts authorized); this one exists only in the temp config.
-const LOGIN = "smoke@dotz.local";
 
 export type SmokeResult = { ok: true; ms: number; checked: string[] } | { ok: false; ms: number; why: string; out: string };
 
@@ -35,13 +34,16 @@ export async function smoke(root: string, o: { startMs?: number } = {}): Promise
 	const tmp = mkdtempSync(join(tmpdir(), "dotz-smoke-"));
 	const home = join(tmp, "home"), data = join(tmp, "data");
 	mkdirSync(home, { recursive: true });
-	mkdirSync(data, { recursive: true });
+	mkdirSync(join(data, "secrets"), { recursive: true });
+	// The smoke calls over the loopback, where only the hub token gets in (hub/entry-check.ts); this one exists only in the temp dir.
+	const token = randomBytes(24).toString("hex");
+	writeFileSync(join(tmp, "data", "secrets", "hub-token"), token, { mode: 0o600 });
 	const port = freePort();
 	writeFileSync(
 		join(data, "config.json"),
 		JSON.stringify({
 			identity: { name: "smoke", language: "ko", timezone: "Asia/Seoul" },
-			web: { port, tailscale_https_port: 0, allow_logins: [LOGIN], peer_discovery: false },
+			web: { port, tailscale_https_port: 0, allow_logins: [], peer_discovery: false },
 			zele: { enabled: false },
 			omp_update: { mode: "off" },
 			self_update: { auto_check: false },
@@ -66,7 +68,7 @@ export async function smoke(root: string, o: { startMs?: number } = {}): Promise
 	let exited = false;
 	void proc.exited.then(() => (exited = true));
 	const base = `http://127.0.0.1:${port}`;
-	const get = (p: string) => fetch(`${base}${p}`, { headers: { "tailscale-user-login": LOGIN }, signal: AbortSignal.timeout(10_000) });
+	const get = (p: string) => fetch(`${base}${p}`, { headers: { "x-dotz-token": token }, signal: AbortSignal.timeout(10_000) });
 	const checked: string[] = [];
 	const output = () => {
 		const read = (f: string) => {
