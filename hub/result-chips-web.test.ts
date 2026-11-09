@@ -73,8 +73,11 @@ test("home: a finished task, a finished session and a 작업내역 row with resu
 		const lane = n => ended.querySelector('[data-t="lane:' + n + '"]'), work = id => ended.querySelector('[data-work="' + id + '"]');
 		const row = t => [...log.querySelectorAll(".hc-row")].find(x => x.textContent.includes(t));
 		return { work: chips(work("st_made")), workNone: chips(work("st_none")), lane: chips(lane("docs")?.closest(".hrx") ?? null), laneNone: chips(lane("plain")),
-			log: chips(row("배포 마무리")), logNone: chips(row("메일 정리")) };`);
+			log: chips(row("배포 마무리")), logNone: chips(row("메일 정리")),
+			// chips wrap side by side across the row, not one per line in its text column
+			tops: [work("st_made"), row("배포 마무리")].map(x => [...x.querySelectorAll(".hrx-f .fatt")].map(c => Math.round(c.getBoundingClientRect().top))) };`);
 	for (const k of ["work", "lane", "log"]) expectThree(r[k] as never);
+	for (const [a, b, c] of r.tops as number[][]) { expect(b).toBe(a!); expect(c!).toBeGreaterThan(a!); }
 	expect([r.workNone, r.laneNone, r.logNone]).toEqual([[], [], []]);
 });
 

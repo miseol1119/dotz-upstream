@@ -337,6 +337,7 @@ details.think .md { padding: var(--sp-1) var(--sp-2) var(--sp-2) var(--box-ind);
 /* the same chips under a list row (project 완료 / 결과) start where its text starts, and inside a home notice row under its text */
 .li-res > .hrx-f { padding-left: calc(var(--row-px) + var(--sp-4) + var(--sp-3)); }
 .li-res > .li:not(:has(> .lead)) + .hrx-f { padding-left: var(--row-px); }
-.hc-row .hrx-f { padding: var(--sp-1) 0 0; }
-.hc-row:has(.hrx-f) { align-items: flex-start; }
-.hc-row:has(.hrx-f) .nt-dot { margin-top: var(--sp-15); }
+/* a notice row's chips take a line of their own across the row (not the narrow text column), so they sit side by side as under a task row;
+   order keeps the row's ::after spacer on its first line, and the 16px start is the 8px dot plus the row gap */
+.hc-row:has(.hrx-f) { flex-wrap: wrap; row-gap: 0; }
+.hc-row .hrx-f { order: 1; padding: var(--sp-1) 0 0 var(--sp-4); }
