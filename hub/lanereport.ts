@@ -13,6 +13,14 @@ import { checkDone, doneChecks, type Check } from "./donesignals.ts";
 import { unlanded } from "./lanetree.ts";
 import { prompt } from "./laneprompt.ts";
 
+// A line that says something stays unchecked ("실기기 미확인") reads as if that closes the job (owner, 2026-11-09). It must say why it cannot be
+// checked here and what was checked instead, behind one of these markers; without one the report goes back to the lane once.
+const UNVERIFIED = /unverified|not (yet )?(verified|checked|tested)|could ?n[o']t (verify|check|test)|미확인|확인\s?못|확인하지 못|검증\s?못|검증하지 못/i;
+export const INSTEAD_CHECKED = /대신 확인\s*:|instead checked\s*:/i;
+export function bareUnverified(text: string): string[] {
+	return text.split("\n").map(l => l.trim()).filter(l => UNVERIFIED.test(l) && !INSTEAD_CHECKED.test(l));
+}
+
 export const REPORT_DEBOUNCE_MS = Number(process.env.DOTZ_REPORT_DEBOUNCE_MS ?? 0);
 
 // An [ask] while the lane's last one is still open (any owner message clears it) that asks nothing new: the same text, or a line with no
@@ -57,6 +65,16 @@ export function report(lane: Lane, written: string, notice: boolean | "pause" = 
 		text = parseTone(text).text;
 		lane.bareAsk = true;
 	} else if (!notice) lane.bareAsk = undefined;
+	if (!notice) {
+		const unchecked = bareUnverified(text);
+		if (unchecked.length && lane.proc && !lane.unverifiedRefused) {
+			lane.unverifiedRefused = true;
+			persist(lane);
+			log(`lane ${lane.name} report refused (unverified without reason: ${unchecked.length} line(s))`);
+			return prompt(lane, msg().unverifiedRefused(unchecked));
+		}
+		lane.unverifiedRefused = undefined;
+	}
 	// The turn's final text answers every owner message still open (a gateway notice does not).
 	const answering = !notice && ownerNotes.reported(lane.name, text);
 	lane.reports++;

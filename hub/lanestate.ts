@@ -60,6 +60,8 @@ export type Lane = Record_ & {
 	silent?: { lastText: string };
 	// A bare [ask] (no choice block) went back to the lane; the next one is a plain note. An owner message or a real card resets it.
 	askRefused?: boolean;
+	// A report with a bare "unverified" line went back to the lane once; the next report goes through and clears it (hub/lanereport.ts).
+	unverifiedRefused?: boolean;
 	// Set when a compaction finished: the next prompt sent to the process carries the retain nudge once (no extra turn).
 	retainNext?: boolean;
 	// Set when the owner changed the workers' model of a running idle lane: its next prompt tells it once (no extra turn).

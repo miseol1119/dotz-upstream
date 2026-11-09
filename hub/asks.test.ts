@@ -249,6 +249,20 @@ test("an [ask] without choices raises nothing: it goes back to the session once,
 	expect(decisionsOf({ ts: "t", kind: "lane_report", source: "lane:pd", lane: "pd", text: reports[0]! })).toEqual([]);
 });
 
+test("a report that says something is unverified without why and what was checked instead goes back once", async () => {
+	const { lane, agent, reports } = await fresh("pu");
+	const bare = "[done] 키보드가 안 내려가게 고쳤어요.\n- 실기기 미확인";
+	await said(agent, bare);
+	await advance(500);
+	expect(reports).toEqual([]);
+	expect(agent.sent.at(-1)!.text).toContain(msg().unverifiedRefused(["- 실기기 미확인"]));
+	const reasoned = "[done] 키보드가 안 내려가게 고쳤어요.\n- 실기기: 이 맥에 폰이 연결돼 있지 않아요. 대신 확인: 헤드리스 390px 화면에서 입력 중 새 메시지 수신";
+	await said(agent, reasoned);
+	await advance(500);
+	expect(reports).toEqual([reasoned]);
+	expect(lane.unverifiedRefused).toBeUndefined();
+});
+
 test("a \"still waiting\" [ask] on a card the owner still has open makes nothing, however its words differ", async () => {
 	const { agent, reports } = await fresh("pe");
 	l.setOpenCardCheck(name => name === "pe");
