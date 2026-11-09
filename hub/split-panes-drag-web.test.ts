@@ -75,15 +75,17 @@ test("the middle of a pane replaces it; a target that is already open only takes
 	expect(await ids(v)).toEqual(["lane:다라", "lane:가나"]);
 });
 
-test("two panes are the most: a third dropped on a pane's edge replaces the pane it lands on, and the ghost says so", async () => {
+test("two panes are the most: a third dropped on a pane's edge replaces the pane it lands on, and the ghost says so inside the window", async () => {
 	const v = await open();
 	await split(v, "lane:가나");
-	await drag(v, ROW("lane:다라"), PANE("main"), 0.97, 0.5, false);
+	await drag(v, ROW("lane:다라"), PANE("lane:가나"), 0.97, 0.5, false);
 	await waitFor(v, `PD && PD.hit && PD.hit.side === "center" && PD.hit.full`);
 	expect(await ev(v, `$(".pn-ghost .pn-gh").textContent`)).toBe("칸은 2개까지라 이 칸을 바꿔요");
+	// at the window's right edge the ghost, hint line included, flips to the pointer's left
+	expect(await ev(v, `$(".pn-ghost").getBoundingClientRect().right <= innerWidth`)).toBe(true);
 	await run(v, `{ const r = PD.hit.r; document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.left + r.width * 0.97, clientY: r.top + r.height / 2, pointerId: 1, button: 0 })); }`);
 	await waitFor(v, `paneList().some(p => p.t === "lane:다라")`);
-	expect(await ids(v)).toEqual(["lane:다라", "lane:가나"]);
+	expect(await ids(v)).toEqual(["main", "lane:다라"]);
 	expect(await ev(v, `[paneSplit("lane:마바", "chat", "right"), paneCount()]`)).toEqual(["", 2]);
 });
 

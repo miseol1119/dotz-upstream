@@ -109,9 +109,10 @@ function paneDragMove(ev) {
   }
   ev.preventDefault();
   getSelection().removeAllRanges();
+  paneDragAim(ev.clientX, ev.clientY);
+  // measured after the aim wrote the hint line, which can widen the ghost past the window's edge
   const gw = PD.ghost.offsetWidth, gh = PD.ghost.offsetHeight, flip = ev.clientX + 12 + gw > innerWidth, up = ev.clientY + 12 + gh > innerHeight;
   Object.assign(PD.ghost.style, { left: `${flip ? ev.clientX - 12 - gw : ev.clientX + 12}px`, top: `${up ? ev.clientY - 12 - gh : ev.clientY + 12}px` });
-  paneDragAim(ev.clientX, ev.clientY);
 }
 // back: the drag ends without a drop, so the ghost goes back to where it was picked up.
 function paneDragEnd(back) {
