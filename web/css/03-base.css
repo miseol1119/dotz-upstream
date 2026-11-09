@@ -86,6 +86,8 @@
 .sel svg.ic { flex: none; color: var(--fg-3); width: 14px; height: 14px; }
 @media (hover: hover) { .sel:hover { background: color-mix(in srgb, var(--fg) 6%, var(--ff-fill)); } }
 @media (pointer: coarse) { .fi, .sel { height: var(--field-h-touch); font-size: 16px; } }
+/* iOS zooms the page when a field under 16px takes focus: on a touch screen every input, textarea, select and editable box stays at 16px, whatever its own rule says (line-height and height are left to those rules) */
+@media (pointer: coarse) { input:not([type=checkbox], [type=radio], [type=range], [type=file], [type=button], [type=submit], [type=reset], [type=color], [type=image], [type=hidden]), textarea, select, [contenteditable]:not([contenteditable=false]) { font-size: 16px !important; } }
 .lbl { margin: var(--sp-4) 0 var(--sp-15); font: 500 12px/16px var(--font); color: var(--fg-2); }
 
 /* menu: the single dropdown component */
