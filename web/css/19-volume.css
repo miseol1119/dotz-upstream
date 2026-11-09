@@ -1,7 +1,7 @@
 /* A lot piled up (web/js/30-monitoring.js monBar / monFeedNodes / monGroupNode): the view chips with their
    counts and 읽음 처리 on one sticky bar, section and day lines, one compact row per report or per source, and the 더 보기 button of a page. */
 .mon-bar { align-items: center; justify-content: space-between; flex-wrap: nowrap; gap: var(--sp-2); }
-.mon-tabs { display: flex; gap: var(--sp-1); min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.mon-tabs { display: flex; gap: 0; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .mon-tabs::-webkit-scrollbar { display: none; }
 .mon-read { flex: none; height: 32px; padding: 0 var(--sp-3); font-size: 13px; }
 .mon-read:disabled { color: var(--fg-3); }

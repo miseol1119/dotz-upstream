@@ -131,7 +131,7 @@ textarea.mbox-ta { display: block; flex: 1; min-height: 160px; margin: var(--sp-
    is in the open mail, and the one tag that stays is small. */
 @media (max-width: 639px) {
   .mr .mr-clip { display: none; }
-  .mr .rc-hd .tag { font-size: 10.5px; padding: 0 var(--sp-15); }
+  .mr .rc-hd .tag { font-size: 10.5px; }
 }
 
 /* Phone: one scrolling row of slim folder chips, an icon-only selection bar on one line, 44px targets in the sheet and the reply. The sheet and the reply keep their buttons clear of the home indicator. */

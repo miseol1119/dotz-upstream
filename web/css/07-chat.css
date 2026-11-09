@@ -58,7 +58,7 @@
 .runstate { min-height: 20px; margin: 0 0 var(--sp-15) var(--sp-1); color: var(--fg-2); font-size: 12px; line-height: 16px; }
 
 /* 상태 태그 (시제품 .bub .st .tag): 봇 메시지 첫 줄 맨 앞에 [확인 필요 / 완료 / 진행 중 / 실패] — 02-basic-markdown.js toneLead가 넣어요 */
-.bm .st-tag { height: 22px; margin-right: var(--sp-2); padding: 0 var(--sp-2); border-radius: 11px; font-size: 12px; line-height: 16px; vertical-align: 1px; }
+.bm .st-tag { height: 22px; margin-right: var(--sp-2); font-size: 12px; line-height: 16px; vertical-align: 1px; }
 
 /* 확인/질문 카드: 컴포저 바로 위에 붙어 있고, 흰 대화 카드 안에서도 한 면으로 읽히게 회색 위에 놓여요 (얇은 모양·동작은 그대로) */
 #composer > .dcard { background: var(--layer); }

@@ -22,13 +22,16 @@ code.path-short { display: inline-block; max-width: 100%; vertical-align: bottom
 .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--fg-3); }
 .dot.ok { background: var(--ok); } .dot.warn, .dot.att { background: var(--warn); } .dot.err { background: var(--err); }
 .dot.pri { background: var(--accent); }
-/* a small status tag is the one pill besides the two-value toggle (docs/ui-spec.md 알약 규칙) */
-.tag { display: inline-flex; align-items: center; flex: none; height: var(--tag-h); padding: 0 var(--tag-px); border-radius: var(--r-pill); background: var(--layer); color: var(--fg-2); font-size: var(--fs-tag); line-height: var(--lh-tag); font-weight: 500; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.tag.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
-.tag.warn { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
-.tag.err { background: color-mix(in srgb, var(--err) 14%, transparent); color: var(--err); }
-.tag.pri { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
-.tag.unreplied, .nb.unreplied { background: color-mix(in srgb, var(--unreplied) 14%, transparent); color: var(--unreplied); font-weight: 600; }
+/* a status is a tone dot and a word, never a capsule (web/DESIGN.md 상태·필터·화면 탭); a tag with no tone is a meta word.
+   Blue words stay --fg-2 (--accent text is under 4.5:1 on white); the dot carries the blue. */
+.tag { --tone: var(--fg-3); display: inline-flex; align-items: center; gap: var(--sp-15); flex: none; height: var(--tag-h); padding: 0; background: none; color: var(--fg-3); font-size: var(--fs-tag); line-height: var(--lh-tag); font-weight: 500; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.tag.ok { --tone: var(--ok); color: var(--ok); font-weight: 600; }
+.tag.warn { --tone: var(--warn); color: var(--warn); font-weight: 600; }
+.tag.err { --tone: var(--err); color: var(--err); font-weight: 600; }
+.tag.pri { --tone: var(--accent); color: var(--fg-2); font-weight: 600; }
+.tag.unreplied { --tone: var(--unreplied); color: var(--unreplied); font-weight: 600; }
+.nb.unreplied { background: color-mix(in srgb, var(--unreplied) 14%, transparent); color: var(--unreplied); font-weight: 600; }
+:is(.tag, .mon-ptag, .tr-st):is(.ok, .warn, .err, .pri, .unreplied, .sent, .failed, .sending, .queued)::before, .dr-hit::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--tone); }
 .dot.unreplied { background: var(--unreplied); }
 button.cchip.unrep-no { height: 22px; padding: 0 var(--sp-2); font-size: 11.5px; color: var(--unreplied); }
 /* 초안 작성 beside 답장 안 함: the one action that moves the mail forward, so it carries the accent (30-monitoring.js mailDraftButton).
@@ -101,12 +104,12 @@ button.li:hover, .li.tap:hover { background: var(--card-hover); }
 /* tabs */
 .chips { display: flex; gap: var(--sp-1); overflow-x: auto; scrollbar-width: none; padding: 0 0 var(--sp-3); min-width: 0; flex: none; }
 .chips::-webkit-scrollbar { display: none; }
-/* filter chips and tabs are small boxes, not pills: only a status tag and the two-value toggle are fully rounded */
+/* chips are small boxes; a filter row is a segmented track (16-result-card.css), a screen tab an underline (20-mailboxes.css) */
 .chip { display: inline-flex; align-items: center; gap: var(--sp-15); flex: none; height: var(--chip-h); padding: 0 var(--sp-3); border: 0; border-radius: var(--r-ctl); background: var(--card); color: var(--fg-2); font-size: 13px; font-weight: 500; max-width: 100%; }
 .chip:hover { background: var(--hover); color: var(--fg); }
 .chip.on { background: var(--fg); color: var(--bg); }
-/* 두 값 설정 (rowToggle): the current value in one pill on the row's card; the small mark says a tap swaps it */
-.chip.tgl { border-radius: var(--r-pill); background: var(--layer); color: var(--fg); font-weight: 500; }
+/* 두 값 설정 (rowToggle): the current value in one segment-shaped cell on the row's card; the small mark says a tap swaps it */
+.chip.tgl { border-radius: var(--r-seg); background: var(--layer); color: var(--fg); font-weight: 500; }
 .chip.tgl::after { content: "⇄"; color: var(--fg-3); font-size: 11px; }
 .chip.tgl.unset { color: var(--fg-2); }
 .chip.tgl:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

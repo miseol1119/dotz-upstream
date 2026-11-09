@@ -46,7 +46,7 @@
 .rq-q { display: flex; flex-direction: column; gap: var(--sp-3); }
 .rq-q > .rq { padding: var(--sp-3) var(--sp-4); border-radius: var(--r-card); background: var(--card); }
 .rq-q > .rq.busy { opacity: .6; }
-.rq-filter { display: flex; flex-wrap: wrap; gap: var(--sp-15); }
+.rq-filter { display: flex; }
 .rq-open { margin-left: auto; height: 28px; padding: 0 var(--sp-2); font-size: 12px; }
 @media (pointer: coarse), (max-width: 639px) { .rq-q > .rq { padding: var(--sp-3); } }
 

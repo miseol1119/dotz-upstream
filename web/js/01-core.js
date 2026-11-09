@@ -16,6 +16,17 @@ function el(tag, props, ...kids) {
   return n;
 }
 const clear = n => { while (n.firstChild) n.removeChild(n.firstChild); return n; };
+// A filter or tab row that scrolls sideways keeps its chosen item in view after it is drawn (a repaint starts the row at its left end).
+// Only the row scrolls, never the page. Returns the row.
+function segKeep(row) {
+  requestAnimationFrame(() => {
+    const on = row.isConnected && row.querySelector(".on"), box = on && on.parentElement;
+    if (!box || box.scrollWidth <= box.clientWidth) return;
+    const b = box.getBoundingClientRect(), r = on.getBoundingClientRect();
+    if (r.left < b.left) box.scrollLeft += r.left - b.left; else if (r.right > b.right) box.scrollLeft += r.right - b.right;
+  });
+  return row;
+}
 // The text field the owner is typing in (on a phone its keyboard is up), or null.
 function typingIn() {
   const a = document.activeElement;

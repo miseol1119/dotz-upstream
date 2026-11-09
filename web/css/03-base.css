@@ -274,7 +274,7 @@ details.work.bad:not(.live) .wdot { display: block; background: var(--err); }
 .mt { font-size: 12px; line-height: 16px; color: var(--fg-2); }
 .mt .mn { font-weight: 600; }
 /* a status pill in a message header (진행 중/완료/질문/실패) is exactly the 16px text line, so it neither sinks below the name and time nor makes the line taller */
-.mt > .tag { height: 16px; padding: 0 var(--sp-15); margin-left: var(--sp-15); vertical-align: top; }
+.mt > .tag { height: 16px; margin-left: var(--sp-15); vertical-align: top; }
 .um { align-self: flex-end; display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-1); max-width: 80%; min-width: 0; margin-top: var(--sp-4); }
 .um:first-child { margin-top: 0; }
 .um.cont { margin-top: calc(var(--sp-2) * -1); }

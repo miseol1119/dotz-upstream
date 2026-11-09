@@ -281,9 +281,9 @@ function pjSearch() {
     el("input", { id: "pl-q", type: "search", placeholder: "프로젝트 검색", "aria-label": "프로젝트 검색", autocomplete: "off", value: PJ.q, oninput: ev => { PJ.q = ev.target.value; pjPaintRows(); } }));
 }
 function pjChips(counts) {
-  return el("div", { class: "pl-chips", role: "tablist", "aria-label": "프로젝트 보기" }, ...PJ_VIEWS.map(([k, label]) =>
+  return segKeep(el("div", { class: "pl-chips", role: "tablist", "aria-label": "프로젝트 보기" }, ...PJ_VIEWS.map(([k, label]) =>
     el("button", { class: `cchip mr-f${PJ.view === k ? " on" : ""}`, type: "button", role: "tab", "aria-selected": String(PJ.view === k), "data-view": k, onclick: () => { PJ.view = k; PJ.more = PJ_PAGE; pjPaintChips(); pjPaintRows(); } },
-      label, counts[k] ? el("span", { class: "mr-fn", text: String(counts[k]) }) : el("span", { class: "mr-fn", hidden: true }))));
+      label, counts[k] ? el("span", { class: "mr-fn", text: String(counts[k]) }) : el("span", { class: "mr-fn", hidden: true })))));
 }
 function pjShell() {
   return el("div", { class: "pl", id: "pl-shell" }, el("div", { class: "pl-top" }, pjSearch(), el("div", { id: "pl-chips" })), el("div", { class: "pl-groups", id: "pl-list" }));

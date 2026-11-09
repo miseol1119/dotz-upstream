@@ -92,8 +92,8 @@ function nscInit() {
   if (nscBox) return;
   const v = $("#v-notices");
   nscBox = {
-    tabs: el("div", { class: "nsc-f", role: "tablist", "aria-label": "알림 종류" }, ...NSC_FILTERS.map(([k, l]) =>
-      el("button", { class: "nsc-fb", type: "button", role: "tab", "data-f": k, onclick: () => nscFilter(k) }, l, el("span", { class: "n", "data-n": k })))),
+    tabs: segKeep(el("div", { class: "nsc-f", role: "tablist", "aria-label": "알림 종류" }, ...NSC_FILTERS.map(([k, l]) =>
+      el("button", { class: "nsc-fb", type: "button", role: "tab", "data-f": k, onclick: () => nscFilter(k) }, l, el("span", { class: "n", "data-n": k }))))),
     num: el("span", { "data-nu": "1", text: "0" }),
     all: el("button", { class: "btn text sm", type: "button", "data-k": "read-all", hidden: true, text: "모두 읽음", onclick: ev => nscReadAll(ev.currentTarget) }),
     list: el("div", { class: "nsc-l" }),

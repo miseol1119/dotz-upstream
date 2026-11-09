@@ -154,8 +154,8 @@ textarea.fi { display: block; height: auto; padding: var(--sp-2) var(--sp-3); li
 .bd { display: inline-flex; align-items: center; height: 16px; padding: 0 var(--sp-15); border-radius: 4px; font: 500 var(--fs-tag)/var(--lh-tag) var(--font); white-space: nowrap; }
 .bd.f { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .bd.a { background: var(--layer); color: var(--fg-2); }
-.tag.st.enforced { background: var(--accent); color: var(--bg); }
-.tag.st.advisory { background: var(--layer); color: var(--fg-2); }
+.tag.st.enforced { color: var(--fg); font-weight: 600; }
+.tag.st.advisory { color: var(--fg-3); }
 .fc { margin-top: var(--sp-6); }
 .fc > .sec { margin-left: 0; margin-right: 0; }
 .fc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin: var(--sp-2) 0 var(--sp-1); }
@@ -193,7 +193,7 @@ textarea.fi { display: block; height: auto; padding: var(--sp-2) var(--sp-3); li
 :root { --mine: #0e7490; }
 :root[data-theme="dark"] { --mine: #38c0d9; }
 .bd.m { background: color-mix(in srgb, var(--mine) 14%, transparent); color: var(--mine); }
-.tag.m, .tag.scope.personal, .tag.scope.project { background: color-mix(in srgb, var(--mine) 14%, transparent); color: var(--mine); }
+.tag.m, .tag.scope.personal, .tag.scope.project { color: var(--mine); font-weight: 600; }
 .tag.scope { height: auto; min-height: 20px; white-space: normal; text-align: left; overflow-wrap: anywhere; }
 .hm-bar .hm-legend { flex: 1 1 100%; display: flex; align-items: center; gap: var(--sp-15); }
 .hm-legend .bd { flex: none; }

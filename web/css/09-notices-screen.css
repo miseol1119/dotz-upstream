@@ -1,11 +1,10 @@
 /* 알림 화면 (31-notices-screen.js, the prototype's #notices): a filter row, one meta line, then up to three lists of one row shape: the dot, the title with its
    time, a one-line summary with the kind tag, and one cell at the end. Emphasis is the title weight only; the dot is the only colour, the tag stays grey. */
 #v-notices { display: flex; flex-direction: column; }
-.nsc-f { display: flex; flex-wrap: nowrap; gap: var(--sp-1); margin: var(--sp-1) 0 var(--sp-2); overflow-x: auto; scrollbar-width: none; }
+.nsc-f { display: flex; flex-wrap: nowrap; gap: 0; margin: var(--sp-1) 0 var(--sp-2); overflow-x: auto; scrollbar-width: none; }
 .nsc-f::-webkit-scrollbar { display: none; }
-.nsc-fb { flex: none; display: inline-flex; align-items: center; gap: var(--sp-15); height: var(--chip-h); padding: 0 var(--sp-3); border: 0; border-radius: var(--r-pill); background: var(--card); color: var(--fg-2); font: 500 13px/20px var(--font); }
-.nsc-fb:not(.on):hover { background: var(--hover); }
-.nsc-fb.on { background: var(--fg); color: var(--bg); font-weight: 600; }
+/* .nsc-fb is a filter segment: its shape is in 16-result-card.css with .mr-f */
+.nsc-fb { display: inline-flex; align-items: center; gap: var(--sp-15); }
 .nsc-fb .n { color: var(--fg-3); font-variant-numeric: tabular-nums; }
 .nsc-fb.on .n { color: inherit; }
 .nsc-fb .n:empty { display: none; }

@@ -325,7 +325,7 @@ function rqFilterBar(rows) {
   if (RQ.app && !by.has(RQ.app)) RQ.app = "";
   const chip = (k, text, n) => el("button", { class: `cchip mr-f${RQ.app === k ? " on" : ""}`, type: "button", role: "tab", "aria-selected": String(RQ.app === k), "data-filter": k || "all", onclick: () => { RQ.app = k; RQ.lim = {}; MON.sig = ""; monSchedule(); } }, text, n ? el("span", { class: "mr-fn", text: String(n) }) : null);
   const total = [...by.values()].reduce((c, v) => c + v.n, 0);
-  return RQ.app || (by.size >= 2 && total >= TR.min) ? el("div", { class: "mr-filter rq-filter", role: "tablist", "aria-label": "앱별 답장" }, chip("", "전체", total), ...[...by].map(([k, v]) => chip(k, v.text, v.n))) : null;
+  return RQ.app || (by.size >= 2 && total >= TR.min) ? segKeep(el("div", { class: "mr-filter rq-filter", role: "tablist", "aria-label": "앱별 답장" }, chip("", "전체", total), ...[...by].map(([k, v]) => chip(k, v.text, v.n)))) : null;
 }
 // 방금 / N분 전 within the hour, as the prototype's rows, then the plain time.
 const rqWhen = at => { const m = at ? Math.floor((Date.now() - at) / 60_000) : -1; return !at ? "" : m < 1 ? "방금" : m < 60 ? `${m}분 전` : rcWhen(new Date(at).toISOString()); };

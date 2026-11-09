@@ -14,7 +14,7 @@
 .pl-search input::placeholder { color: var(--fg-3); }
 .pl-search:focus-within { box-shadow: inset 0 0 0 2px var(--accent); }
 /* one line at every width: the chips scroll sideways instead of wrapping */
-.pl-chips { display: flex; flex-wrap: nowrap; gap: var(--sp-1); min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.pl-chips { display: flex; flex-wrap: nowrap; gap: 0; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .pl-chips::-webkit-scrollbar { display: none; }
 /* the prototype's .sec + .list: each group is its own card, with the heading above it */
 .pl-groups { display: flex; flex-direction: column; min-width: 0; }

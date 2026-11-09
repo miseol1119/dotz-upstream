@@ -106,12 +106,28 @@ The one layout for a row in any list or home card (home cards, 작업내역, pro
 | `--r-sheet` | 20px | sheets and dialogs |
 | `--r-menu` | 14px | popover menus, floating notices |
 | `--r-ctl` | 10px | buttons, fields, chips, tabs, bubbles, menu items |
-| `--r-seg` / `--r-seg-in` | 8px / 6px | segmented control track / chosen cell |
-| `--r-pill` | 999px | only a small status tag (`.tag`) and the two-value toggle (`.chip.tgl`) |
+| `--r-seg` / `--r-seg-in` | 8px / 6px | segmented control and filter track / chosen cell; the two-value toggle (`.chip.tgl`) |
+| `--r-pill` | 999px | round icon buttons only; never a status, filter or tab |
 
 Cards keep 20px padding, list rows 8/16px with a 44px minimum height. No shadows on cards; menus and dialogs keep one soft
 float shadow (`--float`, `--shadow-menu`, `--shadow-dialog`, `--shadow-sheet`). Type and space use the scale tokens
-(`--fs-*`, `--lh-*`, `--sp-*`) in `web/css/01-tokens.css`; the pill-sparingly rule is in `docs/ui-spec.md`.
+(`--fs-*`, `--lh-*`, `--sp-*`) in `web/css/01-tokens.css`.
+
+### Status, filter, screen tab (no capsules)
+
+| Pattern | Use when | Shape |
+|---|---|---|
+| Status | a word that says the state of a row or card (`.tag`, `.mon-ptag`, `.ct-pill`, `.tr-st`, `.dr-hit`) | no fill, no padding: a 6px tone dot (`::before`, `--tone`) + the word, 600 in the tone colour; `.pri`/blue states keep the blue in the dot and the word in `--fg-2`. A tag with no tone is a meta word (`--fg-3`, 500). Status text is >= 4.5:1 in light and dark. |
+| Filter | narrows the same list (`.mr-f` in `.mr-filter`/`.pl-chips`/`.mon-tabs`, `.nsc-fb`) | one segmented track (`--seg-track`, `--r-seg`) drawn by the segments, the chosen one a `--seg-on` cell (`--r-seg-in`) + `--fg` 600. Each segment stays the button (touch hit areas sit on it). A long row scrolls sideways, `segKeep` keeps the chosen one in view. |
+| Screen tab | swaps the whole view under it (`.mx-tab` mailboxes, `.cm-tabs` 댓글/DM: a different list, not a narrower one) | words over a 1px `--line` hairline, chosen = `--fg` 600 + 2px `--fg` underline; side padding `--sp-3` and the full `--btn-hit` 44px height as the hit area. |
+
+Count badges (`.nb`, unread circles) and dots stay as they are; the palette does not change with these shapes.
+
+**Keep a capsule only where it is the natural shape**: a standalone object you pick up or remove, a count, a switch, or a round action
+next to other buttons. Kept: count badges (`.nb`, `.pr-n`, `.pl-nb`, `.mth-n`, `.mlist-b`, `.pk-n`, `.tr-n`, `.fb-n`); switches (`.hs-sw`, `.kk-sw`);
+recipient and token chips (`.dr-chip`, `.pj-tg` channel/file, `.sl-c`/`.sl-a` slash-command arguments, `.fatt` attachments); round icon
+buttons (`.mxs-cx`, `.dr-rc-x`) and the thread mailbox button (`.mth-mb`); KakaoTalk's own date and system chips (`.kk-date`, `.kk-sys`)
+and the jump-back float (`.kk-backpill`), which copy the messenger. Changed to status: `.conn` (연결 끊김), `.cchip.capi` (api사용중), `.dr-st`, `.dsk-pill`.
 Split panes (`web/css/26-panes.css`) add no tokens: a pane is a card, the active pane is marked by `--ff-ring` only, and a drop
 zone is the file-drop look (`--accent` at 12% + `--ff-ring`); the rules are in `docs/ui-spec.md` (분할 칸).
 

@@ -137,7 +137,7 @@ ul.mr-sum.mr-pts { display: block; margin: 0; padding: 0; list-style: none; }
 #mon-tl > .bm.rc.dr { gap: var(--sp-3); }
 .dr-ic { flex: none; display: inline-flex; color: var(--fg-3); }
 .dr-ic .ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
-.dr-st { margin-left: auto; height: 24px; padding: 0 var(--sp-3); border-radius: 12px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.dr-st { margin-left: auto; height: 24px; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .dr-q { font-size: 15px; line-height: 22px; }
 .dr-orig { display: flex; flex-direction: column; gap: var(--sp-05); padding: var(--sp-05) 0 var(--sp-05) var(--sp-3); border-left: 3px solid var(--line-2); min-width: 0; }
 .dr-ok { color: var(--fg-3); font-size: 12px; line-height: 16px; font-weight: 600; }
@@ -217,7 +217,7 @@ a.dr-att:active { background: var(--active); }
 .dr-lib { display: flex; flex-direction: column; gap: var(--sp-1); max-height: 220px; overflow-y: auto; }
 .dr-li { display: flex; align-items: center; gap: var(--sp-2); min-height: 44px; padding: var(--sp-15) var(--sp-3); border: 0; border-radius: var(--r-ctl); background: var(--layer); color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
 .dr-li:hover { background: var(--hover); }
-.dr-hit { flex: none; padding: 0 var(--sp-2); border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 11px; font-weight: 700; line-height: 18px; }
+.dr-hit { --tone: var(--accent); display: inline-flex; align-items: center; gap: var(--sp-15); flex: none; color: var(--fg-2); font-size: 11px; font-weight: 600; line-height: 18px; }
 .dr-q2 { margin: var(--sp-3) 0 var(--sp-2); color: var(--fg-2); font: 500 13px/18px var(--font); }
 .dr-edit.ask { min-height: 64px; }
 .dr-act .dr-manual { margin-left: auto; display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--fg-2); }
@@ -247,11 +247,19 @@ a.dr-att:active { background: var(--active); }
 .ms-hd { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); min-width: 0; padding: 0 var(--sp-1); }
 .ms-hd .ms-n { color: var(--fg-3); font-size: 12px; }
 .ms-rm .ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
-.mr-filter { position: sticky; top: 0; z-index: 2; display: flex; gap: var(--sp-1); flex-wrap: wrap; padding: var(--sp-1) 0 var(--sp-2); background: var(--bg); }
-/* every view pill of an app, a mail list, 프로젝트 and 답장 대기 (ui-spec 탭·칩): the prototype's .tabs on the card fill, the chosen one filled with the ink */
-:is(.mr-filter, .pl-chips) .mr-f { flex: none; height: var(--chip-h); padding: 0 var(--sp-3); border-radius: var(--r-pill); background: var(--card); color: var(--fg-2); font: 500 13px/20px var(--font); }
-:is(.mr-filter, .pl-chips) .mr-f:hover { background: var(--card-hover); }
-:is(.mr-filter, .pl-chips) .mr-f.on, :is(.mr-filter, .pl-chips) .mr-f.on:hover { background: var(--fg); color: var(--bg); }
+.mr-filter { position: sticky; top: 0; z-index: 2; display: flex; gap: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: var(--sp-1) 0 var(--sp-2); background: var(--bg); }
+.mr-filter::-webkit-scrollbar { display: none; }
+/* every filter row of an app, a mail list, 프로젝트, 답장 대기 and 알림 (web/DESIGN.md 필터): one segmented track (--r-seg) drawn by the segments
+   themselves, so the row keeps the chip height and each segment stays the button; the chosen one is a --seg-on cell (--r-seg-in) inside it.
+   A long row scrolls sideways (segKeep keeps the chosen one in view). */
+:is(.mr-filter, .pl-chips) .mr-f, .nsc-fb { position: relative; isolation: isolate; flex: none; height: var(--chip-h); padding: 0 var(--sp-3); border: 0; border-radius: 0; background: var(--seg-track); color: var(--fg-2); font: 500 13px/20px var(--font); }
+:is(.mr-filter, .pl-chips) .mr-f:first-child, .nsc-fb:first-child { border-top-left-radius: var(--r-seg); border-bottom-left-radius: var(--r-seg); }
+:is(.mr-filter, .pl-chips) .mr-f:last-child, .nsc-fb:last-child { border-top-right-radius: var(--r-seg); border-bottom-right-radius: var(--r-seg); }
+:is(.mr-filter, .pl-chips) .mr-f::before, .nsc-fb::before { content: ""; position: absolute; inset: var(--sp-05); z-index: -1; border-radius: var(--r-seg-in); }
+:is(.mr-filter, .pl-chips) .mr-f:hover, .nsc-fb:hover { background: var(--seg-track); color: var(--fg); }
+:is(.mr-filter, .pl-chips) .mr-f:not(.on):hover::before, .nsc-fb:not(.on):hover::before { background: color-mix(in srgb, var(--seg-on) 50%, transparent); }
+:is(.mr-filter, .pl-chips) .mr-f.on, .nsc-fb.on { color: var(--fg); font-weight: 600; }
+:is(.mr-filter, .pl-chips) .mr-f.on::before, .nsc-fb.on::before { background: var(--seg-on); }
 :is(.mr-filter, .pl-chips) .mr-fn { margin-left: var(--sp-05); font-size: 11px; font-variant-numeric: tabular-nums; opacity: .8; }
 
 /* a briefing-shaped answer in chat (11-resultcard.js hcBriefNode): schedule rows with a muted time column, the mail line as a chip, counts as numbers */
@@ -259,7 +267,7 @@ a.dr-att:active { background: var(--active); }
 .hcb > .md { align-self: stretch; }
 .hcb-card { align-self: stretch; max-width: 400px; padding: 0 var(--sp-3); border-radius: var(--r-card); background: var(--layer); }
 .hcb-hd { display: flex; align-items: center; gap: var(--sp-2); min-height: 24px; padding-top: var(--sp-2); }
-.hcb-hd .tag { height: 22px; padding: 0 var(--sp-2); border-radius: var(--r-seg); font-size: 11.5px; font-weight: 600; }
+.hcb-hd .tag { height: 22px; font-size: 11.5px; font-weight: 600; }
 .hcb-h { min-width: 0; color: var(--fg-2); font: 500 13px/20px var(--font); }
 /* time rows of a briefing, sized from the landing page's phone scene */
 .hcb-card .rc-row { padding: var(--sp-15) 0; }

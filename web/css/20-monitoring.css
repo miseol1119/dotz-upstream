@@ -23,11 +23,11 @@
 .cv-row.has-mon-prog > .mon-row-status { flex: 1 0 100%; order: 8; margin-top: var(--sp-05); }
 .cv-row.has-mon-prog > .mon-prog-wrap { flex: 1 0 100%; order: 9; margin-top: var(--sp-05); }
 /* the result tag (same look as .tag, its own class so the row's other tags keep their place in a query) */
-.mon-ptag { display: inline-flex; align-items: center; align-self: center; flex: none; height: 20px; padding: 0 var(--tag-px); border-radius: var(--r-pill); background: var(--layer); color: var(--fg-2); font-size: var(--fs-tag); line-height: var(--lh-tag); font-weight: 500; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.mon-ptag.pri { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
-.mon-ptag.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
-.mon-ptag.warn { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
-.mon-ptag.err { background: color-mix(in srgb, var(--err) 14%, transparent); color: var(--err); }
+.mon-ptag { --tone: var(--fg-3); display: inline-flex; align-items: center; align-self: center; gap: var(--sp-15); flex: none; height: 20px; padding: 0; background: none; color: var(--fg-3); font-size: var(--fs-tag); line-height: var(--lh-tag); font-weight: 500; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.mon-ptag.pri { --tone: var(--accent); color: var(--fg-2); font-weight: 600; }
+.mon-ptag.ok { --tone: var(--ok); color: var(--ok); font-weight: 600; }
+.mon-ptag.warn { --tone: var(--warn); color: var(--warn); font-weight: 600; }
+.mon-ptag.err { --tone: var(--err); color: var(--err); font-weight: 600; }
 
 /* the open item's head: the row of icon, name and state, then the bar / banner under it (wide screens; a phone puts them in the timeline) */
 .mon-actions { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--sp-2); }

@@ -118,7 +118,7 @@ dialog.lbox::backdrop { background: transparent; }
 /* a message from another computer's gateway (01-peer-msg.js): the computer, the kind, then the words */
 .bm.pmc > .ccard { padding: var(--sp-3) var(--sp-4); background: var(--layer); }
 .pmc-hd .mt { margin: 0 0 0 auto; flex: none; }
-.pmc .tag, .pmc .md :not(pre) > code { background: var(--card); }
+.pmc .md :not(pre) > code { background: var(--card); }
 .pmc .md > :last-child { margin-bottom: 0; }
 .pmc-hd { display: flex; align-items: center; gap: var(--sp-15); min-width: 0; font-size: var(--fs-sec); line-height: var(--lh-sec); color: var(--fg-2); }
 .pmc-hd .ic { width: 16px; height: 16px; flex: none; }
@@ -282,7 +282,8 @@ button.cchip:hover { background: var(--layer); color: var(--fg); }
 .cchip.warn { color: var(--warn); }
 /* 360-390px: the chips pull together while the api label shares the row, so the bar keeps fitting without scrolling. */
 @media (max-width: 600px) { .cbar.api { gap: var(--sp-05); } .cbar.api .cchip { padding: 0 var(--sp-15); } .cbar.api .cchip.capi { font-size: 10.5px; } }
-.cchip.capi { height: 20px; padding: 0 var(--sp-2); border-radius: 10px; background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); font-size: 11px; line-height: 16px; font-weight: 600; }
+.cchip.capi::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+.cchip.capi { gap: var(--sp-15); height: 20px; padding: 0; border-radius: 0; background: none; color: var(--warn); font-size: 11px; line-height: 16px; font-weight: 600; }
 .cchip.err { color: var(--err); }
 /* whose model and context the chips show (뙃쥐 or a lane), and a lane's worker model: labels, not buttons */
 .cchip.cown { padding: 0 var(--sp-1); opacity: .65; font-weight: 600; }

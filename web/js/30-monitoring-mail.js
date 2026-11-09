@@ -96,10 +96,10 @@ function mailLand(sel) {
 }
 function mailFilterBar(mails, notices) {
   const cur = mailFilterOf()[0];
-  return el("div", { class: "mr-filter mr-mail", role: "tablist", "aria-label": "메일 보기" }, ...MAIL_FILTERS.map(([k, label, ok]) => {
+  return segKeep(el("div", { class: "mr-filter mr-mail", role: "tablist", "aria-label": "메일 보기" }, ...MAIL_FILTERS.map(([k, label, ok]) => {
     const n = k === "all" ? 0 : k === "pending" ? [...mailDraftLive(notices).values()].filter(mailDraftOpen).length : mails.filter(t => MAILS.has(t) && ok(MAILS.get(t), t)).length;
     return el("button", { class: `cchip mr-f${k === cur ? " on" : ""}`, type: "button", role: "tab", "aria-selected": String(k === cur), "data-filter": k, onclick: () => { MON.mailFilter = k; MON.sig = ""; monSchedule(); } }, label, cntSpan(`mail-filter:${k}`, "mr-fn", n));
-  }));
+  })));
 }
 // A mail or chat of an integration is its own conversation in 채팅. A mail is a Gmail-like flat row: sender and time on one line (with
 // a paperclip and the file count when it has files), the subject with the reply-draft state beside it, and a one-line summary. The

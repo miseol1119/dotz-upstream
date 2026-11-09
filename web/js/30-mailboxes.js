@@ -132,8 +132,8 @@ function mxTabs(it) {
   const s = MX.slot.get("tabs");
   if (s && s.sig === it.esig) return s.node;
   const tab = (id, name, c, extra) => el("button", { class: `mx-tab${MX.box === id ? " on" : ""}`, type: "button", role: "tab", "aria-selected": String(MX.box === id), onclick: () => mxBox(id) }, name, extra, mxDot(c), el("span", { text: String(c.live) }));
-  const node = el("div", { class: "mx-tabs", role: "tablist", "aria-label": "메일함" }, tab("all", "전체", it.all, null), ...it.rows.map(e => tab(e.id, e.b.name, e.c, mxAcctMark(it, e))),
-    el("button", { class: "mx-tab", type: "button", "aria-label": "메일함 추가", onclick: mxNew }, icon("add")));
+  const node = segKeep(el("div", { class: "mx-tabs", role: "tablist", "aria-label": "메일함" }, tab("all", "전체", it.all, null), ...it.rows.map(e => tab(e.id, e.b.name, e.c, mxAcctMark(it, e))),
+    el("button", { class: "mx-tab", type: "button", "aria-label": "메일함 추가", onclick: mxNew }, icon("add"))));
   MX.slot.set("tabs", { sig: it.esig, node });
   return node;
 }
