@@ -6,7 +6,10 @@
 // stay in 채팅's 알림 conversation and never show here; watch reports are not in that conversation (hub/events.ts eventTarget).
 // Data: GET /api/monitors (hub/monitors.ts) -> {items: [{name, watch?, kind, channel?, last_run?, last_result?, next_run?, every?, connection?, since?, conn_reason?, paused?, last_summary?}]}, the notices (30-notices.js NT)
 // and the integrations. It repaints when a notice arrives and once a minute while it is open.
-const NM = { items: [], loaded: false, failed: false };
+const NM = { items: [], loaded: false, failed: false, at: 0 };
+// Opening the monitoring screen reads the list again only when the last read is older than the 60 s refresh below (watch notices refresh it sooner).
+const NM_FRESH_MS = 60000;
+const monitorsFresh = () => NM.loaded && Date.now() - NM.at < NM_FRESH_MS;
 const MON_KIND = { watch: "모니터링", schedule: "예약" };
 // The list's groups after 감시 소식: app-type integrations (hub/integrations.ts kind "app"), then the plain monitors.
 const MON_GROUP = { app: "앱", plain: "일반 모니터링" };
@@ -43,7 +46,7 @@ async function loadMonitors() {
   try {
     const r = await api("/api/monitors");
     NM.items = Array.isArray(r.items) ? r.items : [];
-    NM.loaded = true; NM.failed = false;
+    NM.loaded = true; NM.failed = false; NM.at = Date.now();
   } catch { NM.failed = !NM.loaded; }
   monSchedule();
   homeSoon();
