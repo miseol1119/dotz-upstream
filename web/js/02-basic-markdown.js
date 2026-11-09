@@ -244,6 +244,7 @@ function notify(e) {
   const text = String(e.text || "").replace(/\s+\n/g, "\n").trim();
   const key = `${e.ts}|${e.kind}|${e.target || e.lane || ""}|${text.slice(0, 80)}`;
   if (!text || ntfDone.has(key) || ntfShown.has(key)) return;
+  if (paneNotify(e)) return;
   ntfShown.add(key);
   const alertish = e.kind === "out" && e.target === "alert";
   const box = document.querySelector(".ntf-box") || document.body.appendChild(el("div", { class: "ntf-box", "aria-live": "polite" }));

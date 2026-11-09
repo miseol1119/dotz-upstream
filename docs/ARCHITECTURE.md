@@ -64,3 +64,4 @@ Paths only; each file's header comment says what it does. Tests sit next to thei
 
 - `web/index.html`, `web/sw.js`, `web/custom.js`, `web/manifest.webmanifest`
 - `web/js/NN-*.js` and `web/css/*.css`: classic scripts concatenated in filename order into one app.js by `hub/webapp.ts` (shared globals; `01-core.js` holds the common helpers)
+- split panes (two to four conversations or projects side by side on a wide window): `web/js/43-panes.js` (layout tree, persistence), `web/js/43-panes-view.js` (the screen, dividers), `web/js/43-panes-mirror.js` (inactive panes), `web/css/26-panes.css`; `hub/split-shots.ts` (screenshot scenarios)

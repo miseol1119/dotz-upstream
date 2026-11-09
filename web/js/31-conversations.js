@@ -448,6 +448,7 @@ function convPaint() {
   if (topSig !== monChatTop.dataset.sig) { monChatTop.dataset.sig = topSig; clear(monChatTop); if (mit) monChatTop.append(...monChatTopNodes(mit).filter(Boolean)); }
   $("#v-chat").classList.toggle("no-composer", target === "alert");
   convPaintHead();
+  paneHeads();
 }
 function convSchedule() { if (!convRaf) convRaf = requestAnimationFrame(convPaint); }
 

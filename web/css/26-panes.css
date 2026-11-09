@@ -1,0 +1,39 @@
+/* 분할 창 (web/js/43-panes*.js): from the second pane on, #split takes the place of the one section on a wide screen - [list column][tree of panes].
+   A pane is a card like the conversation card; the active one carries the real section (.in-pane) and the focus ring, the others are mirrors (.pane-mir). */
+#split { --cv-w: 280px; display: grid; grid-template-columns: var(--cv-w) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); column-gap: var(--sp-4); max-width: none; margin: 0; padding-left: var(--edge); padding-right: var(--edge); }
+#split > .pane-side { grid-column: 1; display: flex; flex-direction: column; min-height: 0; margin-bottom: var(--sp-4); }
+#split > .pane-side > .cv-side { display: block; flex: 1; min-height: 0; padding: 0; }
+#split > .pane-side > #v-projects { flex: 1; min-height: 0; max-width: none; margin: 0; padding: 0 var(--sp-2) 0 var(--sp-1); background: transparent; overflow-y: auto; }
+#split > .pane-tree { grid-column: 2; display: flex; min-width: 0; min-height: 0; }
+
+.pane, .pane-row, .pane-col { flex: 1 1 0; display: flex; min-width: 0; min-height: 0; }
+.pane-row { flex-direction: row; }
+.pane-col, .pane { flex-direction: column; }
+.pane { position: relative; border-radius: var(--r-card); background: var(--card); overflow: hidden; }
+.pane.on::after { content: ""; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: var(--ff-ring); pointer-events: none; }
+.pane > .pane-x { position: absolute; top: var(--sp-4); right: var(--sp-3); z-index: 3; }
+
+.pane-bar { position: relative; flex: none; touch-action: none; }
+.pane-row > .pane-bar { width: var(--sp-4); cursor: col-resize; }
+.pane-col > .pane-bar { height: var(--sp-4); cursor: row-resize; }
+.pane-bar::after { content: ""; position: absolute; inset: 0; margin: auto; border-radius: var(--r-ctl); background: transparent; }
+.pane-row > .pane-bar::after { width: var(--sp-05); }
+.pane-col > .pane-bar::after { height: var(--sp-05); }
+.pane-bar:hover::after, .pane-bar:active::after { background: var(--accent); }
+
+#split #v-chat.in-pane { flex: 1; height: auto; min-height: 0; width: 100%; max-width: none; margin: 0; padding: 0; grid-template-columns: minmax(0, 1fr); }
+#split #v-chat.in-pane::before { display: none; }
+#split #v-chat.in-pane > * { grid-column: 1; }
+#split #cv-head { padding-right: calc(var(--sp-8) + var(--sp-4)); }
+#split #v-project.in-pane { flex: 1; min-height: 0; max-width: none; margin: 0; padding: var(--sp-4); overflow-y: auto; }
+
+.pane-mir { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.pane-hd { flex: none; display: flex; align-items: center; gap: var(--sp-2); min-width: 0; padding: var(--sp-3) var(--sp-4); }
+.pane-hd .pane-x { margin-left: auto; }
+.pane-tl { flex: 1; height: auto; min-height: 0; margin-inline: 0; padding: var(--sp-1) var(--sp-6) var(--sp-3); overflow: hidden auto; }
+.pane-tl > .tl-in { max-width: none; gap: var(--sp-3); padding: var(--sp-1) 0 var(--sp-3); }
+.pane-tl > .tl-in > .um, .pane-tl > .tl-in > .bm { margin-top: 0; }
+.pane-cmp { flex: none; display: block; margin: var(--sp-2) var(--sp-3) var(--sp-3); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--line); border-radius: var(--r-card); background: var(--card); color: var(--fg); font: 400 var(--fs-chat)/var(--lh-chat) var(--font); text-align: left; cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane-cmp-t.ph { color: var(--fg-3); }
+.pane-pj { flex: 1; min-height: 0; overflow-y: auto; }
+.pane-pj > .view { max-width: none; margin: 0; padding: var(--sp-4); }
