@@ -229,8 +229,9 @@ button.conn:disabled { cursor: default; }
 }
 @media (max-width: 1099px) and (pointer: coarse) { .appbar .cmdk { width: 36px; height: 36px; } }
 @media (max-width: 639px) {
-  /* typing: the keyboard covers the bar's place, so the bar steps aside instead of floating above the keyboard */
-  .app:has(.composer textarea:focus) .side { display: none; }
+  /* typing: the keyboard covers the bar's place, so the bar steps aside instead of floating above the keyboard. It goes when the keyboard
+     arrives (data-kb, web/js/34-composer-viewport.js), not at the focus, so a docked card's reason field moves once, with the keyboard. */
+  :root[data-kb] .app:has(.composer textarea:focus) .side { display: none; }
   .appbar { height: calc(52px + env(safe-area-inset-top)); padding-left: var(--sp-4); }
   .appbar h1 { font-size: 20px; line-height: 28px; }
   .main .composer { padding-bottom: var(--sp-2); }
@@ -240,7 +241,7 @@ button.conn:disabled { cursor: default; }
   .view { padding: var(--sp-4) var(--sp-3) var(--sp-6); }
   .view.fill { padding-bottom: 0; }
 }
-@media (max-width: 1099px) and (pointer: coarse) { .app:has(.composer textarea:focus) .side { display: none; } }
+@media (max-width: 1099px) and (pointer: coarse) { :root[data-kb] .app:has(.composer textarea:focus) .side { display: none; } }
 /* buttons: one system for every page and card. Kind: primary (accent fill, the default), secondary (.tonal), quiet (.text), danger;
    size: md (default, 40px) and .sm (36px). A touch screen gets a 44px target. Card buttons keep their own class names (.dc-act,
    .dc-go, .dc-back, .dc-manual) and are aliased here, so the look is defined once. */

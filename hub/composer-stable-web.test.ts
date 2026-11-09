@@ -185,6 +185,34 @@ describe("typing on the phone composer while the page updates", () => {
 		expect(await note()).toEqual({ same: true, conn: true, value: "버튼이 안 보여" });
 	}, 30_000);
 
+	// The tab bar steps aside for the keyboard in the frame the keyboard arrives. Hidden at the focus before it, the docked card dropped by the
+	// bar's height and then rose with the keyboard: on iOS the reason field moved 3 times for one tap.
+	test("a tap on the docked card's reason field leaves the tab bar until the keyboard arrives, then both move in one frame", async () => {
+		send({ kind: "out", target: "main", source: "orchestrator", text: "[ask] 글자를 확인해 주세요\n결정: 글자를 확인해 주세요\n1) 확인됨\n2) 안 됨", ts: now() });
+		await waitFor(`DC.cur && DC.cur.question.includes("글자를")`);
+		await view.evaluate(`(() => { document.activeElement.blur(); pickOption(DC.cur, 0, DC.cur.blocks[0].options.find(o => o.n === 2)); })()`);
+		await waitFor(noteFocused);
+		const frames = () => view.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(0))))`);
+		const at = async () => JSON.parse((await view.evaluate(`JSON.stringify({ top: Math.round(document.querySelector("#dcard .dc-note").getBoundingClientRect().top), bottom: Math.round(document.querySelector("#dcard .dc-note").getBoundingClientRect().bottom), bar: getComputedStyle(document.querySelector(".side")).display !== "none" })`)) as string) as { top: number; bottom: number; bar: boolean };
+		await view.evaluate(`(document.activeElement.blur(), 0)`);
+		await view.evaluate(`Promise.all(document.getAnimations().filter(a => a.effect.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => {}))).then(() => 0)`);   // the card's rise-in has ended
+		await frames();
+		const rest = await at();
+		await view.click("#dcard .dc-note");
+		await waitFor(noteFocused);
+		await frames();
+		expect(await at()).toEqual(rest);
+		await view.resize(390, 544);   // the keyboard arrives and the page shrinks (resizes-content)
+		await view.evaluate(`visualViewport.dispatchEvent(new Event("resize")), 0`);
+		await frames();
+		const typing = await at();
+		expect(rest.bar).toBe(true);
+		expect(typing.bar).toBe(false);
+		expect(typing.top).toBeGreaterThanOrEqual(0);
+		expect(typing.bottom).toBeLessThanOrEqual(544);
+		await view.resize(390, 844);
+	}, 30_000);
+
 	test("the app height follows the same viewport the layout uses, so a lagging window.innerHeight cannot shrink the page twice", async () => {
 		await view.resize(390, 544);   // the keyboard has already resized the page (resizes-content)
 		await view.evaluate(`Object.defineProperty(window, "innerHeight", { configurable: true, get: () => 844 }), 0`);   // a frame where innerHeight lags

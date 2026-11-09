@@ -501,11 +501,11 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 ### 폰 키보드에 맞춘 입력창 (visualViewport)
 - 목적: 폰 키보드가 올라와도 입력창이 보이는 영역 안에 있게 해요.
 - 구성: DOM 없음. 숨은 `div`(`height:100dvh`)를 프로브로 달고 CSS 변수 `--vvh`(보이는 높이)와 `--kb`(키보드가 보이는 영역 아래를 가린 높이)를 `<html>`에 써요.
-- 기능: `visualViewport`의 resize/scroll마다 한 프레임에 한 번 `apply`. 키보드 높이는 프로브 높이에서 `offsetTop + height`를 뺀 값이라, iOS가 화면을 키보드만큼 밀어 올려 보여 주면 0이고 줌(`scale>1.01`)이어도 0.
+- 기능: `visualViewport`의 resize/scroll마다 한 프레임에 한 번 `apply`. 키보드 높이는 프로브 높이에서 `offsetTop + height`를 뺀 값이라, iOS가 화면을 키보드만큼 밀어 올려 보여 주면 0이고 줌(`scale>1.01`)이어도 0. 같은 프레임에 키보드가 올라와 있으면 `<html data-kb>`를 달아요(줌을 띐 보이는 높이가 이 페이지 폭에서 본 가장 큰 높이보다 150px 넘게 작을 때, 안드로이드는 `--kb`가 0이라 따로 재요). 아래 탭 바는 포커스가 아니라 이 속성으로 숨어, 도킹된 결정 카드의 이유 칸이 키보드와 함께 한 번만 움직여요.
 - 상태: `visualViewport` 없으면 아무것도 안 해요. 레이아웃은 이 변수를 CSS가 써서 잡아요(스크립트가 위치를 직접 정하지 않음).
 - 데이터: 없음.
-- 근거: web/js/34-composer-viewport.js:1-24.
-- css: web/css/12-composer-phone.css(`--kb`, `--vvh`; `@media (max-width:639px)` :6), 13-code-shell.css, 14-overlay.css(`--vvh`), 20-mail-box.css(폰 메일 쓰기 시트: 아래 끝 `--kb`, 높이 `--vvh`).
+- 근거: web/js/34-composer-viewport.js:1-32.
+- css: web/css/12-composer-phone.css(`--kb`, `--vvh`; `@media (max-width:639px)` :6), 01-tokens.css(`:root[data-kb]` 탭 바 숨김), 13-code-shell.css, 14-overlay.css(`--vvh`), 20-mail-box.css(폰 메일 쓰기 시트: 아래 끝 `--kb`, 높이 `--vvh`).
 
 ### 입력창 (메시지 보내기와 중단)
 - 목적: 현재 대화 대상에 글/파일/요소를 보내고, 작업 중이면 끼워넣기, 대기열, 중단을 해요.
