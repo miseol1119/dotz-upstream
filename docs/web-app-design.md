@@ -500,11 +500,11 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 폰 키보드에 맞춘 입력창 (visualViewport)
 - 목적: 폰 키보드가 올라와도 입력창이 보이는 영역 안에 있게 해요.
-- 구성: DOM 없음. 숨은 `div`(`height:100dvh`)를 프로브로 달고 CSS 변수 `--vvh`(보이는 높이)와 `--kb`(키보드 높이)를 `<html>`에 써요.
-- 기능: `visualViewport`의 resize/scroll마다 한 프레임에 한 번 `apply`. 줌(`scale>1.01`)이면 `--kb`는 0.
+- 구성: DOM 없음. 숨은 `div`(`height:100dvh`)를 프로브로 달고 CSS 변수 `--vvh`(보이는 높이)와 `--kb`(키보드가 보이는 영역 아래를 가린 높이)를 `<html>`에 써요.
+- 기능: `visualViewport`의 resize/scroll마다 한 프레임에 한 번 `apply`. 키보드 높이는 프로브 높이에서 `offsetTop + height`를 뺀 값이라, iOS가 화면을 키보드만큼 밀어 올려 보여 주면 0이고 줌(`scale>1.01`)이어도 0.
 - 상태: `visualViewport` 없으면 아무것도 안 해요. 레이아웃은 이 변수를 CSS가 써서 잡아요(스크립트가 위치를 직접 정하지 않음).
 - 데이터: 없음.
-- 근거: web/js/34-composer-viewport.js:1-22.
+- 근거: web/js/34-composer-viewport.js:1-24.
 - css: web/css/12-composer-phone.css(`--kb`, `--vvh`; `@media (max-width:639px)` :6), 13-code-shell.css, 14-overlay.css(`--vvh`).
 
 ### 입력창 (메시지 보내기와 중단)
@@ -2867,7 +2867,7 @@ CSS 쪽 반응(위 R001~R009에 속한 선언)은 C001, C002, C003 (전역), C02
 
 | 대상 | 트리거 | 구분 | 속성 | 길이(ms) | 지연(ms) | 이징 | 근거 | 원시 ID |
 |---|---|---|---|---|---|---|---|---|
-| rAF 프레임 한 번 뒤로 미루는 다시 그리기, 측정, 즉시 스크롤 (animate 없음, style 쓰기 없음) | 데이터 갱신, 크기 변화 | 제자리 | 없음 (페인트와 측정 시점만 조정; J064, J079는 `scrollIntoView`를 smooth 없이 호출) | 프레임 1개 (J056은 같은 높이가 3프레임 연속일 때까지, 최대 120프레임) | 0 | - | web/js/09-needs-you.js:335, web/js/09-needs-you.js:348, web/js/11-mailbody.js:106, web/js/11-mailbody.js:166, web/js/15-picker.js:124, web/js/20-models.js:122, web/js/30-apps.js:138, web/js/30-kakao.js:1068, web/js/30-monitoring.js:1031, web/js/30-notices.js:123, web/js/31-conversations.js:242, web/js/31-conversations.js:414, web/js/31-notices-screen.js:122, web/js/34-composer-viewport.js:18, web/js/36-shell.js:57, web/custom.js:455 | J049, J050, J056, J057, J063, J064, J078, J079, J088, J089, J094, J095, J100, J114, J115, J123 |
+| rAF 프레임 한 번 뒤로 미루는 다시 그리기, 측정, 즉시 스크롤 (animate 없음, style 쓰기 없음) | 데이터 갱신, 크기 변화 | 제자리 | 없음 (페인트와 측정 시점만 조정; J064, J079는 `scrollIntoView`를 smooth 없이 호출) | 프레임 1개 (J056은 같은 높이가 3프레임 연속일 때까지, 최대 120프레임) | 0 | - | web/js/09-needs-you.js:335, web/js/09-needs-you.js:348, web/js/11-mailbody.js:106, web/js/11-mailbody.js:166, web/js/15-picker.js:124, web/js/20-models.js:122, web/js/30-apps.js:138, web/js/30-kakao.js:1068, web/js/30-monitoring.js:1031, web/js/30-notices.js:123, web/js/31-conversations.js:242, web/js/31-conversations.js:414, web/js/31-notices-screen.js:122, web/js/34-composer-viewport.js:20, web/js/36-shell.js:57, web/custom.js:455 | J049, J050, J056, J057, J063, J064, J078, J079, J088, J089, J094, J095, J100, J114, J115, J123 |
 
 전수표 행 수: 108행 (위 묶음 행 1개 포함). 모션 규칙의 헬퍼 22행(J001~J022), 동작 줄이기 22행(R001~R022), 키프레임 9행(K001~K009, 아래 표)은 각각 그 절에서 셌어요.
 

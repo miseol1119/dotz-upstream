@@ -179,4 +179,25 @@ describe("typing on the phone composer while the page updates", () => {
 		expect(Number(await view.evaluate(`document.querySelector(".app").getBoundingClientRect().height`))).toBeGreaterThan(540);
 		await view.resize(390, 844);
 	}, 30_000);
+
+	// iOS Safari ignores resizes-content: it pans the visual viewport down by the keyboard's height instead of shrinking the page. What the
+	// keyboard covers is only what lies below the visual viewport's bottom edge, so a pan already counts as shown and must not shrink .app too.
+	test("--kb is only what the keyboard covers below the visual viewport: 0 after a pan or a zoom, the keyboard height with no pan", async () => {
+		const src = await Bun.file(new URL("../web/js/34-composer-viewport.js", import.meta.url)).text();
+		await view.resize(390, 699);
+		await view.evaluate(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`);
+		const kbFor = async (height: number, offsetTop: number, scale: number) => String(await view.evaluate(`(async () => {
+			const vv = Object.assign(new EventTarget(), { height: ${height}, offsetTop: ${offsetTop}, scale: ${scale} });
+			Object.defineProperty(window, "visualViewport", { configurable: true, value: vv });
+			document.documentElement.style.removeProperty("--kb");
+			(0, eval)(${JSON.stringify(src)});
+			vv.dispatchEvent(new Event("scroll"));
+			await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+			return document.documentElement.style.getPropertyValue("--kb");
+		})()`));
+		expect(await kbFor(371, 328, 1)).toBe("0px");
+		expect(await kbFor(371, 0, 1)).toBe("328px");
+		expect(await kbFor(371, 0, 1.067)).toBe("0px");
+		await view.resize(390, 844);
+	}, 30_000);
 });
