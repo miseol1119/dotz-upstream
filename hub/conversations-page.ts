@@ -2,10 +2,12 @@ import type { Conversation } from "./conversations.ts";
 
 // One page of GET /api/conversations (docs/web-app-design.md 대화 목록). The sessions and project channels (few) always come with the first page;
 // the mail rows (thousands) come `limit` at a time in the list's order, newest message first, and `next` is the cursor of the older ones.
+// A mail that owes a reply or holds a draft also comes with the first page wherever it sits (the 메일 · 카카오톡 card is drawn from them, web/js/31-conversations.js
+// convWaiting), and the later pages leave those rows out, so the cursor walk meets every row once.
 export const CONV_PAGE = 100;
 export const CONV_PAGE_MAX = 500;
 
-type MailCard = { dir?: string; archived?: true; read?: boolean; reply?: string; source?: string };
+type MailCard = { dir?: string; archived?: true; read?: boolean; reply?: string; unreplied?: true; source?: string };
 export type ConvRow = Conversation & { mail?: MailCard };
 type Tally = { total: number; unread: number };
 export type ConvCounts = { rows: number; mail: Tally & { filters: Record<"all" | "unread" | "owed" | "replied" | "archived" | "sent", number>; sources: Record<string, Tally> } };
@@ -14,6 +16,8 @@ const stamp = (r: ConvRow): string => r.last?.ts ?? "";
 // The order of the list, made total: newest first, equal stamps by target.
 const order = (a: ConvRow, b: ConvRow): number => (stamp(a) < stamp(b) ? 1 : stamp(a) > stamp(b) ? -1 : a.target < b.target ? -1 : a.target > b.target ? 1 : 0);
 const cursorOf = (r: ConvRow): string => `${stamp(r)}|${r.target}`;
+// The rows convWaiting keeps: an incoming, not archived mail with a draft or a reply owed.
+const owes = (r: ConvRow): boolean => !!r.mail && r.mail.dir !== "out" && !r.mail.archived && (r.mail.reply === "draft" || r.mail.unreplied === true);
 const olderThan = (cursor: string) => (r: ConvRow): boolean => {
 	const at = cursor.indexOf("|"), ts = cursor.slice(0, at), target = cursor.slice(at + 1);
 	return stamp(r) < ts || (stamp(r) === ts && r.target > target);
@@ -43,7 +47,7 @@ export function countRows(rows: readonly ConvRow[]): ConvCounts {
 	return { rows: rows.length, mail: { total: mail.length, unread, filters, sources } };
 }
 
-/** The answer to a query: `target=<t>` (repeat it, at most 50) those rows only; `all=1` every row; `before=<cursor>` the next `limit` mail rows after it; otherwise the first page with the counts. */
+/** The answer to a query: `target=<t>` (repeat it, at most 50) those rows only; `all=1` every row; `before=<cursor>` the next `limit` mail rows after it; otherwise the first page with the counts and the owed mails older than it. */
 export function conversationPage(rows: readonly ConvRow[], q: URLSearchParams): { status: number; body: Record<string, unknown> } {
 	const want = new Set(q.getAll("target").slice(0, 50));
 	if (want.size) return { status: 200, body: { items: rows.filter(r => want.has(r.target)), page: { limit: want.size, more: false } } };
@@ -53,9 +57,10 @@ export function conversationPage(rows: readonly ConvRow[], q: URLSearchParams): 
 	const before = q.get("before");
 	if (before !== null && !/^[^|]*\|.+$/.test(before)) return { status: 400, body: { error: "before is a cursor from a page's next" } };
 	const mails = rows.filter(r => r.mail).sort(order);
-	const left = before === null ? mails : mails.filter(olderThan(before));
-	const shown = left.slice(0, limit), more = left.length > shown.length;
+	// Past the first page the owed rows are not repeated: the first page carried them all.
+	const left = before === null ? mails : mails.filter(olderThan(before)).filter(r => !owes(r));
+	const shown = left.slice(0, limit), rest = left.slice(limit), more = rest.some(r => !owes(r));
 	const page = { limit, more, ...(more ? { next: cursorOf(shown[shown.length - 1]!) } : {}) };
 	if (before !== null) return { status: 200, body: { items: shown, page } };
-	return { status: 200, body: { items: [...rows.filter(r => !r.mail), ...shown].sort(order), page, counts: countRows(rows) } };
+	return { status: 200, body: { items: [...rows.filter(r => !r.mail), ...shown, ...rest.filter(owes)].sort(order), page, counts: countRows(rows) } };
 }
