@@ -97,7 +97,7 @@ The one layout for a row in any list or home card (home cards, 작업내역, pro
 - Any extra marker (count, badge, attachment, 결과 N) goes immediately before the status or time, never after it.
 - On dense surfaces (home cards, lists) a marker is one line at meta size and colour (`--fs-meta`, `--fg-3`/`--fg-2`); a row with a marker is as tall as one without. Full chips only on a detail screen or after the row is expanded.
 - A card is as tall as its content; it never stretches to its neighbour's height.
-- An embedded block (chart, list, code) uses the app's `--accent` and neutral tokens and the card title size (16/22) for its title.
+- An embedded block (chart, list, code) uses the app's `--accent` and neutral tokens, and its title is the list block title (`.md .mlist-h`: 600 13/18 in `--fg-3`, as `hub/chart.ts` draws it), so it never outweighs the message around it.
 
 ## Shape and space
 
