@@ -336,6 +336,22 @@ describe("web/DESIGN.md rules", () => {
 		expect(bold).toEqual(["h3"]);
 	});
 
+	test("the open mail's top bar shares the corners of the card it sits flush in", async () => {
+		const v = await openPage();
+		const radii = await ev<string[]>(v, `(() => {
+			const host = document.createElement("div");
+			host.className = "tl-in";
+			host.innerHTML = '<div class="bm alert rc mopen"><div class="mtop"></div></div>';
+			document.body.append(host);
+			const top = e => ["borderTopLeftRadius", "borderTopRightRadius"].map(k => getComputedStyle(e)[k]);
+			const out = [top(host.querySelector(".bm")), top(host.querySelector(".mtop"))].map(a => a.join(" "));
+			host.remove();
+			return out;
+		})()`);
+		// docs/ui-spec.md: the outer corner is the inner corner plus the gap, and a flush bar has no gap
+		expect(radii[1]).toBe(radii[0]);
+	});
+
 	test("text pairs of the tokens reach 4.5:1 in both themes", () => {
 		const rules = parseCss("01-tokens.css", realCss().find(([f]) => f === "01-tokens.css")![1]);
 		const theme = (scope: string) => {
