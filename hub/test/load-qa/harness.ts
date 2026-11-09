@@ -133,9 +133,14 @@ export async function start(g: Gateway): Promise<void> {
 }
 
 /** Runs hub/test/load-qa/isolation-probe.ts inside the sandbox of the run; ok = exit 0, an [ok] line and no [FAIL] line. */
-export async function probe(g: Gateway): Promise<{ ok: boolean; text: string }> {
+export async function probe(g: Gateway, ms = 30_000): Promise<{ ok: boolean; text: string }> {
 	const p = Bun.spawn(sandboxArgv(g.l.profileFile, [process.execPath, join(g.repo, "hub", "test", "load-qa", "isolation-probe.ts")]), { cwd: g.l.cwd, env: g.l.env, stdout: "pipe", stderr: "pipe" });
-	const text = `${await new Response(p.stdout).text()}${await new Response(p.stderr).text()}`;
+	// Both pipes are drained together: reading stdout to its end before stderr could stall the run for good on a busy machine.
+	// A probe that still hangs is killed here, so the caller gets a failed probe instead of a test timeout that also kills the gateway.
+	const kill = setTimeout(() => p.kill("SIGKILL"), ms);
+	const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+	clearTimeout(kill);
+	const text = `${out}${err}`;
 	writeFileSync(join(g.out, "isolation-probe.txt"), text);
 	return { ok: (await p.exited) === 0 && text.includes("[ok]") && !text.includes("[FAIL]"), text };
 }
