@@ -6,7 +6,8 @@ import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from
 import { homedir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { bunBin, embedPending, loadEmbedder, MODEL_NAME, modelReady, notReadyReason, provision, vectorCount } from "./recall-embed.ts";
-import { indexPath, ingest, openRecall } from "./recall-index.ts";
+import { secretFileValues } from "./public-scrub.ts";
+import { forget, indexPath, ingest, openRecall } from "./recall-index.ts";
 import { provisionRerank, rerankHits, rerankReady, RERANK_NAME, RERANK_POOL } from "./recall-rerank.ts";
 import { openDoc, search, type Hit } from "./recall-search.ts";
 
@@ -93,7 +94,7 @@ function dump(db: Database, out: string): number {
 async function refresh(budgetMs: number): Promise<number> {
 	const t0 = Date.now();
 	const db = openRecall(DATA_DIR);
-	const r = ingest(db, { roots: sessionDirs(), budgetMs, convKeys: convKeys() });
+	const r = ingest(db, { roots: sessionDirs(), budgetMs, convKeys: convKeys(), secrets: secretFileValues(DATA_DIR) });
 	const lines = [`indexed ${r.docs} docs from ${r.files} files, removed ${r.removed} gone files${r.complete ? "" : " (budget reached)"}`];
 	let code = 0;
 	if (!modelReady(DATA_DIR)) {
@@ -143,7 +144,7 @@ async function main(argv: readonly string[]): Promise<void> {
 	if (cmd === "index") {
 		const budget = one("budget-ms");
 		const db = openRecall(DATA_DIR);
-		const r = ingest(db, { roots: sessionDirs(), budgetMs: budget ? Number(budget) : undefined, convKeys: convKeys() });
+		const r = ingest(db, { roots: sessionDirs(), budgetMs: budget ? Number(budget) : undefined, convKeys: convKeys(), secrets: secretFileValues(DATA_DIR) });
 		console.log(`indexed ${r.docs} docs from ${r.files} files, removed ${r.removed} gone files${r.complete ? "" : " (budget reached, run again to continue)"}`);
 		return;
 	}
@@ -168,10 +169,17 @@ async function main(argv: readonly string[]): Promise<void> {
 	if (cmd === "open") {
 		const id = pos[0];
 		if (!id) fail("open needs a doc id");
-		const doc = openDoc(openRecall(DATA_DIR, true), id as string);
+		const doc = openDoc(openRecall(DATA_DIR, true), id as string, secretFileValues(DATA_DIR));
 		if (!doc) fail(`no doc ${id}`);
 		const d = doc as NonNullable<typeof doc>;
 		console.log(`${d.id} ${d.ts} ${d.kind} ${d.room} ${d.project} ${d.file}:${d.line}${d.rawFound ? "" : " (raw text gone, showing the indexed copy)"}\nprev ${d.prev || "-"} next ${d.next || "-"}\n\nOWNER:\n${d.owner}\n\nANSWER:\n${d.answer}`);
+		return;
+	}
+	// The pairs of a session file the hygiene retired (raw file gone) stay until its folder goes or the owner asks: forget <path|session id>.
+	if (cmd === "forget") {
+		const what = pos[0];
+		if (!what) fail("forget needs a session file path or session id");
+		console.log(`forgot ${forget(openRecall(DATA_DIR), what as string)} file(s)`);
 		return;
 	}
 	if (cmd === "status") {
@@ -184,7 +192,7 @@ async function main(argv: readonly string[]): Promise<void> {
 		console.log(`dumped ${dump(openRecall(DATA_DIR, true), out as string)} docs to ${out}`);
 		return;
 	}
-	fail(`usage: bun hub/recall-cli.ts refresh|index|search|open|status|dump (index at ${indexPath(DATA_DIR)})`);
+	fail(`usage: bun hub/recall-cli.ts refresh|index|search|open|forget|status|dump (index at ${indexPath(DATA_DIR)})`);
 }
 
 if (import.meta.main) {

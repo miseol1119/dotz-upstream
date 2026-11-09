@@ -7,13 +7,13 @@ import { homedir } from "node:os";
 import { basename, join, sep } from "node:path";
 import { statusActivity } from "./activity.ts";
 import { closeDeadLaneTasks, pruneArchives, pruneTempSessions, pruneUploads, rotateFile, sessionDirs } from "./cleanup.ts";
-import { DATA_DIR, lanesNightlyAt, lanesNightlyCompactAt, lanesRotateMb, log, OMP, paths, writeAtomic } from "./config.ts";
+import { DATA_DIR, lanesNightlyAt, lanesNightlyCompactAt, lanesRotateMb, log, OMP, paths, sessionsKeepDays, writeAtomic } from "./config.ts";
 import { describeCtx } from "./context.ts";
 import { UPLOADS } from "./files.ts";
 import { sweepSnapshots } from "./filesnap.ts";
 import { compactLane, laneBusy, laneJobs, lanes, refreshLaneStats, rotateLane } from "./lanes.ts";
 import { purgeTrash } from "./lanetrash.ts";
-import { nightlyHandover, orchestratorPid } from "./orchestrator.ts";
+import { nightlyHandover, orch, orchestratorPid } from "./orchestrator.ts";
 import { convs } from "./convsessions.ts";
 import { activeHarness } from "./runtime/index.ts";
 import { trackTimer } from "./shutdown.ts";
@@ -82,6 +82,22 @@ async function runLaneHygiene(): Promise<string[]> {
 	return actions;
 }
 
+// Masks secrets in idle OmO session files and deletes those past sessions.keep_days (hub/session-hygiene.ts), in a child process so
+// reading large session files never grows the gateway. The sessions the gateway holds open are passed as active and left alone.
+const SESSION_HYGIENE_TIMEOUT_MS = 30 * 60_000;
+async function runSessionFileHygiene(): Promise<void> {
+	const active = [orch.sessionFile, ...[...lanes.values()].map(l => l.sessionFile), ...convs.conversations().map(c => c.o.orch.sessionFile)].filter((f): f is string => !!f);
+	const proc = Bun.spawn([process.execPath, join(import.meta.dir, "session-hygiene.ts"), "--keep-days", String(sessionsKeepDays()), ...active.flatMap(f => ["--active", f])], {
+		env: { ...process.env, DOTZ_DIR: DATA_DIR }, stdout: "pipe", stderr: "pipe", timeout: SESSION_HYGIENE_TIMEOUT_MS,
+	});
+	const [out, err, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+	if (code !== 0) return log(`session hygiene failed (exit ${code}): ${err.trim().split("\n").at(-1) ?? ""}`);
+	const r = JSON.parse(out.trim().split("\n").at(-1) ?? "{}");
+	const line = `session hygiene: ${r.files} file(s), masked ${r.masked?.lines ?? 0} line(s) in ${r.masked?.files ?? 0} file(s) ${JSON.stringify(r.masked?.hits ?? {})}, deleted ${r.retention?.deleted ?? 0} past ${sessionsKeepDays()} days (pairs kept in recall), ${r.ms} ms`;
+	log(line);
+	if (r.masked?.files || r.retention?.deleted) statusActivity("hub", line);
+}
+
 export function startLaneHygiene(): void {
 	const at = lanesNightlyAt();
 	if (at === "off") return;
@@ -102,6 +118,7 @@ export function startLaneHygiene(): void {
 			// The date is recorded before the run, so a crash in the middle never repeats it on the next start.
 			writeAtomic(paths.laneHygiene, `${JSON.stringify({ date: localDate(new Date()) })}\n`);
 			await runLaneHygiene().catch(e => log(`lane hygiene failed: ${e}`));
+			await runSessionFileHygiene().catch(e => log(`session hygiene failed: ${e}`));
 			arm(untilNext());
 		}, delay));
 	const last = lastRunDate();

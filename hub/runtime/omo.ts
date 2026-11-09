@@ -162,18 +162,21 @@ export function setJsoncPath(text: string, path: string[], value: unknown): stri
 // dotz spawns, `telemetry.enabled: false` in the config OmO reads (covers omo started anywhere else, Dori lanes included),
 // and senpi's `enableInstallTelemetry: false` in the agent settings. Re-applied at gateway start, at every OmO spawn and
 // after every harness update, since an update or a reinstall may bring the defaults back.
+// The same pass turns on senpi's `tools.bash.redactSecretsInOutput` (default off): credential-shaped bash output is redacted
+// before the session file keeps it. OmO has no session retention switch, so hub/session-hygiene.ts masks and prunes the rest.
 const agentSettingsFile = (env: Record<string, string | undefined>) => join(env.OMO_CODING_AGENT_DIR ?? env.PI_AGENT_DIR ?? join(env.HOME ?? homedir(), ".omo", "agent"), "settings.json");
 /** Idempotent: writes only what is not already off. Returns one line per file. */
 export function telemetryOff(env: Record<string, string | undefined> = process.env, file = omoConfigFile(env), settings = agentSettingsFile(env)): string[] {
-	const step = (f: string, key: string, isOff: (text: string) => boolean, write: (text: string) => string): string => {
+	const step = (f: string, key: string, isOff: (text: string) => boolean, write: (text: string) => string, value = false): string => {
+		const what = value ? "secret redaction on" : "telemetry off";
 		try {
 			const text = existsSync(f) ? readFileSync(f, "utf8") : "";
-			if (text.trim() && isOff(text)) return `telemetry off: ${f} ${key}=false (already)`;
+			if (text.trim() && isOff(text)) return `${what}: ${f} ${key}=${value} (already)`;
 			mkdirSync(dirname(f), { recursive: true });
 			writeAtomic(f, write(text));
-			return `telemetry off: ${f} ${key}=false (written)`;
+			return `${what}: ${f} ${key}=${value} (written)`;
 		} catch (e) {
-			const line = `telemetry off: ${f} cannot be edited (${(e as Error).message}); ${key} is not written`;
+			const line = `${what}: ${f} cannot be edited (${(e as Error).message}); ${key} is not written`;
 			log(line);
 			return line;
 		}
@@ -182,6 +185,11 @@ export function telemetryOff(env: Record<string, string | undefined> = process.e
 	return [
 		step(file, "telemetry.enabled", t => asObj(asObj(parseJsonc(t)).telemetry).enabled === false, t => setJsoncPath(t, ["telemetry", "enabled"], false)),
 		step(settings, "enableInstallTelemetry", t => asObj(JSON.parse(t)).enableInstallTelemetry === false, t => `${JSON.stringify({ ...asObj(t.trim() ? JSON.parse(t) : {}), enableInstallTelemetry: false }, null, 2)}\n`),
+		step(settings, "tools.bash.redactSecretsInOutput", t => asObj(asObj(asObj(JSON.parse(t)).tools).bash).redactSecretsInOutput === true, t => {
+			const s = asObj(t.trim() ? JSON.parse(t) : {});
+			const tools = asObj(s.tools);
+			return `${JSON.stringify({ ...s, tools: { ...tools, bash: { ...asObj(tools.bash), redactSecretsInOutput: true } } }, null, 2)}\n`;
+		}, true),
 	];
 }
 

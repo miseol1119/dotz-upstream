@@ -428,3 +428,88 @@ export function publicPostDeny(command: string, dataDir: string, cwd: string): s
 	}
 	return `this post to ${PUBLIC_REPO} still carries personal or sensitive content (${hits.join(", ")}). Remove every such value, de-identify and generalise it, keep the detail (symptom, steps, expected, actual, version, generalised logs), and post again; do not work around this check`;
 }
+
+// Secrets at rest: what an agent or the owner pasted stays in the OmO session files and the recall index copied from them. maskSecrets
+// replaces each credential with a fixed marker naming its kind, never a value, before text is stored or indexed (hub/recall-index.ts at
+// ingest, hub/session-hygiene.ts in session files). Ordinary content (commit ids, sha hashes, uuids, paths) matches no rule: a key=value
+// pair is masked only when its key names a secret and its value looks random. Hits are counts per kind, so a report never repeats a value.
+export const secretMark = (kind: string): string => `[가림:${kind}]`;
+const NOT_A_VALUE = /^(?:[$<{[%*!]|\.{3}|x{4,}|(?:true|false|null|undefined|none|redacted|changeme|password|secret|token)$)/i;
+const MEMBER = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+(?:\(\))?$/; // opts.token, process.env.X: code, not a value
+function entropy(s: string): number {
+	const seen = new Map<string, number>();
+	for (const c of s) seen.set(c, (seen.get(c) ?? 0) + 1);
+	let h = 0;
+	for (const n of seen.values()) h -= (n / s.length) * Math.log2(n / s.length);
+	return h;
+}
+// A value that looks generated: letters and digits with some spread, or a long high-spread mixed-case run. Words, camelCase
+// identifiers, numbers and member paths are not.
+export function looksRandom(v: string): boolean {
+	if (v.length < 8 || NOT_A_VALUE.test(v) || MEMBER.test(v) || /^[/~.]|^https?:/.test(v) || /^[a-z]+(?:[_-][a-z]+)*$/.test(v) || /^\d+$/.test(v)) return false;
+	const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(r => r.test(v)).length;
+	if (/[A-Za-z]/.test(v) && /\d/.test(v)) return classes >= 2 && entropy(v) >= 2.5;
+	return v.length >= 24 && /[a-z]/.test(v) && /[A-Z]/.test(v) && entropy(v) >= 4;
+}
+const SEP = String.raw`\\?["']?\s*[:=]\s*\\?["']?`; // key: value, key=value, "key": "value", and the same JSON-escaped
+type SecretRule = { kind: string; re: RegExp; prefixed?: boolean; random?: boolean };
+// Order matters: a specific shape is masked before a generic one sees its text. `prefixed`: group 1 (a header or key name) is kept.
+const SECRET_RULES: readonly SecretRule[] = [
+	{ kind: "private-key", re: /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----|$)/g },
+	{ kind: "jwt", re: /\beyJ[\w-]{8,}\.eyJ[\w-]{8,}\.[\w-]{8,}/g },
+	{ kind: "github", re: /\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_\w{40,})/g },
+	{ kind: "gitlab", re: /\bgl(?:pat|ptt|dt|rt|ft|oas|cbt|imt|soat)-[\w-]{20,}/g },
+	{ kind: "anthropic", re: /\bsk-ant-[\w-]{20,}/g },
+	{ kind: "openai", re: /\bsk-(?:proj-|svcacct-|admin-)?(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]{20,}/g },
+	{ kind: "google", re: /\b(?:AIza[\w-]{35}|ya29\.[\w.-]{20,}|GOCSPX-[\w-]{20,}|1\/\/0[\w-]{40,})/g },
+	{ kind: "aws", re: /\b(?:AKIA|ASIA|ABIA|ACCA)[0-9A-Z]{16}\b/g },
+	{ kind: "slack", re: /\b(?:xox[abposr]-\d+-[\w-]{8,}|xapp-\d-[\w-]{10,})|https:\/\/hooks\.slack\.com\/services\/[\w/]{20,}/g },
+	{ kind: "discord", re: /\b[MNO][\w-]{23,27}\.[\w-]{6}\.[\w-]{27,40}\b|https:\/\/(?:ptb\.|canary\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]{20,}/g },
+	{ kind: "auth-header", re: new RegExp(`\\b((?:Proxy-)?Authorization${SEP}(?:(?:Bearer|Basic|Token|Bot|Digest)\\s+)?)([\\w.~+/=-]{8,})`, "gi"), prefixed: true, random: true },
+	{ kind: "auth-header", re: /\b(Bearer\s+)([\w.~+/=-]{16,})/g, prefixed: true, random: true },
+	{ kind: "cookie", re: new RegExp(`\\b((?:Set-)?Cookie${SEP})([\\w.-]{1,100}=[\\w.~+/%-]{8,}(?:;\\s*[\\w.-]{1,100}=[\\w.~+/%-]*)*)`, "gi"), prefixed: true, random: true },
+	// The key must end in the secret word (token, api_key, SECRET_KEY), so tokenFile, maxTokens or tokens.css:12: are not keys.
+	{ kind: "pair", re: new RegExp(`(?<![\\w.-])([\\w-]*?(?:passw(?:or)?d|pwd|passphrase|secret|token|api[_-]?key|apikey|access[_-]?key|private[_-]?key|secret[_-]?key|client[_-]?secret)${SEP})([\\w.~+/=@!#$%^*-]{8,})(?![\\w(\\[])`, "gi"), prefixed: true, random: true },
+];
+const valuesRe = new Map<string, RegExp>();
+// The exact values of this install's secret files, longest first, as one pattern (built once per value set).
+function exactRe(values: readonly string[]): RegExp | undefined {
+	if (!values.length) return undefined;
+	const key = values.join("\0");
+	let re = valuesRe.get(key);
+	if (!re) {
+		re = new RegExp([...values].sort((a, b) => b.length - a.length).map(escapeRe).join("|"), "g");
+		valuesRe.clear();
+		valuesRe.set(key, re);
+	}
+	return re;
+}
+
+export function maskSecrets(input: string, values: readonly string[] = []): { text: string; hits: Record<string, number> } {
+	const hits: Record<string, number> = {};
+	const hit = (kind: string) => { hits[kind] = (hits[kind] ?? 0) + 1; return secretMark(kind); };
+	let text = input;
+	const exact = exactRe(values);
+	if (exact) text = text.replace(exact, () => hit("secret-file"));
+	for (const { kind, re, prefixed, random } of SECRET_RULES)
+		text = text.replace(re, (found, ...groups: unknown[]) => {
+			if (!prefixed) return hit(kind);
+			const [head, value] = groups as [string, string];
+			if (value.startsWith("[가림:") || (random && !looksRandom(value))) return found;
+			return head + hit(kind);
+		});
+	return { text, hits };
+}
+
+// The values of the files in <dataDir>/secrets that could be pasted somewhere: long, unspaced and random-looking (a mail address or a
+// setting inside a JSON secret file is not one). Read at call time, never logged.
+export function secretFileValues(dataDir: string): string[] {
+	const secrets = join(dataDir, "secrets");
+	if (!existsSync(secrets)) return [];
+	const out = new Set<string>();
+	for (const name of readdirSync(secrets, { recursive: true }).map(String)) {
+		if (NOT_A_SECRET.test(name)) continue;
+		for (const value of secretValues(fileText(join(secrets, name)))) if (value.length >= 12 && !/\s/.test(value) && looksRandom(value)) out.add(value);
+	}
+	return [...out];
+}

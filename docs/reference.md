@@ -259,6 +259,17 @@ sessions are skipped. Each action goes to the hub log and the activity feed, not
 in `~/.dotz/lane-hygiene.json`; a run missed while the gateway was down is made up a minute after the next start.
 Settings apply when a session starts or resumes.
 
+**Secrets and retention of session files.** OmO keeps every session as a JSONL file under `~/.omo/agent/sessions` with no
+retention of its own. Credentials (JWTs, private key blocks, GitHub/GitLab, Anthropic/OpenAI/Google/AWS, Slack/Discord tokens,
+`Authorization`/`Bearer`/`Cookie` headers, `password=`/`token=`/`secret=` pairs with random-looking values, and the exact values of
+the files in `~/.dotz/secrets`) are replaced by a `[가림:<kind>]` marker before the recall index stores a pair, once for an index
+built earlier, and after the nightly hygiene (`lanes.nightly_at`) in every session file idle for a day and not open in a live OmO
+process (`hub/session-hygiene.ts`, a child process; the file keeps mode 600 and its mtime, the folders 700). dotz also sets
+senpi's `tools.bash.redactSecretsInOutput`. `sessions.keep_days` in `config.json` (default `90`, `0` keeps every file) deletes a
+session file idle that long, with its `-artifacts` folder, once the recall index holds all of it: its masked pairs stay
+searchable. Deleting a project's session folder still removes its pairs; `bun hub/recall-cli.ts forget <file|session id>`
+removes those of one deleted file.
+
 **Memory guard.** One scan of a huge tree or a multi-GB file can grow an orchestrator or session conversation to tens of GB.
 Every 30 s the
 gateway reads each agent's RSS; one over `lanes.max_rss_gb` (default `8`, `0` turns the guard off) is restarted on

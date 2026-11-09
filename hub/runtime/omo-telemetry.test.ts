@@ -19,7 +19,7 @@ test("turns both switches off, keeps comments and other keys, and a second run w
 	const text = readFileSync(cfg, "utf8");
 	expect(text).toContain("// mine");
 	expect(parseJsonc(text)).toEqual({ telemetry: { enabled: false, other: 1 }, x: 2 });
-	expect(JSON.parse(readFileSync(settings, "utf8"))).toEqual({ enableInstallTelemetry: false });
+	expect(JSON.parse(readFileSync(settings, "utf8"))).toEqual({ enableInstallTelemetry: false, tools: { bash: { redactSecretsInOutput: true } } });
 	const second = telemetryOff({}, cfg, settings);
 	expect(second.every(l => l.endsWith("(already)"))).toBe(true);
 	expect(readFileSync(cfg, "utf8")).toBe(text);
@@ -32,7 +32,7 @@ test("adds the telemetry block to a config without one and keeps existing settin
 	writeFileSync(settings, '{ "theme": "dark" }');
 	telemetryOff({}, cfg, settings);
 	expect(parseJsonc(readFileSync(cfg, "utf8"))).toEqual({ profiles: {}, telemetry: { enabled: false } });
-	expect(JSON.parse(readFileSync(settings, "utf8"))).toEqual({ theme: "dark", enableInstallTelemetry: false });
+	expect(JSON.parse(readFileSync(settings, "utf8"))).toEqual({ theme: "dark", enableInstallTelemetry: false, tools: { bash: { redactSecretsInOutput: true } } });
 });
 
 test("the spawn env carries OmO's documented off switches", () => {

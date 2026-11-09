@@ -4,11 +4,15 @@
 // (Latin words as they are, Hangul runs as the word plus overlapping bigrams, so particles do not break a match and two-letter words match).
 // ingest() is incremental: each file resumes at the start of its last unclosed pair, a shrunk or replaced file is read whole, a deleted
 // file takes its docs with it, and a time budget stops it between pairs so the next call carries on.
+// Secrets are masked before a pair is stored (maskSecrets, hub/public-scrub.ts); an index built before that is masked once (MASK_VERSION).
+// A file the session hygiene retired past its retention (retireFile, files.kept = 1) keeps its pairs after the raw file is gone, so an old
+// conversation stays findable; deleting its session folder, or `recall-cli forget`, still removes them.
 import { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { TEMP_PATH } from "./live-guard.ts";
+import { maskSecrets } from "./public-scrub.ts";
 import { ANSWER_CAP, EXTRACT_VERSION, extractPairs, OWNER_CAP, sessionHeader, type Pair, type RawLine, type RecallCtx } from "./recall-extract.ts";
 
 const SCHEMA = `
@@ -40,6 +44,7 @@ export function openRecall(dataDir: string, readOnly = false): Database {
 	chmodSync(file, 0o600);
 	db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000");
 	db.exec(SCHEMA);
+	if (!db.query<{ name: string }, []>("PRAGMA table_info(files)").all().some(c => c.name === "kept")) db.exec("ALTER TABLE files ADD COLUMN kept INTEGER");
 	return db;
 }
 
@@ -134,7 +139,8 @@ function winsOver(a: { answer: string; ts_ms: number; file: string }, b: { answe
 	return a.ts_ms !== b.ts_ms ? a.ts_ms < b.ts_ms : a.file <= b.file;
 }
 
-function upsertPair(db: Database, p: Pair, file: string): void {
+function upsertPair(db: Database, raw: Pair, file: string, secrets: readonly string[]): void {
+	const p = { ...raw, owner: maskSecrets(raw.owner, secrets).text, answer: maskSecrets(raw.answer, secrets).text, title: maskSecrets(raw.title, secrets).text };
 	const tsMs = Date.parse(p.ts) || 0;
 	const textHash = sha(`${p.owner}\0${p.answer}`);
 	const mine = db.query<DocRow, [string]>("SELECT n, answer, ts_ms, file, text_hash FROM docs WHERE id = ?").get(p.id);
@@ -157,11 +163,62 @@ function upsertPair(db: Database, p: Pair, file: string): void {
 		db.query("UPDATE docs SET line=?, off=?, entry=?, ts=?, ts_ms=?, room=?, project=?, cwd=?, session=?, title=?, kind=?, owner=?, answer=?, text_hash=? WHERE n = ?").run(...cols, n);
 		db.query("DELETE FROM fts WHERE rowid = ?").run(n);
 	}
-	db.query("INSERT INTO fts(rowid, owner, answer, meta) VALUES (?, ?, ?, ?)").run(n, tokenize(p.owner).join(" "), tokenize(p.answer).join(" "), tokenize(`${p.title} ${p.project} ${p.room} ${p.kind}`).join(" "));
+	putFts(db, n, p);
 	for (const msgId of p.msgIds) db.query("INSERT OR REPLACE INTO msgs(msg_id, doc_n) VALUES (?, ?)").run(msgId, n);
 }
 
-export interface IngestOpts { readonly roots: readonly string[]; readonly budgetMs?: number; readonly convKeys?: ReadonlyMap<string, string> }
+function putFts(db: Database, n: number, p: { owner: string; answer: string; title: string; project: string; room: string; kind: string }): void {
+	db.query("INSERT INTO fts(rowid, owner, answer, meta) VALUES (?, ?, ?, ?)").run(n, tokenize(p.owner).join(" "), tokenize(p.answer).join(" "), tokenize(`${p.title} ${p.project} ${p.room} ${p.kind}`).join(" "));
+}
+
+// Bumped when the masking rules change: ingest() then re-masks every stored doc once.
+export const MASK_VERSION = "1";
+
+// Masks the stored text of every doc and rewrites its FTS row; a changed doc loses its vectors, so pendingDocs re-embeds it.
+export function maskExisting(db: Database, secrets: readonly string[]): { docs: number; changed: number; hits: Record<string, number> } {
+	const hits: Record<string, number> = {};
+	let docs = 0, changed = 0;
+	db.exec("BEGIN");
+	try {
+		for (const d of db.query<{ n: number; id: string; owner: string; answer: string; title: string; project: string; room: string; kind: string }, []>("SELECT n, id, owner, answer, title, project, room, kind FROM docs").all()) {
+			docs++;
+			const [o, a, t] = [d.owner, d.answer, d.title].map(s => maskSecrets(s ?? "", secrets)) as [ReturnType<typeof maskSecrets>, ReturnType<typeof maskSecrets>, ReturnType<typeof maskSecrets>];
+			if (o.text === (d.owner ?? "") && a.text === (d.answer ?? "") && t.text === (d.title ?? "")) continue;
+			changed++;
+			for (const r of [o, a, t]) for (const [k, v] of Object.entries(r.hits)) hits[k] = (hits[k] ?? 0) + v;
+			db.query("UPDATE docs SET owner = ?, answer = ?, title = ?, text_hash = ? WHERE n = ?").run(o.text, a.text, t.text, sha(`${o.text}\0${a.text}`), d.n);
+			db.query("DELETE FROM fts WHERE rowid = ?").run(d.n);
+			putFts(db, d.n, { ...d, owner: o.text, answer: a.text, title: t.text });
+			db.query("DELETE FROM vecs WHERE doc_id = ?").run(d.id);
+		}
+		db.query("INSERT OR REPLACE INTO meta(k, v) VALUES ('mask', ?)").run(MASK_VERSION);
+		db.exec("COMMIT");
+	} catch (e) {
+		db.exec("ROLLBACK");
+		throw e;
+	}
+	return { docs, changed, hits };
+}
+
+// Called by the session hygiene before it deletes a raw file past its retention: true (and the file's pairs are kept for good) only
+// when the index holds the whole file as it is now, so nothing unindexed is lost with it.
+export function retireFile(db: Database, path: string): boolean {
+	if (!existsSync(path)) return false;
+	const st = statSync(path);
+	const row = db.query<{ size: number; mtime: number; complete: number }, [string]>("SELECT size, mtime, complete FROM files WHERE path = ?").get(path);
+	if (!row || row.complete !== 1 || row.size !== st.size || row.mtime !== st.mtimeMs) return false;
+	db.query("UPDATE files SET kept = 1 WHERE path = ?").run(path);
+	return true;
+}
+
+// Deliberate deletion of a retired file's pairs (its raw file is gone): by its path or its session id. Returns the files removed.
+export function forget(db: Database, pathOrSession: string): number {
+	const rows = db.query<{ path: string }, [string, string]>("SELECT path FROM files WHERE path = ? OR session = ?").all(pathOrSession, pathOrSession);
+	for (const r of rows) removeFile(db, r.path);
+	return rows.length;
+}
+
+export interface IngestOpts { readonly roots: readonly string[]; readonly budgetMs?: number; readonly convKeys?: ReadonlyMap<string, string>; readonly secrets?: readonly string[] }
 export interface IngestResult { files: number; docs: number; removed: number; complete: boolean }
 interface FileRow { size: number; mtime: number; head: string; tail: string; off: number; line: number; cwd: string; session: string; title: string; skip: number; complete: number; after_brief: number }
 interface Stat { path: string; size: number; mtime: number }
@@ -191,7 +248,7 @@ function saveRow(db: Database, path: string, r: FileRow): void {
 }
 
 // Returns the docs written; a file read to the end is complete, one stopped by the budget resumes at the pair it did not write.
-function ingestFile(db: Database, st: Stat, deadline: number, convKeys: ReadonlyMap<string, string> | undefined): number {
+function ingestFile(db: Database, st: Stat, deadline: number, convKeys: ReadonlyMap<string, string> | undefined, secrets: readonly string[]): number {
 	const row = db.query<FileRow, [string]>(`SELECT ${FILE_COLS} FROM files WHERE path = ?`).get(st.path);
 	if (row && row.complete === 1 && row.size === st.size && row.mtime === st.mtime) return 0;
 	const headBytes = readBytes(st.path, 0, 4096);
@@ -219,7 +276,7 @@ function ingestFile(db: Database, st: Stat, deadline: number, convKeys: Readonly
 			const stopped = !p.open && Date.now() > deadline;
 			if (stopped || p.open) next = { off: p.offset, line: p.line, cwd: p.cwd, session: p.session, title: p.title, after_brief: p.afterBrief ? 1 : 0, complete: stopped ? 0 : 1 };
 			if (stopped) break;
-			upsertPair(db, p, st.path);
+			upsertPair(db, p, st.path, secrets);
 			docs++;
 		}
 		const fin = next ?? { off: state.end, line: state.line, cwd: start.cwd, session: start.session, title: start.title, after_brief: start.after_brief, complete: 1 };
@@ -236,17 +293,21 @@ export function ingest(db: Database, opts: IngestOpts): IngestResult {
 	const deadline = Date.now() + (opts.budgetMs ?? Number.POSITIVE_INFINITY);
 	const result: IngestResult = { files: 0, docs: 0, removed: 0, complete: true };
 	if (db.query<{ v: string }, []>("SELECT v FROM meta WHERE k = 'extract'").get()?.v !== EXTRACT_VERSION) {
-		for (const r of db.query<{ path: string }, []>("SELECT path FROM files").all()) removeFile(db, r.path);
+		// A retired file cannot be read again, so its pairs stay as they were extracted.
+		for (const r of db.query<{ path: string }, []>("SELECT path FROM files WHERE kept IS NOT 1").all()) removeFile(db, r.path);
 		db.query("INSERT OR REPLACE INTO meta(k, v) VALUES ('extract', ?)").run(EXTRACT_VERSION);
 	}
-	for (const r of db.query<{ path: string }, []>("SELECT path FROM files").all()) {
-		if (existsSync(r.path)) continue;
+	const secrets = opts.secrets ?? [];
+	if (db.query<{ v: string }, []>("SELECT v FROM meta WHERE k = 'mask'").get()?.v !== MASK_VERSION) maskExisting(db, secrets);
+	for (const r of db.query<{ path: string; kept: number | null }, []>("SELECT path, kept FROM files").all()) {
+		// A retired file's pairs go only with its session folder (a deliberate deletion: the folder, or the project's sessions).
+		if (existsSync(r.path) || (r.kept === 1 && existsSync(dirname(r.path)))) continue;
 		removeFile(db, r.path);
 		result.removed++;
 	}
 	for (const st of sessionFiles(opts.roots)) {
 		if (Date.now() > deadline) { result.complete = false; break; }
-		const docs = ingestFile(db, st, deadline, opts.convKeys);
+		const docs = ingestFile(db, st, deadline, opts.convKeys, secrets);
 		result.files++;
 		result.docs += docs;
 		if (Date.now() > deadline && !db.query("SELECT 1 FROM files WHERE path = ? AND complete = 1").get(st.path)) result.complete = false;

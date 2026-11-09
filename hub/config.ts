@@ -33,6 +33,8 @@ export type Config = {
 	// computer's free memory and load, hub/convcapacity.ts).
 	conversations?: { sessions?: boolean; kinds?: string[]; idle_stop_min?: number; max_live?: number };
 	lanes: { runtime?: string; max_active?: number; compact_at?: number; keep_recent?: number; nightly_at?: string; nightly_compact_at?: number; rotate_mb?: number; max_rss_gb?: number; max_workers?: number; idle_stop_min?: number; worker_idle_min?: number; min_free_disk_gb?: number };
+	// Days an idle OmO session file is kept before the nightly hygiene deletes it (its pairs stay in recall); 0 keeps them. Default 90.
+	sessions?: { keep_days?: number };
 	// Model choice and fallback order, one block per target (the web 모델 · 폴백 screen edits exactly this).
 	models?: ModelsConfig;
 	// Per-model context window and auto-compaction point, keyed by model id without the thinking level (the 컨텍스트 screen edits this).
@@ -222,6 +224,8 @@ export const lanesNightlyCompactAt = () => positive(cfg.lanes?.nightly_compact_a
 export const lanesKeepRecent = () => positive(cfg.lanes?.keep_recent, DEFAULTS.keep_recent);
 export const lanesRotateMb = () => positive(cfg.lanes?.rotate_mb, DEFAULTS.rotate_mb);
 export const lanesNightlyAt = () => String(cfg.lanes?.nightly_at ?? DEFAULTS.nightly_at);
+export const SESSIONS_KEEP_DAYS = 90;
+export const sessionsKeepDays = () => (typeof cfg.sessions?.keep_days === "number" && Number.isFinite(cfg.sessions.keep_days) && cfg.sessions.keep_days >= 0 ? cfg.sessions.keep_days : SESSIONS_KEEP_DAYS);
 // RSS limit of one agent process (orchestrator or lane, task workers included) before the memory guard restarts it; 0 turns the guard off.
 export const lanesMaxRssGb = () => (typeof cfg.lanes?.max_rss_gb === "number" && cfg.lanes.max_rss_gb >= 0 ? cfg.lanes.max_rss_gb : DEFAULTS.max_rss_gb);
 // Memory (owner 2026-10-21: one agent costs ~1 GB, senpi ~600 MB + its claude child ~400 MB). Task workers one lane runs at once

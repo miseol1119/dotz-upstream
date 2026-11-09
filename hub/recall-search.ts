@@ -6,6 +6,7 @@ import type { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
 import { OPEN_CAP, extractPairs, type RecallCtx } from "./recall-extract.ts";
 import { readLines, tokenize } from "./recall-index.ts";
+import { maskSecrets } from "./public-scrub.ts";
 
 export interface SearchQuery {
 	readonly query: string;
@@ -116,7 +117,8 @@ export function search(db: Database, q: SearchQuery, opts: SearchOpts): Hit[] {
 	}));
 }
 
-export function openDoc(db: Database, id: string): OpenedDoc | undefined {
+// The raw text is masked like the stored copy (a session file written before the hygiene ran may still hold a secret).
+export function openDoc(db: Database, id: string, secrets: readonly string[] = []): OpenedDoc | undefined {
 	const d = db.query<DocRow & { off: number; cwd: string; session: string }, [string]>("SELECT * FROM docs WHERE id = ?").get(id);
 	if (!d) return undefined;
 	const near = (cmp: "<" | ">", order: "DESC" | "ASC") =>
@@ -126,7 +128,7 @@ export function openDoc(db: Database, id: string): OpenedDoc | undefined {
 	if (existsSync(d.file)) {
 		const ctx: RecallCtx = { file: d.file, cwd: d.cwd, session: d.session, title: d.title, convKey: d.project, afterBrief: d.kind !== "brief", ownerCap: OPEN_CAP, answerCap: OPEN_CAP };
 		for (const p of extractPairs(readLines(d.file, d.off, d.line, { end: d.off, line: d.line }), ctx)) {
-			if (p.id === d.id) raw = { owner: p.owner, answer: p.answer };
+			if (p.id === d.id) raw = { owner: maskSecrets(p.owner, secrets).text, answer: maskSecrets(p.answer, secrets).text };
 			break;
 		}
 	}
