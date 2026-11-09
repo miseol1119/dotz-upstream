@@ -266,7 +266,7 @@ details.think .md { padding: var(--sp-1) var(--sp-2) var(--sp-2) var(--box-ind);
 .pj-hd .sup { flex: 1 1 260px; min-width: 0; }
 .pj-lg { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--sp-1) var(--sp-15); color: var(--fg-3); font-size: 11.5px; }
 .pj-row { display: flex; align-items: stretch; gap: var(--sp-3); overflow-x: auto; padding: var(--sp-05) var(--sp-05) var(--sp-3); }
-.pj-card { flex: 0 0 340px; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; padding: var(--sp-4); border-radius: var(--r-card); background: var(--card); color: var(--fg); text-align: left; cursor: pointer; transition: background var(--m-fast) var(--m-ease); }
+.pj-card { flex: 0 0 340px; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; padding: var(--sp-4); border-radius: var(--r-card); background: var(--card); color: var(--fg); text-align: left; cursor: pointer; }
 .pj-card:hover { background: var(--card-hover); }
 .pj-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pj-top { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); min-width: 0; }
@@ -303,7 +303,7 @@ details.think .md { padding: var(--sp-1) var(--sp-2) var(--sp-2) var(--box-ind);
 .hm-scroll { overflow-x: auto; padding: 0 0 var(--sp-2); }
 .hm-canvas { position: relative; margin: 0 auto; }
 .hm-svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
-.hm-edge { fill: none; stroke: color-mix(in srgb, var(--fg-3) 55%, transparent); stroke-width: 1.4; transition: stroke var(--m-fast) var(--m-ease); }
+.hm-edge { fill: none; stroke: color-mix(in srgb, var(--fg-3) 55%, transparent); stroke-width: 1.4; }
 .hm-edge.sup { stroke-dasharray: 4 3; }
 .hm-edge.hot { stroke: var(--accent); stroke-width: 1.8; }
 .hm-ah { fill: color-mix(in srgb, var(--fg-3) 70%, transparent); }
@@ -311,7 +311,7 @@ details.think .md { padding: var(--sp-1) var(--sp-2) var(--sp-2) var(--box-ind);
 .hm-lb { fill: var(--accent); font: 500 10.5px var(--font); stroke: var(--bg); stroke-width: 4px; paint-order: stroke; opacity: 0; transition: opacity var(--m-fast) var(--m-ease); }
 .hm-lb.hot { opacity: 1; }
 .hm-ch { position: absolute; top: 0; height: 18px; color: var(--fg-3); font: 500 11px/18px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hm-n { position: absolute; display: flex; flex-direction: column; justify-content: center; gap: var(--sp-05); min-width: 0; padding: var(--sp-15) var(--sp-3); border: 1px solid var(--line-2); border-radius: 8px; background: var(--card); text-align: left; transition: border-color var(--m-fast) var(--m-ease), background var(--m-fast) var(--m-ease); }
+.hm-n { position: absolute; display: flex; flex-direction: column; justify-content: center; gap: var(--sp-05); min-width: 0; padding: var(--sp-15) var(--sp-3); border: 1px solid var(--line-2); border-radius: 8px; background: var(--card); text-align: left; }
 .hm-n:hover { background: var(--hover); border-color: var(--fg-3); }
 .hm-n.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 .hm-n.sup { border-style: dashed; background: var(--bg); }

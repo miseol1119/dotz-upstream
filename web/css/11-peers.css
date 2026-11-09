@@ -28,7 +28,7 @@
 .anch .pr-hd { padding: var(--sp-2) var(--sp-2) var(--sp-1); font-weight: 400; }
 .pr-list { display: flex; flex-direction: column; gap: var(--sp-05); padding: 0 var(--sp-2) var(--sp-2); }
 .anch .pr-list { padding: 0; }
-.pr-row { display: flex; align-items: center; gap: var(--sp-3); width: 100%; min-height: 48px; padding: var(--sp-15) var(--sp-3); border: 0; border-radius: 10px; background: transparent; color: var(--fg); font: inherit; text-align: left; transition: background-color var(--m-base) var(--m-ease); }
+.pr-row { display: flex; align-items: center; gap: var(--sp-3); width: 100%; min-height: 48px; padding: var(--sp-15) var(--sp-3); border: 0; border-radius: 10px; background: transparent; color: var(--fg); font: inherit; text-align: left; }
 .anch .pr-row { padding: var(--sp-15) var(--sp-2); }
 .pr-row:hover { background: var(--hover); }
 .pr-row:active { background: var(--active); }

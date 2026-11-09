@@ -331,6 +331,23 @@ describe("web/DESIGN.md rules", () => {
 		expect(fill.decls.find(([k]) => k === "color")?.[1]).toBe("var(--on-err)");
 	});
 
+	test("only transform and opacity move in a transition", () => {
+		// docs/ui-spec.md Motion: transform and opacity only. A progress bar grows in width; the board cards and the original-draft panel are placed by script or by layout, so they move their box.
+		const BOX = ["left", "top", "width", "height"];
+		const EXCEPT: Record<string, string[]> = {
+			".bar i": ["width"], ".tr-bar > span": ["width"],
+			".bi": [...BOX, "box-shadow"], ".bi.bdrag": ["box-shadow"], ".board.narrow .bi": ["box-shadow"], ".board.narrow .bi.bdrag": ["box-shadow"], ".bph": BOX,
+			".fs-card.tall.od-host": ["width"], ".od-cwrap .od-orig": ["flex-basis", "margin"],
+		};
+		const found: string[] = [];
+		for (const [file, text] of realCss()) for (const r of parseCss(file, text)) for (const [k, v] of r.decls) {
+			if (k !== "transition" && k !== "transition-property") continue;
+			const props = v.split(/,(?![^(]*\))/).map(s => s.trim().split(/\s+/)[0]!);
+			for (const prop of props) if (!["transform", "opacity", "visibility", "none"].includes(prop) && !EXCEPT[r.selector]?.includes(prop)) found.push(`${file} ${r.selector} ${prop}`);
+		}
+		expect(found).toEqual([]);
+	});
+
 	const planted: [string, string, string][] = [
 		["stripe", "colored one-sided border", `.planted { border-left: 3px solid var(--accent); border-radius: var(--r-card); }`],
 		["stripe", "colored inset edge", `.planted { box-shadow: inset 3px 0 0 var(--warn); }`],

@@ -7,7 +7,7 @@
 /* toolbar: tonal buttons sit on the gray canvas here, so they take the card fill to stay visible */
 .hm-bar > .btn.tonal { background: var(--card); }
 .hm-bar > .btn.tonal:hover { background: var(--card-hover); }
-.hm-st { position: relative; display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; padding: var(--sp-5); border-radius: var(--r-card); background: var(--card); transition: background var(--m-fast) var(--m-ease); }
+.hm-st { position: relative; display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; padding: var(--sp-5); border-radius: var(--r-card); background: var(--card); }
 .hm-st.one { cursor: pointer; }
 .hm-st.one:hover { background: var(--card-hover); }
 .hm-st.on { background: var(--active); }
@@ -92,7 +92,7 @@ button.hm-sh { cursor: pointer; }
 .note.err { color: var(--err); }
 textarea.fi { display: block; height: auto; padding: var(--sp-2) var(--sp-3); line-height: 18px; resize: vertical; }
 .hs-mono { font: 12px/18px var(--mono); min-height: 280px; }
-.hs-sw { position: relative; flex: none; width: 36px; height: 20px; padding: 0; border: 0; border-radius: 10px; background: var(--track); transition: background var(--m-fast) var(--m-ease); }
+.hs-sw { position: relative; flex: none; width: 36px; height: 20px; padding: 0; border: 0; border-radius: 10px; background: var(--track); }
 .hs-sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / .3); transition: transform var(--m-base) var(--m-ease); }
 .hs-sw[aria-checked="true"] { background: var(--accent); }
 .hs-sw[aria-checked="true"]::after { transform: translateX(16px); }
@@ -170,7 +170,7 @@ textarea.fi { display: block; height: auto; padding: var(--sp-2) var(--sp-3); li
 .fc-gh .sup { font-weight: 400; }
 .fc-gh .note { flex-basis: 100%; margin: 0 0 0 var(--sp-6); }
 .fc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--sp-2); margin: var(--sp-2) 0 var(--sp-5); }
-.fc-card { display: flex; flex-direction: column; gap: var(--sp-15); min-width: 0; padding: var(--sp-3) var(--sp-4); border-radius: var(--r-ctl); background: var(--card); cursor: pointer; transition: background var(--m-fast) var(--m-ease); }
+.fc-card { display: flex; flex-direction: column; gap: var(--sp-15); min-width: 0; padding: var(--sp-3) var(--sp-4); border-radius: var(--r-ctl); background: var(--card); cursor: pointer; }
 .fc-card:hover { background: var(--card-hover); }
 /* Material 3 card types instead of a colored side stripe: enforced = filled card, advisory = outlined card. */
 .fc-card.enforced, .hs-ft.enforced { background: var(--layer); }

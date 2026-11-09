@@ -58,7 +58,7 @@
 .fb-body { flex: 1 1 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--sp-2); padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: inherit; }
 .fb-body .nm { min-width: 0; font: 600 14px/20px var(--font); overflow-wrap: anywhere; }
 .fb-sum { min-width: 0; color: var(--fg-2); font-size: var(--fs-meta); line-height: var(--lh-meta); }
-.fb-sw { flex: none; height: 28px; padding: 0 var(--sp-1); border: 0; border-radius: var(--r-ctl); background: none; color: var(--fg-3); font-size: 12px; cursor: pointer; transition: color var(--m-fast) var(--m-ease); }
+.fb-sw { flex: none; height: 28px; padding: 0 var(--sp-1); border: 0; border-radius: var(--r-ctl); background: none; color: var(--fg-3); font-size: 12px; cursor: pointer; }
 .fb-sw[aria-checked="true"] { color: var(--accent); }
 .fb-sw:hover { background: var(--hover); }
 .fb-grip { flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--r-ctl); background: none; color: var(--fg-3); cursor: grab; touch-action: none; }
@@ -108,7 +108,6 @@
 /* segmented control: the track takes the small radius, the chosen cell one step smaller (outer = inner + 2) */
 .seg { display: flex; flex-wrap: wrap; gap: var(--sp-05); padding: var(--sp-05); border-radius: var(--r-seg); background: var(--layer); }
 .seg button { flex: 1 1 52px; min-width: 0; height: 26px; padding: 0 var(--sp-15); border: 0; border-radius: var(--r-seg-in); background: transparent; color: var(--fg-2); font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.seg button { transition: background-color var(--m-base) var(--m-ease), color var(--m-base) var(--m-ease); }
 .seg button:hover { color: var(--fg); }
 .seg button.on { background: var(--card); color: var(--fg); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
 @media (pointer: coarse) { .seg button { height: 34px; } }
@@ -185,7 +184,7 @@ body:has(.upd-bar) .app { padding-top: 0; margin-top: var(--ubh); height: calc(1
 /* floating notices (alert / worklog / lane report events): compact cards top-right; each leaves ~4s after the owner
    has actually seen it (tab visible and window focused), hover pauses, a dismissed one never comes back */
 .ntf-box { position: fixed; z-index: 1900; top: 16px; right: 16px; display: flex; flex-direction: column; gap: var(--sp-2); width: min(344px, calc(100vw - 32px)); pointer-events: none; }
-.ntf { pointer-events: auto; display: flex; align-items: flex-start; gap: var(--sp-2); padding: var(--sp-2) var(--sp-15) var(--sp-2) var(--sp-3); border-radius: var(--r-menu); background: var(--pop); color: var(--fg); box-shadow: 0 0 0 1px rgb(0 0 0 / .04), 0 1px 2px rgb(0 0 0 / .06), 0 8px 24px -4px rgb(0 0 0 / .12), 0 20px 40px -12px rgb(0 0 0 / .10); cursor: pointer; transform-origin: 100% 0; transition: transform var(--m-base) var(--m-ease), opacity var(--m-base) var(--m-ease), background var(--m-fast) var(--m-ease); }
+.ntf { pointer-events: auto; display: flex; align-items: flex-start; gap: var(--sp-2); padding: var(--sp-2) var(--sp-15) var(--sp-2) var(--sp-3); border-radius: var(--r-menu); background: var(--pop); color: var(--fg); box-shadow: 0 0 0 1px rgb(0 0 0 / .04), 0 1px 2px rgb(0 0 0 / .06), 0 8px 24px -4px rgb(0 0 0 / .12), 0 20px 40px -12px rgb(0 0 0 / .10); cursor: pointer; transform-origin: 100% 0; transition: transform var(--m-base) var(--m-ease), opacity var(--m-base) var(--m-ease); }
 :root[data-theme="dark"] .ntf { background: #2a2a30; box-shadow: inset 0 1px 0 rgb(255 255 255 / .07), 0 0 0 1px rgb(255 255 255 / .06), 0 2px 4px rgb(0 0 0 / .3), 0 12px 32px -4px rgb(0 0 0 / .55); }
 /* stacked cards step back a little, so the newest reads as the top layer */
 .ntf + .ntf { transform: scale(.985); opacity: .97; }

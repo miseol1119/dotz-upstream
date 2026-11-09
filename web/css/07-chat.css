@@ -114,7 +114,6 @@
 .dc-inl .dc-q { margin: 0 0 var(--sp-05); padding: 0 var(--sp-1); }
 .dc-inl > .dc-ds { padding: 0 var(--sp-1); }
 .dc-row, .dcm-row { flex: none; display: flex; align-items: flex-start; gap: var(--sp-2); width: 100%; min-height: 40px; padding: var(--sp-15) var(--sp-3); border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
-.dc-row, .dcm-row { transition: background-color var(--m-fast) var(--m-ease); }
 .dc-row:hover:not(:disabled), .dcm-row:hover:not(:disabled) { background: var(--hover); }
 .dc-row:active:not(:disabled), .dcm-row:active:not(:disabled) { background: var(--active); }
 .dc-row:disabled, .dcm-row:disabled { cursor: default; }
