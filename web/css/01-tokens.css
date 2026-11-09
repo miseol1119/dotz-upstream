@@ -175,7 +175,7 @@ kbd { display: inline-block; flex: none; padding: 0 var(--sp-15); border: 1px so
 .ustrip { grid-column: 11; margin-left: var(--sp-1); }
 /* 연결 끊김 is a status (web/DESIGN.md 상태): the red dot and the word, no capsule; it stays the button that reconnects */
 .conn { display: inline-flex; align-items: center; gap: var(--sp-15); flex: none; height: 20px; padding: 0; background: none; color: var(--err); font-size: 12px; line-height: 20px; font-weight: 600; white-space: nowrap; }
-.conn::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--err); }
+.conn::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 button.conn { border: 0; font-family: inherit; cursor: pointer; }
 button.conn:disabled { cursor: default; }
 .ustrip { flex: none; display: inline-flex; align-items: center; gap: var(--sp-2); height: 28px; padding: 0 var(--sp-2); border: 0; border-radius: 6px; background: transparent; color: var(--fg-2); font-size: 12px; line-height: 16px; white-space: nowrap; }

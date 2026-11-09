@@ -48,6 +48,8 @@
 .cv-row.pv .cv-m { align-self: center; }
 .cv-m2 { display: flex; align-items: center; gap: var(--sp-15); }
 .cv-m2:empty { display: none; }
+/* a status word that ends the row keeps the old tag's inset, so its last letter lines up with a count badge's digit on the next row */
+.cv-m2 > .tag:last-child { margin-right: var(--tag-px); }
 .cv-head .cvmenu { margin-left: auto; }
 
 /* the header picker (chips / caret menu) is replaced by the list in 대화; 로그 keeps it */

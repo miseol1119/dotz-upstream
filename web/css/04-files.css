@@ -282,7 +282,7 @@ button.cchip:hover { background: var(--layer); color: var(--fg); }
 .cchip.warn { color: var(--warn); }
 /* 360-390px: the chips pull together while the api label shares the row, so the bar keeps fitting without scrolling. */
 @media (max-width: 600px) { .cbar.api { gap: var(--sp-05); } .cbar.api .cchip { padding: 0 var(--sp-15); } .cbar.api .cchip.capi { font-size: 10.5px; } }
-.cchip.capi::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+.cchip.capi::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .cchip.capi { gap: var(--sp-15); height: 20px; padding: 0; border-radius: 0; background: none; color: var(--warn); font-size: 11px; line-height: 16px; font-weight: 600; }
 .cchip.err { color: var(--err); }
 /* whose model and context the chips show (뙃쥐 or a lane), and a lane's worker model: labels, not buttons */
