@@ -37,7 +37,33 @@ export async function checkChart(text: string): Promise<ChartCheck> {
 	return { ok: true, spec: spec as Record<string, unknown> };
 }
 
-const key = (text: string, theme: Theme, ext: string) => `${createHash("sha256").update(`${text}\n${theme}\n${locale()}`).digest("hex").slice(0, 16)}-${theme}.${ext}`;
+// The app's tokens (web/css/01-tokens.css, web/DESIGN.md) as ztd-charts theme tokens, so a chart reads as one of the message's cards: the card is --card
+// with the --line-2 border of a 목록 block, the one highlighted item is --accent and the rest --line-2, labels are --fg-3 (5.4:1 on --card in both themes).
+// Light only: the blue reaches 3.7:1 on white, so accent text is --fg and text on an accent fill is the dark ink of the dark theme's --on-accent (5.0:1).
+const FONT = `Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", sans-serif`;
+const MONO = `ui-monospace, "SF Mono", "Geist Mono", SFMono-Regular, Menlo, Consolas, monospace`;
+const APP_THEME = {
+	light: {
+		name: "dotz-light", bg: "#f2f4f6", panel: "#ffffff", ink: "#191f28", muted: "#616b78", dim: "#d1d6db", accent: "#3182f6", accentText: "#191f28", onAccent: "#121214",
+		onInk: "#ffffff", line: "#d1d6db", line2: "#e5e8eb", neutral: "#d1d6db", neutralStrong: "#616b78", onNeutralStrong: "#ffffff", neutralSoft: "#e5e8eb", lift: "#f9fafb",
+		tint: "rgba(49, 130, 246, 0.14)", fontFamily: FONT, monoFamily: MONO, radius: 12,
+	},
+	dark: {
+		name: "dotz-dark", bg: "#121214", panel: "#1d1d21", ink: "#ececf0", muted: "#8e939c", dim: "#3d3d45", accent: "#6ca7ff", accentText: "#6ca7ff", onAccent: "#121214",
+		onInk: "#1d1d21", line: "#3d3d45", line2: "#2b2b31", neutral: "#3d3d45", neutralStrong: "#8e939c", onNeutralStrong: "#1d1d21", neutralSoft: "#34343b", lift: "#232328",
+		tint: "rgba(108, 167, 255, 0.14)", fontFamily: FONT, monoFamily: MONO, radius: 12,
+	},
+} as const;
+// ztd-charts has no size tokens and draws the card title at 800 22px, the number 17px and the takeaway 800 17px. They become the 목록 block title
+// (.md .mlist-h: 600 13px in --fg-3) and the chat body size (15px, 600), so the chart never outweighs the message around it.
+const appSized = (svg: string, t: (typeof APP_THEME)[Theme]): string =>
+	svg
+		.replace(/font-size="22" font-weight="800" letter-spacing="-0.5" fill="[^"]*"/, `font-size="13" font-weight="600" fill="${t.muted}"`)
+		.replace(/font-size="17" font-weight="700" fill="([^"]*)"/, `font-size="13" font-weight="600" fill="$1"`)
+		.replace(/font-size="17" font-weight="800" letter-spacing="-0.3"/, `font-size="15" font-weight="600"`);
+
+// The style version is part of the key, so drawings cached in an older look are drawn again.
+const key = (text: string, theme: Theme, ext: string) => `${createHash("sha256").update(`${text}\n${theme}\n${locale()}\napp-theme-1`).digest("hex").slice(0, 16)}-${theme}.${ext}`;
 
 // Oldest drawings go first once the folder passes CACHE_BYTES; a file another call removed meanwhile is already gone.
 function prune(): void {
@@ -82,7 +108,7 @@ async function svgOf(spec: Record<string, unknown>, theme: Theme, background: bo
 	const { renderSpecToSVG } = await import("ztd-charts/server");
 	const { theme: _own, ...rest } = spec;
 	// Without a background (the web) the chart card sits flush with the message's other cards, so no outer padding.
-	return renderSpecToSVG(rest as never, { theme, locale: locale(), background, ...(background ? {} : { padding: 0 }), ...(width ? { width } : {}) });
+	return appSized(renderSpecToSVG(rest as never, { theme: APP_THEME[theme], locale: locale(), background, ...(background ? {} : { padding: 0 }), ...(width ? { width } : {}) }), APP_THEME[theme]);
 }
 
 /** The web drawing: an SVG without a page background (the message card shows through), drawn at the width it is shown so its text stays readable on a phone. */
