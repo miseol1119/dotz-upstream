@@ -6,7 +6,7 @@ import { stripSteerMark } from "./steer-mark.ts";
 import { mailByThread, mailTarget } from "./mail.ts";
 import { deriveSpec } from "./message-spec-derive.ts";
 import { noteBroken, ownerKind, ownerText, shownEvent } from "./owner-text.ts";
-import { dropClaim, parseTone, stripHandoff } from "./tone.ts";
+import { dropClaim, statedTone, stripHandoff } from "./tone.ts";
 
 export type HubEvent = { ts: string; kind: string; source: string; text: string; [key: string]: unknown };
 
@@ -47,8 +47,10 @@ export function emit(box: "inbox" | "outbox", event: HubEvent): void {
 	// The choke point of what the owner reads (hub/owner-text.ts): the page, the bell, push and every messenger read this text.
 	if (typeof event.text === "string" && ownerKind(event.kind)) event.text = ownerText(event.text, head => noteBroken(event.source, head), event.source === "gateway");
 	// The shapes of an answer, read once here (hub/message-spec-derive.ts); the text above stays the wire form and is not changed. Kept in the outbox only: nothing sends it to a model.
+	// A leading status mark, [done] or ✅ alike, is the spec's Status element and never a word of its first line.
 	if (typeof event.text === "string" && isAnswer(event)) {
-		const spec = deriveSpec(dropClaim(parseTone(stripHandoff(event.text)).text), NAME);
+		const { tone, text } = statedTone(stripHandoff(event.text));
+		const spec = deriveSpec(dropClaim(text), NAME, tone);
 		if (spec) event.spec = spec;
 	}
 	appendFileSync(box === "inbox" ? paths.inbox : paths.outbox, `${JSON.stringify(event)}\n`);

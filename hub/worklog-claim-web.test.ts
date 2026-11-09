@@ -43,10 +43,10 @@ test("작업내역 draws the claim as a status tag in the entry, never as body t
 			return { tags: tags.map(t => [t.textContent, t.className.includes(" ok "), t.getBoundingClientRect().height > 0]), body: body.innerText.trim() };
 		}))`)) as string,
 	) as { tags: [string, boolean, boolean][]; body: string }[];
-	expect(rows.map(r => r.tags.map(t => t[0]))).toEqual([["확인됨"], ["확인됨"], ["완료", "확인됨"], ["확인됨"], ["보고만 함"], ["확인됨"], ["확인됨"], []]);
+	expect(rows.map(r => r.tags.map(t => t[0]))).toEqual([["완료", "확인됨"], ["완료", "확인됨"], ["완료", "확인됨"], ["확인됨"], ["보고만 함"], ["확인됨"], ["확인됨"], []]);
 	// entries 2 and 3 sit under one header (.cont hides .mt), so the tag has to stay visible in the entry itself
-	expect(rows[1]!.tags[0]).toEqual(["확인됨", true, true]);
-	expect(rows[0]!.body.startsWith("✅ 메신저 로그인 연결을 끝냈어요.")).toBe(true);
+	expect(rows[1]!.tags[1]).toEqual(["확인됨", true, true]);
+	expect(rows[0]!.body.startsWith("메신저 로그인 연결을 끝냈어요.")).toBe(true);
 	expect(rows[2]!.body).toBe("자원 효율 2차를 끝냈어요.");
 	expect(rows[3]!.body).toBe("영어로 남은 줄이에요.");
 	expect(rows[4]!.body).toBe("아직 보고만 한 일이에요.");

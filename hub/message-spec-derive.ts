@@ -288,13 +288,14 @@ function parse(source: string, shape: boolean, relayed: boolean, bot: string): S
 // Words and basic markdown only: conversation, no spec.
 const PLAIN_TYPES = new Set(["Text", "Heading", "Bullets", "Quote", "Meta", "Rule", "Code", "Files"]);
 
-/** The spec of a message's body (tone marker already gone), or null when it is conversation: no shape, plain sentences. A draft approval, a message over SPEC_LIMITS and anything validateSpec refuses are null too; the text then goes the plain way. */
-export function deriveSpec(text: string, bot = ""): MessageSpec | null {
+/** The spec of a message's body (tone marker already gone), or null when it is conversation: no shape, plain sentences. A draft approval, a message over SPEC_LIMITS and anything validateSpec refuses are null too; the text then goes the plain way.
+ * tone: the status mark read off the front (hub/events.ts), the Status element in front of the shapes; a body with no shape stays text all the same. */
+export function deriveSpec(text: string, bot = "", tone?: string): MessageSpec | null {
 	try {
 		if (typeof text !== "string" || !text.trim()) return null;
 		const els = parse(text, true, false, bot);
 		if (!els || els.every(e => PLAIN_TYPES.has(e.type) && e.props.text !== CHART_NOTE)) return null;
-		const spec = specOfElements(els);
+		const spec = specOfElements(tone ? [mk("Status", { tone }), ...els] : els);
 		return validateSpec(spec).ok ? spec : null;
 	} catch {
 		return null;

@@ -173,6 +173,14 @@ function parseTone(text, keepFiles = false) {
   // A failure marker the tone did not read (bold, indented) still draws the failure tag; under the tag the word is said already.
   return { tone: tag || (led ? "fail" : ""), claim: c ? (/^(?:확인됨|verified)/.test(c[0]) ? "verified" : "reported") : "", text: led ? shown.slice(led[0].length) : shown };
 }
+// An answer's status mark in its emoji form (hub/tone.ts TONE_EMOJI) is read as the marker is, the rule of hub/tone.ts statedTone: the marker wins and an emoji after it goes too.
+// emoji: the text had one, so a spec stored before the hub read it (its first line still starts with the mark) is not drawn.
+const MARK_TONE = new Map([["\u2705", "done"], ["\u23f3", "run"], ["\u23f8", "wait"], ["\u2753", "ask"], ["\u274c", "fail"]]);
+const LED_MARK = new RegExp(`^\\s*(${[...MARK_TONE.keys()].join("|")})\\ufe0f?[ \\t]*`, "u");
+function statedTone(text, keepFiles = false) {
+  const p = parseTone(text, keepFiles), m = LED_MARK.exec(p.text);
+  return m ? { ...p, tone: p.tone || MARK_TONE.get(m[1]), text: p.text.slice(m[0].length), emoji: true } : p;
+}
 
 /* ---------- api ---------- */
 // index.html starts the first answers (state, history, plan, read positions, activity) in <head>, before this 480KB script is downloaded and parsed; the first api() of that path takes it over.

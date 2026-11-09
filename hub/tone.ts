@@ -131,14 +131,15 @@ export function parseTone(text: string): { tone?: Tone; text: string } {
 	return tone ? { tone, text: tone === "fail" ? shown.replace(LED_FAIL, "") : shown } : { text: shown };
 }
 
-// Where a session's state is read from its answer (hub/runstate.ts), a status emoji opening the text says what a marker would: sessions
-// write "✅ 끝냈어요" too. Display goes by the marker alone, so parseTone keeps inferring nothing.
+// Where a session's state is read from its answer (hub/runstate.ts) and where an answer's spec is built (hub/events.ts), a status emoji opening
+// the text says what a marker would: sessions write "✅ 끝냈어요" too. Messengers show the emoji as written, so parseTone keeps inferring nothing.
 const EMOJI_TONE = new Map(Object.entries(TONE_EMOJI).map(([tone, emoji]) => [emoji.replace("\ufe0f", ""), tone as Tone]));
 const LED_EMOJI = new RegExp(`^\\s*(${[...EMOJI_TONE.keys()].join("|")})\\ufe0f?[ \\t]*`, "u");
 export function statedTone(text: string): { tone?: Tone; text: string } {
-	const read = parseTone(text);
-	const m = read.tone ? null : LED_EMOJI.exec(read.text);
-	return m ? { tone: EMOJI_TONE.get(m[1]!), text: read.text.slice(m[0].length) } : read;
+	const read = parseTone(text), body = dropClaim(read.text);
+	const m = LED_EMOJI.exec(body);
+	// "[ask] ✅ 끝냈어요", "확인됨 · ✅ 끝냈어요": the marker wins, the emoji after it or after the claim is a second mark, not words.
+	return m ? { tone: read.tone ?? EMOJI_TONE.get(m[1]!), text: body.slice(m[0].length) } : read;
 }
 
 // A messenger with no status style of its own: the status as its emoji, nothing else of the machine's.

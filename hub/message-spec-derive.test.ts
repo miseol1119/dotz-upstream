@@ -97,8 +97,35 @@ test("emit stores the spec of an answer only, and leaves its text alone", () => 
 	emit("outbox", { ts: at(), kind: "out", source: "spec-test", update_key: "progress", text: body });
 	emit("outbox", { ts: at(), kind: "lane_report", source: "spec-test", text: body });
 	emit("outbox", { ts: at(), kind: "message", source: "spec-test", text: body });
-	expect(seen.map(e => (e.spec ? specChildren(e.spec as ReturnType<typeof specOfElements>).map(c => c.type).join("+") : ""))).toEqual(["Text+Facts", "", "", "", "Text+Facts", ""]);
+	expect(seen.map(e => (e.spec ? specChildren(e.spec as ReturnType<typeof specOfElements>).map(c => c.type).join("+") : ""))).toEqual(["Status+Text+Facts", "", "", "", "Text+Facts", ""]);
 	expect(seen[0]!.text).toBe(`[done] ${body}`);
+});
+
+// Owner 2026-11-09: a status mark must not show as plain text. The bot's contract allows [done] and ✅ alike, and the answers of that day began "✅ …" and "[ask] ✅ …".
+test("a leading status mark, marker or emoji, is the Status in front on every answer path, and messengers keep the text as written", () => {
+	const body = "정리했어요.\n\n- **응답:** 5,308ms → 36ms\n- **상태:** 정상";
+	const at = () => new Date().toISOString();
+	const sent: HubEvent[] = [
+		{ ts: at(), kind: "out", source: "orchestrator", target: "main", text: `✅ ${body}` },
+		{ ts: at(), kind: "out", source: "orchestrator", target: "ch:1", text: `[ask] ✅ ${body}` },
+		{ ts: at(), kind: "lane_report", source: "lane:audit", lane: "audit", text: `❌ ${body}` },
+		{ ts: at(), kind: "out", source: "orchestrator", target: "worklog", text: `확인됨 · ✅ ${body}` },
+		{ ts: at(), kind: "out", source: "orchestrator", target: "main", text: "⏸️ 답을 기다려요." },
+		{ ts: at(), kind: "out", source: "orchestrator", target: "main", text: "네, 했어요." },
+	];
+	for (const e of sent) emit("outbox", e);
+	const head = (e: HubEvent) => (e.spec ? specChildren(e.spec as ReturnType<typeof specOfElements>).slice(0, 2).map(c => [c.type, c.props.tone ?? c.props.text]) : null);
+	expect(sent.map(head)).toEqual([
+		[["Status", "done"], ["Text", "정리했어요."]],
+		[["Status", "ask"], ["Text", "정리했어요."]],
+		[["Status", "fail"], ["Text", "정리했어요."]],
+		[["Status", "done"], ["Text", "정리했어요."]],
+		null,
+		null,
+	]);
+	expect(specPlain(sent[0]!.spec as ReturnType<typeof specOfElements>)).toStartWith("[done] 정리했어요.\n\n- ");
+	expect(validateSpec(specOfElements([el("Status", { tone: "later" })])).ok).toBe(false);
+	expect(specChildren(specOf(`✅ ${body}`)!)[0]).toEqual(el("Text", { text: "✅ 정리했어요." }));
 });
 
 test("a meta line for the bot needs the bot's own name", () => {

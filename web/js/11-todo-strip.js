@@ -309,7 +309,7 @@ function msgNode(e) {
     default: {
       const fromLane = typeof e.source === "string" && e.source.startsWith("lane:");
       // A session's report or answer is a full message; its mid-turn progress line (update_key), new or stored, reads as the live status.
-      const { tone: mark, claim, text: parsed } = e.kind === "out" || e.kind === "lane_report" ? parseTone(noHandoff(text), true) : { tone: "", text };
+      const { tone: mark, claim, text: parsed, emoji } = e.kind === "out" || e.kind === "lane_report" ? statedTone(noHandoff(text), true) : { tone: "", text };
       const isNote = e.kind === "out" && !!e.update_key && !e.live && (fromLane || (typeof e.target === "string" && e.target.startsWith("lane:"))) && !parseChoices(parsed).blocks.length;
       // A stored [run] or [wait] draws no tag of its own: syncLiveTags gives the newest report the state of now.
       const parked = parkedTone(mark) && !e.live && !isNote, tone = parked ? "" : isNote ? mark || "run" : mark;
@@ -340,7 +340,9 @@ function msgNode(e) {
       const answer = (e.kind === "out" || e.kind === "lane_report") && !e.relay && (!e.update_key || e.target === "worklog") && e.source !== "gateway" && (mark !== "run" || (e.kind === "out" && !fromLane));
       const inl = pc && !isFixedT(target) && pc.blocks.some(b => b.options.length > 1);   // the card in the message (10-decision-card.js dcInline); in 알림 / 작업내역 a tap opens the sheet
       const shown = inl ? inlineBody(fl.text) : pc && pc.blocks.length ? choiceBody(fl.text) : fl.text;
-      const md = answer ? answerNode(shown, { shaped: fl.files.length > 0, spec: pc && pc.blocks.length ? null : e.spec }) : mdNode(shown, "md", !!e.relay), files = e.relay ? null : pathFiles(md, host);
+      // A spec stored before the hub read an emoji mark holds that mark in its first line: such an answer is drawn from its text, the mark read above.
+      const stale = emoji && !Object.values(e.spec?.elements ?? {}).some(x => x?.type === "Status");
+      const md = answer ? answerNode(shown, { shaped: fl.files.length > 0, spec: (pc && pc.blocks.length) || stale ? null : e.spec }) : mdNode(shown, "md", !!e.relay), files = e.relay ? null : pathFiles(md, host);
       // A briefing-shaped answer (schedule rows, a mail line, counts) is drawn as a card of rows and chips (11-resultcard.js hcBriefNode).
       const brief = e.kind === "out" && !e.relay && !(pc && pc.blocks.length) ? hcBriefNode(fl.text) : null;
       if (e.kind === "out" && !isRestart(e)) streamIn(brief || md, `${e.ts}|${text.length}`, e.ts);
@@ -414,7 +416,7 @@ function chatPush(en, bulk) {
       for (const [k, v] of CS.prog) if (v.target === t) dropProgress(k);
     }
     // Repeated [run]/[wait] reports are one message, as on Discord (hub/lanewire.ts): the newest takes the place of the one before it, until another message stands between.
-    const parked = e.kind === "lane_report" && !e.answering && parkedTone(parseTone(noHandoff(String(e.text ?? ""))).tone);
+    const parked = e.kind === "lane_report" && !e.answering && parkedTone(statedTone(noHandoff(String(e.text ?? ""))).tone);
     if (parked && CS.parked) { if (!CS.parked.classList.contains("cont")) CS.who = ""; CS.parked.remove(); CS.parked = null; }
     const n = msgNode(e);
     if (n) {

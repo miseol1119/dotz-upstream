@@ -81,8 +81,9 @@ const SPEC_SHAPES = new Set(["Steps", "Schedule", "Facts", "Section", "Evidence"
 // shaped: the answer has a shape already (its files); a shape in the spec makes it one too, and then its first paragraph leads with its first sentence (ansLeadHtml).
 // basic: text that is not an answer, so a table is a plain table. relayed: another computer's text, every fence a plain code block.
 // Neighbouring Sections share one card.
+// A Status is the caller's status tag in front of the first line (toneLead), which knows whether a [run] still runs: it is not drawn here.
 function specHtml(spec, { shaped = false, lead = true, basic = false, relayed = false } = {}) {
-  const els = specChildren(spec), c = { basic, relayed }, html = [];
+  const els = specChildren(spec).filter(e => e.type !== "Status"), c = { basic, relayed }, html = [];
   for (let i = 0; i < els.length; i++) {
     const e = els[i];
     if (e.type === "Section") {

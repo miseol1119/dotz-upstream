@@ -21,6 +21,7 @@ ${body}` : body;
 const factValue = (r) => r.value ?? `${r.from} → ${r.to}`;
 const CATALOG = {
   Message: { props: obj({}), plain: () => "" },
+  Status: { props: obj({ tone: (v) => typeof v === "string" && ["done", "run", "wait", "ask", "fail"].includes(v) }), plain: (p) => `[${p.tone}]` },
   Text: { props: obj({ text: nonEmpty }), plain: (p) => p.text },
   Heading: { props: obj({ text: nonEmpty }), plain: (p) => `## ${p.text}` },
   Bullets: {
@@ -141,8 +142,8 @@ function validateSpec(x) {
 }
 const specChildren = (s) => (s.elements[s.root].children ?? []).map((id) => s.elements[id]);
 const elementPlain = (e) => CATALOG[e.type].plain(e.props);
-const specPlain = (s) => specChildren(s).map(elementPlain).join(`
-`);
+const specPlain = (s) => specChildren(s).map((e, i, all) => (i === 0 ? "" : all[i - 1].type === "Status" ? " " : `
+`) + elementPlain(e)).join("");
 function specOfElements(els) {
   const elements = { m: { type: "Message", props: {}, children: els.map((_, i) => `e${i}`) } };
   els.forEach((e, i) => {
@@ -494,14 +495,14 @@ function parse(source, shape, relayed, bot) {
   return out;
 }
 const PLAIN_TYPES = new Set(["Text", "Heading", "Bullets", "Quote", "Meta", "Rule", "Code", "Files"]);
-function deriveSpec(text, bot = "") {
+function deriveSpec(text, bot = "", tone) {
   try {
     if (typeof text !== "string" || !text.trim())
       return null;
     const els = parse(text, true, false, bot);
     if (!els || els.every((e) => PLAIN_TYPES.has(e.type) && e.props.text !== CHART_NOTE))
       return null;
-    const spec = specOfElements(els);
+    const spec = specOfElements(tone ? [mk("Status", { tone }), ...els] : els);
     return validateSpec(spec).ok ? spec : null;
   } catch {
     return null;

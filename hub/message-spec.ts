@@ -31,6 +31,8 @@ const factValue = (r: Row) => r.value ?? `${r.from} → ${r.to}`;
 /** Every component there is. props: exact keys, an unknown key fails. plain: the component as the text shapes of MODE.md "Message layout", which message-spec-derive.ts reads back. A surface without a renderer for a type uses plain. */
 export const CATALOG: Record<string, { props: Check; plain: (p: any) => string }> = {
 	Message: { props: obj({}), plain: () => "" },
+	// The status mark in front of the answer (hub/events.ts reads it off the text): the page draws its status tag, never the mark as words.
+	Status: { props: obj({ tone: v => typeof v === "string" && ["done", "run", "wait", "ask", "fail"].includes(v) }), plain: p => `[${p.tone}]` },
 	Text: { props: obj({ text: nonEmpty }), plain: p => p.text },
 	Heading: { props: obj({ text: nonEmpty }), plain: p => `## ${p.text}` },
 	Bullets: {
@@ -132,7 +134,8 @@ export const specChildren = (s: MessageSpec): SpecElement[] => (s.elements[s.roo
 export const elementPlain = (e: SpecElement): string => CATALOG[e.type]!.plain(e.props);
 
 /** The whole message as text: what is stored, searched and sent to any surface that lacks a component. */
-export const specPlain = (s: MessageSpec): string => specChildren(s).map(elementPlain).join("\n\n");
+export const specPlain = (s: MessageSpec): string =>
+	specChildren(s).map((e, i, all) => (i === 0 ? "" : all[i - 1]!.type === "Status" ? " " : "\n\n") + elementPlain(e)).join("");
 
 /** A spec of these elements (message-spec-derive.ts builds with this). */
 export function specOfElements(els: SpecElement[]): MessageSpec {
