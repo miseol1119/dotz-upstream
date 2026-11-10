@@ -152,9 +152,14 @@ const fbTag = (f, conf) => el("span", { class: "tag warn", title: [fbTagText(f),
 // that is changed on this screen opens its editor in place, one at a time; one that is changed in an app's settings opens that screen.
 const MT_GROUPS = ["어시스턴트", "세션", "답장과 요약"];
 const mtGroupOf = key => key === "main" || key === "background" || key === "lookups" ? 0 : key === "lanes" || key.startsWith("lane:") || key === "workers" || key.startsWith("workers:") ? 1 : 2;
-// A session that is alive but has no row from the hub still gets its own row.
+// A hub that names no place to change a row (an older one, the demo's) still gets every row this screen edits, and a session that is alive
+// but has no row from the hub its own.
+const MT_OWN = { main: "orchestrator", lanes: "lanes", workers: "workers", replies: "replies" };
 function mtRows() {
-  const rows = (M.in_use || []).slice(), have = new Set(rows.map(r => r.key));
+  const rows = (M.in_use || []).map(r => r.change || !MT_OWN[r.key] ? r : { ...r, change: { models: MT_OWN[r.key] } }), own = new Set(rows.map(r => (r.change || {}).models));
+  for (const L of FB_LAYERS) if (!own.has(L.id) && L.cur()) rows.push({ key: L.id === "orchestrator" ? "main" : L.id, label: L.title(), sub: L.sub, model: withLevel(L.cur().model, L.cur().thinking), change: { models: L.id } });
+  if (M.replies && !own.has("replies")) rows.push({ key: "replies", label: "답장 기본값", model: M.replies.value || "", change: { models: "replies" } });
+  const have = new Set(rows.map(r => r.key));
   const extra = (M.lanes || []).filter(l => laneAlive(l) && !have.has(`lane:${l.name}`)).map(l => {
     const conf = withLevel(l.model, l.thinking), act = l.active_model;
     return { key: `lane:${l.name}`, label: `세션 · ${l.title || l.name}`, model: act || conf, ...(act && runBaseOf(act) !== runBaseOf(conf) ? { configured: conf, fallback: true } : {}), change: { models: `lane:${l.name}` } };

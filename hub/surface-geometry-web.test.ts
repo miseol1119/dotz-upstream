@@ -236,7 +236,7 @@ test("390px: the reply card's avatar letter and 초안 tag use a listed size and
 });
 test("390px: the models add button reads at a listed size and line", async () => {
 	const v = await page(390, "light", `go("models")`, `current === "models" && !!document.querySelector("#models .mt-use-row")`);
-	await v.evaluate(`void (M.in_use[0].change = { models: "orchestrator" }, openModels("orchestrator"))`);
+	await v.evaluate(`void openModels("orchestrator")`);   // the demo's rows name no place to change them; the screen still opens the assistant's editor
 	await waitFor(v, `!!document.querySelector("#models .fb-add")`);
 	await typeOk(v, "#models .fb-add");
 });

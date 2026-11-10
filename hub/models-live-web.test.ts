@@ -201,6 +201,16 @@ describe("REQ2/REQ3/REQ5 on 모델·폴백: one list, a row opens its editor in 
 		await waitFor(v, `window.__scrolled === "lanes"`);
 		expect(await state(v)).toEqual({ open: ["lanes"], editors: ["lanes"] });
 	});
+	test("a hub that names no place to change a row still gets an openable row for every target this screen edits", async () => {
+		const v = await boot();
+		await run(v, `window.__mOld = M; modelsOpen = ""; go("models")`);
+		await waitFor(v, `M !== window.__mOld && document.querySelector('.mt-use-row')`);
+		await run(v, `M = { ...M, in_use: [{ key: "main", label: "dotz", model: M.in_use[0].model }] }; renderModels()`);
+		const rows = Object.fromEntries(await q<[string, string | null][]>(v, `return [...document.querySelectorAll(".mt-use-row")].map(r => [r.dataset.use, r.getAttribute("role")])`));
+		for (const k of ["main", "lanes", "workers", "replies"]) expect([k, rows[k]]).toEqual([k, "button"]);
+		await press(v, "main");
+		expect(await state(v)).toEqual({ open: ["main"], editors: ["orchestrator"] });
+	});
 	test("답장 기본값 opens its picker naming Sonnet 5.5 높음 as the default, the same model the rows say drafts use", async () => {
 		const v = await openModels();
 		await press(v, "replies");
