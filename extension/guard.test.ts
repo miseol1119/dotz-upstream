@@ -139,19 +139,21 @@ test("hooks: a brief without a done-condition is blocked, one with it passes and
 	expect(passed.input.tasks[0].task).toContain(budgetLine(noGate));
 });
 
-test("hooks: the owner rule registers /fable-ok and blocks an expensive task model; DOTZ_OWNER_ASKED_FABLE lifts it", async () => {
+test("hooks: the owner rule registers /fable-ok and swaps an expensive task model for the worker model; DOTZ_OWNER_ASKED_FABLE lifts it", async () => {
 	const { pi, handlers, commands } = fakePi(join(dir, "agent-empty"));
 	installGuard(pi, { ...noGate, ask_before_expensive: true, expensive_models: ["fable"] });
 	expect(commands).toContain("fable-ok");
 	expect(handlers.before_subagent_spawn?.length).toBe(1);
 	const ctx = { agent: { kind: "main" }, cwd: dir, sessionManager: { getSessionId: () => "s2" } };
 	const input = { model: "anthropic/fable", tasks: [{ agent: "task", task: "x\nAcceptance: y" }] };
-	const blocked = await handlers.tool_call[0]({ toolName: "task", input }, ctx);
-	expect(blocked.reason).toContain("expensive model");
+	const swapped = await handlers.tool_call[0]({ toolName: "task", input }, ctx);
+	expect(swapped.block).toBeUndefined();
+	expect(String(swapped.input.tasks[0].model)).not.toContain("fable");
+	expect(swapped.input.tasks[0].model).toBeDefined();
 	expect(handlers.before_subagent_spawn[0]({ agent: "task", patterns: ["anthropic/fable"] })).toMatchObject({ block: true });
 	process.env.DOTZ_OWNER_ASKED_FABLE = "1";
 	try {
-		expect((await handlers.tool_call[0]({ toolName: "task", input }, ctx)).block).toBeUndefined();
+		expect((await handlers.tool_call[0]({ toolName: "task", input: { model: "anthropic/fable", tasks: [{ agent: "task", task: "x\nAcceptance: y" }] } }, ctx)).input.model).toBe("anthropic/fable");
 	} finally {
 		delete process.env.DOTZ_OWNER_ASKED_FABLE;
 	}

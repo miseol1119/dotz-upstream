@@ -29,6 +29,7 @@ import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, real
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { broadSearchProblem, expandShellVars, shellText } from "./guard-shell.ts";
+import { grantedHere, ownerPickedHere, swapExpensiveModels, workerPin } from "./guard-expensive.ts";
 export { shellText };
 import { callRules, expandCellVars, OMO_PROJECTS, readPaths, workerTrail } from "./guard-notes.ts";
 import { dataDir, expensiveMatch, type GuardConfig, GUARD_DEFAULTS, installedOriginal, isMain, laneShareReason, loadGuardConfig, logOnce, stateDir, statePath as stateFile, SUB_COMPACT_STOP, SUB_COMPACT_WRAP_UP } from "./guard-config.ts";
@@ -273,10 +274,11 @@ export function checkOmoTaskInput(input: any, isolate = true, roots: string[] = 
 // LOOKUP_MODEL in OmO's provider names; the quick category gets it through the profile). On an API-key session they follow the pin.
 export const LOOKUP_PIN = "anthropic-subscription/claude-sonnet-5-5:medium";
 const LOOKUP_AGENTS = /^(explore|librarian)$/;
-export function pinOmoTaskModel(input: any, pin: string): void {
+export function pinOmoTaskModel(input: any, pin: string, keep: (model: unknown) => boolean = () => false): void {
 	for (const item of Array.isArray(input?.tasks) ? input.tasks : [input]) {
 		if (!item || typeof item !== "object") continue;
 		const agent = typeof item.subagent_type === "string" ? item.subagent_type.trim() : "";
+		if (agent && keep(item.model)) continue; // an expensive model the owner allowed for this job (grant) stays
 		if (agent) item.model = LOOKUP_AGENTS.test(agent) && pin.startsWith("anthropic-subscription/") ? LOOKUP_PIN : pin;
 		else delete item.model;
 	}
@@ -747,8 +749,9 @@ export function installGuard(pi: any, config: GuardConfig = loadGuardConfig()): 
 	const overrideMs = config.override_minutes * 60_000;
 	// Owner rule, off by default: models in `expensive_models` run only after the owner asked. A dotz lane launched with owner_asked_for_fable gets DOTZ_OWNER_ASKED_FABLE=1; otherwise the user runs /fable-ok.
 	const gateExpensive = config.ask_before_expensive && config.expensive_models.length > 0;
-	const fableOk = () => !gateExpensive || process.env.DOTZ_OWNER_ASKED_FABLE === "1" || Date.now() < fableOkUntil;
-	const fableReason = (what: string, found: string) => `orchestrator-guard: ${what} uses an expensive model (${found}). Models listed in guard.expensive_models run only when the owner explicitly asked for it. Use the default worker model, or ask the owner and have them run /fable-ok (${config.override_minutes} min).`;
+	// The gateway's grants (<DOTZ_DIR>/state/expensive-grants.json) count while `until` lies ahead; the key is this process's conversation.
+	const fableOk = () => !gateExpensive || process.env.DOTZ_OWNER_ASKED_FABLE === "1" || Date.now() < fableOkUntil || grantedHere();
+	const fableReason = (what: string, found: string) => `orchestrator-guard: ${what} uses an expensive model (${found}). Models listed in guard.expensive_models run only when the owner explicitly asked for it. Use the default worker model. If the owner asked for it, get a grant on that message (POST /api/expensive-grant {conversation, owner_message: <mid>}) or have them type /fable-ok (${config.override_minutes} min).`;
 	const projectState = (ctx: any) => (state ??= loadState(String(ctx?.cwd ?? process.cwd())));
 	const refreshApplied = (current: ProjectState, extraDirs: string[] = [], history = false): boolean => {
 		let changed = false;
@@ -912,10 +915,10 @@ export function installGuard(pi: any, config: GuardConfig = loadGuardConfig()): 
 		if (isMain(ctx) && !sessionFlagged && !fableOk()) {
 			const effort = String(pi.getThinkingLevel?.() ?? "");
 			const found = expensiveModel([event?.payload?.model, /^(max|xhigh)$/i.test(effort) ? `:${effort}` : undefined]);
-			if (found) {
+			if (found && !ownerPickedHere(event?.payload?.model, effort, config)) {
 				sessionFlagged = true;
 				debug({ phase: "session-expensive", found });
-				ctx.ui?.notify?.(`orchestrator-guard: this session runs on an expensive model (${found}). Fable and max/xhigh effort are for explicit owner requests only; switch back unless the owner asked (/fable-ok silences this).`, "warning");
+				ctx.ui?.notify?.(`orchestrator-guard: this session runs on an expensive model (${found}). Fable and max/xhigh effort are for explicit owner requests only. Do not change the model yourself: ask the owner whether it should stay (/fable-ok silences this).`, "warning");
 			}
 		}
 		if (ctx?.agent?.kind !== "sub" || !event?.payload) return;
@@ -1021,13 +1024,17 @@ export function installGuard(pi: any, config: GuardConfig = loadGuardConfig()): 
 			debug({ phase: "task", verdict });
 			if ("reason" in verdict) return { block: true, reason: verdict.reason };
 			addProjectFooter(verdict.input, process.env.DOTZ_CONV, taskCwd);
-			const dear = fableOk() ? undefined : expensiveTaskModel(event.input);
-			if (dear) return { block: true, reason: fableReason("this task call", dear) };
-			const pin = process.env.DOTZ_ORCHESTRATOR === "1" && !process.env.DOTZ_LANE && isOmoTaskInput(event.input) ? (ownWorkerPin(process.env.DOTZ_WORKER_PIN_FILE) ?? livePin(ctx?.model, pi.getThinkingLevel?.())) : undefined;
+			const gated = gateExpensive && !fableOk();
+			if (gated && swapExpensiveModels(verdict.input, config)) debug({ phase: "task-model-swap", worker: workerPin() });
+			const wanted = process.env.DOTZ_ORCHESTRATOR === "1" && !process.env.DOTZ_LANE && isOmoTaskInput(event.input) ? (ownWorkerPin(process.env.DOTZ_WORKER_PIN_FILE) ?? livePin(ctx?.model, pi.getThinkingLevel?.())) : undefined;
+			const pin = wanted && gated && expensiveModel(wanted) ? workerPin() : wanted;
 			if (pin) {
-				pinOmoTaskModel(event.input, pin);
+				pinOmoTaskModel(event.input, pin, model => gateExpensive && !gated && Boolean(expensiveModel(model)));
 				debug({ phase: "task-model-pin", pin });
 			}
+			// Last net: only a worker model that is itself on the expensive list gets here.
+			const dear = gated ? expensiveTaskModel(verdict.input) : undefined;
+			if (dear) return { block: true, reason: fableReason("this task call", dear) };
 			// The quota comes from `omp usage`, i.e. omp's own login; an OmO process may run on another account, so the gate
 			// would block on a quota that is not the one it spends. No gate on OmO until OmO's own usage can be read.
 			if (config.budget_gate && process.env.DOTZ_RUNTIME !== "omo" && Date.now() >= budgetOkUntil) {
