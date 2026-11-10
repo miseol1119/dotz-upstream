@@ -67,8 +67,10 @@ const waitFor = (v: View, expr: string, ms = 5000) =>
 const q = async <T = unknown>(v: View, code: string): Promise<T> => JSON.parse((await v.evaluate(`JSON.stringify((() => { ${code} })())`)) as string) as T;
 const run = (v: View, code: string) => v.evaluate(`(() => { ${code} })(), 0`);
 const pick = async (v: View, f: string) => {
-	await run(v, `document.querySelector('#mon-tl .mr-f[data-filter="${f}"]').click()`);
-	await waitFor(v, `document.querySelector('#mon-tl .mr-f.on').dataset.filter === ${JSON.stringify(f)}`);
+	await run(v, `const at = k => document.querySelector('#mon-tl [data-filter="' + k + '"]'); if (!at(${JSON.stringify(f)})) at("in").click()`);
+	await waitFor(v, `!!document.querySelector('#mon-tl [data-filter="${f}"]')`);
+	await run(v, `document.querySelector('#mon-tl [data-filter="${f}"]').click()`);
+	await waitFor(v, `document.querySelector('#mon-tl .mr-place .on:not([data-filter="in"]), #mon-tl .mr-f.on').dataset.filter === ${JSON.stringify(f)}`);
 };
 // what the list shows now: the chips, the approval cards (their subjects) and the mail rows (their titles)
 const seen = (v: View) => q<{ chips: string[]; cards: string[]; rows: string[]; empty: string; over: boolean }>(v, `return {
@@ -86,10 +88,10 @@ async function boot(width: number, height: number, key: string): Promise<View> {
 	await run(v, `if (dotzTheme.get() !== "light") dotzTheme.toggle()`);
 	await waitFor(v, `typeof INTG !== "undefined" && INTG.items.length === 1 && CONV.has("mail:fx-c") && PQ.loaded`);
 	await run(v, `go("monitoring", ${JSON.stringify(key)})`);
-	await waitFor(v, `document.querySelector('#mon-tl .mr-f.on')`);
+	await waitFor(v, `document.querySelector('#mon-tl .mr-place .on:not([data-filter="in"]), #mon-tl .mr-f.on')`);
 	return v;
 }
-const landed = (v: View) => q<string>(v, `return document.querySelector("#mon-tl .mr-f.on").dataset.filter`);
+const landed = (v: View) => q<string>(v, `return document.querySelector('#mon-tl .mr-place .on:not([data-filter="in"]), #mon-tl .mr-f.on').dataset.filter`);
 
 for (const [width, height] of [[390, 844], [1280, 900]] as const) {
 	describe(`mail 확인 대기 at ${width}px`, () => {
@@ -99,7 +101,7 @@ for (const [width, height] of [[390, 844], [1280, 900]] as const) {
 			await pick(v, "all");
 			await waitFor(v, `document.querySelectorAll("#mon-tl .mr").length > 0`);
 			const all = await seen(v);
-			expect(all.chips).toEqual(["전체", "안 읽음", "답장 필요2", "확인 대기2", "답장함1", "보관함", "보낸 메일"]);
+			expect(all.chips).toEqual(["전체", "안 읽음", "답장 필요2", "확인 대기2", "답장함1"]);
 			expect(all.cards).toEqual([]);   // a sent draft is folded inside its mail's conversation (30-mail-sent.js); nothing waiting shows under 전체
 			expect(all.rows).toEqual(["자료 요청", "회의 일정 문의", "일정 조율"]);
 			expect(all.over).toBe(false);

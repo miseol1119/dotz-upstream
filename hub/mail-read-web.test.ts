@@ -120,8 +120,10 @@ const seen = (v: View) => q<{ chips: string[]; states: Record<string, string>; r
 	rows: [...document.querySelectorAll("#mon-tl .mr .rc-title")].map(t => t.textContent),
 	empty: document.querySelector("#mon-tl .empty")?.textContent ?? "" }`);
 const pick = async (v: View, f: string) => {
-	await run(v, `document.querySelector('#mon-tl .mr-f[data-filter="${f}"]').click()`);
-	await waitFor(v, `document.querySelector('#mon-tl .mr-f.on').dataset.filter === ${JSON.stringify(f)}`);
+	await run(v, `const at = k => document.querySelector('#mon-tl [data-filter="' + k + '"]'); if (!at(${JSON.stringify(f)})) at("in").click()`);
+	await waitFor(v, `!!document.querySelector('#mon-tl [data-filter="${f}"]')`);
+	await run(v, `document.querySelector('#mon-tl [data-filter="${f}"]').click()`);
+	await waitFor(v, `document.querySelector('#mon-tl .mr-place .on:not([data-filter="in"]), #mon-tl .mr-f.on').dataset.filter === ${JSON.stringify(f)}`);
 };
 const backToList = async (v: View, key: string) => {
 	await run(v, `go("monitoring", ${JSON.stringify(key)})`);
@@ -134,7 +136,7 @@ describe.each([[390, 844], [1280, 900]] as const)("reading a mail at %ipx", (wid
 		const v = await boot(width, height, "i:mail");
 		await waitFor(v, `document.querySelectorAll("#mon-tl .mr").length === 2`);
 		const before = await seen(v);
-		expect(before.chips).toEqual(["전체", "안 읽음1", "답장 필요", "확인 대기", "답장함", "보관함", "보낸 메일"]);
+		expect(before.chips).toEqual(["전체", "안 읽음1", "답장 필요", "확인 대기", "답장함"]);
 		expect(before.states["견적 요청"]).toBe("안 읽음");
 		await Bun.write(join(SHOTS, `list-before-${width}.png`), await v.screenshot());
 
@@ -148,7 +150,7 @@ describe.each([[390, 844], [1280, 900]] as const)("reading a mail at %ipx", (wid
 		await backToList(v, "i:mail");
 		const after = await seen(v);
 		expect(after.states["견적 요청"]).toBe("");
-		expect(after.chips).toEqual(["전체", "안 읽음", "답장 필요", "확인 대기", "답장함", "보관함", "보낸 메일"]);
+		expect(after.chips).toEqual(["전체", "안 읽음", "답장 필요", "확인 대기", "답장함"]);
 		expect(await q<boolean>(v, `return document.documentElement.scrollWidth <= innerWidth`)).toBe(true);
 		await pick(v, "unread");
 		expect(await q<string[]>(v, `return [...document.querySelectorAll("#mon-tl .mr .rc-title")].map(t => t.textContent)`)).toEqual([]);

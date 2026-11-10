@@ -1214,8 +1214,8 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 - 메일함(`web/js/30-mailboxes.js`, `30-mailboxes-set.js`, 계약 `docs/mailbox.md`): 메일 앱 인스턴스가 여러 개여도 모니터링의 한 줄과 한 화면이에요(계정이 둘 이상이면 이름은 `메일`, 앱 바에 계정 칩). 1100px부터 왼쪽에 `전체`와 메일함 칸, 그보다 좁으면 목록 맨 위 칩 줄이에요. 주소는 `monitoring/i%3Amail/<계정>/<메일함>[/set|/new]`이고 옛 주소도 열려요. 행의 폴더 버튼과 선택 막대의 `옮기기`로 같은 계정 안에서 옮기고, 옮긴 뒤 `앞으로는 어떻게 할까요?` 상자에서 고른 것만 학습해요(`되돌리기`는 고르기 전까지). 옮겨도 초안, 승인, 발송은 그대로예요.
 
 - 목적: 받은 메일을 받은편지함처럼 최신순 행으로 보여주고 답장 초안을 관리해요.
-- 구성: 머리, 메일 필터 바(`.mr-filter.mr-mail`, role tablist, aria-label `메일 보기`), 메일 행 목록(`mbList`, 30-mail-box.js), 메일에 속하지 않는 소식 카드, 새 메일 버튼(`mbFab`, 30-mail-box.js).
-- 기능: 필터 `전체 / 안 읽음 / 답장 필요 / 확인 대기 / 답장함 / 보관함 / 보낸 메일`(각 개수 표시, `전체`는 개수 없음, `확인 대기`는 대기 초안 수). 행 탭이면 `go("monitoring", "c:<mail:...>")`로 메일 대화 열기. 행의 연필 `초안 작성`: 대화상자 `답장 초안`(`어떻게 답할까요?`, 안내 `비워 두면 알아서 써요`, 버튼 `초안 만들기`, Cmd/Ctrl+Enter로 제출, `POST /api/mail/<key>/draft`, 토스트 `답장 초안을 만드는 중이에요`, 버튼 `만드는 중…`). `⋯` 메뉴(aria-label `메일 메뉴`): `초안 작성`, `답장 안 함`(답장이 필요한 상태일 때) 또는 `답장 필요로 표시`(그 외), `삭제`; 보낸 메일은 `삭제`만. `답장 안 함` `POST /api/mail/<key>/fyi`, 되돌리기 `DELETE`, 토스트 `답장 안 함으로 표시했어요`(되돌리기 버튼) / `답장 필요로 표시했어요`. 삭제는 확인창 `메일 삭제` / `목록에서 지울까요? 메일함엔 남아 있어요` / `삭제`, `DELETE /api/mail/<key>`, 토스트 `메일을 목록에서 지웠어요`.
+- 구성: 머리, 메일 머리 두 줄(자리 탭 `.mx-tabs.mr-place`, role tablist, aria-label `메일 위치` / `받은 메일`에서만 걸러 보기 `.mr-filter.mr-mail`, aria-label `메일 보기`), 메일 행 목록(`mbList`, 30-mail-box.js), 메일에 속하지 않는 소식 카드, 새 메일 버튼(`mbFab`, 30-mail-box.js).
+- 기능: 머리는 두 줄. 윗줄은 자리 탭(밑줄 탭) `받은 메일 / 보낸 메일 / 보관함`(`보낸 메일`·`보관함`만 개수, 0이면 숨김), 아랫줄은 `받은 메일`에서만 보이는 걸러 보기 `전체 / 안 읽음 / 답장 필요 / 확인 대기 / 답장함`(각 개수 표시, `전체`는 개수 없음, `확인 대기`는 대기 초안 수). `받은 메일`로 돌아오면 직전에 보던 걸러 보기가 켜져요. 행 탭이면 `go("monitoring", "c:<mail:...>")`로 메일 대화 열기. 행의 연필 `초안 작성`: 대화상자 `답장 초안`(`어떻게 답할까요?`, 안내 `비워 두면 알아서 써요`, 버튼 `초안 만들기`, Cmd/Ctrl+Enter로 제출, `POST /api/mail/<key>/draft`, 토스트 `답장 초안을 만드는 중이에요`, 버튼 `만드는 중…`). `⋯` 메뉴(aria-label `메일 메뉴`): `초안 작성`, `답장 안 함`(답장이 필요한 상태일 때) 또는 `답장 필요로 표시`(그 외), `삭제`; 보낸 메일은 `삭제`만. `답장 안 함` `POST /api/mail/<key>/fyi`, 되돌리기 `DELETE`, 토스트 `답장 안 함으로 표시했어요`(되돌리기 버튼) / `답장 필요로 표시했어요`. 삭제는 확인창 `메일 삭제` / `목록에서 지울까요? 메일함엔 남아 있어요` / `삭제`, `DELETE /api/mail/<key>`, 토스트 `메일을 목록에서 지웠어요`.
 - 상태: 열 때 대기 초안이 있으면 `확인 대기` 필터로 시작(한 번만), 없는데 남아 있으면 `전체`로 되돌려요(`mailLand`). `확인 대기` 필터는 메일 행 없이 초안 카드만. 빈 목록 문구: `확인할 초안이 없어요`(확인 대기) / `이 보기에 해당하는 메일이 없어요`. 메일 상태 표시(`MAIL_STATE`): `답장 필요`(warn), `초안 있음`(warn), `답장함`(ok), `답장 안 함`, 보낸 메일 `내가 보냄`; 미답장이면 주황 `미답장` 알약. 답장 칩(`MAIL_REPLY`): `답장 초안 있음`, `자동 답장 보냄`, `답장 대기`. 행 표시: `안 읽음`(또는 `안 읽음 <n>`), 첨부 개수(클립), 규칙 이름표, 제외 이유(`m.why`), 제목 없으면 `(제목 없음)`, 보낸이 없으면 `받는 사람`, 시각은 오늘이면 HH:MM 아니면 `M월 D일`. 첨부는 `첨부 <n>개` 목록과 내려받기 링크(라벨 `<파일명> 내려받기`). 대화에 묶인 메일이 삭제돼 없으면 행이 없어요.
 - 데이터: `MAILS`, `CONV`(`/api/conversations`), `POST /api/mail/<key>/draft`, `POST` `DELETE /api/mail/<key>/fyi`, `DELETE /api/mail/<key>`, `GET /api/mail/<key>/files/<i>[?dl=1]`, 알림.
 - css: web/css/20-mail-box.css, web/css/16-result-card.css(`mr-*`, `md-ctx`), web/css/02-cards-lists-tags.css(`.mr`; 터치/640px 이하에서 `button.cchip.mr-act` 높이 32px, :40).
@@ -1383,7 +1383,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 메일함 목록 도구줄 (선택 막대, 별표, 체크박스)
 - 목적: 모니터링의 메일 목록 위에서 여러 메일을 골라 읽음, 보관, 삭제, 답장 안 함으로 한 번에 처리해요.
-- 구성: `#mbox-bar.mbox-bar`(모두 선택 체크박스 `.mbox-all`, 개수 `.mbox-n`, 동작 버튼 `.mbox-b`, 선택 해제 `.mbox-x`). 각 메일 행 머리에 `.mr-lead`(체크박스 `.mr-chk` + 별표 `.mr-star`). 목록 필터 줄은 30-monitoring.js의 `mailFilterBar`(`.mr-filter.mr-mail`, role=tablist, aria-label `메일 보기`)가 그리고 이 파일은 막대만 그려요.
+- 구성: `#mbox-bar.mbox-bar`(모두 선택 체크박스 `.mbox-all`, 개수 `.mbox-n`, 동작 버튼 `.mbox-b`, 선택 해제 `.mbox-x`). 각 메일 행 머리에 `.mr-lead`(체크박스 `.mr-chk` + 별표 `.mr-star`). 목록 머리(자리 탭 줄 `.mr-place`와 `받은 메일`의 걸러 보기 줄 `.mr-filter.mr-mail`, role=tablist, aria-label `메일 보기`)는 30-monitoring-mail.js의 `mailFilterBar`가 두 줄로 그리고 이 파일은 막대만 그려요.
 - 기능:
   - 행 체크박스 켜기/끄기: `mbLead` onchange가 `MBOX.sel`을 바꾸고 막대만 다시 그려요(`mbPaintBar`).
   - 모두 선택: `mbPaintBar`의 `.mbox-all` onchange(전체 선택/해제, 일부만 고르면 indeterminate).
@@ -1399,7 +1399,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
   - 별표 상태: on이면 aria-label/title `별표 빼기`, 아니면 `별표 달기`, `aria-pressed`.
   - 행 선택 시 `.mr-sel` 클래스.
   - 안 읽음 판단(`mailUnread`): 카드에 `read` 불리언이 있으면 그 값, 없으면 dotz 자체 읽음 위치(`ts(t).unread`). 보낸 메일(`dir:"out"`)은 안 읽음이 아니에요.
-  - 필터 정의(`MAIL_FILTERS`, 30-monitoring.js:456): `전체`(받은 메일, 보관 제외), `안 읽음`, `답장 필요`(reply가 needs 또는 draft), `확인 대기`(메일 행 없음, 답장 초안 승인 카드만), `답장함`, `보관함`, `보낸 메일`.
+  - 필터 정의(`MAIL_FILTERS`, 30-monitoring.js:456): `전체`(받은 메일, 보관 제외), `안 읽음`, `답장 필요`(reply가 needs 또는 draft), `확인 대기`(메일 행 없음, 답장 초안 승인 카드만), `답장함`, `보관함`, `보낸 메일`. 일곱 값은 그대로이고, 보관함·보낸 메일은 자리 탭(`data-filter="archived"`/`"sent"`)이 고르며 받은 메일 탭은 `data-filter="in"`이에요(`MON.mailIn`이 직전 걸러 보기).
   - 새 메일 도착 행은 위에서 미끄러져 들어와요(`mbFresh`/`motionIn`, 첫 그림이나 다른 폴더 전환은 움직임 없음). 처리로 목록에서 빠지는 행은 먼저 사라져요(`mbRowsOut`/`motionOut`). 개수 배지는 바뀐 숫자만 굴러요(`cntSpan`/`rollCount`).
 - 데이터: `POST /api/mail/<key>/action {action}`(1건, 응답 `{ok, synced, note?}`), `POST /api/mail/actions {keys, action}`(여러 건, 응답 `{ok, results:[{key, ok, synced, note?}]}`), action은 read, unread, archive, unarchive, trash, star, unstar. 옛 허브(카드에 `can` 없음)는 삭제만 `DELETE /api/mail/<key>`. 처리 뒤 `convLoad()`와 `loadIntegrations()`. SSE 이벤트는 이 파일에서 코드에서 확인 못 함.
 - 근거: web/js/30-mail-box.js:191 `mbPaintBar`, :220 `mbList`, :176 `mbStar`, :183 `mbLead`, :73 `mbRun`, :58 `mbApply`, :51 `mbRowsOut`, :43 `mbFresh`; 호출처 web/js/30-monitoring.js:858, :456.

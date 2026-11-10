@@ -168,7 +168,7 @@ describe("메일 목록 with 2,000 mails", () => {
 		await waitFor(v, `MBOX.vis.includes("mail:live")`, 3000);
 		expect(await drawn(v)).toBe(200);
 		expect(await ev<number>(v, `MBOX.drawn`)).toBe(200);
-		await run(v, `document.querySelector('#mon-tl .mr-f[data-filter="archived"]').click()`);
+		await run(v, `document.querySelector('#mon-tl [data-filter="archived"]').click()`);
 		await waitFor(v, `MON.mailFilter === "archived" && MBOX.drawn === 100`);
 	});
 

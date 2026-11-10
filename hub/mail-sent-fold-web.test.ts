@@ -101,8 +101,10 @@ const waitFor = (v: View, expr: string, ms = 10_000) =>
 const q = async <T = unknown>(v: View, code: string): Promise<T> => JSON.parse((await v.evaluate(`JSON.stringify((() => { ${code} })())`)) as string) as T;
 const run = (v: View, code: string) => v.evaluate(`(() => { ${code} })(), 0`);
 const pick = async (v: View, f: string) => {
-	await run(v, `document.querySelector('#mon-tl .mr-f[data-filter="${f}"]').click()`);
-	await waitFor(v, `document.querySelector('#mon-tl .mr-f.on').dataset.filter === ${JSON.stringify(f)}`);
+	await run(v, `const at = k => document.querySelector('#mon-tl [data-filter="' + k + '"]'); if (!at(${JSON.stringify(f)})) at("in").click()`);
+	await waitFor(v, `!!document.querySelector('#mon-tl [data-filter="${f}"]')`);
+	await run(v, `document.querySelector('#mon-tl [data-filter="${f}"]').click()`);
+	await waitFor(v, `document.querySelector('#mon-tl .mr-place .on:not([data-filter="in"]), #mon-tl .mr-f.on').dataset.filter === ${JSON.stringify(f)}`);
 };
 async function open(v: View, item: string) {
 	await v.navigate(`http://127.0.0.1:${server.port}/`);

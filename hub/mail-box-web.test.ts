@@ -93,7 +93,7 @@ beforeEach(() => { mails = fresh(); posts = []; composeFails = false; fyiFails =
 const rowJs = (title: string) => `[...document.querySelectorAll("#mon-tl > .mr")].find(r => r.querySelector(".rc-title").textContent === ${JSON.stringify(title)})`;
 const chips = (v: View) => ev<string[]>(v, `[...document.querySelectorAll("#mon-tl .mr-f")].map(b => b.textContent)`);
 const titles = (v: View) => ev<string[]>(v, `[...document.querySelectorAll("#mon-tl > .mr .rc-title")].map(t => t.textContent)`);
-const folder = async (v: View, k: string) => { await run(v, `document.querySelector('#mon-tl .mr-f[data-filter="${k}"]').click()`); await waitFor(v, `document.querySelector('#mon-tl .mr-f.on').dataset.filter === ${JSON.stringify(k)}`); };
+const folder = async (v: View, k: string) => { await run(v, `const at = x => document.querySelector('#mon-tl [data-filter="' + x + '"]'); if (!at(${JSON.stringify(k)})) at("in").click()`); await waitFor(v, `!!document.querySelector('#mon-tl [data-filter="${k}"]')`); await run(v, `document.querySelector('#mon-tl [data-filter="${k}"]').click()`); await waitFor(v, `document.querySelector('#mon-tl .mr-place .on:not([data-filter="in"]), #mon-tl .mr-f.on').dataset.filter === ${JSON.stringify(k)}`); };
 const tick = (v: View, title: string) => run(v, `${rowJs(title)}.querySelector(".mr-chk").click()`);
 const bar = (v: View, label: string) => `[...document.querySelectorAll("#mbox-bar .mbox-b")].find(b => b.getAttribute("aria-label") === ${JSON.stringify(label)})`;
 const posted = (n: number) => waitForPosts(n);
@@ -119,9 +119,9 @@ const attach = (v: View, scope: string, name: string, text: string) => run(v, `c
 const shot = async (v: View, name: string) => { if (!SHOTS) return; mkdirSync(SHOTS, { recursive: true }); await Bun.write(`${SHOTS}/${name}.png`, await v.screenshot()); };
 
 describe("the list", () => {
-	test("seven folders, a checkbox and a star on every row, the unread rows bold, the summary under the subject", async () => {
+	test("five filters in 받은 메일, a checkbox and a star on every row, the unread rows bold, the summary under the subject", async () => {
 		const v = await openList(1280, 800);
-		expect(await chips(v)).toEqual(["전체", "안 읽음4", "답장 필요1", "확인 대기", "답장함1", "보관함1", "보낸 메일1"]);
+		expect(await chips(v)).toEqual(["전체", "안 읽음4", "답장 필요1", "확인 대기", "답장함1"]);
 		expect(await titles(v)).toEqual(["월간 점검 보고서 확인 요청", "회의 일정 변경", "처리가 안 되는 메일", "회사 메일", "읽음 표시를 못 하는 메일함", "견적서 보내드립니다"]);
 		const got = await ev<any>(v, `(() => { const rows = [...document.querySelectorAll("#mon-tl > .mr")]; return rows.map(r => ({ w: parseInt(getComputedStyle(r.querySelector(".rc-title")).fontWeight), label: r.getAttribute("aria-label"), chk: !!r.querySelector("input.mr-chk"), star: !!r.querySelector(".mr-star"), sum: [...r.children].find(c => c.matches(".mr-sum, ul.mr-sum"))?.textContent || "" })); })()`);
 		expect(got[0].w).toBeGreaterThanOrEqual(600);
@@ -141,6 +141,25 @@ describe("the list", () => {
 		expect(await titles(v)).toEqual(["Re: 견적서 보내드립니다"]);
 		expect(await ev<string>(v, `document.querySelector("#mon-tl > .mr .rc-src").textContent`)).toBe("나 → Lee");
 	}, 30_000);
+});
+
+describe("the head of the list", () => {
+	const head = (v: View) => ev<{ tabs: string[][]; shown: string; sel: number; chips: string[] | null; fits: boolean | null }>(v, `(() => { const t = document.querySelector("#mon-tl > .mr-place"), f = document.querySelector("#mon-tl > .mr-filter");
+		return { tabs: [...t.querySelectorAll('[role=tab]')].map(b => [b.dataset.filter, b.getAttribute("aria-selected"), b.querySelector(".mr-fn")?.textContent ?? ""]), shown: getComputedStyle(t).display, sel: t.querySelectorAll('[aria-selected=true]').length,
+			chips: f ? [...f.querySelectorAll(".mr-f")].map(b => b.dataset.filter) : null, fits: f ? f.scrollWidth <= f.clientWidth : null }; })()`);
+	for (const [width, height] of [[390, 844], [1280, 800]] as const) {
+		test(`at ${width}px three place tabs sit over five filters that fit, the filters only in 받은 메일, and 받은 메일 brings back the last filter`, async () => {
+			const v = await openList(width, height);
+			expect(await head(v)).toEqual({ tabs: [["in", "true", ""], ["sent", "false", "1"], ["archived", "false", "1"]], shown: "flex", sel: 1, chips: ["all", "unread", "owed", "pending", "replied"], fits: true });
+			await folder(v, "owed");
+			await folder(v, "sent");
+			expect(await head(v)).toEqual({ tabs: [["in", "false", ""], ["sent", "true", "1"], ["archived", "false", "1"]], shown: "flex", sel: 1, chips: null, fits: null });
+			expect(await titles(v)).toEqual(["Re: 견적서 보내드립니다"]);
+			await run(v, `document.querySelector('#mon-tl [data-filter="in"]').click()`);
+			await waitFor(v, `document.querySelector('#mon-tl .mr-f.on')?.dataset.filter === "owed"`);
+			expect((await head(v)).sel).toBe(1);
+		}, 30_000);
+	}
 });
 
 describe("the list in pages", () => {

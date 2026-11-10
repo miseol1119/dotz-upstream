@@ -75,8 +75,10 @@ const seen = (v: View) => q<{ chips: string[]; cards: string[] }>(v, `return {
 	chips: [...document.querySelectorAll("#mon-tl .mr-f")].map(b => b.textContent),
 	cards: [...document.querySelectorAll("#mon-tl .bm.dr")].map(c => c.querySelector(".dr-sub")?.textContent ?? "") }`);
 const pick = async (v: View, f: string) => {
-	await run(v, `document.querySelector('#mon-tl .mr-f[data-filter="${f}"]').click()`);
-	await waitFor(v, `document.querySelector('#mon-tl .mr-f.on').dataset.filter === ${JSON.stringify(f)}`);
+	await run(v, `const at = k => document.querySelector('#mon-tl [data-filter="' + k + '"]'); if (!at(${JSON.stringify(f)})) at("in").click()`);
+	await waitFor(v, `!!document.querySelector('#mon-tl [data-filter="${f}"]')`);
+	await run(v, `document.querySelector('#mon-tl [data-filter="${f}"]').click()`);
+	await waitFor(v, `document.querySelector('#mon-tl .mr-place .on:not([data-filter="in"]), #mon-tl .mr-f.on').dataset.filter === ${JSON.stringify(f)}`);
 };
 async function boot(width: number, height: number, key: string): Promise<View> {
 	const v = new Bun.WebView({ width, height });
@@ -105,14 +107,14 @@ describe.each([[390, 844], [1280, 900]] as const)("mail drafts at %ipx", (width,
 		await pick(v, "pending");
 		await waitFor(v, `document.querySelectorAll("#mon-tl .bm.dr").length > 0`);
 		const before = await seen(v);
-		expect(before.chips).toEqual(["전체", "안 읽음", "답장 필요3", "확인 대기2", "답장함", "보관함", "보낸 메일"]);
+		expect(before.chips).toEqual(["전체", "안 읽음", "답장 필요3", "확인 대기2", "답장함"]);
 		expect(before.cards.sort()).toEqual(["Re: 고친 초안", "Re: 일정 조율"]);
 		await Bun.write(join(SHOTS, `pending-before-${width}.png`), await v.screenshot());
 
 		await run(v, `[...document.querySelectorAll("#mon-tl .bm.dr")].find(c => c.querySelector(".dr-sub").textContent === "Re: 일정 조율").querySelector(".dr-drop").click()`);
 		await waitFor(v, `!document.querySelector('#mon-tl [data-nid="drop-b"]')`);
 		expect((await seen(v)).cards).toEqual(["Re: 고친 초안"]);
-		expect((await seen(v)).chips).toEqual(["전체", "안 읽음", "답장 필요3", "확인 대기1", "답장함", "보관함", "보낸 메일"]);
+		expect((await seen(v)).chips).toEqual(["전체", "안 읽음", "답장 필요3", "확인 대기1", "답장함"]);
 		expect(await q<boolean>(v, `return document.documentElement.scrollWidth <= innerWidth`)).toBe(true);
 		await pick(v, "all");
 		expect((await seen(v)).cards).toEqual([]);

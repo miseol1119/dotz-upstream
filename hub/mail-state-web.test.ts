@@ -71,8 +71,10 @@ async function boot(width: number, height: number, theme: "light" | "dark" = "li
 const states = (v: View) => q<Record<string, string>>(v, `const o = {}; for (const r of document.querySelectorAll("#mon-tl .mr")) o[r.querySelector(".rc-title").textContent] = [...r.querySelectorAll(".rc-hd .tag")].map(t => t.textContent).join("|"); return o;`);
 const titles = (v: View) => q<string[]>(v, `return [...document.querySelectorAll("#mon-tl .mr .rc-title")].map(t => t.textContent)`);
 const pick = async (v: View, f: string) => {
-	await run(v, `document.querySelector('#mon-tl .mr-f[data-filter="${f}"]').click()`);
-	await waitFor(v, `document.querySelector('#mon-tl .mr-f.on').dataset.filter === ${JSON.stringify(f)}`);
+	await run(v, `const at = k => document.querySelector('#mon-tl [data-filter="' + k + '"]'); if (!at(${JSON.stringify(f)})) at("in").click()`);
+	await waitFor(v, `!!document.querySelector('#mon-tl [data-filter="${f}"]')`);
+	await run(v, `document.querySelector('#mon-tl [data-filter="${f}"]').click()`);
+	await waitFor(v, `document.querySelector('#mon-tl .mr-place .on:not([data-filter="in"]), #mon-tl .mr-f.on').dataset.filter === ${JSON.stringify(f)}`);
 };
 
 for (const [width, height] of [[390, 900], [1280, 900]] as const) {
@@ -103,7 +105,7 @@ for (const [width, height] of [[390, 900], [1280, 900]] as const) {
 
 		test("the filter shows 답장 필요, 답장함 or 보낸 메일 only, with counts, and 전체 brings back the received mail (the sent one stays under 보낸 메일)", async () => {
 			const v = await boot(width, height);
-			expect(await q<string[]>(v, `return [...document.querySelectorAll("#mon-tl .mr-f")].map(b => b.textContent)`)).toEqual(["전체", "안 읽음2", "답장 필요2", "확인 대기", "답장함1", "보관함", "보낸 메일1"]);
+			expect(await q<string[]>(v, `return [...document.querySelectorAll("#mon-tl .mr-f")].map(b => b.textContent)`)).toEqual(["전체", "안 읽음2", "답장 필요2", "확인 대기", "답장함1"]);
 			await pick(v, "unread");
 			expect((await titles(v)).length).toBe(2);
 			await pick(v, "owed");

@@ -153,11 +153,11 @@ for (const [width, height] of [[390, 844], [1280, 900]] as const) {
 			expect(await inlineOf(v, "mail:loc-2")).toEqual(["초안 작성"]);
 			expect(reqs.map(r => [r.method, r.path])).toEqual([["DELETE", "/api/mail/loc-2/fyi"]]);
 			// the sent mail, under 보낸 메일: only 삭제, no row buttons
-			await run(v, `document.querySelector('#mon-tl .mr-f[data-filter="sent"]').click()`);
+			await run(v, `document.querySelector('#mon-tl [data-filter="sent"]').click()`);
 			await waitFor(v, `${row("mail:loc-3")} && !${row("mail:loc-2")}`);
 			expect(await menuOf(v, "mail:loc-3")).toEqual(["삭제", "원문 보기"]);
 			expect(await inlineOf(v, "mail:loc-3")).toEqual([]);
-			await run(v, `document.querySelector('#mon-tl .mr-f[data-filter="all"]').click()`);
+			await run(v, `document.querySelector('#mon-tl [data-filter="in"]').click()`);
 		});
 
 		test("답장 안 함 updates the row, the 답장 필요 filter and the 미답장 badge at once, survives a reload, and can be undone", async () => {
