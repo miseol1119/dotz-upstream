@@ -358,13 +358,67 @@ export type DispatchOptions = {
 	print?: (line: string) => void;
 };
 
+// What the watch knows of the run it started: "running" until GitHub reports it finished, then "failed" (with the line to show) for the rest of the
+// slot, so the watch keeps failing and its own failure alert reaches the owner. A run that finished green is forgotten.
+type RunState = { slot: string; startedAt: string; state: "running" | "failed"; message?: string };
+const RUN_GIVE_UP_MS = 6 * 3600_000;
+const RUN_CLOCK_SKEW_MS = 120_000;
+type RunInfo = { status: string; conclusion: string | null; createdAt: string; url: string };
+
+// A later tick reads the conclusion of the run an earlier tick started (gh run list, the first workflow_dispatch run since then). Returns the failure line, if any.
+async function settleRun(opts: DispatchOptions, exec: Exec, now: Date, slot: string): Promise<string | null> {
+	const file = join(opts.stateDir, "release-run.json");
+	if (!existsSync(file)) return null;
+	let run_: RunState;
+	try {
+		run_ = JSON.parse(readFileSync(file, "utf8")) as RunState;
+	} catch {
+		rmSync(file, { force: true }); // unreadable: nothing to report, the next dispatch writes a fresh one
+		return null;
+	}
+	if (run_.state === "failed") {
+		if (run_.slot === slot) return run_.message ?? "릴리스 실행이 실패했어요.";
+		rmSync(file, { force: true }); // a new slot: the owner has had the alert, the watch recovers and dispatches again
+		return null;
+	}
+	const listed = await exec(["gh", "run", "list", "--workflow", "release.yml", "--repo", RELEASE_REPO, "--event", "workflow_dispatch", "--limit", "10", "--json", "status,conclusion,createdAt,url"]).catch(() => ({ code: 1, out: "" }));
+	let runs: RunInfo[] = [];
+	if (listed.code === 0) {
+		try {
+			runs = JSON.parse(listed.out) as RunInfo[];
+		} catch {
+			// Not JSON: treated as no run seen yet, the next tick asks again.
+		}
+	}
+	const since = Date.parse(run_.startedAt) - RUN_CLOCK_SKEW_MS;
+	const ours = runs.filter(r => Date.parse(r.createdAt) >= since).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))[0];
+	if (!ours || ours.status !== "completed") {
+		if (now.getTime() - Date.parse(run_.startedAt) > RUN_GIVE_UP_MS) rmSync(file, { force: true });
+		return null;
+	}
+	if (ours.conclusion === "success") {
+		rmSync(file, { force: true });
+		return null;
+	}
+	const message = `릴리스 실행이 실패했어요 (${ours.conclusion ?? "결과 없음"}): ${ours.url} · 이 시간대의 수정은 아직 나가지 않았어요. 다음 시간대에 다시 시도해요.`;
+	writeAtomic(file, `${JSON.stringify({ ...run_, state: "failed", message } satisfies RunState)}\n`);
+	return message;
+}
+
 // One tick of the owner's release-slot watch (docs/releases.md): once per slot, start release.yml, whose --auto run decides whether
 // anything goes out. Runs only for the repo owner's GitHub login, so a copy of the watch on another install dispatches nothing.
+// A later tick reads how that run ended; a failed run fails the tick (exit 1) until the next slot, which is how the owner hears of it.
 export async function dispatchSlot(opts: DispatchOptions): Promise<number> {
 	const print = opts.print ?? ((line: string) => console.log(line));
 	const exec = opts.exec ?? run;
-	const slot = slotStart(opts.now ?? new Date()).toISOString();
+	const now = opts.now ?? new Date();
+	const slot = slotStart(now).toISOString();
 	const stateFile = join(opts.stateDir, "release-slot");
+	const failure = await settleRun(opts, exec, now, slot);
+	if (failure) {
+		print(failure);
+		return 1;
+	}
 	if (existsSync(stateFile) && readFileSync(stateFile, "utf8").trim() === slot) return 0;
 
 	const login = await exec(["gh", "api", "user", "--jq", ".login"]);
@@ -386,6 +440,7 @@ export async function dispatchSlot(opts: DispatchOptions): Promise<number> {
 		return 1;
 	}
 	writeAtomic(stateFile, `${slot}\n`);
+	writeAtomic(join(opts.stateDir, "release-run.json"), `${JSON.stringify({ slot, startedAt: now.toISOString(), state: "running" } satisfies RunState)}\n`);
 	print(`release.yml을 시작했어요 (${slot}).`);
 	return 0;
 }

@@ -24,6 +24,7 @@ not gateway code: no restart, no model, and it exists only in the owner's `~/.do
 login except `ddotz`, so a copied watch does nothing. Add it from the install folder, which follows the tags:
 `dotz_watch` name `release-slot`, every 1 minute, on `fail`, command
 `PATH=/opt/homebrew/bin:$PATH bun ~/.local/share/dotz/hub/release.ts --dispatch`.
+The next ticks read how that run ended (`gh run list`); a run that finished red makes the watch fail until the next slot, so its failure alert tells the owner the window's fixes did not go out.
 One slot publishes once: `--auto` stops when the newest scheduled tag's commit is at or after the slot start (00:00, 12:00 or
 18:00 KST), so a cron run that lands hours late does nothing, and the workflow's `release` concurrency group runs both triggers one
 at a time. A hand-cut scheduled release takes its slot the same way; a forced `.M` does not.

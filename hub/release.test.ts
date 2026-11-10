@@ -363,6 +363,7 @@ describe("release slots", () => {
 			const calls: string[] = [];
 			const exec = async (cmd: readonly string[]) => {
 				if (cmd[1] === "api") return { code: 0, out: login };
+				if (cmd[1] === "run") return { code: 0, out: "[]" }; // gh run list: the started run has not shown up yet
 				calls.push(cmd.join(" "));
 				return { code: runCode, out: "" };
 			};
@@ -406,6 +407,61 @@ describe("release slots", () => {
 			const { calls, exec } = gh("ddotz");
 			expect(await dispatchSlot({ stateDir: dir, exec, print, now })).toBe(0);
 			expect(calls).toHaveLength(1);
+		});
+
+		describe("the run it started", () => {
+			// gh stubbed: no real gh or GitHub. `runs` is what `gh run list` answers; `lists` counts those questions.
+			const stub = (runs: () => unknown[]) => {
+				const calls: string[] = [];
+				let lists = 0;
+				const exec = async (cmd: readonly string[]) => {
+					if (cmd[1] === "api") return { code: 0, out: "ddotz" };
+					if (cmd[1] === "run") {
+						lists++;
+						return { code: 0, out: JSON.stringify(runs()) };
+					}
+					calls.push(cmd.join(" "));
+					return { code: 0, out: "" };
+				};
+				return { calls, exec, lists: () => lists };
+			};
+			const run = (createdAt: string, status: string, conclusion: string | null) => ({ createdAt: new Date(kst(createdAt)).toISOString(), status, conclusion, url: "https://example.test/runs/1" });
+
+			test("a finished red run fails the watch until the next slot, which dispatches again", async () => {
+				const dir = stateDir();
+				let runs: unknown[] = [];
+				const { calls, exec } = stub(() => runs);
+				const lines: string[] = [];
+				const say = (l: string) => lines.push(l);
+				expect(await dispatchSlot({ stateDir: dir, exec, print: say, now: kst("2026-11-05T12:00:10") })).toBe(0);
+				runs = [run("2026-11-05T12:00:20", "in_progress", null)];
+				expect(await dispatchSlot({ stateDir: dir, exec, print: say, now: kst("2026-11-05T12:01:10") })).toBe(0);
+				runs = [run("2026-11-05T12:00:20", "completed", "failure")];
+				expect(await dispatchSlot({ stateDir: dir, exec, print: say, now: kst("2026-11-05T12:02:10") })).toBe(1);
+				expect(lines.at(-1)).toContain("https://example.test/runs/1");
+				expect(await dispatchSlot({ stateDir: dir, exec, print: say, now: kst("2026-11-05T13:00:10") })).toBe(1);
+				expect(calls).toHaveLength(1);
+				runs = [run("2026-11-05T18:00:20", "completed", "success"), run("2026-11-05T12:00:20", "completed", "failure")];
+				expect(await dispatchSlot({ stateDir: dir, exec, print: say, now: kst("2026-11-05T18:00:10") })).toBe(0);
+				expect(calls).toHaveLength(2);
+			});
+
+			test("a green run is forgotten and asked about no more", async () => {
+				const dir = stateDir();
+				const { exec, lists } = stub(() => [run("2026-11-05T12:00:20", "completed", "success")]);
+				expect(await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:00:10") })).toBe(0);
+				expect(await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(0);
+				expect(lists()).toBe(1);
+				expect(await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:02:10") })).toBe(0);
+				expect(lists()).toBe(1);
+			});
+
+			test("a run from before the dispatch is not taken for it", async () => {
+				const dir = stateDir();
+				const { exec } = stub(() => [run("2026-11-05T09:00:00", "completed", "failure")]);
+				expect(await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:00:10") })).toBe(0);
+				expect(await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(0);
+			});
 		});
 
 		test("a dry run starts nothing and keeps the slot open", async () => {
