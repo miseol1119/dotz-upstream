@@ -642,6 +642,8 @@ Do this, briefly:
 			done: { here: "This computer", open: "Open", phone: "Phone or another computer", phoneSup: "{url} · sign in with the same Tailscale account", connected: "Connected", discordSup: "Talk to {name} in the chat channel of its category", openApp: "Open the web app", opening: "Opening the web app" },
 		},
 	},
+	// Refusals of the routes the web calls (status codes and the `error` field stay; only the words follow the install language).
+	refuse: { mailNotReady: "mail is not ready in this process yet", mailOff: "mail is turned off on this install", queueGone: "it was already delivered, so it can no longer be cancelled or sent now", subagentGone: "that subagent was not found; finished ones are kept for 10 minutes" },
 	sendFail: { login: "the mail login expired; sign in again", offline: "could not reach the mail service", other: "the mail tool reported an error (details are in the log)" },
 	cmdError: {
 		unknownTarget: (x: string) => `"${x}" is not a lane or target. Write the target first: /model <target> <model>, /effort <target> <level>; /lanes lists the lanes`,

@@ -621,6 +621,8 @@ export const ko: Catalog = {
 			done: { here: "이 컴퓨터", open: "열림", phone: "휴대폰이나 다른 컴퓨터", phoneSup: "{url} · 같은 Tailscale 계정으로 로그인해서 열어요", connected: "연결됨", discordSup: "{name} 카테고리의 대화 채널에 말을 걸면 돼요", openApp: "웹 앱 열기", opening: "웹 앱을 여는 중이에요" },
 		},
 	},
+	// Refusals of the routes the web calls (status codes and the `error` field stay; only the words follow the install language).
+	refuse: { mailNotReady: "메일 기능이 아직 준비되지 않았어요", mailOff: "이 설치에서는 메일이 꺼져 있어요", queueGone: "이미 전달돼서 취소하거나 지금 보낼 수 없어요", subagentGone: "그 서브에이전트를 찾을 수 없어요. 끝난 것은 10분 동안만 남아요" },
 	sendFail: { login: "메일 로그인이 풀렸어요. 다시 로그인해 주세요", offline: "메일 서버에 연결하지 못했어요", other: "메일 도구에서 오류가 났어요. 자세한 내용은 로그에 있어요" },
 	cmdError: {
 		unknownTarget: (x: string) => `"${x}"은(는) 세션이나 대상 이름이 아니에요. 대상을 먼저 적어 주세요: /model <대상> <모델>, /effort <대상> <수준>. 세션 이름은 /lanes에서 볼 수 있어요`,

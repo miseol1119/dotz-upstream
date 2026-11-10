@@ -10,6 +10,7 @@ import { createLocalLogin } from "./local-login.ts";
 import { createWebAccess, localBrowser, WebAccessError, webAccessRoute } from "./web-access.ts";
 import type { Server } from "bun";
 import { ADDRESS, cfg, DATA_DIR, HUB_TOKEN, log, NAME, now, PORT, setMachineName } from "./config.ts";
+import { msg } from "./i18n.ts";
 import { limitWaits } from "./limitwait.ts";
 import { buildWaitlist } from "./waitlist.ts";
 import { keyedSelector, keyFileOk, spendOnKey } from "./fallback.ts";
@@ -118,7 +119,6 @@ const APP_FILES: Record<string, [string, string]> = {
 	"/vendor/xterm.css": ["vendor/xterm.css", "text/css; charset=utf-8"],
 };
 export const ALLOW = new Set((cfg.web?.allow_logins ?? []).map(s => s.toLowerCase()));
-
 
 // Runtime web access (hub/web-access.ts, 설정 → 웹 접속): web.access = "cloudflare" is switched on and off live, so the gates below are read through it per request.
 // In that mode a valid Cloudflare Access token (hub/cf-access.ts) is checked once at the route entry (it needs the key fetch), then passed in as cfOk,
@@ -757,7 +757,7 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 			return input ? json({ ok: true, result: triggerFollowup(input) }) : json({ error: "app, kind (comment|mail|kakao), key required" }, 400);
 		}
 		if (req.method === "POST" && url.pathname === "/api/mail/compose") {
-			if (!mailDeps) return json({ error: "mail is not wired in this process" }, 503);
+			if (!mailDeps) return json({ error: msg().refuse.mailNotReady }, 503);
 			try {
 				const b = await body(req) as Record<string, unknown>;
 				// The owner wrote this himself in the mail app (메일 쓰기 / the reply box): a draft with his text and files, then its send-approval card.
@@ -774,7 +774,7 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 		}
 		// Mails that still wait are checked against their real thread; the ones the owner answered elsewhere become 답장함 (idempotent, read-only in the mailbox). `skipped` counts mails of a source no plugin can read.
 		if (req.method === "POST" && url.pathname === "/api/mail/reconcile") {
-			if (!mailReconcile) return json({ error: "mail is not wired in this process" }, 503);
+			if (!mailReconcile) return json({ error: msg().refuse.mailNotReady }, 503);
 			const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 200));
 			return json(await mailReconcile(limit).catch(error => ({ error: (error as Error).message })));
 		}
@@ -783,8 +783,8 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 			return input ? json({ ok: true, changed: await applyMailStates(input.source, input.items) }) : json({ error: "source and items [{id, read?, replied?}] required" }, 400);
 		}
 		if (req.method === "POST" && url.pathname === "/api/mail") {
-			if (!mailDeps) return json({ error: "mail is not wired in this process" }, 503);
-			if (readAppOff(DATA_DIR).has("mail")) return json({ error: "mail is off on this install" }, 409);
+			if (!mailDeps) return json({ error: msg().refuse.mailNotReady }, 503);
+			if (readAppOff(DATA_DIR).has("mail")) return json({ error: msg().refuse.mailOff }, 409);
 			try {
 				return json(await postMail(await body(req), mailDeps()));
 			} catch (error) {
@@ -913,11 +913,11 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 			const id = decodeURIComponent(parts[2]);
 			if (req.method === "DELETE" && parts.length === 3) {
 				const item = take(id);
-				return item ? json({ text: item.text }) : json({ error: "not queued (already sent)" }, 404);
+				return item ? json({ text: item.text }) : json({ error: msg().refuse.queueGone }, 404);
 			}
 			if (req.method === "POST" && parts[3] === "send" && parts.length === 4) {
 				const item = take(id);
-				if (!item) return json({ error: "not queued (already sent)" }, 404);
+				if (!item) return json({ error: msg().refuse.queueGone }, 404);
 				try {
 					await sendWeb({ lane: item.target.startsWith("lane:") ? item.target.slice(5) : undefined, channel: "web", text: item.text, mode: "steer", sendNow: true, login: item.author ?? "local" });
 				} catch (error) {

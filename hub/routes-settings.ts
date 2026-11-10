@@ -3,6 +3,7 @@ import { ContextLimitError, DATA_DIR, log } from "./config.ts";
 import { compactTarget, ControlError, contextView, setContextModel, ForceRequired, modelsView, providersView, runCommand, setFallback, setModel } from "./control.ts";
 import { subagentDetail, subagentLists, transcriptPage } from "./activity.ts";
 import { activityItems } from "./events.ts";
+import { msg } from "./i18n.ts";
 import { lanes } from "./lanes.ts";
 import { checkNow as checkAccountNow } from "./account-rules.ts";
 import { accountsRoute } from "./accounts-api.ts";
@@ -144,7 +145,7 @@ export async function routeSettings(req: Request, url: URL, parts: string[]): Pr
 		// An OmO process's workers are read from its task store, which its session file locates.
 		const sessionFile = source === "orchestrator" ? orch.sessionFile : source.startsWith("lane:") ? lanes.get(source.slice(5))?.sessionFile : undefined;
 		const detail = await subagentDetail(source, decodeURIComponent(parts[2]), sessionFile);
-		return detail ? json(detail) : json({ error: "no such subagent (finished ones are kept 10 minutes)" }, 404);
+		return detail ? json(detail) : json({ error: msg().refuse.subagentGone }, 404);
 	}
 	if (req.method === "GET" && url.pathname === "/api/activity") {
 		const source = url.searchParams.get("source") ?? "orchestrator";
