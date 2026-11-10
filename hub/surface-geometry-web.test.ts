@@ -117,3 +117,26 @@ test("390px dark: a toast is a dark surface with readable text, not a bright pat
 	expect(g.lum).toBeLessThan(0.6);
 	expect(g.cr).toBeGreaterThanOrEqual(4.5);
 });
+
+const headGeo = (v: View) => q<{ title: number; head: number; closeRight: number; closeBottom: number }>(v, `
+	const hd = document.querySelector(".fs-card .fs-hd").getBoundingClientRect(), x = document.querySelector(".fs-card .fs-x").getBoundingClientRect(), t = document.querySelector(".fs-card .fs-tt").getBoundingClientRect();
+	return { title: Math.round(t.width), head: Math.round(hd.height), closeRight: Math.round(x.right), closeBottom: Math.round(x.bottom) };`);
+const headOk = (g: { title: number; head: number; closeRight: number; closeBottom: number }) => { expect(g.title).toBeGreaterThanOrEqual(96); expect(g.head).toBeLessThan(160); expect(g.closeRight).toBeLessThanOrEqual(390); expect(g.closeBottom).toBeLessThan(844); };
+test("390px: a sheet whose header buttons carry very long labels keeps its title readable and its close button on screen (notice sheet)", async () => {
+	const v = await page(390, "light", `go("notices")`, `NT.loaded && NT.items && NT.items.length > 0`);
+	await v.evaluate(`void ntSheetShow(NT.items[0].id)`);
+	await waitFor(v, `!!document.querySelector(".fs-card .fs-ign span")`);
+	await v.evaluate(`void document.querySelectorAll(".fs-card .fs-hb > :not(.fs-x) span").forEach(s => { s.textContent = ${JSON.stringify(TOKEN)}; })`);
+	await painted(v);
+	await shot(v, "4-sheet-notice-long");
+	headOk(await headGeo(v));
+});
+test("390px: the same holds for the triage sheet's list toggle", async () => {
+	const v = await page(390, "light", `go("monitoring")`, `NM.loaded && TR.loaded`);
+	await v.evaluate(`void (TR.groups = [{ key: "g1", label: "뉴스레터", count: 3, cards: [1, 2, 3].map(i => ({ to: "mail:m" + i, ref: "r" + i, question: "답장할까요?", draft: { body: "네, 알겠습니다" } })) }], trOpen("g1"))`);
+	await waitFor(v, `!!document.querySelector(".fs-card .tr-tog span")`);
+	await v.evaluate(`void document.querySelectorAll(".fs-card .fs-hb > :not(.fs-x) span").forEach(s => { s.textContent = ${JSON.stringify(TOKEN)}; })`);
+	await painted(v);
+	await shot(v, "4-sheet-triage-long");
+	headOk(await headGeo(v));
+});
