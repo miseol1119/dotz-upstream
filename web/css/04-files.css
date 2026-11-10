@@ -221,6 +221,15 @@ details.work.live .wdot { display: block; }
   .runstate.warn .rs-tx, .runstate.err .rs-tx { white-space: normal; }
   .runstate .rs-go { height: 30px; padding: 0 var(--sp-3); }
 }
+/* The subagent count sits at the right end of the status line; with no status text it is the whole line (14-slash-commands.js paintSubsBtn). */
+.runstate .rs-subs { margin-left: auto; }
+.runline.only-subs > :is(.dot, .rs-tx) { display: none; }
+.runline.only-subs .rs-subs { margin-left: 0; }
+/* A message waiting for the turn to end: the owner's bubble, dimmed, with its two ways out in a small line under it (14-slash-commands.js qdBubble). */
+.um.qd > .ub { opacity: .6; }
+.qd-ln { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0 var(--sp-1); color: var(--fg-2); font-size: 12px; line-height: 16px; }
+.qd-ln .btn { flex: none; }
+.qd-ln > span:first-child { margin-right: var(--sp-2); }   /* the text buttons carry this much side padding: both dots sit evenly between their neighbours */
 /* The top of the timeline: older messages load as it comes into view; the button is the fallback. */
 .tl-top { display: flex; justify-content: center; margin: 0 0 calc(var(--sp-15) * -1); }
 .tl-top[hidden] { display: none; }
@@ -236,16 +245,6 @@ details.work.live .wdot { display: block; }
 :is(#send-btn, .pane-chat [data-c="send-btn"]).stop > svg { display: none; }
 :is(#send-btn, .pane-chat [data-c="send-btn"]).stop::before { content: ""; width: 12px; height: 12px; border: 2px solid currentColor; border-radius: 3px; }
 @media (pointer: coarse) { .working .btn { height: 36px; padding: 0 var(--sp-3); } }
-.qlist { display: flex; flex-direction: column; gap: var(--sp-15); margin-bottom: var(--sp-2); }
-.qitem { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-15) var(--sp-15) var(--sp-15) var(--sp-3); border: 0; border-radius: 12px; background: var(--layer); min-width: 0; }
-.qitem .qb { flex: 1; min-width: 0; }
-.qitem .qt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; font-size: 13px; line-height: 18px; font-weight: 400; }
-.qitem .qm { margin-top: var(--sp-05); color: var(--fg-3); font-size: 11px; line-height: 16px; }
-.qitem .btn { flex: none; }
-@media (max-width: 639px) { .qitem { flex-wrap: wrap; } .qitem .qb { flex-basis: 100%; } .qitem .qa { margin-left: auto; } }
-.qitem .qa { display: flex; gap: var(--sp-2); flex: none; }
-.composer.tmode .qitem { background: var(--tb); border-color: var(--tl2); color: var(--tf); }
-.composer.tmode .qitem .qm { color: var(--td); }
 /* phone working actions: no row of their own - stop is the send button (with text typed it sends into the running turn)
    and the end is the floating jump button; no extra chip in the composer bar (owner 2026-10-21: a ⋯ there breaks the bar) */
 @media (max-width: 639px) {
@@ -299,7 +298,6 @@ details.work.live .wdot { display: block; }
 .prompt { display: none; }
 @media (pointer: coarse) { .sendrow textarea { font-size: 16px; line-height: 1.5; min-height: calc(1.5em + 2 * var(--ta-pad)); min-height: calc(1lh + 2 * var(--ta-pad)); } }
 .composer.tmode .sendrow { background: var(--card); }
-.composer.tmode .qitem { background: var(--card); border-color: transparent; }
 
 /* terminal: the same data as a terminal session */
 .termbox { position: relative; flex: 1; min-height: 0; margin-bottom: var(--sp-3); }

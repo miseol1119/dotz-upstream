@@ -215,7 +215,7 @@ function hcTaskBody(line, w) {
 // A row's place in the chat: a work card joins the run of cards that ends the chat, or starts one. A chat message ends a run; a folded tool group does not (the orchestrator's calls land between the rows it deferred).
 function tlHome(n) {
   if (!n.classList.contains("cv-task")) return tl;
-  let last = tl.lastElementChild;
+  let last = tlTail();
   while (last && last.matches("details.work")) last = last.previousElementSibling;
   return last && last.classList.contains("cv-tasks") ? last : tl.appendChild(el("div", { class: "cv-tasks" }));
 }
@@ -447,7 +447,7 @@ function chatPush(en, bulk) {
   const fixed = TL_TOP_NODE && TL_TOP_NODE.parentNode === tl ? 1 : 0;
   while (tl.children.length > ts(target).cap + fixed) (fixed ? tl.children[1] : tl.firstElementChild)?.remove();
   markLive();
-  if (!bulk) scrollChat(false, fresh);
+  if (!bulk) { paintQueue(tl, target); scrollChat(false, fresh); }
 }
 // A work group that stops running: its summary line changes from 작업 중 to the finished count in place, once.
 function workDone(g) {
@@ -457,7 +457,7 @@ function workDone(g) {
 function markLive() {
   const g = CS.group;
   if (!g) return;
-  const live = isWorking(target) && tl.lastElementChild === g.node;
+  const live = isWorking(target) && tlTail() === g.node;
   if (g.live === live) return;
   if (live) { g.live = true; g.node.classList.add("live"); g.update(); } else workDone(g);
 }

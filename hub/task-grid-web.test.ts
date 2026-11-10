@@ -56,9 +56,9 @@ test("1 to 5 rows lay out by the column's width, every line filling it", async (
 	await waitFor(`document.querySelectorAll("#tl .cv-tasks").length === 5 && [...document.querySelectorAll("#tl .cv-sys-st")].every(s => !s.hidden)`);
 	await expectLayout([[1], [2], [3], [3, 1], [3, 2]]);
 
-	// A title stops at two lines, and the pill stays inside its card.
-	const fit = await v.evaluate(`JSON.stringify([...document.querySelectorAll("#tl .cv-task")].map(c => { const t = c.querySelector(".ct-t"), p = c.querySelector(".ct-pill").getBoundingClientRect(), r = c.getBoundingClientRect(); return { tall: Math.round(t.getBoundingClientRect().height), inside: p.right <= r.right && p.left >= r.left }; }))`).then(s => JSON.parse(String(s))) as { tall: number; inside: boolean }[];
-	expect(fit.every(f => f.tall === 44 && f.inside)).toBe(true);
+	// A title stops at two lines and takes only the lines it has (no empty line under a short one), and the pill stays inside its card.
+	const fit = await v.evaluate(`JSON.stringify([...document.querySelectorAll("#tl .cv-task")].map(c => { const t = c.querySelector(".ct-t"), p = c.querySelector(".ct-pill").getBoundingClientRect(), r = c.getBoundingClientRect(); return { long: t.textContent.includes("아주 긴"), tall: Math.round(t.getBoundingClientRect().height), inside: p.right <= r.right && p.left >= r.left }; }))`).then(s => JSON.parse(String(s))) as { long: boolean; tall: number; inside: boolean }[];
+	expect(fit.every(f => f.tall === (f.long ? 44 : 22) && f.inside)).toBe(true);
 
 	await v.resize(412, 900);
 	await expectLayout([[1], [2], [2, 1], [2, 2], [2, 2, 1]]);

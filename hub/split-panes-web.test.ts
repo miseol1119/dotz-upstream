@@ -185,9 +185,9 @@ const MEASURE = `(() => {
 	for (const p of paneList()) {
 		const pane = document.querySelector('#split .pane[data-id="' + p.id + '"]'), q = s => pane.querySelector(s), msgs = pane.querySelectorAll(".tl-in .bm");
 		out[p.t] = { active: pane.classList.contains("on"), scroll: q(".timeline").scrollTop, text: pane.textContent,
-			rect: { title: r(q(".cv-head .cv-hd-t")), head: r(q(".cv-head")), timeline: r(q(".timeline")), message: r(msgs[msgs.length - 1]), todo: r(q(".todo")), subs: r(q(".subs")), queue: r(q(".qlist")),
+			rect: { title: r(q(".cv-head .cv-hd-t")), head: r(q(".cv-head")), timeline: r(q(".timeline")), message: r(msgs[msgs.length - 1]), todo: r(q(".todo")), subs: r(q(".runline .rs-subs")), queue: r(q(".qd")),
 				runline: r(q(".runline")), composer: r(q(".composer")), input: r(q(".sendrow")), send: r(q(".sendrow > .ib")), chips: r(q(".cbar")) },
-			chips: [...pane.querySelectorAll(".cbar .cchip")].filter(n => r(n)).map(n => n.textContent.trim()), strips: { todo: q(".todo").textContent, subs: q(".subs").textContent, queue: q(".qlist").textContent } };
+			chips: [...pane.querySelectorAll(".cbar .cchip")].filter(n => r(n)).map(n => n.textContent.trim()), strips: { todo: q(".todo").textContent, subs: q(".runline .rs-subs").textContent, queue: [...pane.querySelectorAll(".timeline .qd")].map(n => n.textContent).join("|") } };
 	}
 	return out; })()`;
 type Rect = number[] | null;
@@ -242,8 +242,8 @@ test("each pane shows its own conversation's todo strip, subagent line and queue
 		if (side === "main") await focusPane(v, "main");
 		const f = await measure(v);
 		const [l, r] = [f["main"]!.strips, f["lane:가나"]!.strips];
-		expect([l.todo.includes("왼쪽 할 일"), l.todo.includes("오른쪽"), l.queue.includes("왼쪽 대기"), l.queue.includes("오른쪽"), l.subs.includes("1개"), l.subs.includes("2개")]).toEqual([true, false, true, false, true, false]);
-		expect([r.todo.includes("오른쪽 할 일"), r.todo.includes("왼쪽"), r.queue.includes("오른쪽 대기"), r.queue.includes("왼쪽"), r.subs.includes("2개"), r.subs.includes("1개")]).toEqual([true, false, true, false, true, false]);
+		expect([l.todo.includes("왼쪽 할 일"), l.todo.includes("오른쪽"), l.queue.includes("왼쪽 대기"), l.queue.includes("오른쪽"), l.subs.includes("1"), l.subs.includes("2")]).toEqual([true, false, true, false, true, false]);
+		expect([r.todo.includes("오른쪽 할 일"), r.todo.includes("왼쪽"), r.queue.includes("오른쪽 대기"), r.queue.includes("왼쪽"), r.subs.includes("2"), r.subs.includes("1")]).toEqual([true, false, true, false, true, false]);
 		expect(f["main"]!.text.includes("오른쪽 할 일")).toBe(false);
 		expect(f["lane:가나"]!.text.includes("왼쪽 할 일")).toBe(false);
 	}

@@ -29,8 +29,8 @@ iframe으로 칸마다 앱을 띄우지 않고, 화면 코드를 칸 단위로 �
 | 슬래시·멘션 | `SL`, `MENTIONS`, `sendCid` | `14-slash-commands.js:36`, `:40`, `:41` | 활성 칸 입력창 몫 |
 | 결정 카드 | `DC`, `DRF`, `DRR`, `DC_SEEN`/`dcShownT`/`dcLast`/`dcOut`, `#dcard` | `10-decision-card.js:78`, `:207`, `:303`, `:612` | 활성 칸 몫. 비활성 칸은 머리줄 점으로 "답변 필요"만 |
 | 할 일 줄 | `TD`, `loadTodo(t)`, `paintTodo()`, `#todo` | `11-todo-strip.js:2`, `:3`, `:11` | `TD.by`는 이미 대상별. 비활성 칸도 자기 대화의 줄을 그려요(`paneStrips`, 읽기만) |
-| 서브에이전트 줄 | `SUBS`, `SUBD`, `renderSubs()`, `.subs` | `06-subagents.js:2`, `:88`, `:71` | `SUBS`는 출처별. 비활성 칸도 자기 대화의 줄을 그려요(`paintSubs`) |
-| 작업 중·대기열 | `workingLabel`, `QUEUE`, `RUN_MEMO`, `TV` | `14-slash-commands.js:307`, `:347`, `41-runstate.js:38`, `14-slash-commands.js:459` | 대기열(`paintQueue`)·작업 중 줄(`runLineOf`)·모델·추론 강도·컨텍스트 칩(`paintChips`)은 비활성 칸도 자기 대화 값으로 그려요. 값은 이미 클라이언트에 있는 `M`, `C`, `S.lanes`, `QUEUE`에서 읽어서 새 요청이 없어요 |
+| 서브에이전트 | `SUBS`, `SUBD`, `renderSubs()`, `.rs-subs` | `06-subagents.js:2`, `:88`, `:71` | `SUBS`는 출처별. 비활성 칸도 자기 대화의 개수를 상태 줄 오른쪽 끝에 그려요(`paintSubsBtn`) |
+| 작업 중·대기열 | `workingLabel`, `QUEUE`, `RUN_MEMO`, `TV` | `14-slash-commands.js:307`, `:347`, `41-runstate.js:38`, `14-slash-commands.js:459` | 대기 말풍선(`paintQueue`, 칸 타임라인 끝)·작업 중 줄(`runLineOf`)·모델·추론 강도·컨텍스트 칩(`paintChips`)은 비활성 칸도 자기 대화 값으로 그려요. 값은 이미 클라이언트에 있는 `M`, `C`, `S.lanes`, `QUEUE`에서 읽어서 새 요청이 없어요 |
 | 대화 목록·머리 | `convSide`, `convHead` | `31-conversations.js:388`, `:390` | 목록은 분할 중 폭 0으로 접혀 있다가 활성 칸의 `목록` 버튼으로 칸 왼쪽 위에 덮여요. 머리는 칸마다 |
 | 알림 토스트 | `notify()`, `NTF_BY` | `02-basic-markdown.js:243`, `:238` | 열린 칸의 대상이면 토스트 대신 그 칸 머리줄 점 |
 | 실시간 연결 | `EventSource` 하나 | `99-boot.js:39`, `onmessage` `:49` | 그대로 하나. 처리 뒤 `paneEvent(e)`가 칸들에 나눠요 |
@@ -44,13 +44,13 @@ iframe으로 칸마다 앱을 띄우지 않고, 화면 코드를 칸 단위로 �
    들어오는 칸의 대상으로 `setTarget` / `go()`를 부른 뒤 스크롤을 `chatPin`으로 복원해요. 초안·첨부·고른 요소는 `setTarget`이 이미 대상별로 저장·복원해요.
    그래서 칸 하나일 때 코드 경로가 지금과 같아요.
 3. **비활성 칸 = 거울**: 활성 칸에서 나갈 때 그 칸의 타임라인을 복제해 두고, 그 뒤 실시간으로 온 메시지만 `msgNode(e)`로 덧붙여요.
-   비활성 대화 칸은 활성 칸과 같은 틀(`.pane-chat`, `#v-chat`과 같은 규칙)이에요: 머리줄(이름·상태·점, 세션과 프로젝트는 ⋯ 자리까지), 자기 대화의 할 일 줄과 서브에이전트 줄,
+   비활성 대화 칸은 활성 칸과 같은 틀(`.pane-chat`, `#v-chat`과 같은 규칙)이에요: 머리줄(이름·상태·점, 세션과 프로젝트는 ⋯ 자리까지), 자기 대화의 할 일 줄,
    타임라인, 입력창 복사본(초안, 읽기만, 보내기는 꺼짐), 입력 상자 아래의 모델·추론 강도·컨텍스트 줄이에요. 활성이냐 아니냐로 머리, 타임라인, 입력창 틀의 위치와 크기가 달라지지 않아요(0.5px 안).
    칸 안 아무 데나 눌러 활성으로 만들 수 있고, 비활성 칸의 입력창을 누르면 그 칸이 활성이 되면서 입력 상자에 바로 커서가 가요. 활성을 옮길 때 움직임은 없어요.
 4. **이벤트 나누기**: `99-boot.js`의 `onmessage`가 지금처럼 처리한 뒤 `paneEvent(e)`를 불러요. 대상이 열린 비활성 칸이면 그 칸의 다시 그리기를
    `requestAnimationFrame` 한 번으로 모아요. 연결은 늘리지 않아요.
 5. **2차** (이 레인 밖): `CS`/`CV`/`STREAMED`/`DELIV`를 칸별 그리기 문맥으로 옮겨 `chatPush`가 문맥을 받게 하면 비활성 칸도 진짜 화면 코드로
-   그려요. 그다음 결정 카드·할 일 줄·서브에이전트 줄을 칸마다. 그 뒤 칸 종류를 늘려요:
+   그려요. 그다음 결정 카드·할 일 줄을 칸마다. 그 뒤 칸 종류를 늘려요:
    - 메일 스레드 (`30-mail-thread.js`, `#v-chat.mail-open`): 대화 옆 패널이라 칸 안에서 폭 규칙을 다시 정해야 해요.
    - 세션 활동 보기 (`12-terminal-view.js`, `#v-activity`, `LOG_VIEW`): 지금 꺼져 있어요. 켜면 칸 종류 `activity`.
 

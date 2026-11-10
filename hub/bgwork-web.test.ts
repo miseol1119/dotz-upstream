@@ -20,6 +20,10 @@ let ORCH = "idle";
 let CONVS: Record<string, unknown>[] = [];
 const LANES = [{ name: "fix", title: "기술부채 정리", status: "idle", startedAt: agoIso(60), lastText: "The WebView worker is done", model: "anthropic/claude-opus-5-5" }];
 const posts: string[] = [];
+// The chat's queue and subagents (web/js/14-slash-commands.js, 06-subagents.js) and the requests the page makes on them.
+let QUEUED: Work[] = [];
+let SUBS: Record<string, Work[]> = {};
+const hits: string[] = [];
 // A POST the page sends, awaited by path: subscribed before the click, resolved by the fixture server when it arrives.
 const waiters: [string, () => void][] = [];
 const posted = (path: string) => new Promise<void>(res => (posts.includes(path) ? res() : waiters.push([path, res])));
@@ -34,6 +38,9 @@ const server = Bun.serve({
 		const asset = appAsset(req, p);
 		if (asset) return asset;
 		if (req.method === "POST" && /^\/api\/(workers|lanes|orchestrator)\//.test(p)) { posts.push(p); for (const [w, res] of waiters) if (w === p) res(); return json({ ok: true }); }
+		if (p === "/api/queue" && req.method === "GET") return json({ items: QUEUED });
+		if (p.startsWith("/api/queue/")) { hits.push(`${req.method} ${p}`); return json({ ok: true, text: QUEUED.find(i => p.split("/")[3] === i.id)?.text }); }
+		if (p === "/api/subagents") return json({ sources: SUBS });
 		if (p === "/api/events") return sseResponse(req.headers.get("last-event-id") ?? url.searchParams.get("last"));
 		if (p === "/api/state") return json({ name: "dotz", orchestrator: { status: ORCH, lastText: "ok" }, lanes: LANES, terminals: {}, channels: { work: [] }, discord: {}, notices_unread: 0, work: WORK, convs: CONVS, work_now: Date.now(), runs: RUNS });
 		if (p === "/api/notices") return json({ unread: 0, items: [] });
@@ -208,3 +215,44 @@ test("the run line's button acts on its own conversation: a session restarts its
 	await p__api_lanes_fix_restart;
 	expect(posts).not.toContain("/api/orchestrator/restart");
 }, 20_000);
+
+// The chat's end (owner 2026-11-10): a queued message is the owner's dimmed bubble at the end of the timeline with 지금 끼워넣기 and 취소 under it, and the
+// one status line above the input holds what runs on the left and the subagent count on the right; there is no queue card.
+test("a queued message is a bubble at the end of the timeline whose two actions send the same requests, and one status line holds the work and the subagents", async () => {
+	WORK = [{ ...RUNNING, target: "web" }];
+	RUNS = {};
+	QUEUED = [{ id: "q1", target: "main", text: "첫째 대기" }, { id: "q2", target: "main", text: "둘째 대기" }];
+	SUBS = { orchestrator: [{ id: "a1", status: "running", started_at: 1, description: "조사" }, { id: "a2", status: "running", started_at: 1, description: "정리" }] };
+	hits.length = 0;
+	const v = await boot("#chat");
+	await v.evaluate(`(setTarget(MAIN), go("chat"), 0)`);
+	const qd = `document.querySelectorAll("#tl > .qd").length`;
+	await waitFor(v, `${qd} === 2 && !$("#runline").hidden && !$("#runline-subs").hidden`);
+	const st = await q<{ card: boolean; texts: string[]; tail: boolean; lines: number; left: string; right: string }>(v, `
+		const lines = [...document.querySelectorAll("#composer .runstate")].filter(n => n.getBoundingClientRect().height > 0);
+		return { card: !!document.querySelector("#queue"), texts: [...document.querySelectorAll("#tl > .qd > .ub")].map(n => n.textContent), tail: tl.lastElementChild.classList.contains("qd"),
+			lines: lines.length, left: $("#runline-tx").textContent, right: $("#runline-subs").textContent };`);
+	expect(st.card).toBe(false);
+	expect(st.texts).toEqual(["첫째 대기", "둘째 대기"]);
+	expect(st.tail).toBe(true);
+	expect(st.lines).toBe(1);
+	expect(st.left.startsWith("흐름도 그리기")).toBe(true);
+	expect(st.left).not.toContain("백그라운드 작업 중");
+	expect(st.left).not.toContain("Opus");
+	expect(st.right).toBe("서브에이전트 2 ›");
+	// the count opens the subagent sheet
+	await v.evaluate(`($("#runline-subs").click(), 0)`);
+	await waitFor(v, `SUBD && SUBD.sources.join() === "orchestrator" && !sheet.hidden`);
+	await v.evaluate(`(closeSheet(), 0)`);
+
+	const press = (i: number, label: string) => v.evaluate(`([...document.querySelectorAll("#tl > .qd")][${i}].querySelectorAll("button") .forEach(b => b.textContent === ${JSON.stringify(label)} && b.click()), 0)`);
+	await press(0, "지금 끼워넣기");
+	await waitFor(v, `${qd} === 1`);
+	expect(hits).toEqual(["POST /api/queue/q1/send"]);
+	await press(0, "취소");
+	await waitFor(v, `${qd} === 0`);
+	expect(hits).toEqual(["POST /api/queue/q1/send", "DELETE /api/queue/q2"]);
+	expect(await v.evaluate(`ta.value`)).toBe("둘째 대기");
+	QUEUED = [];
+	SUBS = {};
+}, 30_000);

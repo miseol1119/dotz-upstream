@@ -17,12 +17,6 @@
 /* ---------- 채팅 대화 카드 안의 차례 (proto .cv: 머리 -> todo -> 타임라인 -> 진행 줄 -> 확인 카드 -> 컴포저) ---------- */
 /* todo 스트립: 대화 카드 안, 타임라인 바로 위, 카드와 같은 회색 면 (proto .todo) */
 :is(#v-chat, .pane-chat) > .todo { background: var(--layer); }
-/* 서브에이전트 줄: 타임라인 아래 한 줄 (proto .run), 카드가 아니라 조용한 글줄 */
-:is(#v-chat, .pane-chat) > .subs { flex: none; border-radius: 0; background: transparent; overflow: visible; }
-:is(#v-chat, .pane-chat) > .subs .subsum { min-height: 28px; padding: var(--sp-1) var(--sp-3); border-radius: var(--r-ctl); color: var(--fg-2); font: 500 12px/16px var(--font); }
-:is(#v-chat, .pane-chat) > .subs .subsum .dot { width: 6px; height: 6px; }
-:is(#v-chat, .pane-chat) > .subs .subsum .chev { width: 14px; height: 14px; }
-:is(#v-chat, .pane-chat) > .subs .sublist { padding: var(--sp-1); border-radius: var(--r-ctl); background: var(--layer); }
 /* 타임라인 위아래 경계는 .kk-tl(17-kakao.css)과 같은 12px 마스크로 글자를 흐려요. 더 스크롤할 쪽에만 걸려요(edgeFade의 fade-t, fade-b).
    맨 아래에서는 마지막 줄이 그대로 보이고, 맨 아래로 버튼과 입력창은 .timeline 밖이라 흐려지지 않아요. 03-base의 덮개 페이드는 여기서 꺼요.
    메일을 열면 .mtop이 맨 위에 붙어 있어서 위쪽은 흐리지 않아요. */

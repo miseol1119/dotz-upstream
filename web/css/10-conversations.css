@@ -71,7 +71,7 @@
 .cv-sys .cv-sys-mt { font-variant-numeric: tabular-nums; }
 /* 백그라운드 작업 카드 (소개 페이지 작업 카드): 이어진 작업은 한 격자(.cv-tasks)로 묶여 채팅 폭을 꽉 채워요. 한 줄 3장까지, 남는 줄은 그 줄 안에서 폭을 나눠 가져요(4장 = 3 + 1, 5장 = 3 + 2).
    장 수는 창이 아니라 격자 폭으로 정해요. 6칸 격자라 1·2·3장이 모두 나눠떨어져요.
-   상태가 바뀌어도 카드 높이는 그대로예요: 제목은 두 줄 칸을 늘 차지하고, 결과 파일은 그 둘째 줄 자리에 들어오고, 막대는 카드 아래 여백에 떠요(원칙 3·6·7·9). */
+   카드는 내용만큼만 높아요(제목 아래 빈 자리 없음): 한 줄의 카드는 가장 높은 카드에 맞춰 늘어나고, 결과 파일은 제목 아래 줄에 붙고, 막대는 카드 아래 여백에 떠요(원칙 3·6·7·9). */
 .tl-in > .cv-tasks { container: cv-tasks / inline-size; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-2); align-self: stretch; margin: var(--sp-2) 0 0; }
 .cv-tasks:empty { display: none; }
 .cv-task { container: cv-task / inline-size; position: relative; grid-column: span 6; min-width: 0; padding: var(--sp-3) var(--sp-4) var(--sp-4); border-radius: var(--r-card); background: var(--layer); color: var(--fg); text-align: left; }
@@ -87,7 +87,7 @@
 .cv-task .ct-hd { display: grid; grid-template: "lb st" minmax(24px, auto) "t t" auto / minmax(0, 1fr) auto; align-items: center; gap: var(--sp-05) var(--sp-2); width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .cv-task .ct-nm { display: contents; }
 .cv-task .ct-lb { grid-area: lb; overflow: hidden; color: var(--fg-2); font: 400 12px/16px var(--font); text-overflow: ellipsis; white-space: nowrap; }
-.cv-task .ct-t { grid-area: t; display: -webkit-box; min-height: 2lh; overflow: hidden; color: var(--fg); font: 500 15px/22px var(--font); overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.cv-task .ct-t { grid-area: t; display: -webkit-box; min-height: 1lh; overflow: hidden; color: var(--fg); font: 500 15px/22px var(--font); overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 @container cv-task (max-width: 299.98px) { .cv-task .ct-kind:not(:only-child) { display: none; } }   /* 좁은 카드는 알약 옆에 시각만 */
 .cv-task:has(.ct-file) .ct-t { min-height: 1lh; -webkit-line-clamp: 1; }
 /* the card's state: its own dot and the word in --fg-2, no fill (web/DESIGN.md 상태) */
@@ -135,7 +135,6 @@
   #v-chat > .cv-head { display: none; }
   #v-chat > .todo { order: 1; margin: var(--sp-2) var(--sp-3) var(--sp-1); }
   #v-chat > .chatbox { order: 4; }
-  #v-chat > .subs { order: 5; margin: 0 var(--sp-3) var(--sp-1); }
   #v-chat > .composer { order: 6; padding: var(--sp-2) var(--sp-3) var(--sp-3); }
   #v-chat.cv-listing { height: 100%; margin: 0; padding: var(--sp-2) var(--sp-3) var(--sp-6); border-radius: 0; background: transparent; overflow: visible; }
   #v-chat.cv-listing > .cv-side { border-radius: var(--r-card); }
@@ -159,7 +158,6 @@
   :is(#v-chat, .pane-chat) > .cv-head { grid-row: 1; display: flex; align-items: center; gap: var(--sp-2); min-width: 0; padding: var(--sp-3) var(--sp-4); }
   :is(#v-chat, .pane-chat) > .todo { grid-row: 2; margin: 0 var(--sp-3) var(--sp-1); }
   :is(#v-chat, .pane-chat) > .chatbox { grid-row: 4; }
-  :is(#v-chat, .pane-chat) > .subs { grid-row: 5; margin: 0 var(--sp-3); }
   :is(#v-chat, .pane-chat) > .composer { grid-row: 6; width: auto; max-width: none; margin: 0; padding: var(--sp-2) var(--sp-3) var(--sp-3); }
   .cv-row.pv { padding-block: var(--sp-15); }
   .cv-row { min-height: 36px; padding: var(--sp-1) var(--sp-3); gap: var(--sp-2); border-radius: var(--r-ctl); }

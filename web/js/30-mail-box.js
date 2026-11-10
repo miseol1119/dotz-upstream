@@ -447,7 +447,7 @@ function mbReplyPaint(force) {
   let slot = tl.querySelector(":scope > .mbox-reply");
   if (!ok) { if (slot) slot.remove(); return; }
   const b = mbBox(t), sig = JSON.stringify([t, b.open, b.mode]);
-  if (slot && slot.dataset.sig === sig && !force && slot.isConnected && slot === tl.lastElementChild) return;
+  if (slot && slot.dataset.sig === sig && !force && slot.isConnected && slot === tlTail()) return;
   if (slot) slot.remove();
   slot = el("section", { class: `mbox-reply${b.open ? " open" : ""}`, "aria-label": "답장 쓰기", "data-sig": sig });
   // closed, the slot stays empty (and hidden): 답장 / 전체답장 / 전달 are icons in the mail's top bar

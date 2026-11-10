@@ -32,13 +32,13 @@ test("in a conversation the toast does not cover the composer", async () => {
 	expect(await apart("#composer")).toBe(true);
 });
 
-// The line the app draws above the composer while subagents run (renderSubs); the toast must clear it too, mail threads share this view.
-const SUBS_LINE = `(() => { const box = document.querySelector("#v-chat > .subs"); box.hidden = false; box.replaceChildren(el("button", { class: "subsum", type: "button" }, el("span", { class: "nm", text: "서브에이전트 2개 진행 중" }))); })()`;
+// The status line the app draws at the top of the composer while something works (renderWorking); it is inside the composer, so the toast clears it with it.
+const STATUS_LINE = `(() => { const box = document.querySelector("#runline"); box.hidden = false; document.querySelector("#runline-tx").textContent = "작업 중…"; })()`;
 
-test("in a conversation the toast does not cover the subagent line above the composer", async () => {
-	await toastAt(`openTarget("main", "chat")`, `current === "chat" && CV.placed && document.querySelector("#composer").getBoundingClientRect().height > 0`, SUBS_LINE);
-	await waitFor(`document.querySelector("#v-chat > .subs .subsum").getBoundingClientRect().height > 0`);
-	expect(await apart("#v-chat > .subs .subsum")).toBe(true);
+test("in a conversation the toast does not cover the status line above the input", async () => {
+	await toastAt(`openTarget("main", "chat")`, `current === "chat" && CV.placed && document.querySelector("#composer").getBoundingClientRect().height > 0`, STATUS_LINE);
+	await waitFor(`document.querySelector("#runline").getBoundingClientRect().height > 0`);
+	expect(await apart("#runline")).toBe(true);
 	expect(await apart("#composer")).toBe(true);
 });
 

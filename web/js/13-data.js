@@ -235,6 +235,7 @@ function renderAll0(keepScroll) {
   if (lit) { const n = [...tl.querySelectorAll("[data-ts]")].find(m => m.dataset.ts === lit); if (n) ntFlash(n); }
   if (!keepScroll) { chatOpen(); if (LOG_VIEW) scrollTerm(true); } else { CV.snap = null; CV.full = true; }
   markLive();
+  paintQueue(tl, target);
   CV.drawn = CV.divNode ? "" : chatSig(s);   // a divider belongs to one opening: the next one draws anew
 }
 // Coming back to the conversation still in the timeline, with nothing new while it was away: the drawn rows stay (their images too) and only the place is set.

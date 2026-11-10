@@ -345,9 +345,9 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 서브에이전트 줄과 시트 (`#sheet`)
 - 목적: 돌고 있는 서브에이전트를 목록으로 보고, 하나의 기록(트랜스크립트)을 읽어요.
-- 구성: 줄 `.subs`(채팅 위, `button.subsum`)와 홈의 `.subline`. 시트 `aside#sheet`(role=dialog, aria-label `서브에이전트`) 안에 머리(`#sh-back`, `#sh-name`, `#sh-sub`, `#sh-tag`, `#sh-close`)와 본문 `#sh-body`.
+- 구성: 채팅에서는 입력창 위 상태 줄 오른쪽 끝의 `button.rs-subs`(`서브에이전트 N ›`, 상태 글이 없으면 줄 전체가 `서브에이전트 N개 진행 중 ›`), 활동 화면의 `.subs`(`button.subsum`)와 홈의 `.subline`. 시트 `aside#sheet`(role=dialog, aria-label `서브에이전트`) 안에 머리(`#sh-back`, `#sh-name`, `#sh-sub`, `#sh-tag`, `#sh-close`)와 본문 `#sh-body`.
 - 기능: 줄을 누르면 `openSubs([source])`. 목록 행(`button.subrow`)을 누르면 `openSub(source, id, sources)`로 하나의 기록. 뒤로(`#sh-back`, aria-label `목록으로`)는 목록으로, 닫기 `#sh-close`(aria-label `닫기`) 또는 Esc. 닫으면 열었던 요소로 포커스 복귀. 실행 중인 서브에이전트만 목록에 나와요(생성 순서). 기록 열린 상태에서 상태가 `running`이면 3초마다 다시 읽고, 스크롤은 바닥에 붙어 있을 때만 따라가요. 펼쳐 둔 항목은 다시 그려도 유지.
-- 상태: 줄 문구 `서브에이전트 {n}개 진행 중`. 목록 제목 `서브에이전트 {n}개 진행 중`, 부제는 출처 이름들, 비었으면 `진행 중인 서브에이전트가 없어요`. 행: 설명(없으면 agent, 없으면 `서브에이전트`), 의도/도구 한 줄, 출처가 여럿이면 출처 태그, 경과 시간 `N분째`/`방금 시작`. 기록 화면 제목은 설명(또는 agent), 부제 `{대상 이름} · 서브에이전트`, 상태 태그 `진행 중`, `완료`, `실패`, `중단됨`(톤 pri/ok/err/없음). 로딩 `불러오는 중…`, 오류 `기록을 불러오지 못했어요`, 비어 있음 `기록이 없어요`. 로그 보기(`mode term`)이면 본문이 터미널 노드 모양(`sh-body term`), 아니면 대화 모양(`actNode`). 폰: 폭 639px 이하에서 시트가 `100vw`, 테두리 없음(05-log.css:121).
+- 상태: 활동 화면 줄 문구 `서브에이전트 {n}개 진행 중`. 목록 제목 `서브에이전트 {n}개 진행 중`, 부제는 출처 이름들, 비었으면 `진행 중인 서브에이전트가 없어요`. 행: 설명(없으면 agent, 없으면 `서브에이전트`), 의도/도구 한 줄, 출처가 여럿이면 출처 태그, 경과 시간 `N분째`/`방금 시작`. 기록 화면 제목은 설명(또는 agent), 부제 `{대상 이름} · 서브에이전트`, 상태 태그 `진행 중`, `완료`, `실패`, `중단됨`(톤 pri/ok/err/없음). 로딩 `불러오는 중…`, 오류 `기록을 불러오지 못했어요`, 비어 있음 `기록이 없어요`. 로그 보기(`mode term`)이면 본문이 터미널 노드 모양(`sh-body term`), 아니면 대화 모양(`actNode`). 폰: 폭 639px 이하에서 시트가 `100vw`, 테두리 없음(05-log.css:121).
 - 데이터: `GET /api/subagents`(`{sources}`), `GET /api/subagents/{id}?source={source}`, SSE `subagents`(`setSubs(source, items)`).
 - 근거: web/js/06-subagents.js:44 `setSubs`, 06-subagents.js:49 `loadSubs`, 06-subagents.js:53 `subsChanged`, 06-subagents.js:58 `subLine`, 06-subagents.js:71 `renderSubs`, 06-subagents.js:92 `showSheet`, 06-subagents.js:102-104 (`openSubs`, `openSub`, `closeSheet`), 06-subagents.js:113 `loadSub`, 06-subagents.js:124 `renderSubSheet`; web/index.html:167-174 (`#sheet`).
 - css: 05-log.css(`.sheet`, `.sh-body`, `.subrow`, `.subsum`, `.subline`), 07-chat.css(`.subsum`), 01-tokens.css(`.sheet`).
@@ -508,9 +508,9 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 입력창 (메시지 보내기와 중단)
 - 목적: 현재 대화 대상에 글/파일/요소를 보내고, 작업 중이면 끼워넣기, 대기열, 중단을 해요.
-- 구성: `#composer` 안 위에서 아래로 `#dcard`(결정 카드), `#queue`(대기열), `#hints`(슬래시/멘션 메뉴), `#runline`(작업 상태 줄), `form#send.sendrow`(`#atray` 첨부 트레이, `#c-attach` + `textarea#text` + `#send-btn`), 그 아래 `#cbar`(모델/강도/컨텍스트 칩), `#working`(`#working-tx`, `#working-stop`). 인용 바 `#replybar`가 `#send` 앞에 들어와요.
+- 구성: `#composer` 안 위에서 아래로 `#dcard`(결정 카드), `#hints`(슬래시/멘션 메뉴), `#runline`(작업 상태 줄), `form#send.sendrow`(`#atray` 첨부 트레이, `#c-attach` + `textarea#text` + `#send-btn`), 그 아래 `#cbar`(모델/강도/컨텍스트 칩), `#working`(`#working-tx`, `#working-stop`). 인용 바 `#replybar`가 `#send` 앞에 들어와요.
 - 기능: 글자 수에 맞춰 높이 자동(최대 140px, `autosize`). 단어 `ulw`를 쓰면 그라디언트 가장자리+키워드 마크(`paintUlw`). 초안 자동 저장(`saveDraft`). Enter 전송, Shift+Enter 줄바꿈(터치 기기는 Enter가 줄바꿈), 작업 중 Enter는 steer, `⌘/Ctrl+Enter`는 다음 턴 큐, `Alt+Enter`는 중단 후 전송(`sendChat(how)`), 작업 중 Esc는 중단(`stopTarget`). `/terminal <명령>`은 터미널 시트, `/screen`은 화면 공유, 그 밖의 `/명령`은 `sendCommand`로 게이트웨이에 가고 답은 카드로 대화에 붙어요. 보내기 버튼이 `stop` 모양이면 입력이 비었을 때 중단으로 동작해요. 붙여넣기/끌어놓기/`+`는 첨부 트레이 참조.
-- 상태: placeholder 종료된 세션 `종료된 세션이에요`(입력 비활성), 결정 카드 있을 때 `번호를 누르거나 직접 입력해 주세요`, 재개 가능한 종료 세션 `재개하면서 보내기`, 작업 중 `메시지 보내기`, 로그 보기 `메시지 또는 /명령`, 프로젝트 `${이름} 프로젝트의 ${bot}에게 메시지 · /명령`, 메일 `이 메일 답장·전달은 ${bot}에게 · /명령`, 기본 `${이름}에게 메시지 · /명령`. 작업 줄 `작업 중…` 또는 `사용량 한도로 대기 중`(rate-limited, 경고색)에 서브에이전트가 있으면 ` · 서브에이전트 ${n}`, 백그라운드 작업만 있으면 `workLine`. 전송 버튼 aria `보내기`/`중단`(stop 모드 title `지금 하는 일 중단`). 토스트: `파일을 올리는 중이에요`, `명령에는 파일을 붙일 수 없어요`, `명령에는 요소를 붙일 수 없어요`, `이 컴퓨터에서는 화면 공유를 쓸 수 없어요`, `터미널에서 실행할 명령을 /terminal 뒤에 적어 주세요`, 큐에 들어가면 `작업이 끝나면 전달할게요`, 중단하고 전송 `중단하고 보냈어요`, 중단 성공 `작업을 중단했어요`. 전송 실패는 글/첨부/인용/요소를 되돌리고 오류를 토스트(다른 대화로 옮겼으면 원래 대화에 초안을 남겨 `... · 보내지 못한 글은 원래 대화에 남겨 뒀어요`(파일이면 `(파일은 다시 붙여 주세요)`)). 다른 컴퓨터 대화는 파일을 그 컴퓨터로 먼저 올리고(`pqUpload`) 전송 뒤 `loadTarget`.
+- 상태: placeholder 종료된 세션 `종료된 세션이에요`(입력 비활성), 결정 카드 있을 때 `번호를 누르거나 직접 입력해 주세요`, 재개 가능한 종료 세션 `재개하면서 보내기`, 작업 중 `메시지 보내기`, 로그 보기 `메시지 또는 /명령`, 프로젝트 `${이름} 프로젝트의 ${bot}에게 메시지 · /명령`, 메일 `이 메일 답장·전달은 ${bot}에게 · /명령`, 기본 `${이름}에게 메시지 · /명령`. 작업 줄(`#runline.runstate`, 한 줄) 왼쪽은 `작업 중…` 또는 `사용량 한도로 대기 중`(rate-limited, 경고색), 백그라운드 작업이면 `workLine`(`설명 · 경과`, 둘 이상이면 ` · 외 N개`; 앞말과 모델 이름은 없어요). 오른쪽 끝은 서브에이전트가 있을 때 `서브에이전트 N ›`(줄이 좁으면 왼쪽만 말줄임). 상태 글 없이 서브에이전트만 있으면 `서브에이전트 N개 진행 중 ›` 한 줄이에요. 전송 버튼 aria `보내기`/`중단`(stop 모드 title `지금 하는 일 중단`). 토스트: `파일을 올리는 중이에요`, `명령에는 파일을 붙일 수 없어요`, `명령에는 요소를 붙일 수 없어요`, `이 컴퓨터에서는 화면 공유를 쓸 수 없어요`, `터미널에서 실행할 명령을 /terminal 뒤에 적어 주세요`, 큐에 들어가면 `작업이 끝나면 전달할게요`, 중단하고 전송 `중단하고 보냈어요`, 중단 성공 `작업을 중단했어요`. 전송 실패는 글/첨부/인용/요소를 되돌리고 오류를 토스트(다른 대화로 옮겼으면 원래 대화에 초안을 남겨 `... · 보내지 못한 글은 원래 대화에 남겨 뒀어요`(파일이면 `(파일은 다시 붙여 주세요)`)). 다른 컴퓨터 대화는 파일을 그 컴퓨터로 먼저 올리고(`pqUpload`) 전송 뒤 `loadTarget`.
 - 데이터: `POST /api/message`(text, cid, reply, lane, project, mail, settings, conv, mode, files, elements, refs; 같은 `cid`로 다시 보내면 한 번만 저장되고 처음과 같은 응답이 와요. 공백뿐인 글은 파일이나 요소가 없으면 400), `POST /api/command`, `POST /api/lanes/:name/abort` 또는 `POST /api/orchestrator/abort`, `GET /api/queue`.
 - 근거: web/js/14-slash-commands.js:135(taFloor), :152(paintUlw), :169(autosize), :183,:193(keydown), :208(stopTarget), :221(sendCommand), :232(sendChat), :280(updateComposerMeta), :294(tickWorking), :302(renderWorking).
 - css: web/css/04-files.css(`.working`, `.runline`, `.sendrow`, :211, :272 `pointer:coarse`), 07-chat.css(`#c-attach` :51), 03-base.css(`.ta-hl`), 12-composer-phone.css(`max-width:639px`).
@@ -526,12 +526,12 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 대기열 (작업이 끝나면 전달할 메시지)
 - 목적: 작업 중에 `⌘/Ctrl+Enter`로 쌓은 메시지를 다음 턴에 보낼 때까지 보여 줘요.
-- 구성: `#queue.qlist` 안 `.qitem`(`.qb`의 `.qt` 본문과 `.qm`, `.qa` 버튼 둘).
+- 구성: 대기 카드는 없어요. 타임라인 `#tl` 맨 끝에 대기 순서대로 `div.um.qd`(흐린 말풍선 `.ub`와 그 아래 작은 줄 `.qd-ln`: `작업이 끝나면 전달 · 지금 끼워넣기 · 취소`). 보낸 메시지가 일반 말풍선으로 그려지면 대기 말풍선은 사라지고, 대기가 늘면 맨 아래로 스크롤해요.
 - 기능: `지금 끼워넣기`(`POST /api/queue/:id/send`), `취소`(`DELETE /api/queue/:id`로 글을 입력창에 되돌림, `takeBack`).
-- 상태: 줄 설명 `작업이 끝나면 전달`. 입력창에 글이 있으면 취소가 `입력창을 비운 뒤 취소해 주세요`(오류 토스트). 현재 대상의 항목만 보여요. 폰(`max-width:639px`)에서 `.qitem`이 줄바꿈.
+- 상태: 입력창에 글이 있으면 취소가 `입력창을 비운 뒤 취소해 주세요`(오류 토스트). 현재 대상의 항목만 보여요. 분할 화면의 비활성 칸도 같은 말풍선을 자기 타임라인 끝에 그려요(`paintQueue(list, t)`).
 - 데이터: `GET /api/queue`, `POST /api/queue/:id/send`, `DELETE /api/queue/:id`. `answerDecision`/`sendChat` 응답의 `queued`로 갱신.
-- 근거: web/js/14-slash-commands.js:334(loadQueue), :338(renderQueue), :349(takeBack).
-- css: web/css/04-files.css(`.qitem` :218).
+- 근거: web/js/14-slash-commands.js `loadQueue`, `renderQueue`, `paintQueue`, `qdBubble`, `takeBack`.
+- css: web/css/04-files.css(`.um.qd`, `.qd-ln`).
 
 ### 입력창 아래 칩 (모델, 강도, 컨텍스트)
 - 목적: 대상의 모델, 추론 강도, 컨텍스트 사용률을 보고 바로 바꿔요.

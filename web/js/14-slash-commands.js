@@ -312,12 +312,12 @@ function updateComposerMeta() {
 }
 // The elapsed time ticks every second on its own; events only arrive when a tool runs, so a time drawn only on events
 // froze (owner 2026-10-20: stuck at 18s until the answer came).
-let workingLabel = "", workingSubs = 0, workingBg = [];
+let workingLabel = "", workingBg = [];
 function tickWorking() {
   if ($("#working").hidden) return;
   // The bottom line shows only the state (owner 2026-10-20); elapsed time lives on the work card.
   const g = CS.group;
-  $("#working-tx").textContent = $("#runline-tx").textContent = workingBg.length ? workLine(workingBg) : `${workingLabel}${workingSubs ? ` · 서브에이전트 ${workingSubs}` : ""}`;
+  $("#working-tx").textContent = $("#runline-tx").textContent = workingBg.length ? workLine(workingBg) : workingLabel;
   if (g && g.live) g.update();
 }
 setInterval(() => { if (!document.hidden) tickWorking(); }, 1000);
@@ -326,25 +326,33 @@ function runLineOf(t) {
   const info = targetInfo(t), st = info.alive ? info.status : "";
   const on = st === "working" || st === "starting" || st === "rate-limited";
   // A request answered with [later] has no running turn, but its background work is still going: the line stays with that work.
-  const bg = on ? [] : workOfTarget(t), subs = on ? runningSubs(sourceOf(t)).length : 0;
-  const text = bg.length ? workLine(bg) : `${st === "rate-limited" ? "사용량 한도로 대기 중" : "작업 중…"}${subs ? ` · 서브에이전트 ${subs}` : ""}`;
-  return { st, on, bg, text, show: on || bg.length > 0 };
+  const bg = on ? [] : workOfTarget(t), subs = runningSubs(sourceOf(t)).length, has = on || bg.length > 0;
+  const text = bg.length ? workLine(bg) : has ? (st === "rate-limited" ? "사용량 한도로 대기 중" : "작업 중…") : "";
+  // has: something is working (the left text); show: the line is there at all, which subagents alone also make (only their count then).
+  return { st, on, bg, text, subs, has, show: has || subs > 0 };
+}
+// The right end of the one status line: the subagent count, which opens the sheet. With no status text it is the whole line.
+function paintSubsBtn(b, src, n, lead) {
+  b.hidden = !n;
+  if (!n) return;
+  b.textContent = lead ? `서브에이전트 ${n} ›` : `서브에이전트 ${n}개 진행 중 ›`;
+  b.onclick = () => openSubs([src]);
 }
 function renderWorking() {
-  const box = $("#working"), { st, on, bg, show } = runLineOf(target);
+  const box = $("#working"), { st, on, bg, has, subs, show } = runLineOf(target);
   workingBg = bg;
-  box.hidden = !show;
+  box.hidden = !has;
   // Only while the gateway reports this target running: status line, and stop in place of send
   // (with text typed the button sends it into the running turn instead).
   // The send button is the one stop control (owner 2026-10-28): it stops the running turn, or, with no turn running, this conversation's background worker.
   const line = $("#runline"), stopMode = ((on && st !== "rate-limited") || bg.length > 0) && !ta.value.trim() && !ATT.length && !pkCount();
-  line.hidden = !show; line.classList.toggle("warn", st === "rate-limited");
+  line.hidden = !show; line.classList.toggle("warn", st === "rate-limited"); line.classList.toggle("only-subs", !has);
+  paintSubsBtn($("#runline-subs"), sourceOf(target), subs, has); paintSubsBtn($("#runstate-subs"), sourceOf(target), subs, true);
   $("#c-model").classList.toggle("run", on && st !== "rate-limited");
   const sb = $("#send-btn"); sb.classList.toggle("stop", stopMode); sb.setAttribute("aria-label", stopMode ? "중단" : "보내기"); sb.title = stopMode ? "지금 하는 일 중단" : "";
   if (on) {
-    const n = runningSubs(sourceOf(target)).length;
     $(".dot", box).className = `dot ${st === "rate-limited" ? "warn" : "pri"}`;
-    workingLabel = `${st === "rate-limited" ? "사용량 한도로 대기 중" : "작업 중…"}`; workingSubs = n;
+    workingLabel = st === "rate-limited" ? "사용량 한도로 대기 중" : "작업 중…";
     tickWorking();
     $("#working-stop").hidden = true;
   } else if (bg.length) {
@@ -362,17 +370,29 @@ async function loadQueue() {
   try { QUEUE = (await api("/api/queue")).items || []; } catch { return; }
   renderQueue();
 }
-function renderQueue() { paintQueue($("#queue"), target); paneStrips(); }
-// The queued messages of conversation t in box: the open one's #queue, or the list in an inactive pane.
-function paintQueue(box, t) {
-  const mine = QUEUE.filter(i => i.target === t);
-  box.hidden = !mine.length;
-  if (!mine.length) { clear(box); return; }
-  clear(box).append(...mine.map(i => el("div", { class: "qitem" },
-    el("div", { class: "qb" }, el("div", { class: "qt", text: i.text }), el("div", { class: "qm", text: "작업이 끝나면 전달" })),
-    el("div", { class: "qa" },
-      el("button", { class: "btn text inrow", type: "button", onclick: ev => busy(ev.currentTarget, async () => { await api(`/api/queue/${enc(i.id)}/send`, "POST", {}); QUEUE = QUEUE.filter(x => x.id !== i.id); renderQueue(); scheduleState(); }) }, "지금 끼워넣기"),
-      el("button", { class: "btn text inrow", type: "button", onclick: ev => busy(ev.currentTarget, () => takeBack(i)) }, "취소")))));
+function renderQueue() { if (paintQueue(tl, target)) scrollChat(false); paneStrips(); }
+// A queued message is a dimmed bubble of the owner's at the end of the conversation, with its two ways out under it; it goes when the server delivers it, and
+// the delivered message is then the ordinary bubble. The last child of a timeline that is not one of these is tlTail.
+const QD = new WeakMap();
+const tlTail = () => { let n = tl.lastElementChild; while (n && n.classList.contains("qd")) n = n.previousElementSibling; return n; };
+function qdBubble(i) {
+  const sep = () => el("span", { class: "qd-sep", "aria-hidden": "true", text: "·" });
+  return el("div", { class: "um qd" }, el("div", { class: "ub", text: i.text }),
+    el("div", { class: "qd-ln" }, el("span", { text: "작업이 끝나면 전달" }), sep(),
+      el("button", { class: "btn text inrow", type: "button", onclick: ev => busy(ev.currentTarget, async () => { await api(`/api/queue/${enc(i.id)}/send`, "POST", {}); QUEUE = QUEUE.filter(x => x.id !== i.id); renderQueue(); scheduleState(); }) }, "지금 끼워넣기"), sep(),
+      el("button", { class: "btn text inrow", type: "button", onclick: ev => busy(ev.currentTarget, () => takeBack(i)) }, "취소")));
+}
+// The queued messages of conversation t at the end of list: the open timeline, or an inactive pane's. A message drawn after them moves them to the end again.
+// True when there are more of them than were there.
+function paintQueue(list, t) {
+  const mine = QUEUE.filter(i => i.target === t), sig = JSON.stringify(mine.map(i => [i.id, i.text]));
+  const rec = QD.get(list) || { sig: "", nodes: [] }, found = [...list.querySelectorAll(":scope > .qd")];
+  if (rec.sig === sig && found.length === rec.nodes.length && found.every((n, k) => n === rec.nodes[k]) && (!found.length || list.lastElementChild === found[found.length - 1])) return false;
+  for (const n of found) n.remove();
+  const nodes = mine.map(qdBubble);
+  QD.set(list, { sig, nodes });
+  list.append(...nodes);
+  return nodes.length > found.length;
 }
 // Taking a queued message back puts its text into the box; a box with a draft keeps it and the message stays queued.
 async function takeBack(i) {

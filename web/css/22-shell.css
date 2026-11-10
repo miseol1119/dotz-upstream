@@ -187,7 +187,7 @@ body { display: flow-root; }
   :where(.subsum, .mtop-b, .hgreet-more, .hgreet .subline, .board .ch .ib, .ct-file, #c-attach, #send-btn, .cbar .cchip, .mr-f, .nsc-fb, .hm-chip, .pmv-edit, .pmv-more, .dr-rm, .dr-rc-add, .dr-rc-edit .btn, .kk-add-btn)::after { content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, var(--btn-hit)); height: max(100%, var(--btn-hit)); transform: translate(-50%, -50%); }
   .subsum { z-index: 1; }
   .subsum::after { top: calc(var(--sp-3) * -1); bottom: calc(var(--sp-1) * -1); height: auto; transform: translateX(-50%); }
-  .qa .btn.inrow::after { inset: calc(var(--sp-2) * -1 - 1px) calc(var(--sp-05) * -1); }
+  .qd-ln .btn.inrow::after { inset: calc(var(--sp-2) * -1 - 1px) calc(var(--sp-05) * -1); }
   .nsc-f { padding-block: var(--sp-2); margin: calc(var(--sp-1) - var(--sp-2)) 0 0; }
   .rq-hd2 .nsc-f { margin-top: calc(var(--sp-2) * -1); }
   .pl-chips { padding-block: var(--sp-2); margin-block: calc(var(--sp-2) * -1); }

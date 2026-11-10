@@ -110,7 +110,6 @@
         <div class="chatbox"><div class="timeline" id="mon-timeline"><div class="tl-in" id="mon-tl"></div></div></div>
       </section>
       <section class="view fill" id="v-chat" hidden>
-        <div class="subs" hidden></div>
         <div class="todo" id="todo" hidden></div>
         <div class="chatbox">
           <div class="timeline" id="timeline"><div class="tl-in" id="tl"><div class="tl-top" id="tl-top" hidden><button class="btn text tl-more" id="tl-more" type="button" hidden>이전 메시지 더 보기</button></div></div></div>
@@ -119,12 +118,11 @@
         <div class="composer" id="composer">
           <button class="qline" id="qline" type="button" hidden></button>
           <section class="dcard" id="dcard" aria-label="답변 필요" hidden></section>
-          <div class="qlist" id="queue" hidden></div>
           <div class="hintrow" id="hints" hidden></div>
-          <div class="runstate" id="runstate" role="status" hidden><span class="dot" id="runstate-dot"></span><span class="rs-tx" id="runstate-tx"></span><button class="btn text rs-go" id="runstate-act" type="button" hidden></button></div>
+          <div class="runstate" id="runstate" role="status" hidden><span class="dot" id="runstate-dot"></span><span class="rs-tx" id="runstate-tx"></span><button class="btn text rs-go" id="runstate-act" type="button" hidden></button><button class="btn text rs-go rs-subs" id="runstate-subs" type="button" hidden></button></div>
           <div class="pausenote" id="pausenote" role="status" hidden></div>
           <div class="relaynote" id="relaynote" role="note" hidden></div>
-          <div class="runline" id="runline" hidden><span class="dot pri"></span><span id="runline-tx"></span></div>
+          <div class="runline runstate" id="runline" hidden><span class="dot pri"></span><span class="rs-tx" id="runline-tx"></span><button class="btn text rs-go rs-subs" id="runline-subs" type="button" hidden></button></div>
           <form class="sendrow" id="send">
             <div class="atray" id="atray" hidden></div>
             <input type="file" id="c-file" multiple hidden>

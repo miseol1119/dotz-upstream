@@ -45,8 +45,7 @@ function paneMirror(p) {
     m.wrap.addEventListener("scroll", () => edgeFade(m.wrap), { passive: true });
     if (snap) m.keys = snap.keys; else paneFill(m);
     m.todo = el("div", { class: "todo", hidden: true });
-    m.subs = el("div", { class: "subs", hidden: true });
-    m.node = el("div", { class: `pane-mir pane-chat${p.t === "alert" ? " no-composer" : ""}` }, head, m.todo, el("div", { class: "chatbox" }, m.wrap), m.subs, paneComposerEl(m));
+    m.node = el("div", { class: `pane-mir pane-chat${p.t === "alert" ? " no-composer" : ""}` }, head, m.todo, el("div", { class: "chatbox" }, m.wrap), paneComposerEl(m));
     if (!TD.by[p.t]) loadTodo(p.t);
   } else {
     m.node = el("div", { class: "pane-mir" }, head, el("div", { class: "pane-pj" }, snap ? paneBare(snap.n) : el("div", { class: "empty", text: "이 창을 누르면 대화방이 열려요" })));
@@ -60,7 +59,7 @@ function paneMirror(p) {
 function paneComposerEl(m) {
   const c = PNV.cmp.cloneNode(true), id = x => c.querySelector(`#${x}`);
   m.k = { own: id("c-own"), model: id("c-model"), effort: id("c-effort"), worker: id("c-worker"), ring: id("ctx-ring"), api: id("c-api"), fb: id("c-fb"), bar: id("cbar"),
-    queue: id("queue"), run: id("runline"), runTx: id("runline-tx"), send: id("send-btn"), ta: id("text") };
+    run: id("runline"), runTx: id("runline-tx"), subs: id("runline-subs"), send: id("send-btn"), ta: id("text") };
   id("c-attach").dataset.c = "c-attach"; m.k.send.dataset.c = "send-btn";
   for (const x of c.querySelectorAll("#qline, #dcard, #hints, #runstate, #pausenote, #relaynote, #atray, input[type=file], .ta-hl, .ta-tok")) x.remove();
   id("send").className = "sendrow"; id("send").removeAttribute("style");
@@ -75,9 +74,9 @@ function paneComposerEl(m) {
 function paneStrip(m) {
   const t = m.p.t, k = m.k, r = runLineOf(t), working = r.on && r.st !== "rate-limited";
   paintTodo(m.todo, t);
-  paintSubs(m.subs, sourceOf(t));
-  paintQueue(k.queue, t);
-  k.run.hidden = !r.show; k.run.classList.toggle("warn", r.st === "rate-limited"); k.runTx.textContent = r.text;
+  if (paintQueue(m.list, t) && m.p.stick) m.wrap.scrollTop = m.wrap.scrollHeight;
+  k.run.hidden = !r.show; k.run.classList.toggle("warn", r.st === "rate-limited"); k.run.classList.toggle("only-subs", !r.has); k.runTx.textContent = r.text;
+  paintSubsBtn(k.subs, sourceOf(t), r.subs, r.has);
   const stop = (working || r.bg.length > 0) && !k.ta.value.trim();
   k.send.classList.toggle("stop", stop); k.send.setAttribute("aria-label", stop ? "중단" : "보내기"); k.send.title = stop ? "지금 하는 일 중단" : "";
   k.ta.placeholder = composerHint(t, false);
@@ -127,6 +126,7 @@ function paneAppend(m, e) {
     n.dataset.pk = key;
   }
   m.list.append(n);
+  paintQueue(m.list, m.p.t);
 }
 function paneMirrorsPlace() {
   for (const m of PNM.values()) {

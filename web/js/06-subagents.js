@@ -38,8 +38,8 @@ function workAgo(w) {
   const m = workMin(workNow() - (w.ended_at || w.started_at));
   return m < 1 ? "방금" : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`;
 }
-// The model the worker runs on follows its description (hub/bgwork.ts workModel), so the owner sees which model does the work.
-const workLine = ws => `백그라운드 작업 중 · ${ws[0].description}${ws[0].model ? ` · ${ws[0].model}` : ""} · ${workElapsed(ws[0])}${ws.length > 1 ? ` · 외 ${ws.length - 1}개` : ""}`;
+// The left of the status line above the composer: what the background work is and how long it has run. The model is in the chip under the box, so the line does not say it.
+const workLine = ws => `${ws[0].description} · ${workElapsed(ws[0])}${ws.length > 1 ? ` · 외 ${ws.length - 1}개` : ""}`;
 // Re-read the state while work runs, so a finished or failed one leaves the line without waiting for another event.
 setInterval(() => { if (!document.hidden && (workRunning().length || Object.values((S && S.runs) || {}).some(runMoving))) refreshState(); }, 15000);
 function setSubs(source, items) {
