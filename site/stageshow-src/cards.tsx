@@ -73,7 +73,7 @@ export function MailScene() {
       {(s) => (
         <>
           <Collapse open={s.mail} reveal="drop" from="below">
-            <div className="cz-chip"><Icon name="mail" size={13} /><P>{t.chip}</P></div>
+            <div className="cz-chip"><Icon name="mail" size={13} /><span className="cz-chip__t">{t.chip.join(' ')}</span></div>
           </Collapse>
           <Collapse open={s.summary} reveal="drop" from="below">
             <div className="cz-head">

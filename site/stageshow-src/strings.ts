@@ -67,7 +67,7 @@ const en: Strings = {
     composer: 'Send a message',
   },
   mail: {
-    chip: ['New mail · Emily Carter', "· Next week's shoot"],
+    chip: ['New mail · Emily Carter', '· Shoot dates'],
     summary: ['A mail asking whether', 'Tuesday afternoon works for the shoot.'],
     draftTitle: 'Reply draft',
     draftBody: ['Tuesday at 2 PM works.'],
@@ -275,7 +275,7 @@ const es: Strings = {
     composer: 'Enviar un mensaje',
   },
   mail: {
-    chip: ['Correo nuevo · Lucía Fernández', '· Rodaje de la próxima semana'],
+    chip: ['Correo nuevo · Lucía Fernández', '· Rodaje'],
     summary: ['Un correo que pregunta', 'si el martes por la tarde va bien para el rodaje.'],
     draftTitle: 'Borrador de respuesta',
     draftBody: ['El martes a las 14:00 me va bien.'],
