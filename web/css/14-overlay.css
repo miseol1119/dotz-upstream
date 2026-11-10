@@ -43,6 +43,7 @@ dialog.fs-card::backdrop { background: var(--scrim); }
 .fs-tt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-05); }
 .fs-ey { display: block; color: var(--fg-2); font: 600 13px/20px var(--font); }
 .fs-ey .fs-left { color: var(--accent); }
+.fs-t .fs-left { color: var(--fg-3); font: 400 var(--fs-meta)/var(--lh-meta) var(--font); letter-spacing: 0; }   /* the mail sheet's progress, quiet beside the title */
 .fs-t { margin: 0; font: 700 var(--fs-page-sm)/var(--lh-page-sm) var(--font); letter-spacing: -.02em; overflow-wrap: anywhere; }
 .fs-ey.warn { color: var(--warn); }
 .fs-ey.err { color: var(--err); }

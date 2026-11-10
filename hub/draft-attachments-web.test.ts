@@ -48,7 +48,7 @@ const ask = (ref: string, extra: object, body = "안녕하세요.\n\n요청하�
 const openSheet = async (v: View, id: string) => {
 	await waitFor(v, `typeof noticeSheetOpen === "function" && document.querySelector(".hn")`);
 	await v.evaluate(`noticeSheetOpen(${JSON.stringify(String(id))})`);
-	await waitFor(v, `document.querySelector(".fs-bd .fs-card .dc-act")`);
+	await waitFor(v, `document.querySelector(".fs-bd .fs-card .dc-act, .fs-bd .fs-card .rq-acts .dr-send")`);
 	await settled(v);
 };
 
@@ -93,7 +93,7 @@ describe("attachments in the send sheet", () => {
 		});
 	}
 
-	test("the claim in the text raises the warning above 보내기 (not under the files); a plain reply shows only 첨부 없음", async () => {
+	test("the claim in the text raises the warning above 보내기 (not under the files); a plain reply shows no warning", async () => {
 		const v = await open(390, 844);
 		await openSheet(v, String(find("RATT0002").id));
 		await waitFor(v, `document.querySelector(".fs-ft .dr-warn")`);
@@ -104,20 +104,21 @@ describe("attachments in the send sheet", () => {
 		expect(await v.evaluate(`document.querySelector(".fs-ft .dr-warn").getAttribute("role")`)).toBe("alert");
 		const w2 = await open(390, 844);
 		await openSheet(w2, String(find("RATT0003").id));
-		await waitFor(w2, `document.querySelector(".fs-body .dr-none")`);
+		await waitFor(w2, `document.querySelector(".fs-body .dr-files")`);
+		expect(await w2.evaluate(`!!document.querySelector(".fs-body .dr-none")`)).toBe(false);
 		expect(await w2.evaluate(`!!document.querySelector(".fs-ft .dr-warn")`)).toBe(false);
 	});
 });
 
 describe("attachments in the mail draft card", () => {
-	test("the card shows the same rows, and a mail draft without files shows 첨부 없음 (never a hidden row)", async () => {
+	test("the card shows the same rows, and a mail draft without files has no 첨부 없음 band", async () => {
 		const v = await open(390, 900);
 		await waitFor(v, `typeof draftCardNode === "function" && typeof draftFilesNode === "function"`);
 		const n = find("RATT0001");
 		const html = await v.evaluate(`(() => { const n = ${JSON.stringify(n)}; const c = draftCardNode(n); document.body.append(c); return c.querySelectorAll("a.dr-att").length + "|" + [...c.querySelectorAll(".dr-fn")].map(e => e.textContent).join(",") + "|" + c.querySelector("a.dr-att").getAttribute("href"); })()`);
 		expect(html).toBe("2|견적서 최종.pdf,현장사진.jpg|/api/drafts/RATT0001/files/0");
 		const plain = await v.evaluate(`(() => { const n = ${JSON.stringify({ ...n, decision: { ...n.decision, draft: { toLabel: "받는이", to: "a@b.c", body: "안녕하세요." } } })}; const f = draftFilesNode(n.decision.draft), c = draftCardNode(n).querySelector(".dr-files"); return [f.hidden, c.hidden, c.querySelector(".dr-none")?.textContent].join("|"); })()`);
-		expect(plain).toBe("false|false|첨부: 없음");
+		expect(plain).toBe("true|true|");
 	});
 });
 

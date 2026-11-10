@@ -66,7 +66,7 @@ describe("the sheet of a card with no reply-draft record", () => {
 	test("보내기, 고치기, 보내지 않기 and 직접 수정 show, because the session takes each of them; 고치기 answers the notice", async () => {
 		const v = await sheet(390, 844);
 		expect(await texts(v, ".fs-ft button")).toEqual(["보내기", "고치기", "보내지 않기", "직접 수정"]);
-		await v.evaluate(`document.querySelector(".fs-ft .dc-act.alt").click()`);
+		await v.evaluate(`document.querySelector(".fs-ft .rq-acts .btn.tonal").click()`);
 		await waitFor(v, `document.querySelector(".fs-ft .dc-note")`);
 		await v.evaluate(`(() => { const t = document.querySelector(".fs-ft .dc-note"); t.value = "제목을 줄여 줘"; t.dispatchEvent(new Event("input")); document.querySelector(".fs-ft .dc-go").click(); })()`);
 		expect(await answered.promise).toMatchObject({ n: 2, note: "제목을 줄여 줘", label: "고치기" });
@@ -75,7 +75,7 @@ describe("the sheet of a card with no reply-draft record", () => {
 	test("직접 수정 opens the clean body and goes back to the session as a 고치기", async () => {
 		answered = Promise.withResolvers();
 		const v = await sheet(390, 844);
-		await v.evaluate(`document.querySelector(".fs-ft .dc-manual").click()`);
+		await v.evaluate(`document.querySelector(".fs-ft .rq-manual").click()`);
 		await waitFor(v, `document.querySelector(".fs-ft .dc-note")`);
 		const text = await v.evaluate(`document.querySelector(".fs-ft .dc-note").value`) as string;
 		expect(text.startsWith("PaddleOCR")).toBe(true);

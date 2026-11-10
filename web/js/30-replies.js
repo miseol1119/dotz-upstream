@@ -176,16 +176,18 @@ function rqRevise(x) {
 function rqOriginalOf(x) {
   if (x.kind === "held") return null;
   if (x.kind !== "notice") return x.d.original ? { who: x.d.original.who, text: x.d.original.text, ref: x.d.ref } : null;
-  const d = x.n.decision, m = String(d.to || "").startsWith("mail:") ? MAILS.get(d.to) : null, src = { ref: d.draft.ref, t: d.to };   // ref: 원문 보기 loads the full original
-  if (m) return { who: mailSender(m.from), text: m.subject || mailBrief(m, d.to), ...src };
-  if (d.draft.origin && d.draft.origin.text) return { who: "", text: d.draft.origin.text, ...src };
-  return d.draft.ref ? { who: "", text: d.draft.subject || "", ...src } : null;
+  return rqMailOriginal(x.n.decision.draft, x.n.decision.to);
 }
 function rqCardOf(x) {
   if (x.kind === "held") return rqHeldCard(x);
   const dr = x.kind === "notice" ? x.n.decision.draft : null;
   const head = { app: x.inst, label: x.label, pc: rqPcName(x.pc), model: (dr && dr.model) || (x.d && x.d.model) || "", at: x.at, tail: [el("button", { class: "btn text rq-open", type: "button", "data-k": "open", text: "열기", onclick: () => rqGoTo(x) })] };
   const editing = RQ.edit === x.key, busy = rqIsBusy(x), base = { key: x.key, cls: busy ? "busy" : "", attrs: { "data-rq": x.key, "data-kind": x.kind }, head, original: rqOriginalOf(x) };
+  if (x.kind === "notice" && dr.toLabel === "받는이") {   // a mail draft: the parts every screen shows it with (10-reply-card.js rqMailParts)
+    const p = rqMailParts(dr, { t: x.n.decision.to, at: x.at, pc: head.pc, edit: false, tail: head.tail });
+    return rqCard({ ...base, ...p, cls: [base.cls, p.cls].filter(Boolean).join(" "), body: { text: dr.body },
+      ...(editing ? { revise: rqRevise(x) } : { acts: { ...rqNoticeActs(x), busy } }) });
+  }
   if (x.kind === "notice") {
     // The mail draft's own 첨부 줄 (files, or 첨부: 없음) is editable in its conversation and read-only here; anything else says it cannot attach.
     const attach = dr.toLabel === "받는이" ? draftFilesNode(dr, { t: x.n.decision.to, edit: false }) : { attachments: dr.attachments, cannotAttach: [] };

@@ -42,6 +42,21 @@
 .kk-st > .rq-sent { height: auto; margin-top: 0; }
 .rq-sent-at { color: var(--fg-3); font: 400 12px/16px var(--font); }
 
+/* 메일 초안 (10-reply-card.js rqMailParts): the 답장 확인 sheet, the 답장 대기 sheet and the mail's own card draw the same parts. 받는이 is one text button under the body (aria-expanded) that opens its rows in place. */
+.rq.cm .rq-recvfold { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; margin-top: var(--sp-1); }
+.rq-recvfold[hidden], .rq-recvbox[hidden] { display: none; }
+.rq-recvfold .rq-recv { height: 28px; min-height: 0; padding: 0; gap: var(--sp-1); color: var(--fg-3); font-size: var(--fs-meta); font-weight: 400; max-width: 100%; }
+.rq-recvfold .rq-recv .rq-rs { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rq-recvfold .rq-recv .ic { flex: none; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform var(--m-fast) var(--m-ease); }
+.rq-recvfold .rq-recv[aria-expanded="true"] .ic { transform: rotate(180deg); }
+.rq-recvbox { align-self: stretch; min-width: 0; margin-top: var(--sp-3); }   /* clear of the fold button's tap area */
+.rq.cm.rq-ml .rq-brief { margin-top: var(--sp-2); display: grid; gap: var(--sp-1); }
+.bm.dr.rq-ml { gap: 0; }   /* the parts carry their own margins, as in the sheet */
+.rq.cm.rq-ml .rq-og { padding-left: 0; }
+.rq.cm.rq-ml .dr-files { margin-top: var(--sp-2); }
+.rq-acts .rq-manual { margin-left: auto; gap: var(--sp-1); color: var(--fg-3); }
+.rq-acts .rq-manual .ic { width: 14px; height: 14px; }
+
 /* the queue: one list, newest first, an app filter on top */
 .rq-q { display: flex; flex-direction: column; gap: var(--sp-3); }
 .rq-q > .rq { padding: var(--sp-3) var(--sp-4); border-radius: var(--r-card); background: var(--card); }
@@ -54,7 +69,7 @@
 .rq-who { gap: var(--sp-2); }
 .rq-av { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--layer); color: var(--fg-2); font: 600 var(--fs-tag)/var(--lh-tag) var(--font); text-transform: uppercase; }
 .rq.cm .rq-sub { margin-top: var(--sp-1); color: var(--fg-3); font: 400 var(--fs-meta)/var(--lh-meta) var(--font); }
-.rq.cm.dr .rq-sub { margin-top: var(--sp-2); color: var(--fg); font: 600 14px/20px var(--font); }   /* a mail draft: its reply subject heads the body */
+.rq.cm.dr .rq-sub, .rq.cm.rq-ml .rq-sub { margin-top: var(--sp-2); color: var(--fg); font: 600 14px/20px var(--font); }   /* a mail draft: its reply subject heads the body */
 .rq.cm .rq-body, .rq.cm .rq-bodywrap { margin-top: var(--sp-2); }
 .rq.cm .rq-body, .rq.cm .rq-bodywrap > .rq-body { padding: 0; background: none; }
 .rq.cm .rq-acts { margin-top: var(--sp-2); }
@@ -62,7 +77,7 @@
 /* one row, one height: primary (accent) / secondary (tonal) / text, the same 32px box and --r-ctl corner on every card, never a pill (the prototype's .cf row) */
 .rq-acts .btn.sm { height: var(--btn-h-sm); min-height: 0; padding: 0 var(--sp-3); border-radius: var(--r-ctl); font: 600 13px/20px var(--font); }
 /* the reply draft's small buttons keep the 32px box on a phone too: the box is what the owner reads, the 44px reach is an invisible ::after (ui-spec 버튼) */
-@media (pointer: coarse), (max-width: 639px) { .rq-acts .btn.sm { position: relative; height: var(--btn-h-sm); min-height: 0; } .rq-acts .btn.sm::after { content: ""; position: absolute; inset: -6px -2px; } }
+@media (pointer: coarse), (max-width: 639px) { .rq-acts .btn.sm { position: relative; height: var(--btn-h-sm); min-height: 0; } .rq-acts .btn.sm::after { content: ""; position: absolute; inset: calc(var(--sp-2) * -1) -2px; } }
 .rq-acts .btn.text.sm { padding: 0 var(--sp-2); }
 .rq-acts.dr-row .dr-send { flex: none; }
 

@@ -42,8 +42,8 @@ const ask = (ref: string, extra: object) =>
 const openManual = async (v: View, id: string) => {
 	await waitFor(v, `typeof noticeSheetOpen === "function" && document.querySelector(".hn")`);
 	await v.evaluate(`noticeSheetOpen(${JSON.stringify(String(id))})`);
-	await waitFor(v, `document.querySelector(".fs-ft .dc-manual")`);
-	await v.evaluate(`(document.querySelector(".fs-ft .dc-manual").click(), 0)`);
+	await waitFor(v, `document.querySelector(".fs-ft .dc-manual, .fs-ft .rq-manual")`);
+	await v.evaluate(`(document.querySelector(".fs-ft .dc-manual, .fs-ft .rq-manual").click(), 0)`);
 	await waitFor(v, `document.querySelector(".fs-ft .dc-note") && document.querySelector(".fs-ft .dc-fl .dr-add")`);
 };
 // Picks files the way the tap on 파일 추가 and the file dialog would: the tap takes the focus off the text field, then the hidden input gets
@@ -71,8 +71,8 @@ for (const [name, w, h] of [["390", 390, 844], ["1280", 1280, 800]] as const) {
 			const n = find("RTRK0001");
 			await waitFor(v, `typeof noticeSheetOpen === "function" && document.querySelector(".hn")`);
 			await v.evaluate(`noticeSheetOpen(${JSON.stringify(String(n.id))})`);
-			await waitFor(v, `document.querySelector(".fs-ft .dc-manual") && typeof DRF !== "undefined" && DRF.st.RTRK0001 && DRF.add.RTRK0001`);
-			await v.evaluate(`(document.querySelector(".fs-ft .dc-manual").click(), 0)`);
+			await waitFor(v, `document.querySelector(".fs-ft .dc-manual, .fs-ft .rq-manual") && typeof DRF !== "undefined" && DRF.st.RTRK0001 && DRF.add.RTRK0001`);
+			await v.evaluate(`(document.querySelector(".fs-ft .dc-manual, .fs-ft .rq-manual").click(), 0)`);
 			await waitFor(v, `document.querySelector(".fs-ft .dc-fl .dr-add")`);
 			expect(await v.evaluate(`document.querySelector(".fs-ft .dc-fl .dr-add").textContent.trim()`)).toBe("파일 첨부");
 			expect(await v.evaluate(`document.querySelectorAll(".fs-body .dr-ar").length`)).toBe(0);

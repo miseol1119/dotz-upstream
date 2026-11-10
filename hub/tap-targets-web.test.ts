@@ -16,7 +16,7 @@ const NAMED: Record<string, string[]> = {
 	"chat-open": ["#title", ".td-bar"],
 	projects: ["#title"],
 	monitoring: ["#title"],
-	mail: ["#title", ".mr-f", ".rq-og", ".dr-seg button", ".dr-rc-x"],
+	mail: ["#title", ".mr-f", ".rq-og", ".rq-recv"],
 	notices: ["#title", ".nsc-x", ".nsc-fold"],
 	settings: ["#title"],
 };

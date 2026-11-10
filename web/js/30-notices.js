@@ -400,7 +400,7 @@ function dkOpen(dc, draft, nid, ign) {
   const waits = !!ign && !!ign.id && ntNeeds(ign);
   DK.ign = waits ? String(ign.id) : "";
   DK.dc = { ...dc, close: dkClose, draft: draft || null, ignore: waits ? () => ntIgnore(ign) : null };
-  const h = fsOpen({ label: draft ? "보낼 내용 확인" : "결정이 필요해요", cls: draft ? "tall" : "", onClose: () => { if (DK.h === h) { DK.h = DK.node = DK.box = DK.dc = null; DK.nid = DK.ign = ""; } } });
+  const h = fsOpen({ label: draft ? "보낼 내용 확인" : "결정이 필요해요", cls: draft ? (draft.toLabel === "받는이" ? "mid rq-sheet" : "tall") : "", onClose: () => { if (DK.h === h) { DK.h = DK.node = DK.box = DK.dc = null; DK.nid = DK.ign = ""; } } });
   DK.h = h; DK.node = h.node; DK.box = h.box;
   dkPaint();   // the card itself holds the focus, not a row: a focus ring on the first option would read as a pick
 }

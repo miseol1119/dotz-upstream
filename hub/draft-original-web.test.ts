@@ -16,7 +16,7 @@ import { PEER_GET } from "./peer-auth.ts";
 import { appAsset, indexPage } from "./webapp.ts";
 
 // 원문 보기 in the send sheet (web/js/10-draft-original.js, GET /api/drafts/<ref>/original): closed by default, the first open fetches the mail once and keeps it.
-// Wide (>= 900px): the original is a separate panel left of the draft, the draft slides right and keeps its size. Narrow: a 초안 | 원문 toggle slides between them.
+// A mail draft's sheet is the 답장 확인 sheet (10-reply-card.js): the original opens in place under its quote. A comment reply draft's sheet keeps the panel: wide a separate panel left of the draft, narrow a 초안 | 원문 toggle.
 // A vanished mail says so, a peer's draft is read through /api/peer/proxy, and the draft's one-row buttons keep their actions.
 // The same component shows the comment a comment reply draft answers (hub/comments/original.ts): the sheet of an [ask], a combined reply + mail card, and the comment view's own draft card.
 // Headless browser against the real draft store, notice store and draft route; nothing is sent.
@@ -189,122 +189,63 @@ const mountCard = (v: View, ref: string) =>
 		box.append(cmDraftCard({ code: ${JSON.stringify(ref)}, commentId: ${JSON.stringify(commentId("youtube", "top"))}, text: "봐 주셔서 감사합니다. 문서는 설명란 링크에서 받으실 수 있어요.", notes: [] })); })()`);
 
 describe("원문 보기 in the send sheet", () => {
-	test("closed by default and nothing fetched; wide: a separate panel opens left and the draft slides right at the same size; narrow: the toggle slides between them", async () => {
+	test("closed by default and nothing fetched; the sheet has one close button and no tabs; 원문 보기 opens the original in place and keeps it", async () => {
 		const ref = drafts.plain!;
 		for (const [w, h] of [[390, 844], [1280, 800]] as const) {
 			const v = await open(w, h);
-			const isWide = w >= 900;
 			delete hits[ref];
-			await openSheet(v, ref);
-			expect(await expanded(v)).toBe("false");
-			expect(await text(v, ".od-tt")).toBe("원문 보기");
-			expect(await v.evaluate(`document.querySelector(".od-orig").hasAttribute("inert")`)).toBe(true);
+			await openSheet(v, ref, "", ".rq-og");
+			expect(await v.evaluate(`document.querySelectorAll(".fs-hd .fs-x").length`)).toBe(1);
+			expect(await v.evaluate(`document.querySelectorAll(".fs-hd .fs-ign, .od-tg, .od-sg").length`)).toBe(0);
+			expect(await v.evaluate(`document.querySelector(".rq-og").getAttribute("aria-expanded")`)).toBe("false");
+			expect(await v.evaluate(`document.querySelector(".rq-og-wrap .od-pane").hidden`)).toBe(true);
 			expect(hits[ref] ?? 0).toBe(0);
-			if (isWide) expect((await box(v, ".od-tg"))!.h).toBeGreaterThanOrEqual(32);
-			else {
-				expect((await box(v, ".od-sg[data-v=orig]"))!.h).toBeGreaterThanOrEqual(36);
-				expect(await v.evaluate(`document.querySelector(".od-sg[data-v=draft]").getAttribute("aria-pressed")`)).toBe("true");
-				expect((await box(v, ".od-tg")) === null || (await box(v, ".od-tg"))!.w === 0).toBe(true);
-			}
-			const card = (await box(v, ".fs-card"))!, draft = (await box(v, ".od-draftcol > .fs-body"))!;
-
-			await showOrig(v);
+			await click(v, ".rq-og");
 			await waitFor(v, `document.querySelector(".od-pane .mb-txt")`);
-			await settled(v);
 			expect(hits[ref]).toBe(1);
-			expect(await expanded(v)).toBe("true");
-			expect(await text(v, ".od-tt")).toBe("원문 접기");
-			const pane = await text(v, ".od-pane");
-			for (const s of ["Kim Minsu <kim@example.com>", "me@example.net", "다음 주 일정 확인 부탁드립니다", "1번째 줄이에요", "일정표.pdf"]) expect(pane).toContain(s);
-			expect(await text(v, ".od-ot")).toBe("원문");
-			expect(await v.evaluate(`document.querySelectorAll(".od-orig .dc-act, .od-orig .dc-acts, .od-orig .fs-ft").length`)).toBe(0);
-			expect(await v.evaluate(`(() => { const p = document.querySelector(".od-pane"); return p.scrollHeight > p.clientHeight && getComputedStyle(p).overflowY === "auto"; })()`)).toBe(true);
-			const o = (await box(v, ".od-orig"))!, d = (await box(v, ".fs-card"))!, dBody = (await box(v, ".od-draftcol > .fs-body"))!;
-			if (isWide) {
-				expect(o.w).toBeGreaterThanOrEqual(300);
-				expect(d.w).toBe(card.w);
-				expect(dBody.w).toBe(draft.w);
-				expect(d.l).toBeGreaterThan(card.l);
-				expect(d.l - o.r).toBeGreaterThanOrEqual(12);
-				expect(o.t).toBe(d.t);
-				expect(o.h).toBe(d.h);
-				expect(o.l).toBeGreaterThanOrEqual(0);
-				expect(d.r).toBeLessThanOrEqual(w);
-				expect(await v.evaluate(`!document.querySelector(".od-draftcol").contains(document.querySelector(".od-orig"))`)).toBe(true);
-			} else {
-				expect(o.l).toBeGreaterThanOrEqual(0);
-				expect(o.r).toBeLessThanOrEqual(w);
-				expect(o.w).toBeGreaterThan(w - 40);
-				expect((await box(v, ".od-draftcol"))!.r).toBeLessThanOrEqual(0);
-				expect(await v.evaluate(`document.querySelector(".od-sg[data-v=orig]").getAttribute("aria-pressed")`)).toBe("true");
-			}
-
-			await showDraft(v);
-			await settled(v);
-			expect(await expanded(v)).toBe("false");
-			expect(await v.evaluate(`document.querySelector(".od-orig").hasAttribute("inert")`)).toBe(true);
-			expect(await v.evaluate(`getComputedStyle(document.querySelector(".od-orig")).visibility`)).toBe("hidden");
-			expect((await box(v, ".fs-card"))!.l).toBe(card.l);
-			expect((await box(v, ".od-draftcol > .fs-body"))!.l).toBe(draft.l);
-			await showOrig(v);
-			await settled(v);
-			expect(await expanded(v)).toBe("true");
+			expect(await v.evaluate(`document.querySelector(".rq-og").getAttribute("aria-expanded")`)).toBe("true");
+			const card = (await box(v, ".fs-card"))!, pane = (await box(v, ".rq-og-wrap .od-pane"))!;
+			expect(pane.l).toBeGreaterThanOrEqual(card.l);
+			expect(pane.r).toBeLessThanOrEqual(card.r);
+			expect(await text(v, ".od-pane")).toContain("Kim Minsu <kim@example.com>");
+			await click(v, ".rq-og");
+			expect(await v.evaluate(`document.querySelector(".rq-og-wrap .od-pane").hidden`)).toBe(true);
+			await click(v, ".rq-og");
+			expect(await v.evaluate(`document.querySelector(".rq-og").getAttribute("aria-expanded")`)).toBe("true");
 			expect(hits[ref]).toBe(1);
 			v.close();
 		}
 	});
 
-	test("the slide uses --m-slow (300ms) and halfway the panel is between hidden and shown; reduced motion jumps", async () => {
-		const v = await open(1280, 800);
-		await openSheet(v, drafts.plain!);
-		await showOrig(v);
-		await waitFor(v, `document.querySelector(".od-pane .mb-txt")`);
-		await settled(v);
-		await showDraft(v);
-		await settled(v);
-		await showOrig(v);
-		const t = await v.evaluate(`document.getAnimations().filter(a => a.timeline === document.timeline).map(a => a.effect.getComputedTiming().duration).filter(d => d > 0)`);
-		expect(t.length).toBeGreaterThan(0);
-		for (const d of t as number[]) expect(d).toBe(300);
-		await v.evaluate(`document.getAnimations().filter(a => a.timeline === document.timeline).forEach(a => { a.pause(); a.currentTime = 150; })`);
-		const op = Number(await v.evaluate(`getComputedStyle(document.querySelector(".od-orig")).opacity`));
-		expect(op).toBeGreaterThan(0.05);
-		expect(op).toBeLessThan(0.95);
-		v.close();
-	});
-
 	test("the sheet stays open on the original when it repaints (고치기 asks for the change)", async () => {
 		const v = await open(1280, 800);
-		await openSheet(v, drafts.html!);
-		await showOrig(v);
+		await openSheet(v, drafts.html!, "", ".rq-og");
+		await click(v, ".rq-og");
 		await waitFor(v, `document.querySelector(".od-pane .mb-frame")`);
-		await settled(v);
-		await click(v, ".fs-ft .dc-act:nth-child(2)");
+		await click(v, ".fs-ft .rq-acts .btn.tonal");
 		await waitFor(v, `document.querySelector(".fs-ft .dc-note")`);
-		expect(await expanded(v)).toBe("true");
-		expect((await box(v, ".od-orig"))!.w).toBeGreaterThan(300);
+		expect(await v.evaluate(`document.querySelector(".rq-og").getAttribute("aria-expanded")`)).toBe("true");
+		expect((await box(v, ".rq-og-wrap .od-pane"))!.w).toBeGreaterThan(300);
 	});
 
-	test("the draft's buttons are one compact row of the draft panel and still answer", async () => {
+	test("the draft's buttons are one row: 보내기, 고치기, 보내지 않기, and 직접 수정 at the far right; 직접 수정 opens the clean body", async () => {
 		for (const [w, h] of [[390, 844], [1280, 800]] as const) {
 			const v = await open(w, h);
 			await theme(v, "light");
-			await openSheet(v, drafts.plain!);
-			const acts = await v.evaluate(`[...document.querySelectorAll(".dc-acts .dc-act")].map(b => b.textContent)`);
-			expect(acts).toEqual(["보내기", "고치기", "보내지 않기"]);
-			const row = (await box(v, ".dc-acts"))!, main = (await box(v, ".dc-act.main"))!, man = (await box(v, ".dc-manual"))!;
+			await openSheet(v, drafts.plain!, "", ".rq-og");
+			const acts = await v.evaluate(`[...document.querySelectorAll(".fs-ft .rq-acts .btn")].map(b => b.textContent)`);
+			expect(acts).toEqual(["보내기", "고치기", "보내지 않기", "직접 수정"]);
+			const row = (await box(v, ".fs-ft .rq-acts"))!, main = (await box(v, ".fs-ft .rq-acts .btn:nth-child(1)"))!, third = (await box(v, ".fs-ft .rq-acts .btn:nth-child(3)"))!, man = (await box(v, ".fs-ft .rq-manual"))!;
 			expect(main.l).toBe(row.l);
-			expect((await box(v, ".dc-acts .dc-act:nth-child(2)"))!.l).toBeGreaterThan(main.r);
-			expect(row.h).toBeLessThanOrEqual(48);
-			expect(main.h).toBeLessThanOrEqual(48);
-			expect(main.t).toBe((await box(v, ".dc-acts .dc-act:nth-child(3)"))!.t);
+			expect((await box(v, ".fs-ft .rq-acts .btn:nth-child(2)"))!.l).toBeGreaterThan(main.r);
+			expect(main.t).toBe(third.t);
+			expect(man.l).toBeGreaterThan(third.r);
+			expect(man.r).toBeGreaterThan(row.r - 24);
 			expect(man.t).toBeGreaterThanOrEqual(row.t);
 			expect(man.b).toBeLessThanOrEqual(row.b);
-			expect(man.l).toBeGreaterThan((await box(v, ".dc-acts .dc-act:nth-child(3)"))!.r);
 			expect(row.r).toBeLessThanOrEqual(w);
-			expect(await v.evaluate(`document.querySelectorAll(".dc-acts .dc-act").length + document.querySelectorAll(".dc-manual").length`)).toBe(4);
 			await Bun.write(`${SNAP}/buttons-${w}-light.png`, await v.screenshot());
-			await click(v, ".dc-manual");
+			await click(v, ".fs-ft .rq-manual");
 			await waitFor(v, `document.querySelector(".fs-ft .dc-note")`);
 			expect(await v.evaluate(`document.querySelector(".fs-ft .dc-note").value`)).toContain("말씀하신 일정 확인했습니다");
 			v.close();
@@ -313,9 +254,9 @@ describe("원문 보기 in the send sheet", () => {
 
 	test("보내지 않기 in the row posts the answer once", async () => {
 		const v = await open(1280, 800);
-		await openSheet(v, drafts.peer!);
+		await openSheet(v, drafts.peer!, "", ".rq-og");
 		await v.evaluate(`(() => { window.__posts = []; const f = window.fetch; window.fetch = (u, o) => { if (o && o.method === "POST") window.__posts.push(String(u)); return f(u, o); }; })()`);
-		await click(v, ".dc-acts .dc-act:nth-child(3)");
+		await click(v, ".fs-ft .rq-acts .dr-drop");
 		await waitFor(v, `window.__posts.length > 0`);
 		expect(await v.evaluate(`window.__posts.length`)).toBe(1);
 		v.close();
@@ -325,23 +266,20 @@ describe("원문 보기 in the send sheet", () => {
 		const ref = drafts.gone!;
 		gone.add(ref);
 		const v = await open(390, 844);
-		await openSheet(v, ref);
-		await showOrig(v);
+		await openSheet(v, ref, "", ".rq-og");
+		await click(v, ".rq-og");
 		await waitFor(v, `document.querySelector(".od-pane").textContent === "원문을 찾을 수 없어요"`);
 		expect(await text(v, ".od-pane")).toBe("원문을 찾을 수 없어요");
-		await showDraft(v);
-		await settled(v);
-		expect(await v.evaluate(`!document.querySelector(".fs-ft .dc-act").disabled`)).toBe(true);
-		expect((await box(v, ".od-draftcol > .fs-body"))!.w).toBeGreaterThan(120);
+		expect(await v.evaluate(`!document.querySelector(".fs-ft .dr-send").disabled`)).toBe(true);
 	});
 
 	test("a peer's draft is read through /api/peer/proxy, not from this computer", async () => {
 		const ref = drafts.peer!;
 		const v = await open(1280, 800);
 		const t = find(ref).decision!.to;
-		await openSheet(v, ref, `PQ.of.set(${JSON.stringify(t)}, { pc: { name: "mini", url: "http://mini.test:7777" }, key: ${JSON.stringify(t)} })`);
+		await openSheet(v, ref, `PQ.of.set(${JSON.stringify(t)}, { pc: { name: "mini", url: "http://mini.test:7777" }, key: ${JSON.stringify(t)} })`, ".rq-og");
 		delete hits[ref];
-		await showOrig(v);
+		await click(v, ".rq-og");
 		await waitFor(v, `document.querySelector(".od-pane .mb-txt")`);
 		expect(proxied.filter(u => u.endsWith("/original"))).toEqual([`http://mini.test:7777/api/drafts/${ref}/original`]);
 		expect(hits[ref] ?? 0).toBe(0);
@@ -466,21 +404,16 @@ describe("원문 보기 for a comment reply draft", () => {
 });
 
 describe("screenshots", () => {
-	test("a mail draft: closed and open at 390 (both toggle states) and 1280, light", async () => {
+	test("a mail draft: closed and open at 390 and 1280, light", async () => {
 		for (const [w, h] of [[390, 844], [1280, 800]] as const) {
 			const v = await open(w, h);
 			await theme(v, "light");
-			await openSheet(v, drafts.html!);
+			await openSheet(v, drafts.html!, "", ".rq-og");
 			await Bun.write(`${SNAP}/mail-closed-${w}-light.png`, await v.screenshot());
-			await showOrig(v);
+			await click(v, ".rq-og");
 			await waitFor(v, `document.querySelector(".od-pane .mb-frame")`);
 			await settled(v);
 			await Bun.write(`${SNAP}/mail-open-${w}-light.png`, await v.screenshot());
-			if (w < 900) {
-				await showDraft(v);
-				await settled(v);
-				await Bun.write(`${SNAP}/mail-open-${w}-draft-light.png`, await v.screenshot());
-			}
 			v.close();
 		}
 	});

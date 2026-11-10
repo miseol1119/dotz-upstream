@@ -39,13 +39,13 @@ describe("approval cards one after another", () => {
 		const na = noticeOf(a), nb = noticeOf(b);
 		expect(na.decision!.draft!.recipientWarning).toContain("reader2@hanmail.net");
 		await load(`(noticeSheetOpen(${JSON.stringify(na.id)}), 0)`);
-		await waitFor(`document.querySelectorAll(".fs-ft .dc-act").length === 3`);
-		expect(await view.evaluate(`document.querySelector(".fs-left").textContent`)).toBe(" · 남은 1건 (1/2)");
+		await waitFor(`document.querySelectorAll(".fs-ft .rq-acts .btn[data-n]").length === 3`);
+		expect(await view.evaluate(`document.querySelector(".fs-hd .fs-t .fs-left").textContent`)).toBe(" · 남은 1건 (1/2)");
 		expect(await view.evaluate(`document.querySelector(".dc-rw").textContent`)).toContain("hannail.net → reader2@hanmail.net");
 		// The hub answers the first card: the sheet moves on to the next card of the same conversation without another tap.
 		await view.evaluate(`(() => { const n = ntById(DK.nid); n.decision.state = "answered"; n.decision.answer = "1) 보내기"; dkPaint(); return 0; })()`);
-		await waitFor(`DK.nid === ${JSON.stringify(nb.id)} && document.querySelector(".fs-left")`);
-		expect(await view.evaluate(`document.querySelector(".fs-left").textContent`)).toBe(" · 마지막 카드예요 (2/2)");
+		await waitFor(`DK.nid === ${JSON.stringify(nb.id)} && document.querySelector(".fs-hd .fs-t .fs-left")`);
+		expect(await view.evaluate(`document.querySelector(".fs-hd .fs-t .fs-left").textContent`)).toBe(" · 마지막 카드예요 (2/2)");
 		expect(await view.evaluate(`!!document.querySelector(".dc-rw")`)).toBe(true);
 	});
 

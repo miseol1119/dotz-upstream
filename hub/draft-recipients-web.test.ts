@@ -74,6 +74,17 @@ test("전체 답장, a chip off and one added: each is one request and the card 
 	const v = await hub.view({ width: 390, height: 844 });
 	await v.navigate(base);
 	await openSheet(v);
+	// the 답장 확인 sheet: one close x and no 무시; the 받는이 stands folded (the address is a valid one) and opens and closes in place
+	expect(await v.evaluate(`document.querySelectorAll(".fs-card.mid.rq-sheet .fs-hd .fs-x").length`)).toBe(1);
+	expect(await v.evaluate(`document.querySelectorAll(".fs-hd .fs-ign").length`)).toBe(0);
+	const fold = async () => (await v.evaluate(`document.querySelector(".fs-body .rq-recv").getAttribute("aria-expanded") + "/" + document.querySelector(".fs-body .rq-recvbox").hidden`)) as string;
+	expect(await fold()).toBe("false/true");
+	await click(v, ".fs-body .rq-recv");
+	expect(await fold()).toBe("true/false");
+	await click(v, ".fs-body .rq-recv");
+	expect(await fold()).toBe("false/true");
+	await click(v, ".fs-body .rq-recv");
+	expect(await fold()).toBe("true/false");
 	expect(await texts(v, ".fs-body .dr-seg button")).toEqual(["답장", "전체 답장"]);
 	expect(await v.evaluate(`document.querySelector(".fs-body .dr-seg button[data-k='mode-reply']").getAttribute("aria-pressed")`)).toBe("true");
 	expect(await chips(v, "to")).toEqual(["kim@example.com"]);
@@ -110,6 +121,16 @@ test("전체 답장, a chip off and one added: each is one request and the card 
 	expect(notice().decision!.draft).toMatchObject({ to: "kim@example.com", mode: "reply" });
 	expect(notice().text).toContain("> 받는이: kim@example.com\n");
 	expect(notice().text).not.toContain("> 참조:");
+});
+
+test("the 받는이 fold stands open from the start when nobody or a malformed address would receive the mail", async () => {
+	const v = await hub.view({ width: 390, height: 844 });
+	await v.navigate(base);
+	await waitFor(v, `typeof draftRecvFold === "function"`);
+	const state = async (to: string) => (await v.evaluate(`(() => { const f = draftRecvFold({ toLabel: "받는이", to: ${JSON.stringify(to)}, subject: "x", body: "y" }, { t: "main", edit: false }); return f.querySelector(".rq-recv").getAttribute("aria-expanded") + "/" + f.querySelector(".rq-recvbox").hidden; })()`)) as string;
+	expect(await state("")).toBe("true/false");
+	expect(await state("not-an-address")).toBe("true/false");
+	expect(await state("kim@example.com")).toBe("false/true");
 });
 
 test("a draft that is no longer pending shows its 받는이·참조 read only, and the route refuses it", async () => {

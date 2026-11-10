@@ -144,7 +144,7 @@ for (const [name, width] of [["390", 390], ["1280", 1280]] as const) {
 		for (const b of got.draft) {
 			expect(b.radius).toBe("10px");
 			expect(b.h).toBe(32);
-			if (width === 390) expect(b.hit).toBe("-6px");
+			if (width === 390) expect(b.hit).toBe("-8px");   // 32 + 2 x 8: a 44px reach that a fraction of a pixel in the row cannot bring under 44
 		}
 		for (const b of got.result) {
 			expect(b.radius).toBe("10px");

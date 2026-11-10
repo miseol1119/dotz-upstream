@@ -61,7 +61,7 @@ const find = (ref: string) => stored().find(n => n.kind === "decision" && n.deci
 const openSheet = async (v: View, ref: string) => {
 	await waitFor(v, `typeof noticeSheetOpen === "function" && document.querySelector(".hn")`);
 	await v.evaluate(`noticeSheetOpen(${JSON.stringify(String(find(ref).id))})`);
-	await waitFor(v, `document.querySelector(".fs-bd .fs-card .dc-act")`);
+	await waitFor(v, `document.querySelector(".fs-bd .fs-card .rq-acts .dr-send")`);
 	await settled(v);
 };
 
@@ -110,7 +110,7 @@ describe("files in the send sheet at 390px", () => {
 		await openSheet(v, ref);
 		await waitFor(v, `document.querySelector(".fs-ft .dr-warn")`);
 		expect(await texts(v, ".fs-ft .dr-wn")).toEqual(["본문에 문서 파일을 보낸다고 썼지만 첨부파일이 없어요"]);
-		const warn = (await box(v, ".fs-ft .dr-warn"))!, send = (await box(v, ".fs-ft .dc-act.main"))!;
+		const warn = (await box(v, ".fs-ft .dr-warn"))!, send = (await box(v, ".fs-ft .rq-acts .dr-send"))!;
 		expect(warn.b).toBeLessThanOrEqual(send.t);
 		expect(await v.evaluate(`getComputedStyle(document.querySelector(".fs-ft .dr-warn")).backgroundColor !== getComputedStyle(document.querySelector(".fs-card")).backgroundColor`)).toBe(true);
 
@@ -137,7 +137,7 @@ describe("files in the send sheet at 390px", () => {
 		await waitFor(v, `document.querySelector(".fs-ft .dr-none")`);
 		expect(await texts(v, ".fs-ft .dr-none")).toEqual(["이 계정은 파일을 못 보내요 · 본문만 가요"]);
 		expect(await v.evaluate(`!!document.querySelector(".fs-body .dr-add")`)).toBe(false);
-		await click(v, ".fs-ft .dc-act.main");
+		await click(v, ".fs-ft .rq-acts .dr-send");
 		await waitFor(v, `document.querySelector(".fs-card .dtitle")`);
 		expect(await texts(v, ".fs-card .dtitle")).toEqual(["첨부 없이 보낼까요?"]);
 		expect(await v.evaluate(`!!document.querySelector("dialog[open]")`)).toBe(false);

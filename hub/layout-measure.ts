@@ -533,9 +533,9 @@ export const SCREENS: Screen[] = [
 	{ name: "project", call: `go("project", "ch:5")`, view: "project", ready: `!!document.querySelector("#v-project > *")` },
 	{ name: "monitoring", call: `go("monitoring")`, view: "monitoring", ready: `NM.loaded` },
 	{ name: "mail", call: `go("monitoring", "i:mail")`, view: "monitoring", ready: `NM.loaded && MON.sel === "i:mail"` },
-	// mail-recipient: the draft card's 받는 사람 추가 opened, an address field + 확인 button in the row
-	{ name: "mail-recipient", call: `go("monitoring", "i:mail")`, view: "monitoring", ready: `NM.loaded && MON.sel === "i:mail" && ${SHOWN_ADD}`,
-		open: { call: `${SHOWN_ADD}.click()`, ready: `!!document.querySelector(".dr-rc-edit .dr-rc-in")` }, close: `document.querySelectorAll(".dr-rc-edit .btn.text:not(.dr-rc-go)").forEach(b => b.click())` },
+	// mail-recipient: the draft card's 받는이 fold (button.rq-recv) opened, then 받는 사람 추가 opened: an address field + 확인 button in the row
+	{ name: "mail-recipient", call: `go("monitoring", "i:mail")`, view: "monitoring", ready: `NM.loaded && MON.sel === "i:mail" && !!document.querySelector(".rq-recv")`,
+		open: { call: `(document.querySelectorAll('.rq-recv[aria-expanded="false"]').forEach(b => b.click()), ${SHOWN_ADD}.click())`, ready: `!!document.querySelector(".dr-rc-edit .dr-rc-in")` }, close: `document.querySelectorAll(".dr-rc-edit .btn.text:not(.dr-rc-go)").forEach(b => b.click())` },
 	{ name: "notices", call: `go("notices")`, view: "notices", ready: `NT.loaded && !!document.querySelector("#v-notices > *")` },
 	{ name: "settings", call: `go("settings")`, view: "settings", ready: `!!document.querySelector("#settings > *")` },
 	{ name: "kakao", call: `go("monitoring", "i:kakao")`, view: "monitoring", ready: `NM.loaded && MON.sel === "i:kakao" && KK.loaded && KK.rooms.length === 5` },

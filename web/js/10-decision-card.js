@@ -285,12 +285,12 @@ function draftFilesNode(d, o = {}) {
       st.library ? el("button", { class: "btn tonal", type: "button", onclick: openLib }, "첨부 파일 폴더에서 고르기") : null) : null;
     const add = can && st.canAttach ? el("button", { class: "dr-add", type: "button", disabled: busy, "aria-expanded": String(!!DRF.menu[ref]), onclick: () => { if (!st.library) pickers.click(); else { DRF.menu[ref] = DRF.menu[ref] ? "" : "menu"; paint(); } } }, icon("clip"), el("span", { text: busy ? "붙이는 중…" : "파일 추가" })) : null;
     if (o.warn) { clear(o.warn).append(...warns.filter(Boolean)); o.warn.hidden = !warns.some(Boolean); }
-    // A mail draft always shows its 첨부 row, files or 없음, so the owner can tell a missing file from a hidden one (owner 2026-10-26).
+    // A mail draft with no file shows no 첨부 band (owner 2026-11-10): the 파일 추가 button stands alone; a file, or a real problem, is still listed.
     const mailDraft = d.toLabel === "받는이";
     // o.live (the mail of a combined card, read only): the list is read from the staged files, so a ✓ says they are on the mail.
     clear(box).append(...[fl.length ? el("div", { class: o.live && live ? "dr-fh ok" : "dr-fh", text: o.live && live ? `✓ 첨부 ${fl.length}개 붙어 있어요` : `첨부 ${fl.length}개` }) : null, ...rows,
       named ? el("div", { class: "dr-note", text: "열람 불가" }) : null,
-      !fl.length && (d.noAttachments || mailDraft) ? el("div", { class: "dr-none" }, icon("clip"), el("span", { text: "첨부: 없음" })) : null,
+      !fl.length && d.noAttachments && !mailDraft ? el("div", { class: "dr-none" }, icon("clip"), el("span", { text: "첨부: 없음" })) : null,
       add, menu, lib, ...(o.warn ? [] : warns), pickers].filter(Boolean));
     box.hidden = !box.querySelector(".dr-fh, .dr-none, .dr-warn, .dr-add");
   }
@@ -359,8 +359,9 @@ function draftToNode(d, o = {}) {
     const seg = live.reply ? el("div", { class: "seg dr-seg", role: "group", "aria-label": "답장 범위" },
       ...[['reply', '답장'], ['all', '전체 답장']].map(([k, text]) => el("button", { class: live.mode === k ? "on" : "", type: "button", "data-k": `mode-${k}`, "aria-pressed": String(live.mode === k), disabled: off || !editable, text, onclick: () => { if (editable && !off && live.mode !== k) run(() => drrWrite(ref, { mode: k })); } }))) : null;
     const ccRow = live.cc.length || (live.reply && editable) ? row("cc", "참조", live.cc, editable) : null;
-    clear(box).append(...[seg, live.reply || live.to.length ? row("to", "받는이", live.to, editable) : null, ccRow].filter(Boolean));
+    clear(box).append(...[seg, live.reply || live.to.length || o.always ? row("to", "받는이", live.to, editable) : null, ccRow].filter(Boolean));
     box.hidden = !box.querySelector(".dr-rcrow");
+    if (o.onpaint) o.onpaint(live);
   }
   paint();
   if (ref && o.edit !== false && !DRR.st[ref]) drrLoad(ref).then(paint);
@@ -462,12 +463,12 @@ const DRAFT_PROGRESS = /^-# ((?:남은 \d+건|마지막 카드예요)(?: \(\d+\/
 const draftProgress = text => (DRAFT_PROGRESS.exec(text || "") || [])[1] || "";
 const draftIsLast = text => draftProgress(text).startsWith("마지막");
 function renderSheet(box, dc, picks, step) {
-  const st = DC.st[dc.key] || "", d = dc.draft, edit = DC.edit[dc.key] && !st.startsWith("sent") ? DC.edit[dc.key] : null;
+  const st = DC.st[dc.key] || "", d = dc.draft, edit = DC.edit[dc.key] && !st.startsWith("sent") ? DC.edit[dc.key] : null, mail = !!d && d.toLabel === "받는이";
   const old = $(".fs-body", box), top = old && box.dataset.key === dc.key ? old.scrollTop : 0;
   const oldNote = $(".dc-note", box), refocus = !!oldNote && document.activeElement === oldNote, caret = refocus ? oldNote.selectionStart : 0;
   const qText = d ? draftQ(dc.blocks[0] && dc.blocks[0].title) : dc.question;
   // A mail draft's 받는이·참조 live in its own rows at the top of the body and change in place, so the head does not repeat them.
-  const head = fsHead(d ? [
+  const head = mail ? fsHead([el("div", { class: "fs-t" }, "답장 확인", dc.left ? el("span", { class: "fs-left", text: ` · ${dc.left}` }) : null)], { close: dc.close }) : fsHead(d ? [
     el("span", { class: "fs-ey" }, qText || "보내기 전에 확인해요", dc.left ? el("span", { class: "fs-left", text: ` · ${dc.left}` }) : null),
     !d.toLabel || d.toLabel !== "받는이" ? el("div", { class: "dc-dh" }, el("span", { class: "dc-dr-k", text: d.toLabel }), el("span", { class: "dc-dr-v", text: d.to || "-" })) : null,
     d.subject ? el("div", { class: "dc-dh" }, el("span", { class: "dc-dr-k", text: "제목" }), el("span", { class: "dc-dr-v sub", text: d.subject })) : null,
@@ -477,11 +478,11 @@ function renderSheet(box, dc, picks, step) {
   const warnBox = el("div", { class: "dr-warnbox", hidden: true });
   const orgDrawn = () => { delete box.dataset.sig; paintDecision(); };   // the sig does not hold the hub's answer, so the repaint is asked for
   const both = !!d && !!d.mail && d.toLabel === "대상" && orgHas(d.ref, dc.t, orgDrawn);   // a comment reply + mail: the original sits inline at the top (no room for the side panel beside the mail part)
-  const body = d ? el("div", { class: "fs-body panel", tabindex: "0", role: "region", "aria-label": "보낼 내용" }, draftBriefNode(d.brief), decideNode(d), (!d.toLabel || d.toLabel === "받는이" ? draftToNode(d, { t: dc.t, edit: !st }) : null), both ? orgInline(d, dc.t) : null, both ? replyHead() : null, draftRuleNode(d), draftOriginNode(d), draftBodyNode(d.body, "dc-dr-b"), draftFilesNode(d, { t: dc.t, edit: !st, warn: warnBox }), draftMailNode(d.mail, { t: dc.t }))
+  const body = mail ? mailSheetBody(dc, d, st, warnBox) : d ? el("div", { class: "fs-body panel", tabindex: "0", role: "region", "aria-label": "보낼 내용" }, draftBriefNode(d.brief), decideNode(d), (!d.toLabel || d.toLabel === "받는이" ? draftToNode(d, { t: dc.t, edit: !st }) : null), both ? orgInline(d, dc.t) : null, both ? replyHead() : null, draftRuleNode(d), draftOriginNode(d), draftBodyNode(d.body, "dc-dr-b"), draftFilesNode(d, { t: dc.t, edit: !st, warn: warnBox }), draftMailNode(d.mail, { t: dc.t }))
     : qText ? el("div", { class: "fs-body panel fit" }, mdNode(qText, "md dc-q")) : null;
   // 원문 보기 (10-draft-original.js): the original is its own panel beside the draft (a toggle on a phone); the draft side (body + footer) is the one that slides.
   box.classList.remove("od-host", "od-on");
-  const col = d && d.ref && body && !d.mail && (d.toLabel === "대상" || d.toLabel === "받는이") && orgHas(d.ref, dc.t, orgDrawn) ? el("div", { class: "od-draftcol" }) : null;
+  const col = d && d.ref && body && !d.mail && d.toLabel === "대상" && orgHas(d.ref, dc.t, orgDrawn) ? el("div", { class: "od-draftcol" }) : null;
   const org = col ? orgNodes(d, dc.t, box, col) : null;
   const foot = el("div", { class: "fs-ft" });
   foot.append(warnBox);
@@ -490,9 +491,15 @@ function renderSheet(box, dc, picks, step) {
   else if (d) {
     // One compact row: the first choice (보내기) filled, 고치기 tonal, the rest as text, and 직접 수정 as a small link at the end.
     const opts = dc.blocks[0].options, oe = opts.find(o => o.label === DRAFT_EDIT);
+    const manual = oe && !st ? () => { delete DC.note[dc.key]; DC.edit[dc.key] = { bi: 0, opt: oe, manual: true }; paintDecision(); } : null;
+    if (mail) {   // the reply card's row: 보내기 filled, 고치기 tonal, the rest as text, 직접 수정 at the right end
+      const bs = st === "undo" ? [dcUndoBtn(dc, "btn sm dr-send")] : opts.map((o, i) => el("button", { class: i === 0 ? "btn sm dr-send" : o.label === DRAFT_EDIT ? "btn tonal sm" : `btn text sm${o.label === "보내지 않기" ? " dr-drop" : ""}`, type: "button", "data-n": String(o.n), disabled: !!st, onclick: () => pickOption(dc, 0, o) }, o.label));
+      foot.append(el("div", { class: "dr-act dr-row rq-acts" }, ...bs, ...(manual ? [rqManualBtn(manual)] : [])));
+    } else {
     const btns = st === "undo" ? [dcUndoBtn(dc, "dc-act main")] : opts.map((o, i) => el("button", { class: `dc-act${i === 0 ? " main" : o.label === DRAFT_EDIT ? " alt" : ""}${picks[0] && picks[0].n === o.n ? " on" : ""}`, type: "button", disabled: !!st, onclick: () => pickOption(dc, 0, o) }, o.label));
-    const man = oe && !st ? el("button", { class: "dc-manual", type: "button", title: "직접 수정", "aria-label": "직접 수정", onclick: () => { delete DC.note[dc.key]; DC.edit[dc.key] = { bi: 0, opt: oe, manual: true }; paintDecision(); } }, icon("pencil"), el("span", { text: "직접 수정" })) : null;
+    const man = manual ? el("button", { class: "dc-manual", type: "button", title: "직접 수정", "aria-label": "직접 수정", onclick: manual }, icon("pencil"), el("span", { text: "직접 수정" })) : null;
     foot.append(el("div", { class: "dc-acts" }, ...btns, ...(man ? [man] : [])));
+    }
   } else if (dc.blocks.length > 1) foot.append(...multiNodes(dc, picks, st));
   else {
     const blk = dc.blocks[step];

@@ -68,16 +68,16 @@ const draw = `(() => {
 })()`;
 
 for (const width of [1440, 390]) {
-	test(`draft card at ${width}px: one question, mail preview, three actions, state badges, the thread row is the link`, async () => {
+	test(`draft card at ${width}px: one head line, mail preview, three actions, state badges, the thread row is the link`, async () => {
 		const v = await open(width);
 		const got = JSON.parse((await v.evaluate(`(${draw}, JSON.stringify((() => {
 			const cards = [...document.querySelectorAll("#mon-tl > .bm.dr")];
 			const c = cards[0], txt = e => e.textContent.trim();
 			const row = document.querySelector("#mon-tl > .bm.mr");
 			return { n: cards.length, states: cards.map(x => x.querySelector(".dr-st, .rq-sent").dataset.state), badge: cards.map(x => txt(x.querySelector(".dr-st, .rq-sent"))),   // a sent draft says 보냈어요 in its foot
-				questions: cards.map(x => x.textContent.split(${JSON.stringify(Q)}).length - 1), chip: txt(c.querySelector(".dr-chip")), subject: txt(c.querySelector(".dr-sub")),
+				questions: cards.map(x => x.querySelectorAll(".rq-hd").length), chip: txt(c.querySelector(".dr-chip")), subject: txt(c.querySelector(".dr-sub")),
 				subjectWeight: Number(getComputedStyle(c.querySelector(".dr-sub")).fontWeight), paras: [...c.querySelectorAll(".dr-body p")].map(txt),
-				orig: !!c.querySelector(".rq-orig"), buttons: cards.map(x => [...x.querySelectorAll("button:not(.dr-rm):not(.rq-more)")].map(txt)), more: cards.map(x => x.querySelectorAll(".rq-more").length), rm: cards.map(x => x.querySelectorAll(".dr-rm").length), rowCount: document.querySelectorAll("#mon-tl > .bm.dr .dcm-row").length,
+				orig: !!c.querySelector(".rq-orig"), buttons: cards.map(x => [...x.querySelectorAll("button:not(.dr-rm):not(.rq-more):not(.rq-recv)")].map(txt)), more: cards.map(x => x.querySelectorAll(".rq-more").length), rm: cards.map(x => x.querySelectorAll(".dr-rm").length), rowCount: document.querySelectorAll("#mon-tl > .bm.dr .dcm-row").length,
 				over: document.documentElement.scrollWidth > innerWidth, w: c.getBoundingClientRect().width,
 				rowRole: [row.getAttribute("role"), row.tabIndex], rowButtons: [...row.querySelectorAll("button")].map(b => b.dataset.k) };
 		})()))`)) as string) as any;

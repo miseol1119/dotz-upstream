@@ -60,7 +60,7 @@ test("a draft card that stands alone shows the lines once: the 메일 list, 답�
 	expect(await v.evaluate(`(() => { const c = monNoticeNode(ntById("wait"), []); c.id = "alone"; document.body.append(c); const n = ${blocks("#alone")}; c.remove(); return n; })()`)).toBe(1);
 	await openMail(page, "fx-2");
 	await v.evaluate(`(noticeSheetOpen("wait"), 0)`);
-	await waitFor(`DK.box && DK.box.querySelector(".fs-body .dc-brief")`);
+	await waitFor(`DK.box && DK.box.querySelector(".fs-body .rq-brief")`);
 	expect(await v.evaluate(`DK.box.querySelectorAll('[data-k="mail-lines"]').length`)).toBe(1);
 	await v.evaluate(`(dkClose(false), rqOpen(), 0)`);
 	await waitFor(`document.querySelector('#mon-tl .rq-r .nsc-tx')`);
