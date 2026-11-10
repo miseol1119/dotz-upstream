@@ -120,6 +120,19 @@ if [ -n "$UNINSTALL" ]; then
 	link=$HOME/.omp/agent/extensions/dotz
 	if [ -L "$link" ] && [ "$(readlink "$link")" = "$APP" ]; then rm -f "$link"; say "removed omp plugin link"; fi
 	if [ -d "$APP" ]; then rm -rf "$APP"; say "removed $APP"; fi
+	# The `dotz` terminal command (hub/dotz-command.ts): only a link to this data dir's launcher, and the block it appended to the shell files.
+	BB=${BUN_INSTALL:-$HOME/.bun}/bin
+	for dir in "$(dirname "$(command -v bun 2>/dev/null || echo "$BB/bun")")" "$BB" "$HOME/.local/bin"; do
+		case $dir in "$HOME"/*) ;; *) continue ;; esac
+		if [ -L "$dir/dotz" ] && [ "$(readlink "$dir/dotz")" = "$DATA/bin/dotz" ]; then rm -f "$dir/dotz"; say "removed command link $dir/dotz"; fi
+	done
+	for rc in .zshrc .bashrc .bash_profile .profile; do
+		f=$HOME/$rc
+		grep -qx '# >>> dotz >>>' "$f" 2>/dev/null && grep -qx '# <<< dotz <<<' "$f" || continue
+		# the block and the blank line it was appended after; written through cat so the file's mode and links stay
+		TMP=$(mktemp) && awk '/^# >>> dotz >>>$/ { skip = 1; held = 0; next } skip && /^# <<< dotz <<<$/ { skip = 0; next } skip { next } { if (held) print ""; held = ($0 == ""); if (!held) print } END { if (held) print "" }' "$f" >"$TMP" && cat "$TMP" >"$f"; rm -f "$TMP"
+		say "removed the dotz block from $f"
+	done
 	if [ -n "$PURGE" ]; then
 		if [ -d "$DATA" ]; then rm -rf "$DATA"; say "removed data dir $DATA"; fi
 	elif [ -d "$DATA" ]; then say "kept data dir $DATA (config, secrets, memory); --purge removes it"; fi

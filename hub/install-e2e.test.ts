@@ -2,9 +2,10 @@
 // a tarball install stamps itself and then self-updates to a newer local tarball; a --git install stays a git checkout and
 // self-updates through git as before. The copy of this repo's files is the "release".
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { installDotzCommand } from "./dotz-command.ts";
 
 const REPO = join(import.meta.dir, "..");
 let root: string, release: string, env: Record<string, string>;
@@ -383,3 +384,43 @@ test("when the opener exits 1 the address is printed instead", () => {
 	expect(i.out).toMatch(ADDRESS);
 	expect(i.out).not.toContain("opened the setup page");
 }, 60_000);
+
+// --uninstall takes the `dotz` command with it: the link the gateway made and the PATH block it appended to the shell files, and nothing else of the owner's.
+test("--uninstall removes the dotz command link and the shell file block, keeps everything else of the owner's; a foreign dotz stays", () => {
+	for (const purge of [true, false]) {
+		const home = mkdtempSync(join(root, "uninstall-"));
+		const data = join(home, ".dotz");
+		const bunDir = join(home, ".bun", "bin");
+		const rc = join(home, ".zshrc");
+		const mine = '# mine\nexport EDITOR=vim\n\nalias ll="ls -l"\n';
+		mkdirSync(bunDir, { recursive: true });
+		writeFileSync(rc, mine);
+		// a bun outside home: no link, the block goes into the shell file; then the same with a link beside bun
+		installDotzCommand({ dir: data, pkg: "/nowhere", bun: "/opt/none/bun", home, expose: true, shell: "/bin/zsh", platform: "darwin" });
+		expect(readFileSync(rc, "utf8")).toContain("# >>> dotz >>>");
+		installDotzCommand({ dir: data, pkg: "/nowhere", bun: join(bunDir, "bun"), home, expose: true, shell: "/bin/zsh", platform: "darwin" });
+		expect(lstatSync(join(bunDir, "dotz")).isSymbolicLink()).toBe(true);
+		const other = join(home, ".local", "bin");
+		mkdirSync(other, { recursive: true });
+		writeFileSync(join(other, "dotz"), "#!/bin/sh\necho not ours\n");
+		const r = run(["sh", join(REPO, "install.sh"), "--uninstall", ...(purge ? ["--purge"] : [])], { HOME: home, DOTZ_HOME: join(home, "app"), DOTZ_DIR: data });
+		expect(r.code).toBe(0);
+		expect(lstatSync(join(bunDir, "dotz"), { throwIfNoEntry: false })).toBeUndefined();
+		expect(readFileSync(rc, "utf8")).toBe(mine);
+		expect(readFileSync(join(other, "dotz"), "utf8")).toContain("not ours");
+		expect(existsSync(data)).toBe(!purge);
+	}
+});
+
+test("--uninstall leaves a dotz link that points somewhere else, and a shell file with no dotz block", () => {
+	const home = mkdtempSync(join(root, "uninstall-"));
+	const bunDir = join(home, ".bun", "bin");
+	mkdirSync(bunDir, { recursive: true });
+	writeFileSync(join(home, "elsewhere"), "x\n");
+	symlinkSync(join(home, "elsewhere"), join(bunDir, "dotz"));
+	writeFileSync(join(home, ".zshrc"), "# only mine\n");
+	const r = run(["sh", join(REPO, "install.sh"), "--uninstall"], { HOME: home, DOTZ_HOME: join(home, "app"), DOTZ_DIR: join(home, ".dotz") });
+	expect(r.code).toBe(0);
+	expect(lstatSync(join(bunDir, "dotz")).isSymbolicLink()).toBe(true);
+	expect(readFileSync(join(home, ".zshrc"), "utf8")).toBe("# only mine\n");
+});
