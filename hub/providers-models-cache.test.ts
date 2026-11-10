@@ -3,7 +3,7 @@
 // stays until a login changes (auth.json), the runtime binary changes (an update) or 10 minutes pass, and concurrent asks share one process.
 import { afterAll, expect, spyOn, test } from "bun:test";
 import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { authFile } from "./apikey-policy.ts";
 import { availableModels } from "./providers.ts";
 import { clock } from "./runtime/test-clock.ts";
@@ -53,6 +53,20 @@ test("a changed login (auth.json) is listed at the next ask, not 10 minutes late
 	spawns = 0;
 	clock.now += 1000;
 	login();
+	await availableModels();
+	expect(spawns).toBeGreaterThan(0);
+});
+
+test("a model added to the agent's models.json is listed at the next ask, not 10 minutes later", async () => {
+	const models = join(dirname(auth), "models.json");
+	writeFileSync(models, JSON.stringify({ providers: {} }));
+	utimesSync(models, ++stamp, ++stamp);
+	await availableModels();
+	spawns = 0;
+	clock.now += 1000;
+	await availableModels();
+	expect(spawns).toBe(0);
+	utimesSync(models, ++stamp, ++stamp);
 	await availableModels();
 	expect(spawns).toBeGreaterThan(0);
 });

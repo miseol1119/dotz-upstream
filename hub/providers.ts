@@ -2,7 +2,7 @@
 // started and finished through the gateway), API keys (`omp auth import`), sign-out (`omp auth-broker logout`), plus
 // the model catalog and quota. The gateway keeps no credentials of its own; keys are only ever shown masked.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { log, OMP, THINKING_LEVELS, writeAtomic } from "./config.ts";
 import { label } from "./account-alias.ts";
 import { authFile } from "./apikey-policy.ts";
@@ -98,8 +98,8 @@ async function ompJson<T>(args: string[], timeoutMs = 30_000): Promise<T | undef
 type Cached<T> = { at: number; value: T; stamp?: string };
 const TTL_MS = 20_000;
 // The model catalog is a child process (`omo --list-models`: ~0.5 s CPU, ~280 MB peak RSS, measured 2026-10-26) that every open page asked
-// for each minute (and 구성 every 15 s). It only changes with a login (auth.json, or invalidate() after a web login) or a runtime update
-// (the binary), so it is kept until one of those changes, re-read at most every MODELS_TTL_MS as a backstop.
+// for each minute (and 구성 every 15 s). It only changes with a login (auth.json, or invalidate() after a web login), a model added to the
+// agent's models.json or a runtime update (the binary), so it is kept until one of those changes, re-read at most every MODELS_TTL_MS as a backstop.
 const MODELS_TTL_MS = 10 * 60_000;
 const mtimeOf = (path: string | null | undefined): number => {
 	try {
@@ -108,7 +108,7 @@ const mtimeOf = (path: string | null | undefined): number => {
 		return 0;
 	}
 };
-const modelsStamp = (): string => [authFile(), Bun.which(OMO), Bun.which(OMP)].map(mtimeOf).join(":");
+const modelsStamp = (): string => [authFile(), join(dirname(authFile()), "models.json"), Bun.which(OMO), Bun.which(OMP)].map(mtimeOf).join(":");
 // The credential store moves between reads (a login, a key import, a pin) and a test or a second agent dir swaps the file: the
 // cache holds only the store it read, so a path or mtime change reads again instead of serving another store's accounts.
 const authStamp = (): string => `${authFile()}:${mtimeOf(authFile())}`;
