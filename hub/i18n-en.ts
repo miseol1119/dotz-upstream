@@ -224,6 +224,7 @@ export const en = {
 	orchTransient: `${enLeads.transientLead}. Continue the request you were handling when it stopped.`,
 
 	laneStopped: "[dotz gateway] Your process was restarted after it stopped responding. Continue the last request.",
+	laneSteered: (texts: string[]) => `Messages you received during the stuck turn. Handle them too if you have not yet:\n${texts.map(t => `- ${t}`).join("\n")}`,
 	laneRate: `${enLeads.rateLead}. Continue the work you were doing when it stopped.`,
 	laneProvider: `${enLeads.providerLead}. Continue the work you were doing when it stopped.`,
 	laneTransient: `${enLeads.transientLead}. Continue the work you were doing when it stopped.`,

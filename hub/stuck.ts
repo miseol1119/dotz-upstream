@@ -135,6 +135,8 @@ export function createStuckWatch(o: StuckWatchOpts) {
 				if (s.abortedAt !== undefined) s.abortedAt = now;
 				return;
 			}
+			// Capped and told: the turn is left alone until it ends normally, also after the hourly window slides past the old recoveries.
+			if (s.capped) return;
 			const grown = sizeOf(o.sessionFile());
 			if (grown !== undefined) {
 				if (size !== undefined && grown > size) progress("session file");

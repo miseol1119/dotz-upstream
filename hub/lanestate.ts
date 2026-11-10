@@ -44,6 +44,10 @@ export type Lane = Record_ & {
 	// Set to restart the process on the same session once it exits: text is the resume prompt (none = back to idle).
 	revive?: { text?: string };
 	lastFrameAt?: number;
+	/** Owner messages steered into the running turn since its turn_start: a stuck-turn recovery sends them again (lanerun.ts recover). */
+	steered?: string[];
+	/** An owner abort the process may ignore: killed and resumed idle when the turn is still running at its end (laneops.ts abortLane). */
+	abortTimer?: Timer;
 	recoveries?: number[];
 	recoveryCapped?: boolean;
 	workingSince?: number;

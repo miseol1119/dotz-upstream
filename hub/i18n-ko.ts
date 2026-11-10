@@ -217,6 +217,7 @@ export const ko: Catalog = {
 	orchTransient: `${koLeads.transientLead}. 멈췄을 때 처리하던 요청을 이어서 하세요.`,
 
 	laneStopped: "[dotz gateway] 프로세스가 응답을 멈춰서 다시 시작했어요. 마지막 요청을 이어서 처리하세요.",
+	laneSteered: (texts: string[]) => `멈춘 턴 중에 받은 메시지예요. 아직 처리하지 않았다면 함께 처리하세요:\n${texts.map(t => `- ${t}`).join("\n")}`,
 	laneRate: `${koLeads.rateLead}. 멈췄을 때 하던 작업을 이어서 하세요.`,
 	laneProvider: `${koLeads.providerLead}. 멈췄을 때 하던 작업을 이어서 하세요.`,
 	laneTransient: `${koLeads.transientLead}. 멈췄을 때 하던 작업을 이어서 하세요.`,

@@ -693,6 +693,7 @@ export function createPrompts(deps: PromptDeps) {
 	function reopen(wrap: (text: string) => string): { replayed: number; texts: string[] } {
 		const open = [...openDeferred(), ...(current && !current.done ? [current] : []), ...prompts]
 			.filter((p, i, all) => all.indexOf(p) === i)
+			.filter(p => !p.cancelled)
 			.filter(p => {
 				const done = isAnswered(p.replyTo);
 				if (done) deps.log(`not replaying ${p.target ?? "-"} ${p.replyTo} after the restart: already answered`);

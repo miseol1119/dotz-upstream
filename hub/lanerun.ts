@@ -6,7 +6,8 @@ import { isExpensive } from "./lanegates.ts";
 import { markSteers, steerContract, steerToken } from "./steer-mark.ts";
 import { hubChain, Chain, keyedWorker, Reverter, workerKeyEnv } from "./fallback.ts";
 import { pauseExhausted } from "./lanefailover.ts";
-import { statusActivity, endSubagents } from "./activity.ts";
+import { statusActivity, endSubagents, runningSubagents } from "./activity.ts";
+import { createStuckWatch } from "./stuck.ts";
 import { readEvents } from "./laneevents.ts";
 import { abandonCompact } from "./context.ts";
 import { report, withHeld } from "./lanereport.ts";
@@ -18,6 +19,28 @@ import { unfinishedWork } from "./laneunfinished.ts";
 
 export const RECOVERY_MAX = 3;
 export const RECOVERY_WINDOW_MS = 60 * 60_000;
+
+// One stuck-turn watch per lane (hub/stuck.ts): fed by the lane's events (laneevents.ts), it aborts a turn that shows no progress for
+// stuckTurnMs() and recovers the lane on the same session when the abort does not end the turn. Waiting on a subagent, a compaction or
+// an owner question is not a stall. The line goes to the lane's own channel only; past the hourly cap the orchestrator is told once.
+const watches = new WeakMap<Lane, ReturnType<typeof createStuckWatch>>();
+export function laneStuck(lane: Lane): ReturnType<typeof createStuckWatch> {
+	let w = watches.get(lane);
+	if (!w) {
+		w = createStuckWatch({
+			key: `lane:${lane.name}`,
+			pid: () => lane.proc?.pid,
+			sessionFile: () => lane.sessionFile,
+			exempt: () => lane.status !== "working" || !lane.proc || runningSubagents(`lane:${lane.name}`) > 0 || lane.ctx.compaction.state === "queued" || lane.ctx.compaction.state === "compacting" || Boolean(lane.pendingAsk),
+			abort: () => lane.proc?.abort(),
+			restart: why => recover(lane, `${why} (턴이 끝나지 않았어요)`, true),
+			stuck: minutes => hooks.notice(lane, `작업이 ${minutes}분 동안 멈춰 있어서 끊고 다시 이어가요.`),
+			capped: minutes => hooks.report(lane, `[lane stuck] 턴이 ${minutes}분 동안 멈춰 있어요. 한 시간 안에 ${RECOVERY_MAX}번 자동 복구했는데 또 멈춰서 더는 건드리지 않아요. 직접 확인해 주세요.`),
+		});
+		watches.set(lane, w);
+	}
+	return w;
+}
 
 // The runtime whose session file a lane holds: recorded at spawn, else (a lane saved before it was recorded) read from the
 // session's place: omp keeps sessions under ~/.omp, OmO under ~/.omo (or its agent dir), Claude Code names a bare id.
@@ -144,6 +167,9 @@ export function spawn(lane: Lane, resume: boolean): boolean {
 		lane.proc = undefined;
 		abandonCompact(lane.ctx, "the lane process exited");
 		clearTimeout(lane.watchdog);
+		clearTimeout(lane.abortTimer);
+		lane.abortTimer = undefined;
+		laneStuck(lane).reset();
 		clearTimeout(lane.resumeTimer);
 		lane.resumeTimer = undefined;
 		clearTimeout(lane.transientTimer);
@@ -189,7 +215,7 @@ export function resumeLane(lane: Lane, text: string): void {
 	log(`lane ${lane.name} resumed ${lane.sessionFile}`);
 }
 
-// Aborts a lane that cannot go on (a turn with no frames for STALL_MS, or a failed compaction) by killing its process,
+// Recovers a lane that cannot go on (a stuck turn that ignored its abort, or a failed compaction) by killing its process,
 // then resumes the same session: a turn that was running is told to continue, an idle lane just comes back idle.
 export function recover(lane: Lane, why: string, wasWorking: boolean): void {
 	if (!lane.proc || !lane.sessionFile || lane.revive) return;
@@ -211,6 +237,8 @@ export function recover(lane: Lane, why: string, wasWorking: boolean): void {
 	log(`lane ${lane.name} recovering: ${why}`);
 	// Bookkeeping: not a chat message and not an orchestrator turn. Only the final "[lane stuck]" above is reported.
 	log(`lane ${lane.name} recovery ${lane.recoveries.length}/${RECOVERY_MAX}: restarting on the same session`);
-	lane.revive = { text: wasWorking ? msg().laneStopped : undefined };
+	// Owner messages steered into the cut-off turn may not have been read: they go along with the continue text.
+	const steered = wasWorking ? (lane.steered ?? []) : [];
+	lane.revive = { text: wasWorking ? msg().laneStopped + (steered.length ? `\n\n${msg().laneSteered(steered)}` : "") : undefined };
 	lane.proc.kill(true);
 }

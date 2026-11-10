@@ -6,7 +6,7 @@ import { rmSync } from "node:fs";
 import { handleError, laneRecovered, settleRevert, settleChain } from "./lanefailover.ts";
 import { nextLastText, scheduleReport, REPORT_DEBOUNCE_MS, report } from "./lanereport.ts";
 import { compactAtFor, lanesCompactAt, log } from "./config.ts";
-import { recover } from "./lanerun.ts";
+import { laneStuck, recover } from "./lanerun.ts";
 import { prompt } from "./laneprompt.ts";
 import { msg } from "./i18n.ts";
 import { revertWhy } from "./fallback.ts";
@@ -16,6 +16,7 @@ import { runtimeFor } from "./runtime/index.ts";
 // A lane started with a fallback chain: after a failed request the runtime may move to the next model by itself and redo
 // the turn, so the failure is acted on (pause, retry, error report) only when no such switch follows within a short grace.
 const FALLBACK_GRACE_MS = 3000;
+const STUCK_RECOVER_DELAY_MS = 250;
 
 // OmO refuses a new turn while its own turn or compaction still runs ("Concurrent ... turn admission"): the provider call
 // failed, nothing answered the text and the lane went idle on a lane error (ecount-relearn 2026-11-06 02:10). It is sent again
@@ -64,6 +65,7 @@ export async function readEvents(lane: Lane, proc: AgentProcess): Promise<void> 
 	// Whether the turn was running when the current frame's first event arrived (before any of its events took effect).
 	let wasWorking = false;
 	for await (const ev of proc.events) {
+		laneStuck(lane).progress(ev.type);
 		emitEventActivity(source, ev);
 		noteEvent(lane.ctx, ev, portOf(lane));
 		switch (ev.type) {
@@ -84,6 +86,8 @@ export async function readEvents(lane: Lane, proc: AgentProcess): Promise<void> 
 				rmSync(pendingFile(lane), { force: true });
 				setStatus(lane, "working");
 				lane.progressAt = Date.now();
+				lane.steered = undefined;
+				laneStuck(lane).begin();
 				break;
 			case "assistant":
 				if (ev.stop === "error" && lane.prompted !== undefined && REFUSED_RE.test(ev.error.text)) {
@@ -119,6 +123,14 @@ export async function readEvents(lane: Lane, proc: AgentProcess): Promise<void> 
 				break;
 			case "turn_end":
 				lane.resuming = false;
+				clearTimeout(lane.abortTimer);
+				lane.abortTimer = undefined;
+				// Our stuck abort ended the turn: the lane is recovered right now on its session; the cut-off turn reports nothing.
+				if (laneStuck(lane).end()) {
+					// A beat for the abort's last frames to land before the process is replaced.
+					setTimeout(() => lane.proc === proc && recover(lane, "턴이 멈춰 있어서 끊었어요", true), STUCK_RECOVER_DELAY_MS);
+					break;
+				}
 				scheduleReport(lane);
 				settleRevert(lane, true);
 				setTimeout(() => settleChain(lane), REPORT_DEBOUNCE_MS + 150);

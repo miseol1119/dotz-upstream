@@ -35,7 +35,7 @@ import { inOrder, localize } from "./outlang.ts";
 import { dropClaim, splitTone, stripHandoff, stripLater, stripProjectInfo } from "./tone.ts";
 import { isLate, isSnowflake, lateQuote, lateRequestId, replyRef, snowflakeTime, withQuote } from "./threads.ts";
 import { keepBrief } from "./draft-approval.ts";
-import { markDraftPosted, onDecisionClosed, onDraftCardRefreshed, openDraftCards, openDraftRefs, openDraftText, orchestratorAnswered, rewriteOpenDraft } from "./notices.ts";
+import { allNotices, markDraftPosted, onDecisionClosed, onDraftCardRefreshed, openDraftCards, openDraftRefs, openDraftText, orchestratorAnswered, rewriteOpenDraft } from "./notices.ts";
 import { cardPointer, cardRef, cardTitle, CARDS_LEAD, closedCardText, createApprovalQueue, loadHeld, pendingCardsNote, splitDraftCards } from "./approval-queue.ts";
 import { mailItemKey, mailKeyOfRef } from "./draft-handled.ts";
 import { draftHeads, listDrafts as listMailDrafts } from "../features/reply-drafts/lib/store.ts";
@@ -44,6 +44,7 @@ import { recheckAnswered } from "./watch-recheck.ts";
 import { route } from "./notify-route.ts";
 import { isWebLane } from "./discord-post.ts";
 import { repeatAlert } from "./alert-gate.ts";
+import { pendingWaits } from "./auth.ts";
 
 // Prompt queue: see prompts.ts. Unanswered prompts are kept on disk, so a restart mid-turn replays them on boot.
 const PENDING = join(DATA_DIR, "pending.json");
@@ -570,6 +571,14 @@ export function cancelOwnerTurn(c: Conv = mainConv): string | undefined {
 function wireAnswers(c: Conv): void {
 	c.o.setOwnerCancel(() => cancelOwnerTurn(c));
 	c.o.setWorkerHandlers(c.queue.workersSpawned, c.queue.workersDone, c.queue.workersSteered);
+	// A stuck turn (hub/stuck.ts) is told in the conversation whose request it holds, never elsewhere (313ab2cf, 7b95eed4).
+	c.o.setStuckHandler(minutes => {
+		const target = c.queue.current()?.target ?? (c.key === MAIN ? undefined : c.primary);
+		if (!target) return log(`stuck turn of ${c.key} (${minutes} min): no conversation to tell`);
+		void out(target, `작업이 ${minutes}분 동안 멈춰 있어서 끊고 다시 이어가요.`, undefined, { source: "gateway" }).catch(e => log(`stuck notice to ${target} failed: ${e}`));
+	});
+	// An open question to the owner (a decision notice, a dotz_auth wait) is a legitimate wait, not a stall.
+	c.o.setStuckGuard(() => allNotices().some(n => n.kind === "decision" && n.decision?.state === "open" && (n.decision.to === c.primary || (c.key === MAIN && (n.decision.to === "main" || n.decision.to.startsWith("auth:"))))) || pendingWaits().some(w => w.session === c.key));
 	// The final answer of a turn goes to every channel that asked and did not already get a dotz_send reply.
 	c.o.setAnswerHandlers(
 		c.queue.onPrompt,

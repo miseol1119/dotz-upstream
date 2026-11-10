@@ -24,6 +24,7 @@ import { parseTone } from "./tone.ts";
 import { activeCount, laneLimits, launchWait, waitingLanes } from "./lanelimits.ts";
 import { trackTimer } from "./shutdown.ts";
 import { diskGuardTick } from "./diskguard.ts";
+import { ABORT_GRACE_MS } from "./stuck.ts";
 
 const NAME_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
 
@@ -146,6 +147,7 @@ export function sendToLane(name: string, text: string, ref?: string, gateway = f
 	// report, so every one woke the orchestrator.
 	if (!gateway && !/^\[owner via /.test(text) && text !== "/budget-ok") lane.orchAsked = true;
 	const how: LaneDelivery = !lane.proc ? "resumed" : lane.status === "working" || lane.startingOn === lane.proc ? "steered" : lane.status === "rate-limited" ? "held" : "received";
+	if (!gateway && lane.proc && lane.status === "working") (lane.steered ??= []).push(text);
 	if (lane.proc) prompt(lane, text);
 	else resumeLane(lane, text);
 	ownerNotes.asked(name, ref);
@@ -206,7 +208,18 @@ export function abortLane(name: string): void {
 	if (!lane.proc) throw new Error(`lane ${name} is not running`);
 	lane.ownerStopped = true;
 	persist(lane);
-	lane.proc.abort();
+	const p = lane.proc;
+	p.abort();
+	// A process that ignores the abort stays "working": killed after the grace and resumed on the same session idle, with no continue text
+	// and not counted as a recovery (the owner stopped it; laneevents.ts turn_end disarms this).
+	clearTimeout(lane.abortTimer);
+	lane.abortTimer = setTimeout(() => {
+		lane.abortTimer = undefined;
+		if (lane.proc !== p || lane.status !== "working") return;
+		log(`lane ${name} ignored the owner abort; restarting it on the same session`);
+		lane.revive = { text: undefined };
+		p.kill(true);
+	}, ABORT_GRACE_MS);
 }
 
 // Resumes a stopped lane (or, with text, steers a running one) from its saved session.
