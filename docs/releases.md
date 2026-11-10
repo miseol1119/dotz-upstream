@@ -36,7 +36,7 @@ starts it again. A new slot stops a run still going from the old one before it s
 and it exists only in the owner's `~/.dotz/watches.json`. The command also refuses any GitHub login except `ddotz`, so a copied watch does nothing.
 Add it from the install folder, which follows the tags: `dotz_watch` name `release-slot`, every 1 minute, on `fail`, command
 `PATH=/opt/homebrew/bin:$PATH bun ~/.local/share/dotz/hub/release.ts --dispatch`; the default timeout is enough.
-A release that failed makes the watch fail until the next slot, so its failure alert tells the owner the window's fixes did not go out.
+A release that failed makes the watch fail until the next slot, so its failure alert tells the owner the window's fixes did not go out. A skipped slot (red suite, or a green one whose release failed) ends the tick with exit 3 (`hub/release-exit.ts`); the watch alert then says the slot was skipped instead of counting the minutes it kept failing.
 One slot publishes once: `--auto` stops when the newest scheduled tag's commit is at or after the slot start (00:00, 12:00 or
 18:00 KST), so a second run in the same slot does nothing.
 `.github/workflows/release.yml` is kept for one thing only, the switch to signed tags: the release that brings this code is started the old way by

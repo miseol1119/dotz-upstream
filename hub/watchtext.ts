@@ -4,6 +4,7 @@
 // the raw text folds under a "원문" fence that the web renders collapsed (web/js/11-watchtext.js mirrors this file, 02-basic-markdown.js
 // folds the fence) and Discord shows as a code block.
 import { TZ } from "./config.ts";
+import { SLOT_SKIPPED_EXIT } from "./release-exit.ts";
 
 // The words the gateway writes for a lost login, its recovery and a check that found nothing new. hub/notice-class.ts reads them back
 // (loginLost, watchUnchanged) and hub/limit-alert.ts writes the provider ones, so both sides share one spelling.
@@ -21,6 +22,8 @@ export function watchReasonKo(reason: string): string {
 	if (r === "match" || r.startsWith("matched /")) return "조건에 맞는 결과가 나왔어요";
 	if (r === "fail") return "점검에 실패했어요";
 	if (r === "recovered") return "다시 정상이에요";
+	// The release-slot watch fails every minute of a skipped slot: that is one skipped slot, not that many failed checks.
+	if (r.endsWith(`(exit ${SLOT_SKIPPED_EXIT})`) && /^failed \d+ times in a row/.test(r)) return "이 시간대의 릴리스를 건너뛰었어요";
 	const fails = /^failed (\d+) times in a row/.exec(r)?.[1];
 	if (fails) return `${fails}번 연속 실패했어요`;
 	if (r.startsWith("stopped after a password")) return `${LOGIN_NO_PASSWORD_KO}. 맥 암호에 저장하고 다시 연결을 눌러 주세요`;

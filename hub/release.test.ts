@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { SLOT_SKIPPED_EXIT } from "./release-exit.ts";
 import { type Attempt, failedFiles, failedTests, RETRY_MAX_FAILED_SHARE, runGate, runWithRetry, type GateEnv, type SuiteFn, type SuiteResult, testFileCount } from "./release-gate.ts";
 import {
 	compareVersions,
@@ -644,7 +645,7 @@ describe("release slots", () => {
 			const run = scripted([failing(names(3)), failing([names(3)[1]!], 3)]);
 			kit.state.runner = d => runWithRetry(d, run.attempt);
 			const out: string[] = [];
-			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print: l => out.push(l) }, "2026-11-05T12:00:10")).toBe(1);
+			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print: l => out.push(l) }, "2026-11-05T12:00:10")).toBe(SLOT_SKIPPED_EXIT);
 			expect(kit.state.released).toEqual([]);
 			expect(run.calls).toHaveLength(2); // never a second retry
 			expect(readFileSync(join(dir, "release-slot"), "utf8").trim()).toBe(slotStart(kst("2026-11-05T12:00:10")).toISOString());
@@ -658,7 +659,7 @@ describe("release slots", () => {
 			const over = Math.floor(100 * RETRY_MAX_FAILED_SHARE) + 1;
 			const run = scripted([failing(names(over))]);
 			kit.state.runner = d => runWithRetry(d, run.attempt);
-			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print }, "2026-11-05T12:00:10")).toBe(1);
+			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print }, "2026-11-05T12:00:10")).toBe(SLOT_SKIPPED_EXIT);
 			expect(run.calls).toEqual([undefined]);
 			expect(kit.state.released).toEqual([]);
 		});
@@ -765,11 +766,11 @@ describe("release slots", () => {
 				const lines: string[] = [];
 				const say = (l: string) => lines.push(l);
 				kit.state.release = { code: 1, out: "first line\npush refused: remote hung up" };
-				expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T12:00:10")).toBe(1);
+				expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T12:00:10")).toBe(SLOT_SKIPPED_EXIT);
 				expect(lines.at(-1)).toContain("push refused: remote hung up");
 				expect(existsSync(join(dir, "release-slot"))).toBe(true);
 				expect(JSON.parse(readFileSync(join(dir, "release-run.json"), "utf8"))).toMatchObject({ state: "failed" });
-				expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T13:00:10") })).toBe(1);
+				expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T13:00:10") })).toBe(SLOT_SKIPPED_EXIT);
 				expect(kit.state.suites).toBe(1);
 				expect(kit.state.released).toHaveLength(1);
 				kit.state.release = { code: 0, out: "released" };
@@ -785,7 +786,7 @@ describe("release slots", () => {
 				const now = kst("2026-11-05T12:00:10");
 				await tick(kit, { stateDir: dir, exec, print, now });
 				writeFileSync(join(dir, "gate-result.json"), JSON.stringify({ slot: slotStart(now).toISOString(), sha: kit.state.head, green: true, failed: [], detail: "" }));
-				expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(1);
+				expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(SLOT_SKIPPED_EXIT);
 				expect(existsSync(join(dir, "release-slot"))).toBe(true);
 			});
 		});
@@ -793,7 +794,7 @@ describe("release slots", () => {
 		test("a red suite releases nothing", async () => {
 			const dir = stateDir();
 			const kit = gateKit({ green: false, failed: ["hub/a.test.ts"], detail: "" });
-			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print }, "2026-11-05T12:00:10")).toBe(1);
+			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print }, "2026-11-05T12:00:10")).toBe(SLOT_SKIPPED_EXIT);
 			expect(kit.state.released).toEqual([]);
 			expect(JSON.parse(readFileSync(join(dir, "release-run.json"), "utf8"))).toMatchObject({ state: "failed" });
 		});
@@ -804,12 +805,12 @@ describe("release slots", () => {
 			const kit = gateKit({ green: false, failed: ["hub/a.test.ts", "hub/b.test.ts"], detail: "" });
 			const lines: string[] = [];
 			const say = (l: string) => lines.push(l);
-			expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T12:00:10")).toBe(1);
+			expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T12:00:10")).toBe(SLOT_SKIPPED_EXIT);
 			expect(lines.at(-1)).toContain("hub/a.test.ts, hub/b.test.ts");
 			expect(calls).toEqual([]);
 			expect(kit.state.released).toEqual([]);
 			// the rest of the slot: the watch keeps failing, the suite is not run again
-			expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:01:10") })).toBe(1);
+			expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:01:10") })).toBe(SLOT_SKIPPED_EXIT);
 			expect(kit.state.suites).toBe(1);
 			expect(kit.state.spawned).toHaveLength(1);
 			expect(calls).toEqual([]);
@@ -829,7 +830,7 @@ describe("release slots", () => {
 			];
 			const kit = gateKit({ green: false, failed: ["hub/a.test.ts", "hub/b.test.ts"], failures, detail: "the tail of the output" });
 			const lines: string[] = [];
-			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print: l => lines.push(l) }, "2026-11-05T12:00:10")).toBe(1);
+			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print: l => lines.push(l) }, "2026-11-05T12:00:10")).toBe(SLOT_SKIPPED_EXIT);
 			expect(existsSync(join(dir, "gate-result.json"))).toBe(false); // cleared, as before
 			const kept = JSON.parse(readFileSync(join(dir, "release-red.json"), "utf8")) as { failures: unknown; failed: unknown; detail: string; sha: string };
 			expect(kept).toMatchObject({ failures, failed: ["hub/a.test.ts", "hub/b.test.ts"], detail: "the tail of the output", sha: kit.state.head });

@@ -7,6 +7,8 @@ function watchReasonKo(reason) {
   if (r === "match" || r.startsWith("matched /")) return "조건에 맞는 결과가 나왔어요";
   if (r === "fail") return "점검에 실패했어요";
   if (r === "recovered") return "다시 정상이에요";
+  // hub/release-exit.ts SLOT_SKIPPED_EXIT: the release-slot watch fails every minute of a skipped slot; that is one skipped slot, not that many failed checks.
+  if (/^failed \d+ times in a row.*\(exit 3\)$/.test(r)) return "이 시간대의 릴리스를 건너뛰었어요";
   const fails = (r.match(/^failed (\d+) times in a row/) || [])[1];
   if (fails) return `${fails}번 연속 실패했어요`;
   if (r.startsWith("stopped after a password")) return "저장된 비밀번호가 없어 다시 로그인하지 못했어요. 맥 암호에 저장하고 다시 연결을 눌러 주세요";

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { writeAtomic } from "../firstrun/atomic.ts"; // not hub/config.ts: it needs a data dir at load, and CI has none
 import { ownerAddress, releaseTerms, scrub, type Term } from "./public-scrub.ts";
 import { clearGate, gateStatus, realGateEnv, runGate, runSuiteIn, saveRedEvidence, startGate, type GateEnv } from "./release-gate.ts";
+import { SLOT_SKIPPED_EXIT } from "./release-exit.ts";
 import { buildReleaseNote, NOTE_LOG_FORMAT, parseNoteCommits } from "./release-note.ts";
 import { keyMissing, pushAuthArgs, RELEASE_IDENTITY, signingKeyPath, signMode, signTag, verifyOwnTag, type SignMode } from "./release-sign.ts";
 
@@ -491,7 +492,7 @@ export async function dispatchSlot(opts: DispatchOptions): Promise<number> {
 	const failure = settleRun(opts, slot);
 	if (failure) {
 		print(failure);
-		return 1;
+		return SLOT_SKIPPED_EXIT;
 	}
 	if (existsSync(stateFile) && readFileSync(stateFile, "utf8").trim() === slot) return 0;
 
@@ -560,7 +561,7 @@ export async function dispatchSlot(opts: DispatchOptions): Promise<number> {
 	writeAtomic(join(opts.stateDir, "release-run.json"), `${JSON.stringify({ slot, startedAt: now.toISOString(), state: "failed", message } satisfies RunState)}\n`);
 	clearGate(opts.stateDir);
 	print(message);
-	return 1;
+	return SLOT_SKIPPED_EXIT;
 }
 
 function failedList(failed: readonly string[]): string {

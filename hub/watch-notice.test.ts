@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { now } from "./config.ts";
+import { SLOT_SKIPPED_EXIT } from "./release-exit.ts";
 import { emit } from "./events.ts";
 import { inboxText } from "./intake.ts";
 import { keepWatchNewest, listNotices, NOTICE_CAP, setOrchestratorAvailable, setWatchLabelResolver, setWatchSummarizer, WATCH_DAYS, WATCH_KEEP } from "./notices.ts";
@@ -25,6 +26,13 @@ afterAll(() => {
 	setOrchestratorAvailable(() => true);
 	clearChannel(CH);
 	clearChannel(CH2);
+});
+
+test("a skipped release slot is not counted in failed ticks: the reason reads the same however many minutes it has failed", () => {
+	const skipped = (fails: number) => watchReasonKo(`failed ${fails} times in a row (exit ${SLOT_SKIPPED_EXIT})`);
+	expect(skipped(2)).toBe(skipped(300));
+	expect(skipped(2)).not.toContain("2");
+	expect(skipped(2)).not.toBe(watchReasonKo("failed 2 times in a row (exit 1)"));
 });
 
 test("reasons of the watch runner read as Korean and unknown ones pass through", () => {
