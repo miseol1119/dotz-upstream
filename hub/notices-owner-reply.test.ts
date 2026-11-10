@@ -27,6 +27,24 @@ test("an answer by number, numbered label or label text closes it", () => {
 	}
 });
 
+test("plain words pointing at an option's number close it", () => {
+	for (const text of ["1번으로 해", "1로 하자", "2번", "ㄱㄱ 1로", "2) 그걸로 해요", "2번 부탁해요", "1이요"]) {
+		resetNoticesForTest();
+		ask();
+		owner(text);
+		expect({ text, state: state().state }).toEqual({ text, state: "answered" });
+	}
+});
+
+test("another subject, even one holding a number that matches an option, leaves it open", () => {
+	for (const text of ["그건 그렇고 날씨 어때?", "맥북도 재시작했어요.", "1시에 재시작했어요", "2분 뒤에 다시 해줘", "1 시간 뒤에 봐요", "2026-11-10에 보내요", "1.5배로 해줘"]) {
+		resetNoticesForTest();
+		ask();
+		owner(text);
+		expect({ text, state: state().state }).toEqual({ text, state: "open" });
+	}
+});
+
 test("a number that is no option, or a label inside another sentence, leaves it open", () => {
 	ask();
 	owner("7");
