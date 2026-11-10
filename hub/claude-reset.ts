@@ -8,6 +8,8 @@ import { claudeGrants, claudeOrg, claudeResets, claudeUsageGet, subscriptionAcco
 
 type Json = Record<string, any>;
 const API = "https://api.anthropic.com/api/organizations";
+// The results the usage screen knows how to word (web/js/21-providers.js resetRow). Any other answer is not told to the owner as a success.
+const OUTCOMES = new Set(["reset", "nothing_to_reset", "not_limited", "no_credit", "already_redeemed", "already_used", "cooldown"]);
 
 let using = false;
 export async function useClaudeReset(b: Json): Promise<{ status: number; body: Json }> {
@@ -39,6 +41,7 @@ export async function useClaudeReset(b: Json): Promise<{ status: number; body: J
 		const r = (await out.json()) as Json;
 		const outcome = String(r.result ?? "");
 		log(`claude: limit reset ${grant.id} for ${acct.name}: ${outcome}`);
+		if (!OUTCOMES.has(outcome)) return { status: 502, body: { error: "리셋권 결과를 확인하지 못했어요. 사용량 화면에서 남은 개수를 확인해 주세요" } };
 		return { status: 200, body: { ok: true, outcome, left: outcome === "reset" ? held - 1 : held } };
 	} catch (e) {
 		log(`claude: limit reset failed: ${(e as Error).message}`);

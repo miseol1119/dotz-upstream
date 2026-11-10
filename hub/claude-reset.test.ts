@@ -55,13 +55,13 @@ const usage = (cedar: Json | null = { eligible: true, next_grant_id: "free_reset
 
 type Call = { url: string; method: string; headers: Record<string, string>; body?: Json };
 const RESET_URL = `https://api.anthropic.com/api/organizations/${ORG}/reset_rate_limits`;
-function upstream(body: Json, status = 200): Call[] {
+function upstream(body: Json, status = 200, resetBody: Json = { result: "reset", resets_left: 0, cleared: ["seven_day"] }): Call[] {
 	const calls: Call[] = [];
 	globalThis.fetch = (async (input: string | URL | Request, init: RequestInit = {}) => {
 		const url = String(input), method = init.method ?? "GET";
 		calls.push({ url, method, headers: init.headers as Record<string, string>, ...(init.body ? { body: JSON.parse(String(init.body)) } : {}) });
 		if (method === "GET" && url === CLAUDE_USAGE_URL) return status === 200 ? Response.json(body) : new Response("", { status });
-		if (method === "POST" && url === RESET_URL) return Response.json({ result: "reset", resets_left: 0, cleared: ["seven_day"] });
+		if (method === "POST" && url === RESET_URL) return Response.json(resetBody);
 		throw new Error(`unexpected request ${method} ${url}`);
 	}) as typeof fetch;
 	return calls;
@@ -141,6 +141,24 @@ test("with confirm: true it reads afresh and sends one reset for that grant to t
 	expect(calls.findIndex(c => c.method === "GET")).toBeLessThan(calls.indexOf(used[0]!));
 	// the route started a usage re-read; it settles here, while the fake upstream still answers
 	await refreshQuota();
+});
+
+test("an answer to the reset that is not one of the known outcomes is not a success: an error answer, no ok, no count", async () => {
+	for (const known of ["reset", "nothing_to_reset", "not_limited", "no_credit", "already_redeemed", "already_used", "cooldown"]) {
+		upstream(usage(), 200, { result: known });
+		const r = await post({ provider: "anthropic", account: "main", grant_id: "launch-fable", confirm: true });
+		expect([known, r.status, r.body.ok]).toEqual([known, 200, true]);
+		await refreshQuota();
+	}
+	for (const odd of [{ result: "" }, { result: "brand_new_outcome" }, {}, { result: null }, { result: 1 }]) {
+		const calls = upstream(usage(), 200, odd);
+		const r = await post({ provider: "anthropic", account: "main", grant_id: "launch-fable", confirm: true });
+		expect(resetsCalls(calls).length).toBe(1);
+		expect(r.status).not.toBe(200);
+		expect(r.body.ok).toBeUndefined();
+		expect(r.body.left).toBeUndefined();
+		expect(typeof r.body.error).toBe("string");
+	}
 });
 
 test("confirmed but spent, unknown, expired or without an org id: refused, no reset sent", async () => {
