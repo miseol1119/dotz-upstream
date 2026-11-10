@@ -11,6 +11,7 @@ import { anthropicUsage } from "./providers.ts";
 import { keepHome, persist } from "./lanestate.ts";
 import { closeLaneCards, laneVerified } from "./notices.ts";
 import { convs } from "./convsessions.ts";
+import { MAIN } from "./session-key.ts";
 import { doneProblem } from "./donesignals.ts";
 import { stripHandoff } from "./tone.ts";
 import { answerMovesToLane, lanePlace, startedIn } from "./threads.ts";
@@ -194,7 +195,7 @@ export async function routeLanes(req: Request, url: URL, parts: string[]): Promi
 				const asking = queue.current();
 				const origin = { home, asking: asking?.target, askingMessage: asking?.replyTo, isWork: (id: string) => Boolean(discord.channels.work[id]), threadParent: (id: string) => discord.channels.threads[id]?.parent };
 				const place = lanePlace({ ...origin, discordForWeb: postSettings().web_lanes });
-				const lane = launch(String(b.name), String(b.cwd), String(b.brief ?? ""), b.model, b.worker_model ? String(b.worker_model) : undefined, asked, String(b.title).trim());
+				const lane = launch(String(b.name), String(b.cwd), String(b.brief ?? ""), b.model, b.worker_model ? String(b.worker_model) : undefined, asked, String(b.title).trim(), typeof b.session === "string" && b.session && b.session !== MAIN ? b.session : undefined);
 				// Started from the web: it lives in the web (its session conversation, notices and push), with no Discord channel.
 				if (place.kind === "web") {
 					lane.web = true;

@@ -387,7 +387,7 @@ function orchestratorTools(pi: any): void {
 			if (held) return { content: [{ type: "text", text: held }] };
 			if (p.action === "launch" && !String(p.title ?? "").trim()) return { content: [{ type: "text", text: "title required: use 2-4 plain words of the work in the owner's language (e.g. 디스코드 설정)" }] };
 			const out =
-				p.action === "launch" ? await call("/api/lanes", { method: "POST", body: JSON.stringify({ why: p.why, hours: p.hours, owner_asked_for_lane: p.owner_asked_for_lane, name: p.name, title: p.title, kind: p.kind, home: p.home, cwd: p.cwd, brief: p.brief, model: p.model, worker_model: p.worker_model, est: p.est, force: p.force, owner_asked_for_fable: p.owner_asked_for_fable }) })
+				p.action === "launch" ? await call("/api/lanes", { method: "POST", body: JSON.stringify({ why: p.why, hours: p.hours, owner_asked_for_lane: p.owner_asked_for_lane, session: process.env.DOTZ_CONV ?? "main", name: p.name, title: p.title, kind: p.kind, home: p.home, cwd: p.cwd, brief: p.brief, model: p.model, worker_model: p.worker_model, est: p.est, force: p.force, owner_asked_for_fable: p.owner_asked_for_fable }) })
 				: p.action === "list" ? await call("/api/lanes")
 				: p.action === "send" ? await call(`/api/lanes/${p.name}/send`, { method: "POST", body: JSON.stringify({ text: p.text, session: process.env.DOTZ_CONV ?? "main" }) })
 				: p.action === "handover" ? await call(`/api/lanes/${p.name}/handover`, { method: "POST", body: JSON.stringify({ text: p.text }) })
@@ -420,7 +420,7 @@ function orchestratorTools(pi: any): void {
 		parameters: z.object({ action: z.enum(["add", "list", "remove", "approve"]), timeout_seconds: z.number().optional(), retry: z.record(z.string(), z.array(z.number())).optional(), approval_minutes: z.number().optional(), once: z.boolean().optional(), name: z.string().optional(), label: z.string().optional(), command: z.string().optional(), script: z.string().optional(), every_minutes: z.number().optional(), on: z.enum(["change", "match", "fail"]).optional(), pattern: z.string().optional(), to: z.string().optional(), cwd: z.string().optional(), session_url: z.string().optional(), expect: z.string().optional(), refresh_hours: z.number().optional(), host: z.string().optional(), profile: z.string().optional(), app: z.string().optional(), project: z.string().optional(), internal: z.boolean().optional() }),
 		async execute(_id: string, p: any) {
 			const out =
-				p.action === "add" ? await call("/api/watches", { method: "POST", body: JSON.stringify(p) })
+				p.action === "add" ? await call("/api/watches", { method: "POST", body: JSON.stringify({ ...p, session: process.env.DOTZ_CONV ?? "main" }) })
 				: p.action === "list" ? await call("/api/watches")
 				: p.action === "approve" ? await call(`/api/watches/${p.name}/approve`, { method: "POST" })
 				: await call(`/api/watches/${p.name}`, { method: "DELETE" });
@@ -430,11 +430,11 @@ function orchestratorTools(pi: any): void {
 	pi.registerTool({
 		name: "dotz_schedule",
 		label: "Dotz schedule",
-		description: "Reminders and recurring jobs: at the time, the text comes back to you as an inbox turn to act on. action=add {text, at (ISO with offset, e.g. 2026-10-17T09:00:00+09:00) or in_minutes, every_minutes? (>=5)}; list; remove {id}. Use it when the owner says remind me / tell me when / every day.",
-		parameters: z.object({ action: z.enum(["add", "list", "remove"]), text: z.string().optional(), at: z.string().optional(), in_minutes: z.number().optional(), every_minutes: z.number().optional(), id: z.string().optional() }),
+		description: "Reminders and recurring jobs: at the time, the text comes back to you as an inbox turn to act on. action=add {text, at (ISO with offset, e.g. 2026-10-17T09:00:00+09:00) or in_minutes, every_minutes? (>=5), project? (a ch:/th:/mail:/settings: conversation target)}; list; remove {id}. A schedule made in a conversation session belongs to that conversation and comes back to its session; project names another conversation. Use it when the owner says remind me / tell me when / every day.",
+		parameters: z.object({ action: z.enum(["add", "list", "remove"]), text: z.string().optional(), at: z.string().optional(), in_minutes: z.number().optional(), every_minutes: z.number().optional(), project: z.string().optional(), id: z.string().optional() }),
 		async execute(_id: string, p: any) {
 			const out =
-				p.action === "add" ? await call("/api/schedules", { method: "POST", body: JSON.stringify(p) })
+				p.action === "add" ? await call("/api/schedules", { method: "POST", body: JSON.stringify({ ...p, session: process.env.DOTZ_CONV ?? "main" }) })
 				: p.action === "list" ? await call("/api/schedules")
 				: await call(`/api/schedules/${p.id}`, { method: "DELETE" });
 			return { content: [{ type: "text", text: JSON.stringify(out).slice(0, 3000) }] };

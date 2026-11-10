@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { NAME } from "./config.ts";
 import { createLaneRelay, createOwnerNotes, ownerAlone } from "./lanerelay.ts";
+import { MAIN } from "./session-key.ts";
 
 function relay() {
 	const sent: string[] = [];
@@ -153,4 +154,32 @@ test("an untagged report while the lane's workers run, or a usage-limit notice, 
 	expect(ownerAlone({ orchAsked: true, claim: { state: "reported" } }, false, 1)).toBe(false);
 	expect(ownerAlone({ orchAsked: true }, false, 0)).toBe(false);
 	expect(ownerAlone({ orchAsked: false }, false, 0)).toBe(true);
+});
+
+test("a report of a lane started from a conversation goes to that session only; held reports flush per session", () => {
+	const sent: [string, string][] = [];
+	const busy = new Set<string>();
+	const r = createLaneRelay({ busy: k => busy.has(k), deliver: (t, k) => sent.push([k, t]), lead: n => `[lane reports ${n}]` });
+	expect(r.report("a", "[done] first", "/a", false, "ch:1")).toBe("relayed");
+	expect(r.report("m", "[done] main one", "/m")).toBe("relayed");
+	expect(sent.map(([k]) => k)).toEqual(["ch:1", MAIN]);
+	busy.add("ch:1").add("ch:2").add(MAIN);
+	expect(r.report("a", "[done] second", "/a", false, "ch:1")).toBe("held");
+	expect(r.report("b", "[done] other", "/b", false, "ch:2")).toBe("held");
+	expect(r.report("m", "[done] main two", "/m")).toBe("held");
+	busy.clear();
+	expect(r.flush("ch:1")).toBe(1);
+	expect(sent.slice(2).map(([k]) => k)).toEqual(["ch:1"]);
+	expect(r.held().map(h => h.lane).sort()).toEqual(["b", "m"]);
+	expect(r.flush()).toBe(1);
+	expect(r.flush("ch:2")).toBe(1);
+	expect(sent.slice(3).map(([k]) => k)).toEqual([MAIN, "ch:2"]);
+	expect(sent[3]![1]).toContain("main two");
+});
+
+test("a report arriving in a busy conversation turn is steered into that session's turn, not main's", () => {
+	const steered: [string, string][] = [];
+	const r = createLaneRelay({ busy: k => k === "ch:1", deliver: () => {}, lead: n => `[${n}]`, steer: (t, k) => (steered.push([k, t]), true) });
+	expect(r.report("a", "[done] x", "/a", false, "ch:1")).toBe("steered");
+	expect(steered.map(([k]) => k)).toEqual(["ch:1"]);
 });

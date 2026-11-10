@@ -12,9 +12,11 @@
 // - a report arriving while the orchestrator is in a turn is steered into that turn at once (2026-10-20: held reports
 //   reached it after p90 368 s); only when the turn cannot take it are reports batched into one prompt for idle.
 import { orchestratorOnlyAsk } from "./forline.ts";
+import { MAIN } from "./session-key.ts";
 import { parkedTone, parseTone, type Tone } from "./tone.ts";
 
-export type Relay = { lane: string; tone?: Tone; text: string; file: string };
+/** `from`: the session key of the conversation that launched the lane (none = main); its report goes to that session. */
+export type Relay = { lane: string; tone?: Tone; text: string; file: string; from?: string };
 
 /** No orchestrator turn for an untagged report: see the list above. A done claim made further down the text still goes. */
 export const ownerAlone = (l: { orchAsked?: boolean; claim?: unknown }, pause: boolean, workers: number): boolean => pause || l.orchAsked === false || (workers > 0 && !l.claim);
@@ -84,23 +86,24 @@ export function createOwnerNotes(deps: OwnerNotesDeps) {
 	};
 }
 
-export function createLaneRelay(deps: { busy: () => boolean; deliver: (text: string) => void; lead: (n: number) => string; steer?: (text: string) => boolean }) {
+// Busy, deliver and steer name the session (`key`) the report belongs to: a lane started from a conversation reports to that conversation's session, not to main.
+export function createLaneRelay(deps: { busy: (key: string) => boolean; deliver: (text: string, key: string) => void; lead: (n: number) => string; steer?: (text: string, key: string) => boolean }) {
 	const last = new Map<string, string>();
 	const held: Relay[] = [];
 	const norm = (t: string) => t.replace(/\s+/g, " ").trim();
 	const body = (items: Relay[]) => `${deps.lead(items.length)}\n${items.map(relayItem).join("\n\n")}`;
-	// The sessions whose question for the owner this orchestrator turn heard; the turn ends at the idle hook (flush).
-	const asked = new Set<string>();
+	// The lanes whose question for the owner this session's turn heard (lane -> session key); the turn ends at the idle hook (flush).
+	const asked = new Map<string, string>();
 	const heard = (items: Relay[]) => {
-		for (const r of items) if (r.tone === "ask" && !orchestratorOnlyAsk(parseTone(r.text).text)) asked.add(r.lane);
+		for (const r of items) if (r.tone === "ask" && !orchestratorOnlyAsk(parseTone(r.text).text)) asked.set(r.lane, r.from ?? MAIN);
 	};
-	const send = (items: Relay[]) => {
+	const send = (key: string, items: Relay[]) => {
 		heard(items);
-		deps.deliver(body(items));
+		deps.deliver(body(items), key);
 	};
 
 	/** A lane's report: "relayed" (now), "steered" (into the running turn), "held" (batched for idle), "disk" (routine), "owner" (owner-only exchange) or "duplicate". */
-	function report(lane: string, text: string, file: string, ownerOnly = false): "relayed" | "steered" | "held" | "disk" | "owner" | "duplicate" {
+	function report(lane: string, text: string, file: string, ownerOnly = false, from = MAIN): "relayed" | "steered" | "held" | "disk" | "owner" | "duplicate" {
 		const { tone } = parseTone(text);
 		if (parkedTone(tone)) return "disk";
 		if (!tone && ownerOnly && !/^\[lane [a-z]+\]/.test(text)) return "owner";
@@ -109,9 +112,9 @@ export function createLaneRelay(deps: { busy: () => boolean; deliver: (text: str
 		// that resumed a lane which died again at once must still reach the orchestrator (2026-10-20 17:16, gateway-ui).
 		if (last.get(lane) === key && !/^\[lane [a-z]+\]/.test(text)) return "duplicate";
 		last.set(lane, key);
-		const item = { lane, tone, text, file };
-		if (deps.busy()) {
-			if (deps.steer?.(body([item]))) {
+		const item = { lane, tone, text, file, from };
+		if (deps.busy(from)) {
+			if (deps.steer?.(body([item]), from)) {
 				heard([item]);
 				return "steered";
 			}
@@ -121,18 +124,20 @@ export function createLaneRelay(deps: { busy: () => boolean; deliver: (text: str
 			else held.push(item);
 			return "held";
 		}
-		send([item]);
+		send(from, [item]);
 		return "relayed";
 	}
 
-	/** The orchestrator went idle: everything held goes in as one prompt. */
-	function flush(): number {
-		asked.clear();
-		if (!held.length || deps.busy()) return 0;
-		const items = held.splice(0);
-		send(items);
+	/** The session `key` went idle: what it held goes in as one prompt. */
+	function flush(key = MAIN): number {
+		for (const [lane, k] of asked) if (k === key) asked.delete(lane);
+		if (deps.busy(key)) return 0;
+		const items = held.filter(h => (h.from ?? MAIN) === key);
+		if (!items.length) return 0;
+		for (const h of items) held.splice(held.indexOf(h), 1);
+		send(key, items);
 		return items.length;
 	}
 
-	return { report, flush, held: () => held.slice(), asked: () => [...asked] };
+	return { report, flush, held: () => held.slice(), asked: () => [...asked.keys()] };
 }

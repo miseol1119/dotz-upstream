@@ -21,6 +21,7 @@ import { josa } from "./account-rules.ts";
 import { issueBlock } from "./choices.ts";
 import { DATA_DIR, log, now, paths, readJsonOrQuarantine, writeAtomic } from "./config.ts";
 import { blockedByFeatures } from "./featuredirs.ts";
+import { convTargetOf } from "./session-key.ts";
 import { deriveLabel, isKeyLabel, plainLabel, watchReasonKo } from "./watchtext.ts";
 
 export type WatchOwner = { app?: string; project?: string; internal?: true };
@@ -36,6 +37,8 @@ export type Watch = {
 	pattern?: string;
 	session?: { url: string; expect?: string; refresh_hours: number; host?: string; profile?: string; login_url?: string; secret?: string };
 	channels?: string[];
+	/** The conversation (ch:/th:/mail:/settings: target) it was made in or for: its wake goes to that conversation's session (wakeTarget). */
+	conv?: string;
 	// Who the watch serves (hub/watch-scope.ts): an app instance key, a project (ch:<id> or a project folder) or the gateway's own housekeeping; none = a standalone monitor.
 	owner?: WatchOwner;
 	to: string;
@@ -481,6 +484,9 @@ function ownerOf(input: Record<string, any>): WatchOwner | undefined {
 	return Object.keys(out).length ? out : undefined;
 }
 
+/** The target an orchestrator-bound wake is delivered to: its conversation, else its first work channel, else a ch: project; none = main. */
+export const wakeTarget = (w: Watch): string | undefined => w.conv ?? (w.channels?.length ? `ch:${w.channels[0]}` : undefined) ?? (w.owner?.project?.startsWith("ch:") ? w.owner.project : undefined);
+
 export function addWatch(input: Record<string, any>, rulesText: string): Watch {
 	const name = String(input.name ?? "").trim();
 	if (!/^[a-z0-9-]{1,40}$/.test(name)) throw new Error("name must be [a-z0-9-], up to 40 chars");
@@ -521,11 +527,12 @@ export function addWatch(input: Record<string, any>, rulesText: string): Watch {
 		if (!Array.isArray(wait) || !wait.every(m => typeof m === "number" && m >= 1)) throw new Error(`retry.${kind} must be a list of minutes (>= 1 each; [] stops the watch until the owner approves)`);
 	}
 	const owner = ownerOf(input);
+	const conv = convTargetOf({ conv: input.conv, session: input.session });
 	const old = items.findIndex(w => w.name === name);
 	if (old >= 0) removeWatch(items[old].id);
 	const site = session ? new URL(session.url).hostname.replace(/^www\./, "") : undefined;
 	const label = String(input.label ?? "").trim().slice(0, 60) || deriveLabel({ name, header: scriptHeader(script), site });
-	const w: Watch = { id: randomBytes(3).toString("hex"), name, ...(label ? { label } : {}), command, ...(script ? { script } : {}), ...(input.cwd ? { cwd: String(input.cwd) } : script ? { cwd: dirname(script) } : {}), every_minutes: every, on, ...(on === "match" ? { pattern: String(input.pattern) } : {}), ...(session ? { session } : {}), ...(Array.isArray(input.channels) && input.channels.length ? { channels: input.channels.map(String) } : {}), ...(owner ? { owner } : {}), to: String(input.to ?? "orchestrator"), created: now(), ...(timeout ? { timeout_seconds: timeout } : {}), ...(retry ? { retry: retry as Record<string, number[]> } : {}), ...(approval ? { approval_minutes: approval } : {}), ...(input.once === true ? { once: true } : {}), state: { fails: 0 } };
+	const w: Watch = { id: randomBytes(3).toString("hex"), name, ...(label ? { label } : {}), command, ...(script ? { script } : {}), ...(input.cwd ? { cwd: String(input.cwd) } : script ? { cwd: dirname(script) } : {}), every_minutes: every, on, ...(on === "match" ? { pattern: String(input.pattern) } : {}), ...(session ? { session } : {}), ...(Array.isArray(input.channels) && input.channels.length ? { channels: input.channels.map(String) } : {}), ...(conv ? { conv } : {}), ...(owner ? { owner } : {}), to: String(input.to ?? "orchestrator"), created: now(), ...(timeout ? { timeout_seconds: timeout } : {}), ...(retry ? { retry: retry as Record<string, number[]> } : {}), ...(approval ? { approval_minutes: approval } : {}), ...(input.once === true ? { once: true } : {}), state: { fails: 0 } };
 	loginGate(w);
 	items.push(w);
 	save();

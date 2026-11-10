@@ -54,7 +54,7 @@ import { allNotices, backfillNotices, draftCardCounts, dropChannelNotices, refre
 import { startReflection } from "./reflect.ts";
 import { recipeBlock } from "./recipes.ts";
 import { syncFeatureWatches } from "./features.ts";
-import { startSchedules, stopSchedules } from "./schedule.ts";
+import { scheduleTarget, startSchedules, stopSchedules } from "./schedule.ts";
 import { syncRoutineSchedules } from "./custom.ts";
 import { startHarnessUpdate } from "./update.ts";
 import { startOmoEngineWatch } from "./runtime/omo-engine-watch.ts";
@@ -66,7 +66,7 @@ import { clearChannel, endStanding, lapseStandings, nameWatches, setupChannel, w
 import { watchLine } from "./watchtext.ts";
 import { createWatchSummarizer } from "./watchsummary.ts";
 import { clearTrackedTimers, runShutdown } from "./shutdown.ts";
-import { addWatch, allWatches, approveWatch, isWatchIssue, setWatchGate, startWatches, stopWatches, type Watch, watchChoice } from "./watch.ts";
+import { addWatch, allWatches, approveWatch, isWatchIssue, setWatchGate, startWatches, stopWatches, type Watch, wakeTarget, watchChoice } from "./watch.ts";
 import { watchOwner } from "./app-features.ts";
 import { blockedByOff, newsMuted, watchOff } from "./app-off.ts";
 import { loadPlugins, pluginClaim, pluginMailThread, pluginThread, startPlugins } from "./plugins.ts";
@@ -551,7 +551,7 @@ startStallSweep((conversation, r) => {
 startOrphanReaper();
 startHostSweep();
 startSchedules(s => {
-	const channel = discord.status.enabled ? "chat" : "web";
+	const channel = scheduleTarget(s, discord.status.enabled ? "chat" : "web");
 	const event = { ts: now(), kind: "schedule", source: "schedule", channel, id: s.id, every: s.every_minutes, text: s.text };
 	emit("inbox", event);
 	deliver(inboxText(event), { target: channel });
@@ -611,11 +611,12 @@ startWatches((w, reason, output, prev) => {
 		const quiet = wakeOnly(w, reason, orchestratorAvailable());
 		if (!quiet) emit("inbox", event);
 		const wake = inboxText(quiet ? { ...event, wakeOnly: true } : event);
-		if (!w.channels?.length) return deliver(wake);
+		const target = wakeTarget(w);
+		if (!w.channels?.length) return deliver(wake, target ? { target } : undefined);
 		const [first, ...others] = w.channels;
 		endStanding(first, "once");
 		if (!quiet) for (const c of others) void out(`ch:${c}`, watchLine(event.label, reason, output, { note: `(처리는 #${discord.channels.work[first] ?? first}에서)`, prev }).slice(0, 1900), undefined, { source: "gateway", news: true, ...watchRoute(w) }).catch(() => undefined);
-		return deliver(wake, { target: `ch:${first}` });
+		return deliver(wake, { target: target ?? `ch:${first}` });
 	}
 	// A failing, stopped or unapproved check is an issue: it goes to alert with a choice block, whatever `to` the watch has.
 	const issue = isWatchIssue(reason);

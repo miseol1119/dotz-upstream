@@ -41,3 +41,21 @@ export function primaryTarget(key: string): string {
 	if (key === "worklog") return "web:worklog";
 	return key;
 }
+
+const CONV_TARGET = /^(?:(?:ch|th|mail|settings):\S+|web:alert|web:worklog)$/;
+
+/**
+ * The conversation a schedule or watch belongs to: the conversation target given as `conv` (or `project`), else the primary target of
+ * the session that created it. Made in main, or by a session key that is no conversation, it belongs to none (main runs it, as before).
+ * A given target of an unknown kind is an error.
+ */
+export function convTargetOf(input: { conv?: unknown; project?: unknown; session?: unknown }): string | undefined {
+	for (const [name, v] of [["conv", input.conv], ["project", input.project]] as const) {
+		if (v === undefined || v === null || v === "") continue;
+		if (typeof v !== "string" || !CONV_TARGET.test(v)) throw new Error(`${name} must be a conversation target (ch:<id>, th:<id>, mail:<key> or settings:<key>)`);
+		return v;
+	}
+	if (typeof input.session !== "string" || input.session === MAIN) return undefined;
+	const target = primaryTarget(input.session);
+	return CONV_TARGET.test(target) ? target : undefined;
+}

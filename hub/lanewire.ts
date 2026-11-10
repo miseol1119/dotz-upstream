@@ -12,11 +12,18 @@ import { createLaneRelay, ownerAlone } from "./lanerelay.ts";
 import { workersOf } from "./lanevis.ts";
 import { inOrder, localize, noteHandoffLeak } from "./outlang.ts";
 import { parkedTone, parseTone, stripHandoff } from "./tone.ts";
-import { send, deliver, out } from "./outbound.ts";
+import { send, deliver, onConvIdle, out } from "./outbound.ts";
+import { MAIN, primaryTarget } from "./session-key.ts";
 import { dropForLine, forLines } from "./forline.ts";
 import { clipKeepingAsk, normalizeAsk, plainBareAsk } from "./ask-normalize.ts";
 
-export const laneRelay = createLaneRelay({ busy: () => orch.status === "working", deliver: text => deliver(text), lead: n => msg().inboxLaneReports(n), steer: text => steerOrchestrator(msg().laneReportSteer(text)) });
+// A lane started from a conversation session reports to that session (its key is the lane's `from`); the rest report to main.
+export const laneRelay = createLaneRelay({
+	busy: key => (key === MAIN ? orch : convs.get(key)?.o.orch)?.status === "working",
+	deliver: (text, key) => void (key === MAIN ? deliver(text) : convs.deliverTo(key, text, { target: primaryTarget(key) })),
+	lead: n => msg().inboxLaneReports(n),
+	steer: (text, key) => (key === MAIN ? steerOrchestrator(msg().laneReportSteer(text)) : (convs.get(key)?.o.steer(msg().laneReportSteer(text)) ?? false)),
+});
 
 // Why this orchestrator post may not go out, when it would ask a session's open question a second time. A session's [ask] is already in 답변 필요 and the owner's answer
 // there reaches the session, so the turn that heard it makes no card of its own, in any words (2026-11-05 publish-voice: two cards 9 s apart; the same
@@ -32,12 +39,13 @@ export function repostRefusal(target: string, text: string): string | undefined 
 }
 
 export function installLaneHandlers(): void {
+	onConvIdle(key => void laneRelay.flush(key));
 	setVerifiedHandler((name, text) => laneVerified(name, text));
 	setOpenCardCheck(laneHasOpenCard);
 	setReportHandler((lane, raw, answering, pause) => {
 		noteHandoffLeak(`lane:${lane.name}`, raw);
 		const text = stripHandoff(raw);
-		const how = laneRelay.report(lane.name, raw, join(paths.lanes, lane.name, "report.md"), ownerAlone(lane, pause === true, workersOf(`lane:${lane.name}`).length));
+		const how = laneRelay.report(lane.name, raw, join(paths.lanes, lane.name, "report.md"), ownerAlone(lane, pause === true, workersOf(`lane:${lane.name}`).length), lane.from);
 		if (how === "relayed" || how === "held" || how === "steered") lane.orchAsked = false;
 		if (how === "steered") log(`lane ${lane.name} report steered into the orchestrator's turn`);
 		else if (how === "relayed") log(`lane ${lane.name} report relayed to the orchestrator`);

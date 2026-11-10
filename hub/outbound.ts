@@ -166,7 +166,8 @@ export const workRows = createWorkRows({
 });
 // `owner` marks the owner's own message (it leads with the what-runs-now line); schedules, watches and mail carry a target but are not.
 // True when the message was steered into the running turn (only one of the same conversation is, prompts.ts deliver).
-// An owner message goes to its conversation's session (main with conversation sessions off); everything else to main.
+// A prompt with a target (an owner message, a schedule, a watch or a mail wake of a conversation) goes to that conversation's session
+// (main with conversation sessions off); one with no target goes to main.
 // From a tap on the update bar until the restart, a new turn is held and goes in after it (hub/update-now.ts).
 export function deliver(text: string, reply?: Reply): boolean {
 	if (updateNow()?.hold(text, reply)) return false;
@@ -174,7 +175,7 @@ export function deliver(text: string, reply?: Reply): boolean {
 }
 export function deliverNow(text: string, reply?: Reply): boolean {
 	if (reply) discord.typing(reply.target);
-	return convs.deliverTo(reply?.owner ? convs.keyOf(reply.target) : MAIN, text, reply);
+	return convs.deliverTo(reply?.target ? convs.keyOf(reply.target) : MAIN, text, reply);
 }
 
 // "web:alert" / "web:worklog": the answer to a question the owner asked in that web conversation (hub/intake.ts sendWeb).
@@ -575,6 +576,10 @@ function wireAnswers(c: Conv): void {
 
 // A conversation session is wired when the registry creates it: its own queue (pending.json in its folder) and background-work view,
 // the restart replay and idle hooks main.ts gives main, and its error [ask] posted into its own conversation.
+// Lane reports held for a conversation session go in when it goes idle (hub/lanewire.ts installs this).
+let convIdle: (key: string) => void = () => {};
+export const onConvIdle = (fn: (key: string) => void): void => void (convIdle = fn);
+
 setWiring(c => {
 	let bg: ReturnType<typeof createBgWork> | undefined;
 	const q = makeQueue(c.key, c.o, join(c.dir!, "pending.json"), () => bg);
@@ -585,6 +590,7 @@ setWiring(c => {
 	c.o.setIdleHandler(() => {
 		q.settleTurn(c.o.turnFailed());
 		q.redeliverSteered();
+		convIdle(c.key);
 	});
 	c.o.setErrorHandler(e => void out(c.primary, errorAsk(NAME, e), undefined, { source: "gateway" }).catch(err => log(`error ask to ${c.primary} failed: ${err}`)));
 	return { queue: q, bg };

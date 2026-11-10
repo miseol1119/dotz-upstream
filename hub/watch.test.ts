@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { DATA_DIR, paths } from "./config.ts";
 import { advance, clock } from "./runtime/test-clock.ts";
 import type { ReloginOpts, ReloginResult } from "./autologin.ts";
-import { addWatch, allWatches, approveWatch, exec, learnLife, listWatches, patchWatch, putWatchScript, reloadWatches, removeWatch, runWatch, sessionGapMs, setSessionIo, startWatches, watchScript, watchShell } from "./watch.ts";
+import { addWatch, allWatches, approveWatch, exec, learnLife, listWatches, patchWatch, putWatchScript, reloadWatches, removeWatch, runWatch, sessionGapMs, setSessionIo, startWatches, wakeTarget, watchScript, watchShell } from "./watch.ts";
 
 const notes: { name: string; reason: string }[] = [];
 let waiter: (() => void) | undefined;
@@ -477,4 +477,17 @@ test("a day of failures in fewer than 10 runs does not pause, and a watch withou
 	expect(state("t-fail-few").paused).toBe("fail");
 	approveWatch("t-fail-few");
 	expect(state("t-fail-few").paused).toBeUndefined();
+});
+
+test("a watch made in a conversation session belongs to it; the wake target is conv, then the first channel, then a ch: project", () => {
+	const inCh = addWatch({ name: "t-conv-session", command: "echo a", session: "ch:7" }, "");
+	const inMain = addWatch({ name: "t-conv-main", command: "echo b", session: "main" }, "");
+	const named = addWatch({ name: "t-conv-named", command: "echo c", conv: "th:4", channels: ["9"] }, "");
+	const chan = addWatch({ name: "t-conv-chan", command: "echo d", channels: ["9", "8"] }, "");
+	const proj = addWatch({ name: "t-conv-proj", command: "echo e", project: "ch:3" }, "");
+	const folder = addWatch({ name: "t-conv-folder", command: "echo f", project: "some-folder" }, "");
+	expect(inCh.conv).toBe("ch:7");
+	expect(inMain.conv).toBeUndefined();
+	expect([inCh, inMain, named, chan, proj, folder].map(wakeTarget)).toEqual(["ch:7", undefined, "th:4", "ch:9", "ch:3", undefined]);
+	expect(() => addWatch({ name: "t-conv-bad", command: "echo g", conv: "nope" }, "")).toThrow("conv must be a conversation target");
 });

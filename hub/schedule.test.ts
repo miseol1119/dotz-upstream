@@ -3,7 +3,8 @@ import { afterEach, beforeAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { paths } from "./config.ts";
 import { advance, clock } from "./runtime/test-clock.ts";
-import { addSchedule, listSchedules, patchSchedule, removeSchedule, startSchedules } from "./schedule.ts";
+import { sessionKeyOf } from "./session-key.ts";
+import { addSchedule, listSchedules, patchSchedule, removeSchedule, scheduleTarget, startSchedules } from "./schedule.ts";
 
 const fired: string[] = [];
 beforeAll(() => startSchedules(s => fired.push(s.id)));
@@ -63,4 +64,27 @@ test("bad values and unknown ids are refused and change nothing", () => {
 	expect(JSON.stringify(stored(s.id))).toBe(before);
 	expect(() => patchSchedule("nope00", { paused: true })).toThrow("no schedule");
 	expect(patchSchedule(s.id, { every_minutes: 10080 }).every_minutes).toBe(10080);
+});
+
+test("a schedule made in a conversation session fires into that conversation's session, one made in main (or without conv) into main's", async () => {
+	const inCh = addSchedule({ text: "채널 일", in_minutes: 10, session: "ch:1" });
+	const inMain = addSchedule({ text: "메인 일", in_minutes: 10, session: "main" });
+	const plain = addSchedule({ text: "그냥", in_minutes: 10 });
+	const named = addSchedule({ text: "지정", in_minutes: 10, project: "th:7" });
+	expect(stored(inCh.id).conv).toBe("ch:1");
+	expect(stored(named.id).conv).toBe("th:7");
+	expect(inMain.conv).toBeUndefined();
+	expect(plain.conv).toBeUndefined();
+	const rules = { on: true };
+	expect(sessionKeyOf(scheduleTarget(inCh, "chat"), rules)).toBe("ch:1");
+	expect(sessionKeyOf(scheduleTarget(inMain, "chat"), rules)).toBe("main");
+	expect(sessionKeyOf(scheduleTarget(plain, "web"), rules)).toBe("main");
+	await advance(11 * 60_000);
+	expect(fired.sort()).toEqual([inCh.id, inMain.id, plain.id, named.id].sort());
+});
+
+test("a schedule with an unknown conversation kind is rejected", () => {
+	expect(() => addSchedule({ text: "x", in_minutes: 10, project: "lane:a" })).toThrow("project must be a conversation target");
+	expect(() => addSchedule({ text: "x", in_minutes: 10, conv: "nope" })).toThrow("conv must be a conversation target");
+	expect(listSchedules()).toEqual([]);
 });

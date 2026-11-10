@@ -79,7 +79,7 @@ function footer(lane: Lane): string {
 	return withReplyLine(msg().footer({ lane: lane.name, language: languageName(lang()), mode: modeFile(), workerModel: laneWorkerModel(lane), slots: lane.workerSlots ?? laneLimits(0, lane).workers, worktree: worktreeNote(lane.worktree) })) + donts + (features ? `\n\n${features}` : "");
 }
 
-export function launch(name: string, cwd: string, brief: string, model?: string, worker?: string, fableOk?: boolean, title?: string): Lane {
+export function launch(name: string, cwd: string, brief: string, model?: string, worker?: string, fableOk?: boolean, title?: string, from?: string): Lane {
 	if (!NAME_RE.test(name)) throw new Error("lane name must match [a-z0-9][a-z0-9-]{0,31}");
 	if (!cwd.startsWith("/") || !existsSync(cwd)) throw new Error(`cwd must be an existing absolute path: ${cwd}`);
 	const prior = lanes.get(name);
@@ -91,7 +91,7 @@ export function launch(name: string, cwd: string, brief: string, model?: string,
 	mkdirSync(dir(name), { recursive: true });
 	const place = laneWorktree(name, cwd);
 	if (!existsSync(place.cwd)) throw new Error(`lane ${name}: working directory does not exist: ${place.cwd}`);
-	const lane: Lane = { name, ...(title ? { title } : {}), cwd: place.cwd, worktree: place.worktree, model: selector, workerModel: worker || undefined, fableOk: fableOk || undefined, status: "starting", startedAt: now(), lastText: "", reports: 0, ctx: newCtx(), orchAsked: true, ...(why ? { waiting: why } : {}) };
+	const lane: Lane = { name, ...(title ? { title } : {}), cwd: place.cwd, worktree: place.worktree, model: selector, workerModel: worker || undefined, fableOk: fableOk || undefined, status: "starting", startedAt: now(), lastText: "", reports: 0, ctx: newCtx(), orchAsked: true, ...(from ? { from } : {}), ...(why ? { waiting: why } : {}) };
 	lanes.set(name, lane);
 	persist(lane);
 	writeFileSync(join(dir(name), "brief.md"), `${brief}\n`);
