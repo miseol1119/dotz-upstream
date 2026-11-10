@@ -643,5 +643,14 @@ Do this, briefly:
 		},
 	},
 	sendFail: { login: "the mail login expired; sign in again", offline: "could not reach the mail service", other: "the mail tool reported an error (details are in the log)" },
+	cmdError: {
+		unknownTarget: (x: string) => `"${x}" is not a lane or target. Write the target first: /model <target> <model>, /effort <target> <level>; /lanes lists the lanes`,
+		noLane: (x: string) => `There is no lane named "${x}"; /lanes lists them`,
+		unknownModel: (x: string) => `No model matches "${x}"; /model lists them`,
+		thinking: (x: string) => `The effort level is one of: ${x}`,
+		usage: (x: string) => `Write it like this: ${x}`,
+		unknownCommand: (x: string) => `"${x}" is not a command; /help lists them`,
+		other: "The command failed. The details are in the log",
+	},
 };
 export type Catalog = typeof en;

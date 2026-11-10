@@ -434,8 +434,28 @@ function errorCard(e: unknown, text: string): CommandCard {
 	const t = T();
 	if (e instanceof ForceRequired) return card(t.failed, [], { tone: "err", note: t.forceNote, actions: [{ label: t.applyAnyway, send: `${text.trim()} --force` }] });
 	if (!(e instanceof ControlError)) log(`command ${text.trim().split(/\s+/)[0]} failed: ${e}`);
-	const reason = String((e as Error)?.message ?? e).split("\n")[0]!.replaceAll(homedir(), "~");
-	return card(t.failed, [], { tone: "err", note: reason });
+	const raw = String((e as Error)?.message ?? e).split("\n")[0]!.replaceAll(homedir(), "~");
+	const known = commandErrorKey(raw);
+	// A reason already in Korean is the owner's to read; an English one (the API's, for agents) is told by its kind, else by the log.
+	if (!known && !/[가-힣]/.test(raw)) log(`command ${text.trim().split(/\s+/)[0]} failed: ${raw}`);
+	return card(t.failed, [], { tone: "err", note: known ? known.text : /[가-힣]/.test(raw) ? raw : msg().cmdError.other });
+}
+
+// The English reasons the control API gives agents (ControlError), told to the owner in his language: the kind of failure picks the key.
+const ERROR_KINDS: [RegExp, Exclude<keyof ReturnType<typeof msg>["cmdError"], "other">][] = [
+	[/^unknown target "(.*?)"/, "unknownTarget"],
+	[/^no lane (.+)$/, "noLane"],
+	[/^unknown model "(.*?)"/, "unknownModel"],
+	[/^thinking must be one of (.+)$/, "thinking"],
+	[/^usage: (.+)$/, "usage"],
+	[/^unknown command "(.*?)"/, "unknownCommand"],
+];
+export function commandErrorKey(reason: string): { key: string; text: string } | undefined {
+	for (const [re, key] of ERROR_KINDS) {
+		const m = re.exec(reason);
+		if (m) return { key, text: msg().cmdError[key](m[1]!) };
+	}
+	return undefined;
 }
 
 // The "한도" answer: each window's remaining share and reset time, and the last account switch.

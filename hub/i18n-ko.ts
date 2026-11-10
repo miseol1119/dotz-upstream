@@ -622,4 +622,13 @@ export const ko: Catalog = {
 		},
 	},
 	sendFail: { login: "메일 로그인이 풀렸어요. 다시 로그인해 주세요", offline: "메일 서버에 연결하지 못했어요", other: "메일 도구에서 오류가 났어요. 자세한 내용은 로그에 있어요" },
+	cmdError: {
+		unknownTarget: (x: string) => `"${x}"은(는) 세션이나 대상 이름이 아니에요. 대상을 먼저 적어 주세요: /model <대상> <모델>, /effort <대상> <수준>. 세션 이름은 /lanes에서 볼 수 있어요`,
+		noLane: (x: string) => `"${x}" 세션이 없어요. /lanes에서 이름을 확인해 주세요`,
+		unknownModel: (x: string) => `"${x}"에 맞는 모델이 없어요. /model에서 고를 수 있어요`,
+		thinking: (x: string) => `추론 강도는 ${x} 중에서 골라 주세요`,
+		usage: (x: string) => `이렇게 적어 주세요: ${x}`,
+		unknownCommand: (x: string) => `"${x}"은(는) 없는 명령이에요. /help에서 볼 수 있어요`,
+		other: "명령을 실행하지 못했어요. 자세한 내용은 로그에 있어요",
+	},
 };

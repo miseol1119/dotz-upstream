@@ -2,7 +2,8 @@
 // bunfig.toml preloads hub/runtime/test-setup.ts, which points DOTZ_DIR at a temp folder before any hub module loads.
 import { expect, test } from "bun:test";
 import { homedir } from "node:os";
-import { limitsCard, runCommand, setGatewayRestart } from "./control.ts";
+import { commandErrorKey, limitsCard, runCommand, setGatewayRestart } from "./control.ts";
+import { msg } from "./i18n.ts";
 import type { AccountReport } from "./usage-account.ts";
 
 const STATUS_WORDS = /\b(working|idle|stopped|exited|starting)\b/;
@@ -60,6 +61,19 @@ test("a failed command is an err card with a one-line reason and no home path", 
 	expect(card.note).toBeTruthy();
 	expect(card.note).not.toContain("\n");
 	expect(card.note).not.toContain(homedir());
+});
+
+test("a failed command gives its real reason in the owner's language, not the API's English text", async () => {
+	const cases: [string, string][] = [
+		["/model nosuch-model", msg().cmdError.unknownTarget("nosuch-model")],
+		["/effort ultra", msg().cmdError.unknownTarget("ultra")],
+		["/stop nolane", msg().cmdError.noLane("nolane")],
+		["/nosuchcommand", msg().cmdError.unknownCommand("/nosuchcommand")],
+		["/stop", msg().cmdError.usage("/stop <lane>")],
+	];
+	for (const [text, note] of cases) expect({ text, note: (await runCommand(text)).note }).toEqual({ text, note });
+	expect(commandErrorKey("thinking must be one of low, high")?.key).toBe("thinking");
+	expect(commandErrorKey("something nobody mapped")).toBeUndefined();
 });
 
 test("/help groups the commands", async () => {
