@@ -52,8 +52,50 @@ type ModelsConfig = Partial<Record<FallbackTarget, TargetModels>>;
 
 export const CONFIG_FILE = join(DATA_DIR, "config.json");
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max", "auto"] as const;
+// A state file that no longer parses must not keep the gateway from starting: it is moved aside as <file>.corrupt-<time> (never deleted or
+// overwritten), the last copy that parsed at a start (<file>.good, not for big files) is put back, else `fallback()` is used. What happened waits in
+// takeRecoveries() until hub/main.ts can raise a notice (this file loads before the notice store exists).
+export type Recovery = { file: string; moved: string; restored: boolean };
+const recoveries: Recovery[] = [];
+export const takeRecoveries = (): Recovery[] => recoveries.splice(0);
+export function readJsonOrQuarantine<T>(file: string, fallback: () => T, opts: { keepGood?: boolean } = {}): T {
+	if (!existsSync(file)) return fallback();
+	const keepGood = opts.keepGood ?? true;
+	const text = readFileSync(file, "utf8");
+	try {
+		const value = JSON.parse(text) as T;
+		if (keepGood && (!existsSync(`${file}.good`) || readFileSync(`${file}.good`, "utf8") !== text)) writeAtomic(`${file}.good`, text);
+		return value;
+	} catch (e) {
+		const moved = `${file}.corrupt-${Date.now()}`;
+		renameSync(file, moved);
+		let value: T | undefined, restored = false;
+		if (keepGood && existsSync(`${file}.good`)) {
+			try {
+				const good = readFileSync(`${file}.good`, "utf8");
+				value = JSON.parse(good) as T;
+				writeAtomic(file, good);
+				restored = true;
+			} catch {
+				// The last good copy is unreadable too: the defaults below take over.
+			}
+		}
+		if (!restored) {
+			value = fallback();
+			writeAtomic(file, `${JSON.stringify(value, null, 2)}\n`);
+		}
+		recoveries.push({ file, moved, restored });
+		try {
+			appendFileSync(join(DATA_DIR, "hub.log"), `${new Date().toISOString()} ${file} did not parse (${(e as Error).message}); kept as ${moved}, started from ${restored ? "its last good copy" : "defaults"}\n`);
+		} catch {
+			// No log file yet (first start): the notice still tells the owner.
+		}
+		return value as T;
+	}
+}
+const defaultConfig = (): Config => ({ discord: { token_file: "", owner_id: "", guild: "" }, web: { port: 7420, tailscale_https_port: 0, allow_logins: [] }, lanes: {} });
 function loadConfig(): Config {
-	return JSON.parse(readFileSync(CONFIG_FILE, "utf8"));
+	return readJsonOrQuarantine(CONFIG_FILE, defaultConfig);
 }
 export const cfg: Config = loadConfig();
 // Model + thinking level a section of config.json selects; omp takes them as one `--model <model>:<thinking>` selector.

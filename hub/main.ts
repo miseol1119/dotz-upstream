@@ -1,8 +1,8 @@
 // Dotz hub entry: bun hub/main.ts. Owns Discord, lanes and the event bus; serves the web app + API on
 // 127.0.0.1 only. Tailnet access goes through `tailscale serve`, which adds the Tailscale-User-Login header.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { cfg, DATA_DIR, HOME, HOST, log, NAME, now, paths, PORT, restartCapMs, TZ, writeAtomic } from "./config.ts";
+import { basename, join } from "node:path";
+import { cfg, DATA_DIR, HOME, HOST, log, NAME, now, paths, PORT, restartCapMs, takeRecoveries, TZ, writeAtomic } from "./config.ts";
 import "./lock.ts"; // must stay right after config.ts: takes the single-instance lock before the other modules load
 import "../firstrun/first-run-boot.ts"; // a seed install still in its web onboarding serves only that and never gets past this line (firstrun/first-run-boot.ts)
 import { parseCommand, setGatewayRestart } from "./control.ts";
@@ -592,6 +592,8 @@ const cards: CardAudit = {
 	open: () => draftCardCounts().open,
 	turn: c => wakeOnce(CARD_AUDIT_ID, msg().cardAudit(c.closed, c.refreshed, c.open)),
 };
+// A state file that did not parse at load (hub/config.ts readJsonOrQuarantine) was set aside; tell the owner what the gateway started from.
+for (const r of takeRecoveries()) void out(discord.status.enabled ? "worklog" : "web", msg().fileRecovered(basename(r.file), r.restored), undefined, { source: "gateway" }).catch(e => log(`recovery notice failed: ${e}`));
 void runMigrations({ ...(process.env.DOTZ_NO_ORCHESTRATOR === "1" ? {} : { cards }), dataDir: DATA_DIR, ask: alert, notify: text => void out(discord.status.enabled ? "worklog" : "web", text, undefined, { source: "gateway" }).catch(e => log(`migration notice failed: ${e}`)) }).catch(e => log(`migrations failed: ${e}`));
 setWatchSummarizer(createWatchSummarizer());
 nameWatches();

@@ -1,13 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
-import { log, paths, writeAtomic } from "./config.ts";
+import { log, paths, readJsonOrQuarantine, writeAtomic } from "./config.ts";
 import { everyMinutes } from "./watch.ts";
 
 export const MIN_EVERY_MINUTES = 5; // shortest repeat a schedule takes
 
 export type Schedule = { id: string; text: string; at: string; every_minutes?: number; created: string; paused?: boolean; last?: string };
 
-const items: Schedule[] = existsSync(paths.schedules) ? JSON.parse(readFileSync(paths.schedules, "utf8")) : [];
+const items: Schedule[] = readJsonOrQuarantine(paths.schedules, () => []);
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const save = () => writeAtomic(paths.schedules, `${JSON.stringify(items, null, 2)}\n`);
 let onFire: (s: Schedule) => void = () => {};

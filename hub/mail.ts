@@ -4,7 +4,7 @@
 // Discord and the event bus are injected (MailDeps), so this module has no hub imports beyond config.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, sep } from "node:path";
-import { cfg, DATA_DIR, log, writeAtomic } from "./config.ts";
+import { cfg, DATA_DIR, log, readJsonOrQuarantine, writeAtomic } from "./config.ts";
 import { FileError, replyFilesOf, safeName, serveFile, type ReplyFile } from "./files.ts";
 import { MAIL_HTML_MAX, sanitizeMailHtml } from "./mailhtml.ts";
 import { addressesOf, addressKey, directionOf, EXCLUSION_LABEL, evictSurplus, migrateMails, nextReply, noteOwnSender, ownAddresses, replyExclusion, replyExpected, replyOf, selfSent, setOwnAddresses, setToOnlyDir, type MailReply, type MailReplyEvent, type ReplyBy, type StoredMail } from "./mail-state.ts";
@@ -95,12 +95,8 @@ export function mailKey(source: string, id: string): string {
 
 export const mailTarget = (key: string) => `mail:${key}`;
 
-let records: MailRecord[] = [];
-try {
-	if (existsSync(FILE)) records = JSON.parse(readFileSync(FILE, "utf8"));
-} catch (error) {
-	log(`mail: ${FILE} unreadable, starting empty: ${error}`);
-}
+// An unreadable history is moved aside as a .corrupt-<time> file (readJsonOrQuarantine), so the first save cannot overwrite it with the empty list.
+let records: MailRecord[] = readJsonOrQuarantine<MailRecord[]>(FILE, () => [], { keepGood: false });
 const byKey = new Map(records.map(r => [r.key, r]));
 for (const r of records) trackBox(r);
 const aliases = cfg as unknown as { mail?: { own_addresses?: unknown }; zele?: { aliases?: unknown } };
