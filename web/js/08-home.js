@@ -434,6 +434,14 @@ function homeStripRow(title, sup, tag, tone, open) {
     el("span", { class: "tx" }, el("span", { class: "hd", text: title }), el("span", { class: "sup", text: sup })),
     el("span", { class: "end" }, el("span", { class: `tag ${tone}`, text: tag }), icon("chev", "chev")));
 }
+// While no model account is connected the bot cannot answer: one line and one button to the settings accounts screen, on 홈 and in the empty chat.
+// It waits for the first read of /api/providers (P), so it never flashes while the list loads.
+function acctConnectRow() {
+  if (!P || P.providers.some(isConnected)) return null;
+  return el("div", { class: "li hstrip", "data-connect-account": "" },
+    el("span", { class: "tx" }, el("span", { class: "hd", text: "계정을 연결해야 답할 수 있어요" })),
+    liEnd(el("button", { class: "btn tonal inrow", type: "button", onclick: () => go("accounts") }, "계정 연결")));
+}
 function renderHomeNow() {
   const now = $("#home-now"), box = $("#home-cards");
   if (!now || !box) return;
@@ -455,7 +463,7 @@ function renderHomeNow() {
   const owedBlock = owed.length || drafts ? [
     el("div", { class: "hn-h hsub" }, el("h2", { text: "답장" }), owedN ? unrepCount(owedN) : null),
     el("div", { class: "hn", "data-k": "replies", "data-cap": "replies" }, ...(drafts ? [homeRepliesRow(drafts)] : []), ...owed.map(homeOwedRow))] : [];
-  clear(now).append(homeGreeting(h), ...[homeStrip()].filter(Boolean),
+  clear(now).append(homeGreeting(h), ...[acctConnectRow(), homeStrip()].filter(Boolean),
     el("div", { class: "hneeds" },
       el("div", { class: "hn-h hneeds-h" }, el("h2", { text: "답변 필요" }), waiting ? el("span", { class: "sup", text: `${waiting}` }) : null, crit ? el("span", { class: "tag warn", text: `중요 ${crit}` }) : null),
       nyListNode(needs), ...owedBlock));
