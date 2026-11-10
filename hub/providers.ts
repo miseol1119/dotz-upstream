@@ -14,7 +14,7 @@ import { hardPinned, stickyAccount } from "./account-sticky.ts";
 import { labeledAccountView } from "./accounts-api.ts";
 import { apiBudget } from "./api-budget.ts";
 import { codexUsage, withCodex } from "./codex-usage.ts";
-import { type AccountReport, AccountUsage, type QuotaLimit, cliTokensSettled, fromOmp, runtimeIdOf, subscriptionAccount, subscriptionAccounts } from "./usage-account.ts";
+import { type AccountReport, AccountUsage, type ClaudeResets, type QuotaLimit, cliTokensSettled, fromOmp, runtimeIdOf, subscriptionAccount, subscriptionAccounts } from "./usage-account.ts";
 
 // omp provider id -> the env var omp reads its API key from (omp docs: providers.md, "Environment variables").
 const PROVIDER_ENV: Record<string, string> = {
@@ -82,7 +82,7 @@ export function secretValues(): string[] {
 type OmpModel = { kind?: string; selector: string; id?: string; name?: string; provider: string; reasoning?: boolean; thinking?: unknown };
 type OmpCredential = { provider: string; credential?: Record<string, unknown> };
 type OmpLimit = { id: string; label?: string; window?: { id?: string; label?: string; resetsAt?: number }; amount?: { used?: number; limit?: number; remaining?: number; unit?: string }; status?: string };
-type OmpUsageReport = { provider: string; limits?: OmpLimit[]; metadata?: { email?: string }; account?: string; plan?: string };
+type OmpUsageReport = { provider: string; limits?: OmpLimit[]; metadata?: { email?: string }; account?: string; plan?: string; resets?: ClaudeResets };
 
 async function ompJson<T>(args: string[], timeoutMs = 30_000): Promise<T | undefined> {
 	try {
@@ -699,13 +699,13 @@ const ompHasCredential = async (provider: string): Promise<boolean> => ((await o
 
 // Pure: maps the usage reports to the API shape; providers holding credentials but absent from the reports
 // (or reporting no limits) are listed as unavailable with a plain reason.
-export function buildQuota(reports: OmpUsageReport[], credentialed: string[]): { providers: { provider: string; account?: string; account_label?: string; plan?: string; limits: QuotaLimit[] }[]; unavailable: { provider: string; reason: string }[] } {
+export function buildQuota(reports: OmpUsageReport[], credentialed: string[]): { providers: { provider: string; account?: string; account_label?: string; plan?: string; resets?: ClaudeResets; limits: QuotaLimit[] }[]; unavailable: { provider: string; reason: string }[] } {
 	const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 	const providers = reports
 		.filter((r): r is OmpUsageReport & { limits: OmpLimit[] } => Array.isArray(r.limits) && r.limits.length > 0)
 		.map(r => ({
 			provider: r.provider,
-			...(r.account ?? r.metadata?.email ? { account: r.account ?? r.metadata?.email, account_label: label((r.account ?? r.metadata?.email)!) } : {}), ...(r.plan ? { plan: r.plan } : {}),
+			...(r.account ?? r.metadata?.email ? { account: r.account ?? r.metadata?.email, account_label: label((r.account ?? r.metadata?.email)!) } : {}), ...(r.plan ? { plan: r.plan } : {}), ...(r.resets ? { resets: r.resets } : {}),
 			limits: r.limits.map((l): QuotaLimit => ({
 				id: String(l.id), label: String(l.label ?? l.id), window: String(l.window?.id ?? l.window?.label ?? ""),
 				used: num(l.amount?.used), limit: num(l.amount?.limit), remaining: num(l.amount?.remaining), unit: String(l.amount?.unit ?? ""),

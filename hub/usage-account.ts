@@ -9,7 +9,8 @@
 // answered 429 is not asked again before its retry-after.
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { authFile } from "./apikey-policy.ts";
 import { cfg } from "./config.ts";
@@ -26,7 +27,11 @@ type Limit = { id: string; label: string; window: { id: string; label: string; d
 // One limit as GET /api/quota carries it (hub/providers.ts buildQuota, hub/codex-usage.ts).
 export type QuotaLimit = { id: string; label: string; window: string; used: number | null; limit: number | null; remaining: number | null; unit: string; resets_at: number | null; status: string };
 // Shaped like one `omp usage --json` report, plus whose numbers they are.
-export type AccountReport = { provider: "anthropic"; account: string; via: "omo-pinned" | "omo-sticky" | "omo-pool" | "omp"; limits: Limit[]; fetchedAt?: number; problem?: AccountProblem; retryAt?: number; plan?: string };
+export type AccountReport = { provider: "anthropic"; account: string; via: "omo-pinned" | "omo-sticky" | "omo-pool" | "omp"; limits: Limit[]; fetchedAt?: number; problem?: AccountProblem; retryAt?: number; plan?: string; resets?: ClaudeResets };
+// The account's 리셋권 (Anthropic's "limit reset", program cedar_ember): how many are left, by kind (주간, Fable), the nearest expiry,
+// and the grant a use spends (next_grant_id, else the usable one that expires first). usable: a grant applies now and the account's
+// organization id is known locally (the use call needs it, and dotz makes no extra request to learn it).
+export type ClaudeResets = { held: number; usable: boolean; expires_at: number | null; kinds: { kind: string; left: number }[]; grant?: { id: string; kind: string } };
 
 type Json = Record<string, any>;
 const readJson = (file: string): Json | undefined => {
@@ -199,6 +204,66 @@ export function limitsOf(body: Json): Limit[] {
 	});
 }
 
+// The usage read. cedar_ember=1 adds the 리셋권 (null without it); the server lists them only to a Claude Code user-agent (with
+// dotz's own it answers ineligible_reason "surface"), so this one GET names the installed Claude Code version, else a known one.
+let cliUa: string | undefined;
+function claudeCliUa(): string {
+	if (cliUa) return cliUa;
+	let v = "2.1.316";
+	try {
+		const found = readdirSync(join(homedir(), ".local", "share", "claude", "versions")).filter(n => /^\d+\.\d+\.\d+$/.test(n));
+		const num = (s: string) => s.split(".").map(Number);
+		found.sort((a, b) => { const x = num(a), y = num(b); return x[0]! - y[0]! || x[1]! - y[1]! || x[2]! - y[2]!; });
+		v = found.at(-1) ?? v;
+	} catch {
+		// no Claude Code install on this machine: the known version stays
+	}
+	return (cliUa = `claude-cli/${v} (external, cli)`);
+}
+export const CLAUDE_USAGE_URL = `${USAGE_URL}?cedar_ember=1&skip_spend=1`;
+export const claudeUsageGet = (fetchFn: (url: string, init: RequestInit) => Promise<Response>, token: string): Promise<Response> =>
+	fetchFn(CLAUDE_USAGE_URL, { headers: { authorization: `Bearer ${token}`, accept: "application/json", "anthropic-beta": "oauth-2025-04-20", "user-agent": claudeCliUa() }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+
+// Pure: the grants with a reset left, nearest expiry first. A grant named Fable is "Fable", a weekly one "주간".
+const msOf = (v: unknown): number | null => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? Date.parse(v) : null);
+export function claudeGrants(body: Json): { id: string; kind: string; left: number; expires: number | null; now: boolean }[] {
+	const list: Json[] = Array.isArray(body?.cedar_ember?.grants) ? body.cedar_ember.grants : [];
+	return list
+		.filter(g => typeof g?.id === "string" && Number(g.resets_left) > 0)
+		.map(g => ({
+			id: g.id as string,
+			kind: /fable/i.test(`${g.id} ${g.label ?? ""}`) ? "Fable" : g.type === "weekly" || /weekly/i.test(String(g.label ?? "")) ? "주간" : "기타",
+			left: Math.floor(Number(g.resets_left)),
+			expires: msOf(g.ends_at),
+			now: g.usable_now !== false && g.paused !== true,
+		}))
+		.sort((a, b) => (a.expires ?? Number.MAX_SAFE_INTEGER) - (b.expires ?? Number.MAX_SAFE_INTEGER));
+}
+// Pure: the 리셋권 in one usage answer. Undefined when the answer has none to show: no cedar_ember (null) or ineligible with no grants.
+export function claudeResets(body: Json, canUse: () => boolean): ClaudeResets | undefined {
+	const c = body?.cedar_ember;
+	if (!c || typeof c !== "object") return undefined;
+	const grants = claudeGrants(body);
+	if (!grants.length && c.eligible === false) return undefined;
+	const kinds: { kind: string; left: number }[] = [];
+	for (const g of grants) {
+		const k = kinds.find(x => x.kind === g.kind);
+		if (k) k.left += g.left;
+		else kinds.push({ kind: g.kind, left: g.left });
+	}
+	const ready = c.eligible === false ? [] : grants.filter(g => g.now);
+	const next = ready.find(g => g.id === c.next_grant_id) ?? ready[0];
+	return { held: grants.reduce((n, g) => n + g.left, 0), usable: !!next && canUse(), expires_at: grants[0]?.expires ?? null, kinds, ...(next ? { grant: { id: next.id, kind: next.kind } } : {}) };
+}
+// The organization id an OmO account's reset call goes to: its Claude CLI dir's .claude.json (oauthAccount.organizationUuid), read
+// locally. An account without that dir (a token kept in auth.json) has none, and its 리셋권 are shown only.
+export function claudeOrg(name: string, file = authFile()): string | undefined {
+	const a = (readJson(file)?.["anthropic-subscription"]?.accounts ?? []).find((x: Json) => x?.name === name);
+	if (typeof a?.dirId !== "string" || !/^[0-9a-f]{32}$/.test(a.dirId)) return undefined;
+	const org = readJson(join(dirname(file), "anthropic-subscription-claude", a.dirId, ".claude.json"))?.oauthAccount?.organizationUuid;
+	return typeof org === "string" && /^[0-9a-f-]{36}$/i.test(org) ? org : undefined;
+}
+
 // Pure: omp's Anthropic report (runtimes other than OmO run on omp's login) in the same shape, named by its email.
 export function fromOmp(r: { limits?: Json[]; metadata?: { email?: string } }): AccountReport {
 	const limits = (r.limits ?? []).flatMap((l): Limit[] => {
@@ -243,7 +308,7 @@ export class AccountUsage {
 		if (until !== undefined && t < until) return keep("rate_limited", until - t, until);
 		this.backoff.delete(acct.name);
 		try {
-			const res = await this.fetchFn(USAGE_URL, { headers: { authorization: `Bearer ${acct.token}`, accept: "application/json", "anthropic-beta": "oauth-2025-04-20", "user-agent": "dotz" }, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+			const res = await claudeUsageGet(this.fetchFn, acct.token);
 			if (res.status === 401 || res.status === 403) return keep("expired", RETRY_MS);
 			if (res.status === 429) {
 				const wait = Math.max(RETRY_MS, retryAfterMs(res.headers.get("retry-after"), t) ?? FRESH_MS);
@@ -251,7 +316,9 @@ export class AccountUsage {
 				return keep("rate_limited", wait, t + wait);
 			}
 			if (!res.ok) return keep("failed", RETRY_MS);
-			return this.settle(acct.name, { provider: "anthropic", account: acct.name, via, ...plan, limits: limitsOf(await res.json()), fetchedAt: t }, t, FRESH_MS);
+			const body = await res.json();
+			const resets = claudeResets(body, () => !!claudeOrg(acct.name));
+			return this.settle(acct.name, { provider: "anthropic", account: acct.name, via, ...plan, limits: limitsOf(body), fetchedAt: t, ...(resets ? { resets } : {}) }, t, FRESH_MS);
 		} catch {
 			return keep("failed", RETRY_MS);
 		}

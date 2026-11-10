@@ -196,17 +196,21 @@ async function startLogin(p, pending) {
 
 /* ---------- usage ---------- */
 let quotaTimer;
-// 리셋권 of one account (hub/codex-usage.ts): how many it holds and the nearest expiry. 사용 works only with one held and a limit reached,
-// and asks first, naming the limits it refills and how many stay; only that confirm sends POST /api/quota/reset-credit with confirm: true.
+// 리셋권 of one account (hub/codex-usage.ts, Claude: hub/usage-account.ts claudeResets): how many it holds (Claude: by kind) and the nearest
+// expiry. 사용 works only with one usable, and asks first, naming the pass (Claude) or the limits it refills and how many stay; only that
+// confirm sends POST /api/quota/reset-credit with confirm: true.
 function resetRow(p, name) {
-  const r = p.resets, wins = (p.limits || []).map(limitName).join("와 ");
-  const why = r.held && !r.usable ? "한도에 걸리면 쓸 수 있어요" : "";
-  const sub = [r.held && r.expires_at ? `${dayLabel(r.expires_at)} 만료` : "", why].filter(Boolean).join(" · ");
-  const say = { reset: "한도를 다시 채웠어요", nothing_to_reset: "다시 채울 한도가 없어서 쓰지 않았어요", no_credit: "남은 리셋권이 없어요", already_redeemed: "이미 쓴 리셋권이에요" };
+  const r = p.resets, claude = p.provider === "anthropic", wins = (p.limits || []).map(limitName).join("와 ");
+  const why = !claude && r.held && !r.usable ? "한도에 걸리면 쓸 수 있어요" : "";
+  const kinds = claude ? (r.kinds || []).map(k => `${k.kind} ${k.left}`).join(" · ") : "";
+  const sub = [kinds, r.held && r.expires_at ? `${dayLabel(r.expires_at)} 만료` : "", why].filter(Boolean).join(" · ");
+  const say = { reset: "한도를 다시 채웠어요", nothing_to_reset: "다시 채울 한도가 없어서 쓰지 않았어요", not_limited: "다시 채울 한도가 없어서 쓰지 않았어요", no_credit: "남은 리셋권이 없어요", already_redeemed: "이미 쓴 리셋권이에요", already_used: "이미 쓴 리셋권이에요", cooldown: "조금 뒤에 다시 쓸 수 있어요" };
+  const what = claude ? `${p.account_label || p.account}의 ${r.grant ? `${r.grant.kind} ` : ""}리셋권으로 한도를` : `${p.account}의 ${wins || "한도"}를`;
+  const send = claude ? { provider: "anthropic", account: p.account, grant_id: r.grant && r.grant.id, confirm: true } : { account: p.account, confirm: true };
   const use = () => dialog({ confirm: true, title: "리셋권을 쓸까요?",
-    body: el("div", { class: "sup", text: `${name} ${p.account}의 ${wins || "한도"}를 지금 다시 채워요. 쓰고 나면 리셋권이 ${r.held - 1}개 남아요. 되돌릴 수는 없어요.` }),
+    body: el("div", { class: "sup", text: `${name} ${what} 지금 다시 채워요. 쓰고 나면 리셋권이 ${r.held - 1}개 남아요. 되돌릴 수는 없어요.` }),
     actions: [{ label: "취소", onclick: c => c() }, { label: "리셋권 쓰기", kind: "pri", onclick: (c, b) => busy(b, async () => {
-      try { const out = await api("/api/quota/reset-credit", "POST", { account: p.account, confirm: true }); c(); toast(say[out.outcome] || "리셋권을 썼어요"); loadQuota(true); }
+      try { const out = await api("/api/quota/reset-credit", "POST", send); c(); toast(say[out.outcome] || "리셋권을 썼어요"); loadQuota(true); }
       catch (e) { c(); toast(e.message || "리셋권을 쓰지 못했어요", true); loadQuota(true); }
     }) }] });
   return el("div", { class: "lim rc" },

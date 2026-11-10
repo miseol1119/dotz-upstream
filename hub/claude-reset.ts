@@ -1,0 +1,49 @@
+// Spends one Claude 리셋권 (Anthropic's "limit reset", program cedar_ember) of an OmO subscription account, the call Claude Code's
+// /limit-reset makes: POST /api/organizations/{org}/reset_rate_limits {program, grant_id, request_id}. Reached only from
+// POST /api/quota/reset-credit with provider "anthropic" and confirm: true (the usage screen's confirm step), and only after a fresh
+// read shows that grant still has one left and applies now. The token is never refreshed: an expired one is refused, not renewed.
+import { randomUUID } from "node:crypto";
+import { log } from "./config.ts";
+import { claudeGrants, claudeOrg, claudeResets, claudeUsageGet, subscriptionAccounts } from "./usage-account.ts";
+
+type Json = Record<string, any>;
+const API = "https://api.anthropic.com/api/organizations";
+
+let using = false;
+export async function useClaudeReset(b: Json): Promise<{ status: number; body: Json }> {
+	if (b.confirm !== true) return { status: 400, body: { error: "리셋권은 확인을 거친 뒤에만 써요" } };
+	if (typeof b.account !== "string" || typeof b.grant_id !== "string") return { status: 400, body: { error: "어느 리셋권인지 알 수 없어요" } };
+	if (using) return { status: 409, body: { error: "리셋권을 쓰는 중이에요" } };
+	using = true;
+	try {
+		const acct = subscriptionAccounts().find(a => a.name === b.account);
+		if (!acct) return { status: 404, body: { error: "이 Claude 계정을 찾지 못했어요" } };
+		if (acct.expiresAt !== null && acct.expiresAt <= Date.now()) return { status: 409, body: { error: "로그인이 풀려서 쓰지 않았어요" } };
+		const org = claudeOrg(acct.name);
+		if (!org) return { status: 409, body: { error: "이 계정은 여기서 리셋권을 쓸 수 없어요" } };
+		const res = await claudeUsageGet(fetch, acct.token);
+		if (res.status === 401 || res.status === 403) return { status: 409, body: { error: "로그인이 풀려서 쓰지 않았어요" } };
+		if (!res.ok) return { status: 502, body: { error: `리셋권을 확인하지 못했어요 (${res.status})` } };
+		const now = (await res.json()) as Json;
+		const grant = claudeGrants(now).find(g => g.id === b.grant_id);
+		if (!grant) return { status: 409, body: { error: "남은 리셋권이 없어요" } };
+		if (!grant.now || now.cedar_ember?.eligible === false) return { status: 409, body: { error: "지금은 이 리셋권을 쓸 수 없어요" } };
+		const held = claudeResets(now, () => true)?.held ?? grant.left;
+		const out = await fetch(`${API}/${org}/reset_rate_limits`, {
+			method: "POST",
+			headers: { authorization: `Bearer ${acct.token}`, accept: "application/json", "content-type": "application/json", "anthropic-beta": "oauth-2025-04-20" },
+			body: JSON.stringify({ program: "cedar_ember", grant_id: grant.id, request_id: randomUUID() }),
+			signal: AbortSignal.timeout(15_000),
+		});
+		if (!out.ok) return { status: 502, body: { error: `리셋권을 쓰지 못했어요 (${out.status})` } };
+		const r = (await out.json()) as Json;
+		const outcome = String(r.result ?? "");
+		log(`claude: limit reset ${grant.id} for ${acct.name}: ${outcome}`);
+		return { status: 200, body: { ok: true, outcome, left: outcome === "reset" ? held - 1 : held } };
+	} catch (e) {
+		log(`claude: limit reset failed: ${(e as Error).message}`);
+		return { status: 502, body: { error: "리셋권을 쓰지 못했어요" } };
+	} finally {
+		using = false;
+	}
+}

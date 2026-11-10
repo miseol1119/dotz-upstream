@@ -8,12 +8,13 @@ import { checkNow as checkAccountNow } from "./account-rules.ts";
 import { accountsRoute } from "./accounts-api.ts";
 import { cancelByOwner, orch, restart as restartOrchestrator, resumeNow } from "./orchestrator.ts";
 import { convs } from "./convsessions.ts";
-import { cancelLogin, completeLogin, LoginBusy, loginStatus, logoutProvider, quota, refreshQuota, saveProviderKey, startLogin } from "./providers.ts";
+import { cancelLogin, completeLogin, forgetAccountUsage, LoginBusy, loginStatus, logoutProvider, quota, refreshQuota, saveProviderKey, startLogin } from "./providers.ts";
 import { featureCatalog } from "./features.ts";
 import { mailboxRoute } from "./routes-mailbox.ts";
 import { harnessGraph, readHarnessFile } from "./harness.ts";
 import { lastReport, RUNTIME_IDS, runtimesView, startVerify, UseRefused, useRuntime, verifyState, type UseRole } from "./runtime/verify.ts";
 import { json, body, terminals, BodyError } from "./routes-util.ts";
+import { useClaudeReset } from "./claude-reset.ts";
 import { useResetCredit } from "./codex-usage.ts";
 import { budgetSettings, deleteAdminKey, monthlyLimitOf, saveAdminKey, saveMonthlyLimit } from "./api-budget.ts";
 import { postSettings, savePostSettings } from "./discord-post.ts";
@@ -163,9 +164,13 @@ export async function routeSettings(req: Request, url: URL, parts: string[]): Pr
 		return json({ source, history: page.items.length > 0, items: [...page.items, ...live], more: page.more });
 	}
 	if (req.method === "GET" && url.pathname === "/api/quota") return json(await (url.searchParams.has("fresh") ? refreshQuota() : quota()));
-	// Spends one Codex 리셋권, only with confirm: true from the usage screen's confirm step (hub/codex-usage.ts); then the usage is read again.
+	// Spends one 리셋권, only with confirm: true from the usage screen's confirm step: Codex (hub/codex-usage.ts), or with provider
+	// "anthropic" a Claude account's (hub/claude-reset.ts); then the usage is read again.
 	if (req.method === "POST" && url.pathname === "/api/quota/reset-credit") {
-		const r = await useResetCredit(await body(req));
+		const b = await body(req);
+		const claude = b?.provider === "anthropic";
+		const r = await (claude ? useClaudeReset(b) : useResetCredit(b));
+		if (claude && typeof b.account === "string") forgetAccountUsage(b.account);
 		if (r.status === 200) void refreshQuota().catch(e => log(`usage refresh failed: ${(e as Error).message}`));
 		return json(r.body, r.status);
 	}
