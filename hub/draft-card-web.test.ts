@@ -148,14 +148,19 @@ for (const width of [1280, 390]) {
 			const draft = ${JSON.stringify({ ...DRAFT, brief: BRIEF })}, n = ${JSON.stringify(note("a", "open"))};
 			n.decision.draft = draft;
 			MAILS.set("mail:fx-9", { subject: "월간 점검 보고서 확인 요청", from: draft.brief.from, source: "fx", at: ${JSON.stringify(now)} });
-			const nodes = [draftNode(draft, { t: "mail:fx-9" }), draftCardNode(n), draftCardNode(n, { bare: true })];
-			document.body.replaceChildren(...nodes);
-			return JSON.stringify({ texts: nodes.map(x => x.textContent), over: document.documentElement.scrollWidth > innerWidth });
+			// each where the app draws it: the decision card's draft above the input (no timeline), the two cards in the monitoring timeline, whose column their narrow rules ask
+			window.renderMonitoring = () => {}; window.monSchedule = () => {};
+			const nodes = [draftNode(draft, { t: "mail:fx-9" }), draftCardNode(n), draftCardNode(n, { bare: true })], col = document.querySelector("#mon-tl");
+			col.replaceChildren(...nodes.slice(1)); col.closest(".view").prepend(nodes[0]);
+			const edge = col.closest(".timeline").getBoundingClientRect().right;
+			return JSON.stringify({ texts: nodes.map(x => x.textContent), shown: nodes.every(x => x.getBoundingClientRect().width > 0),
+				over: document.documentElement.scrollWidth > innerWidth || nodes.some(x => x.getBoundingClientRect().right > Math.min(edge, innerWidth) + 0.5 || [...x.querySelectorAll("*")].some(e => e.getBoundingClientRect().right > innerWidth + 0.5)) });
 		})()`)) as string) as any;
 		for (const text of got.texts) {
 			for (const line of [BRIEF.summary, ...BRIEF.todo, ...BRIEF.questions, "보내 주신 보고서는 잘 받았습니다."]) expect(text).toContain(line);
 			expect(text).toContain("Alex Sender");
 		}
+		expect(got.shown).toBe(true);
 		expect(got.over).toBe(false);
 	});
 }
