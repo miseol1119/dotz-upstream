@@ -238,3 +238,31 @@ test("from 1100px the list sits beside the overview, and a section page opens ov
 	await waitFor(v, `document.querySelector(".pl-row")`);
 	await shot(v, "07-list-1280-dark.png");
 });
+
+test("from 1100px, back after pressing another project returns to the one pressed before and the app never calls history.go", async () => {
+	const v = await boot(1280, 900);
+	await run(v, `go("home")`);
+	await waitFor(v, `current === "home"`);
+	await run(v, `window.__goCalls = 0; const g = history.go.bind(history); history.go = n => { window.__goCalls++; return g(n); }`);
+	const sel = () => q<[string, string]>(v, `return [document.querySelector("#pl-list .pl-row.on .pl-n")?.textContent ?? "", location.hash]`);
+	const press = async (i: number, name: string) => {
+		await run(v, `document.querySelectorAll("#pl-list .pl-row:not(.sub):not([data-k='sessions'])")[${i}].click()`);
+		await waitFor(v, `document.querySelector("#pl-list .pl-row.on .pl-n")?.textContent === ${JSON.stringify(name)}`);
+	};
+	const back = (go: "back" | "forward") => run(v, `window.__popped = new Promise(res => addEventListener("popstate", () => res(true), { once: true })); history.${go}()`);
+	await run(v, `document.querySelector('#nav .ni[data-view="projects"]').click()`);
+	await waitFor(v, `current === "project" && document.querySelector("#pl-list .pl-row.on")`);
+	await press(0, "프로젝트 1");
+	const first = await sel();
+	await press(1, "프로젝트 2");
+	const second = await sel();
+	await back("back");
+	await waitFor(v, `document.querySelector("#pl-list .pl-row.on .pl-n")?.textContent === "프로젝트 1" && location.hash === ${JSON.stringify(first[1])}`);
+	await back("forward");
+	await waitFor(v, `document.querySelector("#pl-list .pl-row.on .pl-n")?.textContent === "프로젝트 2" && location.hash === ${JSON.stringify(second[1])}`);
+	await back("back");
+	await waitFor(v, `location.hash === ${JSON.stringify(first[1])}`);
+	await back("back");
+	await waitFor(v, `current === "home" && location.hash === "#home"`);
+	expect(await q(v, `return window.__goCalls`)).toBe(0);
+});

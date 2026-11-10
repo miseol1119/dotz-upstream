@@ -256,7 +256,7 @@ function onActivity(a) {
 /* ---------- switching the target ---------- */
 const DRAFT_KEY = t => `dotz-draft:${t}`;
 function saveDraft() { ts(target).draft = ta.value; try { if (ta.value) localStorage.setItem(DRAFT_KEY(target), ta.value); else localStorage.removeItem(DRAFT_KEY(target)); } catch {} }
-function setTarget(t) {
+function setTarget(t, nav) {   // nav: go() follows and stacks the entry itself (an item pressed); without it the conversation changes in place
   if (!validTarget(t) || t === target) return;
   saveDraft();
   ts(target).att = ATT;   // the files waiting in the composer stay with their conversation, like the typed text
@@ -264,7 +264,7 @@ function setTarget(t) {
   closeSheet();
   target = t;
   if (!isRelayT(t)) try { localStorage.setItem(TARGET_KEY, t); } catch {}   // a relayed computer is entered by the address (#chat/relay:<adapter>:<key>), never restored from here
-  if (current === "chat" || current === "activity") routeReplace(monCtx && current === "chat" ? `monitoring/c:${enc(t)}` : `${current}/${t}`);
+  if (!nav && (current === "chat" || current === "activity")) routeReplace(monCtx && current === "chat" ? `monitoring/c:${enc(t)}` : `${current}/${t}`);
   const s = ts(t);
   s.whole = false;
   convSync();

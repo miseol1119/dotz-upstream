@@ -269,7 +269,7 @@ const mnRow = () => MN.info && el("button", { class: "li tap", type: "button", o
 mnLoad();
 
 $("#brand").append(el("span", { class: "brand-c", id: "brand-c", hidden: true }, icon("drop")));
-$("#brand").onclick = () => (prTrig() ? prOpen() : go("home"));
+$("#brand").onclick = () => (prTrig() ? prOpen() : (H.tab = true, go("home")));
 // The phone's page title, on a page without a back arrow (there the title names the conversation or sub-page and the arrow leads back).
 const prTitleTap = () => { if (prTrig() && !$("#appbar").classList.contains("back")) prOpen(); };
 $("#title").addEventListener("click", prTitleTap);
@@ -290,7 +290,7 @@ document.addEventListener("keydown", ev => {
   if (prNext(ev.shiftKey ? -1 : 1)) ev.preventDefault();
 });
 // Tapping 홈 again while on 홈 opens the computer sheet (like the 채팅 tab's re-tap, 04-state.js chatTabTap) and the next tap closes it; with one gateway the tab behaves as before.
-const homeTabTap = () => { if (PR.node) prClose(); else if (current === "home" && PR.list.length >= 2) prOpen(); else go("home"); };
+const homeTabTap = () => { if (PR.node) prClose(); else if (current === "home" && PR.list.length >= 2) prOpen(); else { H.tab = true; go("home"); } };
 if (PR.list.length) prPaint();
 prLoad();
 setInterval(() => { if (!document.hidden) prLoad(); }, 60_000);
