@@ -28,7 +28,8 @@
   if (h.view !== "notices") setTimeout(() => { for (const t of ["worklog"]) if (t !== target && !ts(t).hLoaded) loadTarget(t, true).catch(() => {}); }, 1500);
   await state;
   paneRestore();
-  if (pushOpenTs) { const at = pushOpenTs; pushOpenTs = ""; pushOpen(PUSH_HASH, at, pushOpenNid); }   // the app was started by a tap on a push
+  if (pushOpenTs) { const at = pushOpenTs; pushOpenTs = ""; pushTapCold(pushOpen(PUSH_HASH, at, pushOpenNid)); }   // the app was started by a tap on a push
+  else if (!pushQ.has("n")) pushTapCold();   // a decision (?n=) reports when its sheet is open (30-notices.js)
   introStart();   // the screen tour (42-intro.js) asks the gateway after a pause; nothing here waits for it
   loadModels(true);
   loadProviderData().then(() => { if (current === "home") renderHome(); }, () => {});

@@ -256,11 +256,11 @@ describe("web app modules", () => {
 
 describe("service worker shell", () => {
 	const swSource = readFileSync(join(import.meta.dir, "..", "web", "sw.js"), "utf8");
-	const boot = (caches: ReturnType<typeof fakeCaches>, fetchImpl: (u: string) => Promise<Response>, clients: unknown = {}) => {
+	const boot = (caches: ReturnType<typeof fakeCaches>, fetchImpl: (u: string) => Promise<Response>, clients: unknown = {}, timer: (run: () => void) => void = run => run()) => {
 		const handlers: Record<string, (ev: any) => void> = {};
 		const location = { origin: "https://dotz.test" };
 		// The worker's wait before its background check runs at once here: only what it does after that wait is under test.
-		new Function("self", "caches", "location", "fetch", "Response", "URL", "setTimeout", swSource)({ clients, addEventListener: (t: string, h: (ev: any) => void) => { handlers[t] = h; } }, caches, location, (u: string | Request) => fetchImpl(typeof u === "string" ? u : u.url), Response, URL, (run: () => void) => run());
+		new Function("self", "caches", "location", "fetch", "Response", "URL", "setTimeout", swSource)({ clients, addEventListener: (t: string, h: (ev: any) => void) => { handlers[t] = h; } }, caches, location, (u: string | Request) => fetchImpl(typeof u === "string" ? u : u.url), Response, URL, timer);
 		return handlers;
 	};
 
@@ -346,8 +346,8 @@ describe("service worker shell", () => {
 
 	test("a tapped notification focuses an open window and hands it the target instead of opening a new one", async () => {
 		const events: string[] = [];
-		const win = { url: "https://dotz.test/#chat/main", focus: async () => { events.push("focus"); }, postMessage: (m: { open: string }) => { events.push(`msg ${m.open}`); } };
-		const h = boot(fakeCaches(), async () => new Response(""), { matchAll: async () => [win], openWindow: async () => { events.push("open"); } });
+		const win = { url: "https://dotz.test/#chat/main", focus: async () => { events.push("focus"); }, postMessage: (m: { open: string }, ports?: MessagePort[]) => { events.push(`msg ${m.open}`); ports?.[0]?.postMessage(1); } };
+		const h = boot(fakeCaches(), async () => new Response(""), { matchAll: async () => [win], openWindow: async () => { events.push("open"); } }, () => {});   // the wait for the window's answer never runs out here
 		let done!: Promise<unknown>;
 		h.notificationclick!({ notification: { close: () => {}, data: { url: "/#chat/lane:a" } }, waitUntil: (p: Promise<unknown>) => { done = p; } });
 		await done;

@@ -181,8 +181,8 @@ async function ntJump(n, quiet = false) {
   // A session this page has not read yet (it began and ended while the page slept) is not gone: ask the gateway before ntGo sends the tap to the main chat.
   if (isLaneT(want) && S && !S.lanes.some(l => `lane:${l.name}` === want)) { await refreshState(); if (seq !== ntJumpSeq) return; }
   const t = ntGo(want);
-  if (!t) return;
-  if (isLaneT(want) && t === MAIN) { toast("이 세션은 이미 지워졌어요"); return; }   // the main chat has no message of it: say so instead of landing on the nearest one
+  if (!t) return "no-conversation";
+  if (isLaneT(want) && t === MAIN) { toast("이 세션은 이미 지워졌어요"); return "session-gone"; }   // the main chat has no message of it: say so instead of landing on the nearest one
   chatUnpin();
   ntKeep = isLaneT(t) ? t : "";
   CV.jump = at;   // set after ntGo (a new opening resets it): the opening's first draw lands on this message, not on the "새 메시지" divider (chatOpen)
@@ -192,12 +192,15 @@ async function ntJump(n, quiet = false) {
     await ensureMsg(t, at);   // a stale stream may not have the message yet: fetch it before jumping
     await ntReach(t, at);
     for (let i = 0; i < 300 && seq === ntJumpSeq && !CV.placed; i++) await ntRaf();   // the opening's first draw waits for the read position (chatReady)
-    if (seq !== ntJumpSeq || target !== t || current !== "chat") return;
+    if (seq !== ntJumpSeq || target !== t || current !== "chat") return "moved-on";
     chatShow(at);
     const m = ntFind(at), exact = !!m && m.dataset.ts === at;
     if (m) chatJump(m);
     if (exact) ntFlash(m);
-    else if (n.at && !quiet) toast(m ? "그 메시지가 없어서 가까운 곳을 열었어요" : "그 메시지를 찾을 수 없어요");
+    else {
+      if (n.at && !quiet) toast(m ? "그 메시지가 없어서 가까운 곳을 열었어요" : "그 메시지를 찾을 수 없어요");
+      return m ? "near-message" : "no-message";   // what a tap on a push reports to the gateway (23-installable-app-web.js pushTapReport)
+    }
   } catch {}
 }
 // The conversation behind a sheet (a decision, an [ask], a failure): the same jump, without one for a question that has no conversation (a login request) or lives on another computer.
@@ -206,12 +209,12 @@ const ntUnder = n => { if (!n.pc && validTarget(n.src || n.open || "")) ntJump(n
 // A tapped push: open its notice, or its conversation at the message it is about (loaded first when the stream missed it).
 async function pushOpen(hash, at, nid) {
   const p = parseHash(hash), t = p.t || MAIN;
-  if (!at || p.view !== "chat") { go(p.view, p.t); return; }
+  if (!at || p.view !== "chat") { go(p.view, p.t); return ""; }
   const find = () => (NT.loaded && ntById(nid)) || ntMsgFor(t, at);
   if (!find()) await loadNotices();   // a cold start, or a page that slept through it: the notice decides where this lands (a monitor's row, a failure's sheet)
   const n = find();
-  if (!n && t === "alert") { go("notices"); return; }   // no notice behind it: the 알림 screen, not the record conversation
-  noticeOpen(n || { kind: "message", tone: "", src: t, open: t, at });
+  if (!n && t === "alert") { go("notices"); return "no-notice"; }   // no notice behind it: the 알림 screen, not the record conversation
+  return noticeOpen(n || { kind: "message", tone: "", src: t, open: t, at });
 }
 
 /* ---- one handler for every notice entry point ---- */
@@ -266,7 +269,7 @@ async function noticeOpenId(id, quiet, hash, at) {
   let n = ntById(id);
   if (!n) { await loadNotices(); n = ntById(id); }
   if (!n && at) return pushOpen(hash, at, "");
-  if (!n) { if (!quiet) toast("이 알림은 이미 처리됐어요"); return; }
+  if (!n) { if (!quiet) toast("이 알림은 이미 처리됐어요"); return "notice-gone"; }
   return noticeOpen(n);
 }
 function ntRead(n) {
@@ -694,14 +697,14 @@ function ntSheetShow(id, det, pn = null) {
 }
 
 // A tapped notification (or an option button on it) asks an open window to show the decision; a cold start carries it as ?n=<id>.
-if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", ev => { const d = ev.data || {}; if (d.notice) { ovCloseAll(); noticeOpenId(d.notice, false, new URL(d.open, location.href).hash, d.ts); } });
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", ev => { const d = ev.data || {}; if (d.notice) { pushTapGot(ev); ovCloseAll(); noticeOpenId(d.notice, false, new URL(d.open, location.href).hash, d.ts).then(r => pushTapReport(d.tap, r), () => pushTapReport(d.tap, "error")); } });
 {
   const want = PUSH_FOLLOW ? "" : new URLSearchParams(location.search).get("n") || "";   // a relayed notice's ?n names an item on the other computer (prFollow)
   if (want) {
     const u = new URL(location.href);
     u.searchParams.delete("n");
     history.replaceState(history.state, "", u.pathname + u.search + u.hash);
-    setTimeout(() => noticeOpenId(want, true, PUSH_HASH, pushDecisionAt), 500);
+    setTimeout(() => pushTapCold(noticeOpenId(want, true, PUSH_HASH, pushDecisionAt)), 500);
   }
 }
 

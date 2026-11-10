@@ -47,7 +47,7 @@ function prTryFollow() {
   prGo(`${p.url}/${q.size ? `?${q}` : ""}${u.hash}`, true);
 }
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", ev => { const d = ev.data || {}; if (typeof d.follow === "string") { prFollowHref = d.follow; prTryFollow(); } });
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", ev => { const d = ev.data || {}; if (typeof d.follow === "string") { pushTapGot(ev); prFollowHref = d.follow; prTryFollow(); pushTapReport(d.tap, "follow"); } });
 
 // Frames this gateway forwards from the other computers' event streams (hub/peer-stream.ts), so the page hears them without leaving its own origin:
 // peer_counts updates that computer's numbers (and the bot name's dot) at once; peer_notice is a new notice there. It toasts (tap = that computer, at the item, like a

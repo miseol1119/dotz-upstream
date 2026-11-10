@@ -373,15 +373,20 @@ const wants = (s: Stored, m: PushMessage, t: number) => m.kind === "test" || !pr
 
 // Deliver through one subscription for each device not in `done` (an app's before a browser's) and mark the device done. A device whose chosen
 // subscription has the kind switched off (or whose page is open) stays quiet: that is its owner's choice there, and no other subscription fires.
-function cover(list: Stored[], m: PushMessage, done: Set<string>): void {
+function cover(list: Stored[], m: PushMessage, done: Set<string>): number {
 	const now = Date.now();
+	let sent = 0;
 	for (const s of [...list].sort((x, y) => Number(y.app === true) - Number(x.app === true))) {
 		if (done.has(device(s)) || done.has(epKey(s.endpoint))) continue;
 		done.add(device(s));
 		done.add(epKey(s.endpoint));
 		if (!s.app && hasApp(s.did)) continue;   // a browser of a device that has the app is never a channel
-		if (wants(s, m, now)) void deliver(s, m);
+		if (wants(s, m, now)) {
+			void deliver(s, m);
+			sent++;
+		}
 	}
+	return sent;
 }
 
 // undefined: the peer did not take the relay (down, refused, an error); otherwise the devices it covered.
@@ -400,7 +405,7 @@ async function fanOut(m: PushMessage): Promise<void> {
 	// A device this gateway is switched off for counts as covered: no subscription of it fires here, and the peers are told to skip it too.
 	const done = new Set<string>(Object.keys(devices).filter(isOff));
 	for (const s of subs) if (s.did && isOff(s.did)) done.add(epKey(s.endpoint));
-	cover(subs.filter(s => s.app === true), m, done);
+	let reached = cover(subs.filter(s => s.app === true), m, done);
 	let list: Awaited<ReturnType<typeof relayPeers>> = [];
 	try {
 		list = await relayPeers();
@@ -412,13 +417,26 @@ async function fanOut(m: PushMessage): Promise<void> {
 		for (const p of [...up]) {
 			const skip = [...done].filter(k => !k.startsWith("e:"));
 			const got = await relayTo(p.url, JSON.stringify({ from: me!.url, via, skip, kind: m.kind, title: m.title, body: m.body, url: m.url, tag: m.tag, ts: m.ts, id: m.id }));
-			if (got) for (const k of got) done.add(k);
-			else up.splice(up.indexOf(p), 1);
+			if (got) {
+				for (const k of got) done.add(k);
+				reached += got.filter(k => EP_KEY.test(k)).length;   // one ep: key per device the peer reached
+			} else up.splice(up.indexOf(p), 1);
 		}
 	};
 	await ask("app");
-	cover(subs, m, done);
+	reached += cover(subs, m, done);
 	await ask("all");
+	// One line per send, so a tap that does not land can be traced to what was sent (ids and address only, never the title or body).
+	log(`push: sent ${logFields({ tag: m.tag, kind: m.kind, to: m.url, ts: m.ts, nid: m.nid, id: m.id })} devices=${reached}`);
+}
+const logValue = (v: unknown): string => (typeof v === "string" ? v.replace(/[\s=]+/g, "_").slice(0, 120) : "");
+const logFields = (f: Record<string, unknown>): string => Object.entries(f).flatMap(([k, v]) => (logValue(v) ? [`${k}=${logValue(v)}`] : [])).join(" ");
+// A tapped notification, as its page reports it (web/js/23-installable-app-web.js pushTapReport): the way it came in and the screen it reached.
+const TAP_PATHS = ["open-window", "new-window"];
+export function tapLanded(b: Record<string, unknown>): boolean {
+	if (typeof b.path !== "string" || !TAP_PATHS.includes(b.path)) return false;
+	log(`push: tap ${logFields({ tag: b.tag, path: b.path, via: b.why, screen: b.screen, reason: b.reason })}`);
+	return true;
 }
 
 async function peerJson(peerUrl: string, path: string, body?: object): Promise<Record<string, any> | undefined> {
@@ -635,6 +653,7 @@ export async function pushRoute(req: Request, url: URL): Promise<Response | unde
 		cover(b.via === "app" ? subs.filter(s => s.app === true) : subs, m, done);
 		return json({ ok: true, served: [...done].filter(k => !skip.has(k)) });
 	}
+	if (req.method === "POST" && p === "/api/push/tap") return tapLanded(b) ? json({ ok: true }) : json({ error: "path required" }, 400);
 	if (req.method === "POST" && p === "/api/push/unsubscribe") {
 		const gone = findSub(b.endpoint);
 		subs = subs.filter(s => s.endpoint !== b.endpoint);

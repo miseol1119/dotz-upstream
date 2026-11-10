@@ -15,9 +15,22 @@ const SHARE = "dotz-share";
 // A tap that has to start the app, kept beside the shares: a phone may bring the app back at the address it started with, not the one openWindow named
 // (a stale ?n= came back on the owner's Samsung Internet app, and every push landed on one old decision, 2026-11-05). The page reads it on load (23-installable-app-web.js pushTapCheck).
 const TAP = "/push/tap";
-async function openAt(href) {
-  try { await (await caches.open(SHARE)).put(TAP, new Response(JSON.stringify({ href, at: Date.now() }))); } catch (e) { console.warn("push tap", e); }
+// `how`: the tap's tag and why no open window took it, which the page reports to the gateway with where it landed (hub/push.ts POST /api/push/tap).
+async function openAt(href, how) {
+  try { await (await caches.open(SHARE)).put(TAP, new Response(JSON.stringify({ href, at: Date.now(), path: "new-window", ...how }))); } catch (e) { console.warn("push tap", e); }
   await self.clients.openWindow(href);
+}
+// The app itself: a top-level window at the root. Other windows of this origin (a user app under /apps/<id>/, a screen share) have no receiver for a tap.
+const isAppWin = (w, origin) => { try { const u = new URL(w.url); return u.origin === origin && u.pathname === "/"; } catch { return false; } };
+// How long a window has to say it got a tap's message: a frozen or reloading page drops it, and the tap then opens the address instead.
+const ACK_MS = 2500;
+function tellWindow(win, msg) {
+  return new Promise(res => {
+    const ch = new MessageChannel();
+    const t = setTimeout(() => res(false), ACK_MS);
+    ch.port1.onmessage = () => { clearTimeout(t); res(true); };
+    try { win.postMessage(msg, [ch.port2]); } catch { clearTimeout(t); res(false); }
+  });
 }
 // A navigation answers from the cache at once; its background check waits this long, so its eight requests do not join the page's own first ones on a busy gateway.
 const REFRESH_AFTER_MS = 3000;
@@ -106,7 +119,7 @@ function pushSuppressed(wins, url, origin) {
   return wins.some(w => {
     try {
       const at = new URL(w.url);
-      return at.origin === want.origin && w.visibilityState === "visible" && w.focused === true && (at.hash === want.hash || (want.hash === "#chat/alert" && at.hash === "#notices"));
+      return at.origin === want.origin && at.pathname === "/" && w.visibilityState === "visible" && w.focused === true && (at.hash === want.hash || (want.hash === "#chat/alert" && at.hash === "#notices"));
     } catch { return false; }
   });
 }
@@ -199,25 +212,26 @@ self.addEventListener("notificationclick", ev => {
   const url = new URL(data.url || "/", location.origin).href;
   // The message the notification is about: the page makes sure it is loaded before it jumps to it (a cold start gets it as ?m=, its notice as ?i=).
   const at = data.ts || "", id = data.id || "", nid = data.nid || "";
+  const tag = ev.notification.tag || "";
   const openApp = async () => {
-    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    const win = wins.find(w => new URL(w.url).origin === location.origin);
-    // A notice relayed from another computer: this app opens, then the page switches to that computer (33-peers.js prFollow), at the item.
-    if (data.pc) {
-      if (win && await win.focus().then(() => true, () => false)) { win.postMessage({ follow: url }); return; }
-      await openAt(url);
-      return;
+    const wins = (await self.clients.matchAll({ type: "window", includeUncontrolled: true })).filter(w => isAppWin(w, location.origin));
+    const win = wins.find(w => w.focused) || wins.find(w => w.visibilityState === "visible") || wins[0];
+    // A window that refuses focus (a browser may) would change where nobody sees it, and one that does not answer has not got the tap: a new one opens at the item instead.
+    let why = "no-window";
+    if (win) {
+      if (await win.focus().then(() => true, () => false)) {
+        const tap = { path: "open-window", tag };
+        // A notice relayed from another computer: this app opens, then the page switches to that computer (33-peers.js prFollow), at the item.
+        if (await tellWindow(win, data.pc ? { follow: url, tap } : { open: url, ts: at, tap, ...(nid ? { nid } : {}), ...(id ? { notice: id } : {}) })) return;
+        why = "no-ack";
+      } else why = "focus-refused";
     }
-    // A window that refuses focus (a browser may) would change where nobody sees it: a new one opens at the item instead.
-    if (win && await win.focus().then(() => true, () => false)) {
-      win.postMessage({ open: url, ts: at, ...(nid ? { nid } : {}), ...(id ? { notice: id } : {}) });
-      return;
-    }
+    if (data.pc) { await openAt(url, { tag, why }); return; }
     const cold = new URL(url);   // the conversation draws first; the page then lands on the message (a decision also opens its sheet over it)
     if (at) cold.searchParams.set("m", at);
     if (nid) cold.searchParams.set("i", nid);
     if (id) cold.searchParams.set("n", id);
-    await openAt(cold.href);
+    await openAt(cold.href, { tag, why });
   };
   // An option button of a decision: the answer is posted from here, the app stays closed. If it could not be delivered the detail opens.
   if (id && /^opt:\d+$/.test(ev.action || "")) {

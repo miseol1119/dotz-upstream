@@ -37,9 +37,21 @@ async function sharedIntake() {
 window.addEventListener("load", sharedIntake);
 // a tapped notification asks an open window to show its conversation; listened for as the script runs (not after the page's load
 // event) so a tap that lands while the page is still starting is not dropped
-if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", ev => { const d = ev.data || {}, h = d.open ? new URL(d.open, location.href).hash : ""; if (!h || d.notice) return;   // a decision push (d.notice) is opened by its id (30-notices.js)
+// A tap the worker hands an open window says how it got here ({tap}: path, tag) and brings a port: the page answers on it that it got the tap (else sw.js opens the
+// address instead), and reports where it landed (POST /api/push/tap, one line in the gateway log).
+const pushTapGot = ev => { try { ev.ports[0].postMessage(1); } catch {} };
+function pushTapReport(tap, reason) {
+  if (!tap || !tap.path) return;
+  const screen = current === "chat" ? `chat:${target}` : current;
+  fetch("/api/push/tap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tag: tap.tag || "", path: tap.path, why: tap.why || "", screen, reason: typeof reason === "string" ? reason : "" }), keepalive: true }).catch(() => {});
+}
+if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", ev => { const d = ev.data || {}, h = d.open ? new URL(d.open, location.href).hash : "";
+  if (d.open && !d.notice) pushTapGot(ev);   // a decision push (d.notice) is answered and opened by its id (30-notices.js)
+  if (!h || d.notice) { if (d.open && !d.notice) pushTapReport(d.tap, "no-address"); return; }
   ovCloseAll();   // nothing left open covers the landing
-  if (d.ts) pushOpen(h, d.ts, d.nid); else if (location.hash !== h) { const p = parseHash(h); go(p.view, p.t); } });
+  const landed = d.ts ? pushOpen(h, d.ts, d.nid) : location.hash !== h ? (p => go(p.view, p.t))(parseHash(h)) : "";
+  Promise.resolve(landed).then(r => pushTapReport(d.tap, r), () => pushTapReport(d.tap, "error"));
+});
 // A new shell version: sw.js refreshShell posts {type:"shell-updated"} when its background fetch brought a changed page, script or styles.
 // The page reloads onto it only while it is hidden and nothing would be lost (empty composer, no attachment, sheet, dialog, or viewer open): a reload
 // under a visible page closes the phone keyboard, even with an empty box. Otherwise a chip offers it, and the reload comes when the page is next hidden. The route is the hash and survives the reload; the scroll place is kept in sessionStorage and put back (chatOpen, shellRestoreViews).
@@ -127,6 +139,18 @@ async function pushTapCheck() {
     localStorage.setItem(PUSH_SPENT, JSON.stringify(spent));
     history.replaceState(null, "", tap.href);
     reloadPage();
+  } catch (e) { console.warn("push tap", e); }
+}
+// The tap that started this page (its record in the cache, web/sw.js openAt) reports where the page landed, once; `landing`: the open's result, awaited.
+let PUSH_REPORTED = false;
+async function pushTapCold(landing) {
+  if (PUSH_REPORTED || PUSH_REPLAY) return;   // a spent address reloads at the real tap (pushTapCheck), and that page reports
+  PUSH_REPORTED = true;
+  try {
+    const hit = await (await caches.open("dotz-share")).match("/push/tap"), tap = hit && await hit.json();
+    if (!tap || tap.href !== PUSH_HREF || Date.now() - tap.at > 5 * PUSH_TAP_MS) return;
+    const reason = await landing;
+    pushTapReport(tap, PUSH_FOLLOW && !reason ? "follow" : reason);
   } catch (e) { console.warn("push tap", e); }
 }
 async function pwaInit() {

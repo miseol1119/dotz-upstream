@@ -110,7 +110,7 @@ const swOf = (wins: unknown[]) => {
 	};
 };
 const pushOf = (id: string) => noticePush(notices.find(n => n.id === id) as unknown as Notice)!;
-const OPEN_WINDOW = (view: View, posted: unknown[]) => ({ url: `${hub.origin}/#home`, focus: async () => {}, postMessage: (m: unknown) => { posted.push(m); void view; } });
+const OPEN_WINDOW = (view: View, posted: unknown[]) => ({ url: `${hub.origin}/#home`, focus: async () => {}, postMessage: (m: unknown, ports?: MessagePort[]) => { posted.push(m); ports?.[0]?.postMessage(1); void view; } });
 // What the worker posted, delivered the way the page receives it from an open window.
 const deliver = (view: View, m: unknown) => on(view).run(`navigator.serviceWorker.dispatchEvent(new MessageEvent("message", { data: ${JSON.stringify(m)} }));`);
 // A tap on `msg` with the app closed (it starts at the address the worker opens), and with it open.
@@ -178,7 +178,7 @@ describe.each([["phone", 390], ["desktop", 1280]] as const)("%s", (_name, width)
 	test("a push tapped with the app open lands on the message", async () => {
 		const view = await open(width), posted: unknown[] = [];
 		await swOf([OPEN_WINDOW(view, posted)]).tap(pushOf("rep"));
-		expect(posted).toEqual([{ open: `${hub.origin}/#chat/lane:a`, ts: LANE_AT, nid: "rep" }]);
+		expect(posted).toEqual([{ open: `${hub.origin}/#chat/lane:a`, ts: LANE_AT, nid: "rep", tap: { path: "open-window", tag: "" } }]);
 		await deliver(view, posted[0]);
 		expect(await landed(view)).toEqual({ t: "lane:a", at: LANE_AT, seen: true });
 	});
