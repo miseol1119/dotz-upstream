@@ -132,11 +132,12 @@ function fbWhy(layer) {
   return { reason: pd ? FB_DOWN_KO[pd.down] || "" : "", until: pd && pd.until && isFinite(Date.parse(pd.until)) ? pd.until : "" };
 }
 function liveModel(t) {
-  // A project conversation: its own choice and its session's model, or main's as it is with no choice.
-  if (isProjT(t)) {
-    const c = M && M.conversations && M.conversations[t], m = liveModel(MAIN);
-    if (!c) return m;
-    const conf = c.own || m.conf, act = c.active;
+  // A project or mail conversation: its own choice, else its kind's default (the mail app's), plus its session's model; main's as it is with neither.
+  if (isModelT(t)) {
+    const c = M && M.conversations && M.conversations[t], m = liveModel(MAIN), tv = TV.get(t);
+    const kind = c ? c.kind : tv && tv.inherited_kind ? tv.inherited : "";
+    if (!c && !kind) { const p = isMailT(t) && ctxSession(t); return p && p.model ? { sel: p.model, conf: "", fallback: null } : m; }
+    const conf = (c && c.own) || kind || m.conf, act = c && c.active;
     return { sel: act || conf, conf, fallback: act && conf && runBaseOf(act) !== runBaseOf(conf) ? fbWhy("orchestrator") : null };
   }
   const main = t === MAIN, om = M && M.orchestrator;

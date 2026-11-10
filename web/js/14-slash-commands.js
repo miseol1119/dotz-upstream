@@ -410,10 +410,10 @@ function ctxSession(t) {
 }
 function renderCtxRing() {
   const mb = $("#c-model"), lane = isLaneT(target) && S ? S.lanes.find(x => x.name === laneOf(target)) : null;
-  const orchT = target === MAIN || isProjT(target);
+  const orchT = target === MAIN || isModelT(target);
   // A conversation with a session of its own but no model choice (작업내역, 알림, a mail thread, app settings) follows main's model: its chip reads that
   // session's model from the context list, main's configured one while the session has no figure yet. The chips only show it; the model is main's to change.
-  const convOnly = isConvT(target) && !isProjT(target), cs = convOnly ? ctxSession(target) : null;
+  const convOnly = isConvT(target) && !isModelT(target), cs = convOnly ? ctxSession(target) : null;
   // The model it answers on now, a fallback included (20-models.js liveModel), with 폴백 중 beside it when that is not the configured one.
   const live = orchT ? liveModel(target) : convOnly ? { sel: (cs && cs.model) || liveModel(MAIN).conf, conf: "", fallback: null } : lane ? liveModel(`lane:${lane.name}`) : null, sel = live && live.sel;
   // The chips say whose they are: the orchestrator and a lane often run the same model with a similar context, and
@@ -421,7 +421,7 @@ function renderCtxRing() {
   const owner = orchT || convOnly ? botName : lane ? `세션 ${lane.title || lane.name}` : "";
   const ob = $("#c-own"), wb = $("#c-worker"), wsel = lane && lane.worker_model;
   // The row reads as in main; a project's own choice shows in the tooltips and in the menus' first row (inheritRow).
-  const chipOwner = isProjT(target) ? "이 프로젝트" : convOnly ? "이 대화" : owner;
+  const chipOwner = isProjT(target) ? "이 프로젝트" : isModelT(target) ? "이 메일" : convOnly ? "이 대화" : owner;
   ob.hidden = !(sel && owner); ob.textContent = owner;
   wb.hidden = !wsel;
   if (wsel) { const [wbase, wlevel] = String(wsel).split(":"); wb.textContent = `서브에이전트 ${modelChipText(wbase)}${wlevel ? ` · ${thinkKo(wlevel)}` : ""}`; wb.title = `이 세션의 서브에이전트 모델`; }
@@ -442,7 +442,7 @@ function renderCtxRing() {
   b.hidden = !(p && (p.kind === "conversation" ? p.tokens > 0 : p.running && p.tokens != null));
   if (b.hidden) return;
   const pct = p.percent != null ? Math.min(100, Math.max(0, p.percent)) : 0;
-  const who = isProjT(target) ? chipOwner : isConvT(target) ? "이 대화" : owner;
+  const who = isModelT(target) ? chipOwner : isConvT(target) ? "이 대화" : owner;
   const label = `${who} 컨텍스트 ${p.percent != null ? `${Math.round(p.percent)}% · ${kfmt(p.tokens)}/${kfmt(p.window)}` : `${kfmt(p.tokens)} 토큰`}${p.running ? "" : " · 쉬는 중이라 마지막 값이에요"}`;
   b.title = label; b.setAttribute("aria-label", label);
   b.textContent = p.percent != null ? `컨텍스트 ${Math.round(p.percent)}%` : `컨텍스트 ${kfmt(p.tokens)}`;
@@ -451,17 +451,18 @@ function renderCtxRing() {
 /* ---------- composer chips: model / effort / context of the current target (GET/PUT /api/target) ---------- */
 // The chips are quick switches; the last row of each opens the 모델 · 폴백 screen at this target (fallback order lives there).
 const MODELS_LINK = { value: "__models", label: "모델 설정", sub: "대체 모델 순서까지" };
-const targetParam = () => isLaneT(target) || isProjT(target) ? target : "main";
+const targetParam = () => isLaneT(target) || isModelT(target) ? target : "main";
 // The context ring and its 압축 stay on the session they read; the hub maps the target to it (hub/control.ts convOf).
 const ctxParam = () => target;
-// A project conversation's way back: the first row of its menus, checked while it made no choice (T.own is absent elsewhere).
+// A project or mail conversation's way back: the first row of its menus, checked while it made no choice (T.own is absent elsewhere).
 const INHERIT = "__inherit";
-const inheritRow = T => T.own === undefined ? [] : [{ value: INHERIT, label: "메인 대화와 같게", sub: selText(T.inherited) }];
+const inheritRow = T => T.own === undefined ? [] : [{ value: INHERIT, label: T.inherited_kind ? "이 메일 기본값과 같게" : "메인 대화와 같게", sub: selText(T.inherited) }];
 const chipValue = (T, v) => T.own === false ? INHERIT : v;
 // GET /api/target per target, kept so a chip opens its menu at once; the server builds it from the CLI model list, which is slow while cold.
 // The first click used to wait for that response (owner 2026-10-22: first click on the model/effort chip felt slow).
 const TV = new Map(), TV_BUSY = new Set();
-async function fetchTV(k) { const T = await api(`/api/target?target=${enc(k)}`); TV.set(k, T); return T; }
+// A mail with a default model has no entry in the model list until its session exists (20-models.js liveModel reads this view), so its chip is drawn again.
+async function fetchTV(k) { const T = await api(`/api/target?target=${enc(k)}`); TV.set(k, T); if (isMailT(k) && T.inherited_kind) renderCtxRing(); return T; }
 // Fills the cache at idle once the chips render, so even the first click finds it.
 function prefetchTV() {
   const k = targetParam();
@@ -490,7 +491,7 @@ async function targetChange(title, change, label, t = targetParam()) {
   TV.delete(body.target);
   await Promise.all([loadModels(true), loadContext(true), fetchTV(body.target).catch(() => {})]); refreshState();
 }
-const followsMain = () => isConvT(target) && !isProjT(target);
+const followsMain = () => isConvT(target) && !isModelT(target);
 $("#c-model").onclick = ev => busy(null, () => {
   if (followsMain()) return;
   const anchor = ev.currentTarget;

@@ -2,6 +2,7 @@
 import { draftAppOf, sendTargetOf } from "./approval-wire.ts";
 import { collectOutcomes, localMidnight } from "./reply-outcomes.ts";
 import { cfg, DATA_DIR } from "./config.ts";
+import { convs } from "./convsessions.ts";
 import { unreadOf } from "./conversations.ts";
 import { appEntries, INTEGRATIONS, integrationAvailable, integrationContext, integrationItems, withConnection, withStoreDrafts } from "./integrations.ts";
 import { createApp, deleteApp, removalPlan, removeApp } from "./app-off.ts";
@@ -128,7 +129,10 @@ export async function routeApps(req: Request, url: URL, unrepliedMailList: () =>
 		try {
 			await refreshReplyModelChoices();
 			if (!fieldsOf(app).length || !appEntries(DATA_DIR).some(e => e.key === app && !e.gone)) throw new SettingsError(`${app}: 바꿀 수 있는 설정이 없어요`, 404);
-			return json({ key: app, fields: req.method === "GET" ? readSettings(DATA_DIR, app) : writeSettings(DATA_DIR, app, (await body(req)).values) });
+			const fields = req.method === "GET" ? readSettings(DATA_DIR, app) : writeSettings(DATA_DIR, app, (await body(req)).values);
+			// The mail app's 이 메일에서 쓸 모델 changed: the mail conversations with no pick of their own move to it at their next turn (hub/convsessions.ts).
+			if (req.method === "PATCH" && app.split("-")[0] === "mail") convs.followKind("mail");
+			return json({ key: app, fields });
 		} catch (error) {
 			return json({ error: (error as Error).message }, error instanceof SettingsError ? error.status : 400);
 		}

@@ -16,6 +16,7 @@ import * as discord from "./discord.ts";
 import { keepHome, laneWorkerModel } from "./lanestate.ts";
 import { convs, type Conv } from "./convsessions.ts";
 import { isProjectTarget } from "./projectchat.ts";
+import { isMailTarget } from "./conv-model.ts";
 import { MAIN } from "./session-key.ts";
 import { convOfTarget, grantExpensive, noteModelChange, ownerGate } from "./model-guard.ts";
 import { abortLane, applyChainChange as applyLaneChain, compactLane, laneLive, laneModels, lanes, restartLane, resumeByName, setLaneModel, setLaneWorkerModel, stopLane } from "./lanes.ts";
@@ -62,9 +63,10 @@ function fallbacksView() {
 	};
 }
 
-// A project conversation with its own session: its chip reads and changes that conversation alone (ConvMeta.ownModel); with
-// conversation sessions off the project runs on main, so its target is main's.
-const projectOf = (target: string) => (isProjectTarget(target) && convs.keyOf(target) === target ? target : undefined);
+// A project or mail conversation with its own session: its chip reads and changes that conversation alone (ConvMeta.ownModel); with
+// conversation sessions off it runs on main, so its target is main's.
+const modelConv = (target: string) => isProjectTarget(target) || isMailTarget(target);
+const projectOf = (target: string) => (modelConv(target) && convs.keyOf(target) === target ? target : undefined);
 // The conversation session that answers `target`, of any kind (mail, app settings, alert...): its context chip, /context and /compact act on that
 // session, unlike the model, which only a project chooses. A lane keeps its bare name.
 const convOf = (target: string) => {
@@ -72,9 +74,13 @@ const convOf = (target: string) => {
 	return key === MAIN ? undefined : key;
 };
 const ownModelOf = (key: string) => convs.get(key)?.meta.ownModel;
-const convModel = (key: string) => (ownModelOf(key) ? parseSelector(ownModelOf(key)!) : orchestratorModel());
+// Its own pick, else its kind's default (the mail app's 이 메일에서 쓸 모델), else main's.
+const convModel = (key: string) => {
+	const picked = ownModelOf(key) ?? convs.kindModel(key);
+	return picked ? parseSelector(picked) : orchestratorModel();
+};
 // What the composer chips of every device read: project conversations that chose a model or run now. Absent means it inherits main's.
-const projectModels = () => Object.fromEntries(convs.conversations().filter(c => isProjectTarget(c.key) && (c.meta.ownModel || convs.live(c))).map(c => [c.key, { own: c.meta.ownModel ?? "", active: convs.live(c) ? c.o.orch.activeModel : "" }]));
+const projectModels = () => Object.fromEntries(convs.conversations().filter(c => modelConv(c.key) && (c.meta.ownModel || convs.kindModel(c.key) || convs.live(c))).map(c => [c.key, { own: c.meta.ownModel ?? "", active: convs.live(c) ? c.o.orch.activeModel : "", ...(convs.kindModel(c.key) ? { kind: convs.kindModel(c.key) } : {}) }]));
 
 export async function modelsView() {
 	return {
@@ -208,7 +214,7 @@ const choicesFor = async (model: string) => {
 // A project conversation's chips: `own` says whether the value is its own, `inherited` is main's. `key` opens the 모델 · 폴백 screen on main's chain, which it shares.
 async function projectView(key: string) {
 	const c = convs.get(key), cur = convModel(key);
-	return { target: key, key: "orchestrator", own: Boolean(ownModelOf(key)), inherited: selectorOf(orchestratorModel()), model: cur.model, thinking: cur.thinking, active_model: c?.o.orch.activeModel ?? "", running: Boolean(c && convs.live(c)), busy: c?.o.orch.status === "working", context: c && convCtx(c), models: await choicesFor(cur.model), thinking_levels: [...THINKING_LEVELS], note: "" };
+	return { target: key, key: "orchestrator", own: Boolean(ownModelOf(key)), inherited: convs.kindModel(key) ?? selectorOf(orchestratorModel()), inherited_kind: Boolean(convs.kindModel(key)), model: cur.model, thinking: cur.thinking, active_model: c?.o.orch.activeModel ?? "", running: Boolean(c && convs.live(c)), busy: c?.o.orch.status === "working", context: c && convCtx(c), models: await choicesFor(cur.model), thinking_levels: [...THINKING_LEVELS], note: "" };
 }
 export async function targetView(target: string) {
 	const key = targetKey(target), conv = convOf(target);
@@ -238,7 +244,7 @@ export async function changeTarget(target: string, change: { model?: string; thi
 	const key = targetKey(target);
 	let by = "owner";
 	// inherit puts a conversation back on main's model: a model change like any other.
-	const inherits = change.inherit && key.startsWith("ch:");
+	const inherits = change.inherit && Boolean(projectOf(key));
 	if (change.req && (change.model || change.thinking || change.workerModel || inherits)) {
 		const gate = ownerGate(change.req, { conv: convOfTarget(target === "workers" ? target : key), model: inherits ? orchestratorModel().model : (change.model ?? change.workerModel), thinking: inherits ? undefined : change.thinking }, change.ownerMessage);
 		if ("denied" in gate) throw new ControlError(gate.denied, 403);
@@ -283,8 +289,8 @@ type ModelChange = { ok: true; target: string; model: string; thinking: string; 
 const PROJECT_NOTE = "Only this conversation changes.";
 const projectApplied = (applied: "live" | "restarted" | "next-start") => (applied === "next-start" ? "next-turn" : applied);
 function inheritMain(key: string): ModelChange {
-	const main = orchestratorModel(), own = Boolean(ownModelOf(key));
-	return { ok: true, target: key, ...main, applied: own ? projectApplied(convs.setOwnModel(key, undefined)) : "live", note: own ? PROJECT_NOTE : "unchanged" };
+	const own = Boolean(ownModelOf(key)), applied = own ? projectApplied(convs.setOwnModel(key, undefined)) : "live";
+	return { ok: true, target: key, ...convModel(key), applied, note: own ? PROJECT_NOTE : "unchanged" };
 }
 
 // A running lane's model or effort change is refused without force: it invalidates that lane's whole message cache.
@@ -495,10 +501,10 @@ export function setGatewayRestart(fn: () => string): void {
 	gatewayRestart = fn;
 }
 
-const normalizeTarget = (arg: string) => (arg === "orchestrator" || arg === "lanes" || arg === "workers" || arg.startsWith("ch:") ? arg : `lane:${arg.replace(/^lane:/, "")}`);
+const normalizeTarget = (arg: string) => (arg === "orchestrator" || arg === "lanes" || arg === "workers" || modelConv(arg) ? arg : `lane:${arg.replace(/^lane:/, "")}`);
 
 function currentOf(target: string): { model: string; thinking: string } {
-	if (target.startsWith("ch:")) return convModel(target);
+	if (modelConv(target)) return convModel(target);
 	const cur = target === "orchestrator" ? orchestratorModel() : target === "lanes" ? lanesModel() : target === "workers" ? parseSelector(workerModel()) : lanes.has(target.slice(5)) ? parseSelector(lanes.get(target.slice(5))!.model) : undefined;
 	if (!cur) throw new ControlError(`unknown target "${target.replace(/^lane:/, "")}" (orchestrator, lanes, workers, or a lane name; /lanes lists them)`);
 	return cur;

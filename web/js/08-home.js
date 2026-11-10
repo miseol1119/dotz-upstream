@@ -591,6 +591,8 @@ const RELAY = { name: {}, note: {}, back: MAIN, on: false };
 const mailSender = f => String(f || "").replace(/<[^>]*>/g, "").replace(/["']/g, "").trim() || String(f || "");
 const validTarget = t => t === MAIN || isFixedT(t) || isProjT(t) || (isLaneT(t) && t.length > 5) || (isMailT(t) && t.length > 5) || (isSettingsT(t) && t.length > 9) || isRelayT(t);
 // A conversation that can have an agent session of its own (hub/session-key.ts CONV_KINDS): its target is its session key.
+// A conversation whose chips pick its own model: a project, or a mail while mail has sessions of its own (else it runs on main).
+const isModelT = t => isProjT(t) || (isMailT(t) && !!C && (C.conversation_kinds || []).includes("mail"));
 const isConvT = t => isProjT(t) || isFixedT(t) || isMailT(t) || isSettingsT(t);
 const sourceOf = t => t === MAIN || isConvT(t) || isRelayT(t) ? "orchestrator" : t;
 const targetOfSource = s => s === "orchestrator" ? MAIN : s;

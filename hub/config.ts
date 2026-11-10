@@ -310,6 +310,9 @@ export function parseSelector(selector: string): { model: string; thinking: stri
 	const tail = selector.slice(i + 1);
 	return i > 0 && (THINKING_LEVELS as readonly string[]).includes(tail) ? { model: selector.slice(0, i), thinking: tail } : { model: selector, thinking: DEFAULT_MODEL.thinking };
 }
+/** A kind of conversation's own model, in the shape of models.* (model + thinking). Read from the setting's "<model>:<thinking>"; unset or empty = follows main. */
+export type KindModel = { model: string; thinking: string };
+export const kindModelOf = (value: unknown): KindModel | undefined => (typeof value === "string" && value.trim() ? parseSelector(value.trim()) : undefined);
 // "<model>[:<thinking>]" typed as one argument: the thinking level when the suffix is one, else just the model.
 export function splitThinking(input: string): { model: string; thinking?: string } {
 	const i = input.lastIndexOf(":");

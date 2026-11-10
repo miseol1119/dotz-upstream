@@ -23,7 +23,7 @@ const tmp = (): string => {
 
 type Fake = { o: Orchestrator; delivered: string[]; parked: number; applied: number; started(): boolean };
 
-function setup(opts: { on?: boolean; maxLive?: number; idleMin?: number; dir?: string; history?: HubEvent[]; queue?: Prompts } = {}) {
+function setup(opts: { on?: boolean; maxLive?: number; idleMin?: number; dir?: string; history?: HubEvent[]; queue?: Prompts; kindModel?: (key: string) => string | undefined } = {}) {
 	const dir = opts.dir ?? tmp();
 	let clock = 1_000_000;
 	const fakes = new Map<string, Fake>();
@@ -101,6 +101,7 @@ function setup(opts: { on?: boolean; maxLive?: number; idleMin?: number; dir?: s
 		history: () => opts.history ?? [],
 		workers: () => 0,
 		workerPin: () => "main-pin",
+		kindModel: key => opts.kindModel?.(key),
 		log: () => {},
 		now: () => clock,
 	});
@@ -284,4 +285,35 @@ test("a conversation's own model stays its own, reaches its session alone, and s
 	expect(again.fakes.get("ch:1")!.started()).toBe(false);
 	again.registry.setOwnModel("ch:1", undefined);
 	expect(existsSync(pin)).toBe(false);
+});
+
+// A kind's default model (the mail app's 이 메일에서 쓸 모델): a conversation of that kind starts on it and stays off main's model; its own pick still wins.
+test("a mail conversation runs on the mail default, not on main's model; without one it inherits main's; its own pick wins", () => {
+	const kind: { mail?: string } = { mail: "m/mail:low" };
+	const t = setup({ kindModel: key => (key.startsWith("mail:") ? kind.mail : undefined) });
+	for (const key of ["mail:k1", "mail:k2", "ch:1"]) t.registry.ensure(key);
+	expect(t.makes.get("mail:k1")!.model!()).toBe("m/mail:low");
+	expect(t.makes.get("ch:1")!.model!()).toBeUndefined();
+	const pin = (key: string) => join(t.dir, "conv-sessions", key.replace(":", "_"), "worker-pin");
+	expect(readFileSync(pin("mail:k1"), "utf8").trim()).toBe("main-pin");
+	// Main moved: the mail conversation does not follow, the one with no default does.
+	t.registry.followMain();
+	expect(t.fakes.get("mail:k1")!.applied).toBe(0);
+	expect(t.fakes.get("ch:1")!.applied).toBe(1);
+	// A conversation's own pick wins over the default, and a later change of the default leaves it alone.
+	t.registry.setOwnModel("mail:k2", "m/own:high");
+	kind.mail = "m/other:medium";
+	t.registry.followKind("mail");
+	expect(t.makes.get("mail:k2")!.model!()).toBe("m/own:high");
+	expect(t.fakes.get("mail:k2")!.applied).toBe(1);
+	// The inheriting one follows the new default (now, after its turn, or at its next start), and keeps its workers on main's.
+	expect(t.makes.get("mail:k1")!.model!()).toBe("m/other:medium");
+	expect(t.fakes.get("mail:k1")!.applied).toBe(1);
+	// No default any more: it inherits main's again, and the worker pin goes.
+	kind.mail = undefined;
+	t.registry.followKind("mail");
+	expect(t.makes.get("mail:k1")!.model!()).toBeUndefined();
+	expect(t.fakes.get("mail:k1")!.applied).toBe(2);
+	expect(existsSync(pin("mail:k1"))).toBe(false);
+	expect(t.fakes.get("ch:1")!.applied).toBe(1);
 });

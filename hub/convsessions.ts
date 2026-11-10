@@ -12,6 +12,7 @@ import { historyEvents, type HubEvent } from "./events.ts";
 import { mailByThread } from "./mail.ts";
 import { createOrchestrator, orchBusy, type OrchOpts, type Orchestrator } from "./orchestrator.ts";
 import { createCapacity } from "./convcapacity.ts";
+import { convKindModel } from "./conv-model.ts";
 import { workersOf } from "./lanegates.ts";
 import { omoSelector } from "./runtime/omo.ts";
 import type { createPrompts, Pending, Reply } from "./prompts.ts";
@@ -40,6 +41,8 @@ export type ConvDeps = {
 	workers: (c: Conv, file?: string) => number;
 	/** Main's model as a task pin: the workers of a conversation on its own model stay on it (extension/guard.ts ownWorkerPin). */
 	workerPin: () => string;
+	/** The model the owner set for this conversation's kind (the mail app's 이 메일에서 쓸 모델) as a selector; undefined = follow main. Below ownModel, above main. */
+	kindModel?: (key: string) => string | undefined;
 	log: (line: string) => void;
 	now?: () => number;
 };
@@ -93,9 +96,14 @@ export function createConvSessions(d: ConvDeps) {
 	const live = (c: Conv): boolean => c.o.orchestratorPid() !== undefined;
 	const metaFile = (c: Conv) => join(c.dir!, "state.json");
 	const saveMeta = (c: Conv) => writeAtomic(metaFile(c), `${JSON.stringify({ ...readJson(metaFile(c)), ...c.meta, parked: c.meta.parked }, null, 2)}\n`);
+	const kindModel = (key: string): string | undefined => d.kindModel?.(key) || undefined;
+	/** What this conversation runs on apart from main: its own pick, else its kind's default. */
+	const effective = (c: Conv): string | undefined => c.meta.ownModel ?? kindModel(c.key);
+	// The model each session was last told to run on, so a default that did not change never restarts anything.
+	const told = new Map<string, string | undefined>();
 	const syncPin = (c: Conv): void => {
 		const file = join(c.dir!, "worker-pin");
-		if (c.meta.ownModel) writeAtomic(file, `${d.workerPin()}\n`);
+		if (effective(c)) writeAtomic(file, `${d.workerPin()}\n`);
 		else rmSync(file, { force: true });
 	};
 
@@ -119,7 +127,7 @@ export function createConvSessions(d: ConvDeps) {
 			source: `conv:${key}`,
 			keepalive: false,
 			asks: false,
-			model: () => c.meta.ownModel,
+			model: () => effective(c),
 			env: { DOTZ_CONV: key, DOTZ_WORKER_PIN_FILE: join(dir, "worker-pin"), ...(meta.name ? { DOTZ_CONV_NAME: meta.name } : {}) },
 			scope: () => scopeText(c.meta),
 			seed: () => {
@@ -131,6 +139,7 @@ export function createConvSessions(d: ConvDeps) {
 		convs.set(key, c);
 		saveMeta(c);
 		syncPin(c);
+		told.set(key, effective(c));
 		for (const h of hooks) h(c);
 		return c;
 	}
@@ -201,13 +210,25 @@ export function createConvSessions(d: ConvDeps) {
 		c.meta.ownModel = selector;
 		saveMeta(c);
 		syncPin(c);
+		told.set(key, effective(c));
 		return c.o.applyModelChange();
 	}
 	/** Main's model changed: sessions that inherit follow it, the others only re-pin their workers on it. */
 	function followMain(): void {
 		for (const c of convs.values()) {
-			if (c.meta.ownModel) syncPin(c);
+			if (effective(c)) syncPin(c);
 			else c.o.applyModelChange();
+		}
+	}
+	/** A kind's default model changed (`mail`): its sessions with no pick of their own follow it now, after their turn, or at their next start. */
+	function followKind(kind: string): void {
+		for (const c of convs.values()) {
+			if (!c.key.startsWith(`${kind}:`)) continue;
+			syncPin(c);
+			const now = effective(c);
+			if (c.meta.ownModel || told.get(c.key) === now) continue;
+			told.set(c.key, now);
+			c.o.applyModelChange();
 		}
 	}
 
@@ -283,6 +304,8 @@ export function createConvSessions(d: ConvDeps) {
 		deliverTo,
 		setOwnModel,
 		followMain,
+		followKind,
+		kindModel,
 		stateOf,
 		setMain,
 		restore,
@@ -367,5 +390,6 @@ export const convs = createConvSessions({
 	// Silent workers count: a long wait writes nothing, and the park would end it (the lanes' reply-voice stop, laneidle.ts).
 	workers: (c, file = c.o.orch.sessionFile) => runningOmoWorkers(file) + quietOmoWork(file).length,
 	workerPin: () => omoSelector(workersOf(selectorOf(orchestratorModel()))),
+	kindModel: key => convKindModel(DATA_DIR, key),
 	log: hubLog,
 });

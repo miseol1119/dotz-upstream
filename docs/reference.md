@@ -206,6 +206,10 @@ differences". The `dotz_lane` launch tool takes an optional `worker_model` that 
 The session brief contract tells the session to review a subagent's diff itself before applying it. A running session keeps its
 subagent model until it restarts.
 
+**Mail conversation model.** A mail's conversation can run on its own model instead of main's. Order: the model picked in that
+conversation's chip, then the mail app's 이 메일에서 쓸 모델 (`custom/apps.json` `<mail app>.conv_model`, `<model>:<thinking>`, per mail app), then main's.
+With none set nothing changes. A new default reaches a mail at its next turn, main's later changes do not move it, and its task subagents stay on main's subagent model.
+
 **Model fallback chains.** When a model fails at request time (usage limit, outage), the next model of a chain takes
 over. Three chains, each a list in `config.json`: `models.orchestrator.fallback`, `models.lanes.fallback` (every session's own
 model) and `models.workers.fallback` (the sessions' task subagents); an entry is a model selector (`provider/id[:thinking]`, the
