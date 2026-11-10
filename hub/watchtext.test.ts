@@ -201,3 +201,17 @@ test("a sentinel a check prints never reaches the prose, and a match on it alone
 	expect(sentinelMatch("matched /gone/", "sample-repo-gone")).toBe(true);
 	expect(watchLine("점검", "failed 3 times in a row (exit 1)", "repo-gone")).toBe(`점검: 3번 연속 실패했어요\n${rawFence("repo-gone")}`);
 });
+
+// A schedule's name skips the channel tag its text starts with, and a name cut for length never ends inside a bracket or quote (the owner saw
+// "#sample-점검(ch:…)" and "확인(형 \"지금…" as names).
+test("a schedule's name skips a leading channel tag and is never cut inside a bracket or quote", () => {
+	const names = [
+		"#sample-점검(ch:1234567890123456789): 오늘 12:00 릴리스가 나왔는지 보고, 나왔으면 알려 줘요.",
+		'12:00 릴리스 뒤 Claude 리셋권 표시 확인(형 "지금 리셋권이 몇 장 남았어?"라고 물어본 화면)을 해 줘요.',
+		"답장 파일 재대조(샘플 맥 downloads 폴더의 답장 파일과 보낸 목록)을 다시 맞춰 봐요.",
+	].map(scheduleLabel);
+	expect(names[0]).toBe("오늘 12:00 릴리스가 나왔는지 보고, 나왔으면 알려 줘요");
+	for (const n of names.slice(1)) expect({ n, open: n.replace(/[^("“(\[]/g, "").length > n.replace(/[^)”)\]]/g, "").length || (n.match(/"/g) ?? []).length % 2 === 1 }).toEqual({ n, open: false });
+	expect(names[1]!.startsWith("12:00 릴리스 뒤 Claude 리셋권 표시 확인")).toBe(true);
+	expect(names[2]!.startsWith("답장 파일 재대조")).toBe(true);
+});

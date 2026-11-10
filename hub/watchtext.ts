@@ -351,17 +351,35 @@ const RUNS = new RegExp(
 		.join("|"),
 	"g",
 );
+// Where the last bracket or quote still open in s begins (-1: none), so a cut title never ends inside one.
+const openAt = (s: string): number => {
+	const open: number[] = [];
+	let quote = -1;
+	[...s].forEach((c, i) => {
+		if (c === '"') quote = quote < 0 ? i : -1;
+		else if ("([{（“‘".includes(c)) open.push(i);
+		else if (")]}）”’".includes(c)) open.pop();
+	});
+	const at = [...open, ...(quote < 0 ? [] : [quote])];
+	return at.length ? Math.min(...at) : -1;
+};
 const cutWords = (s: string, n: number): string => {
 	if (s.length <= n) return s;
-	const t = s.slice(0, n - 1), at = t.lastIndexOf(" ");
-	return `${(at > n / 2 ? t.slice(0, at) : t).replace(/[\s,·:(]+$/, "")}…`;
+	let t = s.slice(0, n - 1);
+	const at = t.lastIndexOf(" ");
+	if (at > n / 2) t = t.slice(0, at);
+	const o = openAt(t);
+	if (o >= 0) t = t.slice(0, o);
+	return `${t.replace(/[\s,·:(]+$/, "")}…`;
 };
+// A channel tag the text starts with ("#big-bath-점검(ch:1567…):"): it names where the schedule posts, not what it does.
+const CHANNEL_TAG = /^\s*#[^\s(]+\((?:ch|lane|th):[^)\s]+\):?\s*/;
 
 // The short name of a schedule, from its text (the whole instruction it runs): the first sentence without what it runs (RUNS, a bracket or the rest of a
 // sentence that holds a command), without the brackets and commas an id leaves behind; a sentence too long for a title keeps the words before its first
 // ": " ("flaky-tests 3차"), else it is cut between words. "" when nothing readable is left.
 export function scheduleLabel(text: string): string {
-	let s = (text.replace(TARGETS, "").trim().split("\n")[0] ?? "").replace(/\s+/g, " ");
+	let s = (text.replace(TARGETS, "").replace(CHANNEL_TAG, "").trim().split("\n")[0] ?? "").replace(/\s+/g, " ");
 	s = s.replace(/\s*[(（][^()（）]*(?:[)）]|$)/g, m => (CMD.test(m) || /^\s*[(（]state\s/.test(m) ? "" : m)).replace(RUNS, "");
 	s = s.replace(/[ \t]*[,·][ \t]*([)）])/g, "$1").replace(/([(（])[ \t]*[,·][ \t]*/g, "$1").replace(/\s*[(（]\s*[)）]/g, "");
 	s = s.replace(/\s+([,.!?)])/g, "$1").replace(/\s{2,}/g, " ").trim();
