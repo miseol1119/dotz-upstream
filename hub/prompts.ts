@@ -95,6 +95,7 @@ export function createPrompts(deps: PromptDeps) {
 	const wokenRun = () => woke.some(w => !w.in);
 	// The run started from a user frame nothing delivered explains (a schedule's raw text, a runtime's own message): its answer is its own, no request's.
 	let unpairedRun = false;
+	let resultTo: string | undefined;   // where this woken run already delivered a worker's result; its later answers (no new wake) restate it there only
 
 	/** Records that the owner message `replyTo` got an answer. */
 	function markAnswered(replyTo: string | undefined | null): void {
@@ -268,6 +269,7 @@ export function createPrompts(deps: PromptDeps) {
 			return false;
 		}
 		closeTurn();
+		resultTo = undefined;
 		current = started && prompts.splice(prompts.indexOf(started), 1)[0];   // not by `i`: the prompts dropped above moved it (2026-11-04 15:52: the turn lost its prompt)
 		unpairedRun = !current;
 		if (current) {
@@ -296,6 +298,7 @@ export function createPrompts(deps: PromptDeps) {
 	 */
 	function settleTurn(failed = false): void {
 		const p = current;
+		resultTo = undefined;
 		if (!p) {
 			unpairedRun = false;
 			return askLeftover();
@@ -551,13 +554,14 @@ export function createPrompts(deps: PromptDeps) {
 		const result = fromWorker || !unpairedRun ? nextResult() : undefined;
 		if (result) {
 			result.delivered = true;
+			if (fromWorker) resultTo = result.target;
 			saveLinks();
 			deps.log(`the result of ${result.id} goes to its request ${result.replyTo ?? "(no id)"} in ${result.target}`);
 		}
 		// The oldest request waiting on this worker takes the reply; the others of that worker close with it.
 		const tied = result ? tiedOpen(result) : [];
 		const ask = tied[0];
-		const to: OwnerMessage = result ? { target: ask?.target ?? result.target, replyTo: ask ? ask.replyTo : result.replyTo, at: result.at, prompt: ask ?? deferred.find(d => d.target === result.target && d.replyTo === result.replyTo) } : (orphanTarget(fromWorker) ?? lastResortTarget());
+		const to: OwnerMessage = result ? { target: ask?.target ?? result.target, replyTo: ask ? ask.replyTo : result.replyTo, at: result.at, prompt: ask ?? deferred.find(d => d.target === result.target && d.replyTo === result.replyTo) } : !fromWorker && resultTo ? { target: resultTo, at: Date.now() } : (orphanTarget(fromWorker) ?? lastResortTarget());
 		if (to.prompt?.cancelled || result?.cancelled) return void deps.log(`an answer for a request the owner cancelled was dropped (${t.length} chars)`);
 		if (recentSent.some(s => s.target === to.target && Date.now() - s.at <= ORPHAN_MAX_AGE_MS && s.text.includes(t))) return;
 		deps.log(`an answer had no prompt; sent to ${to.replyTo ?? "no message"} in ${to.target} (${t.length} chars): ${t.slice(0, 80)}`);

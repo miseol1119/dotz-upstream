@@ -1433,3 +1433,23 @@ test("a restart does not replay the gateway's silent-wait nudge, in any language
 	expect(n).toBe(2);
 	expect(state.delivered).toEqual(["[replay] upload today's episode", `[replay] ${quoted}`]);
 });
+
+test("a worker's result and its restatement in the same wake go to the worker's conversation, not to a [later] request that spawned no worker", async () => {
+	const t = setup();
+	t.startTurn("request R", { target: "web", replyTo: "R" });
+	t.q.workersSpawned([{ id: "st_w" }]);
+	t.q.onAnswer("[later]");
+	t.state.working = false;
+	t.q.settleTurn();
+	// A conversation session hands main a request; the turn ends [later] without spawning a worker.
+	t.startTurn("request C", { target: "ch:1", replyTo: "C" });
+	t.q.onAnswer("[later]");
+	t.state.working = false;
+	t.q.settleTurn();
+	t.q.workersDone(["st_w"]);
+	t.q.onAnswer("the result of the worker");
+	t.q.onAnswer("the same outcome, worded another way");
+	await Promise.resolve();
+	expect(t.state.posts.filter(p => p.replyTo === "R").length).toBe(1);
+	expect(t.state.posts.filter(p => p.target !== "web")).toEqual([]);
+});

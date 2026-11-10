@@ -26,7 +26,9 @@ const FN_LINE_LIMIT = 300;
 const FN_LINE_CEILINGS: Counts = {
 	"extension/guard.ts installGuard": 375, "hub/bgwork.ts createBgWork": 375, "hub/comments/engine.ts createEngine": 625, "hub/devices.ts createDevices": 325,
 	"hub/kakao/web.ts createKakaoWeb": 650, "hub/messenger-agent.ts createAgentAdapter": 350,
-	"hub/orchestrator.ts createOrchestrator": 975, "hub/peer-monitor.ts createPeerMonitor": 400, "hub/prompts.ts createPrompts": 700, "hub/routes.ts makeRoute": 625,
+	"hub/orchestrator.ts createOrchestrator": 975, "hub/peer-monitor.ts createPeerMonitor": 400,
+	"hub/prompts.ts createPrompts": 725, // 725th: a woken run's restated worker result stays with the conversation that got the first answer (resultTo)
+	"hub/routes.ts makeRoute": 625,
 	"web/js/07-board.js makeBoard": 375,
 };
 // Modules that import each other cannot be loaded, tested or replaced one by one; these are the cycles that exist today (members, sorted).
