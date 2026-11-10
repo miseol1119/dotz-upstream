@@ -2,7 +2,7 @@
 // signals (events, session file, process-tree CPU) and the exemptions (workers, compaction, open owner question, idle) keep a long
 // normal turn untouched; at most three recoveries per hour.
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cfg } from "./config.ts";
 import { createPrompts } from "./prompts.ts";
@@ -17,6 +17,10 @@ const DATA = process.env.DOTZ_DIR!;
 const STUCK_MS = 10 * 60_000;
 process.env.DOTZ_STUCK_MS = String(STUCK_MS);
 const mod: typeof Orchestrator = await import("./orchestrator.ts?stuck");
+
+// What happened in what order: the snapshot's commands and the kills.
+const order: string[] = [];
+let psOut = "";
 
 class FakeAgent implements AgentProcess {
 	static next = 9100;
@@ -57,6 +61,7 @@ class FakeAgent implements AgentProcess {
 	watchSubagents = () => {};
 	kill = (force?: boolean) => {
 		this.kills.push(!!force);
+		order.push(force ? "kill9" : "term");
 		if (!this.ignoreTerm || force) this.exit.resolve(force ? 137 : 143);
 	};
 }
@@ -80,6 +85,10 @@ beforeAll(() => {
 	adapters.fake = fake;
 	cfg.orchestrator = { ...cfg.orchestrator, runtime: "fake" };
 	stuck.setCpuSampler(async () => cpu);
+	stuck.setSnapshotRunner(async cmd => {
+		order.push(`snap:${cmd[0]!.split("/").pop()}`);
+		return cmd[0] === "/bin/ps" ? psOut : "sample line";
+	});
 });
 afterAll(() => {
 	delete adapters.fake;
@@ -106,7 +115,7 @@ function session(key: string) {
 	});
 	const alerts: string[] = [];
 	const notices: { minutes: number; target?: string }[] = [];
-	o.setRestartedHandler(() => q.reopen(t => `[replay] ${t}`));
+	o.setRestartedHandler(lead => q.reopen(stuck.leadWith(t => `[replay] ${t}`, lead)));
 	o.setIdleHandler(() => {
 		q.settleTurn(o.turnFailed());
 		q.redeliverSteered();
@@ -357,4 +366,119 @@ test("g) the fourth stuck turn in an hour is alerted once and not restarted a fo
 	expect(agent.kills).toEqual([]);
 	s.o.stop();
 	await quiet(1000);
+});
+
+// A: the shape of the frozen call, never its arguments.
+const SECRET_ARG = "distinctive-arg-5c1e7f";
+const EVAL_ARGS = JSON.stringify({ language: "js", code: `await tool.bash({ command: "${SECRET_ARG}" }); await tool.bash({ command: "b" }); await tool.read({ path: "p" });` });
+const evalCall = (id: string): AgentEvent => ({ type: "activity", row: { type: "tool_call", tool: "eval", call_id: id, text: "eval", args: EVAL_ARGS } });
+const SHAPE_LINE = "앞 턴이 eval js 셀 안의 tool.bash x2, tool.read x1에서 10분 멈춰서 끊었어요. 같은 호출 모양을 되풀이하지 마세요.";
+
+test("a) callShape: the tool name, and for eval the language and the tool.<name>( counts, with no argument text", () => {
+	expect(stuck.callShape("bash", JSON.stringify({ command: SECRET_ARG }))).toBe("bash");
+	expect(stuck.callShape("eval", JSON.stringify({ language: "py", code: "x = 1" }))).toBe("eval py 셀");
+	const shape = stuck.callShape("eval", EVAL_ARGS);
+	expect(shape).toBe("eval js 셀 안의 tool.bash x2, tool.read x1");
+	expect(shape).not.toContain(SECRET_ARG);
+});
+
+for (const answersAbort of [true, false]) {
+	test(`a) the request sent again after a stuck turn (${answersAbort ? "abort ended it" : "abort ignored, killed"}) opens with the open call's shape and no argument`, async () => {
+		const s = session("main");
+		s.q.deliver("run it", chat("chat", answersAbort ? "m20" : "m21"));
+		const first = started.at(-1)!;
+		first.endOnAbort = answersAbort;
+		await first.push({ type: "session", ref: join(DATA, "stuck-shape.jsonl") }, { type: "turn_start" });
+		s.q.onPrompt("run it");
+		// a finished call is not the frozen one; the eval call without its end is
+		await first.push({ type: "activity", row: { type: "tool_call", tool: "read", call_id: "c0", text: "read" } }, { type: "activity", row: { type: "tool_result", tool: "read", call_id: "c0", text: "ok" } }, evalCall("c1"));
+		await quiet(STUCK_MS);
+		if (!answersAbort) await quiet(stuck.ABORT_GRACE_MS);
+		const second = started.at(-1)!;
+		expect(second).not.toBe(first);
+		const text = second.sent.map(m => m.text).join("\n");
+		expect(text).toContain(SHAPE_LINE);
+		expect(text).toContain("run it");
+		expect(text).not.toContain(SECRET_ARG);
+		s.o.stop();
+		await quiet(1000);
+	});
+}
+
+test("a) a restart that is not a stuck recovery redelivers the request without the line", async () => {
+	const s = session("main");
+	const first = await turn(s, "plain restart", chat("chat", "m22"));
+	await first.push(evalCall("c9"));
+	s.o.restart("model change");
+	await quiet(1000);
+	const second = started.at(-1)!;
+	expect(second).not.toBe(first);
+	const text = second.sent.map(m => m.text).join("\n");
+	expect(text).toContain("plain restart");
+	expect(text).not.toContain("멈춰서 끊었어요");
+	s.o.stop();
+	await quiet(1000);
+});
+
+// B: the diagnostic snapshot.
+test("b) maskCommand keeps the binary and hides secret-looking arguments", () => {
+	const masked = stuck.maskCommand(`/usr/bin/bun run gw.ts --token abc123 --api-key=zzz API_KEY=qq -H Authorization: Bearer tok999 --model fast ${"x".repeat(50)}`);
+	expect(masked.startsWith("/usr/bin/bun run gw.ts")).toBe(true);
+	for (const secret of ["abc123", "zzz", "qq", "tok999", "xxxxx"]) expect(masked).not.toContain(secret);
+	expect(masked).toContain("--model fast");
+	expect(masked).toContain("API_KEY=***");
+});
+
+test("b) the snapshot is written before the TERM kill, under DATA_DIR/stuck, with a masked tree and only the last line's type and time", async () => {
+	order.length = 0;
+	const s = session("main");
+	const file = join(DATA, "stuck-snap.jsonl");
+	writeFileSync(file, `{"type":"x"}\n{"type":"message","timestamp":"2026-11-10T00:00:00Z","content":"PRIVATE-LINE-TEXT"}\n`);
+	s.q.deliver("snap me", chat("chat", "m30"));
+	const first = started.at(-1)!;
+	psOut = [`  ${first.pid}     1  05:00 0:01.00 /usr/bin/bun gw.ts --token SECRETVALUE`, `  ${first.pid + 5000} ${first.pid}  04:00 0:02.00 sleep 1`, "   99     1  01:00 0:00.00 unrelated"].join("\n");
+	await first.push({ type: "session", ref: file }, { type: "turn_start" });
+	s.q.onPrompt("snap me");
+	await first.push({ type: "assistant", text: "", stop: "other" });
+	await quiet(STUCK_MS);
+	expect(order.indexOf("snap:ps")).toBeGreaterThanOrEqual(0);
+	expect(order.indexOf("snap:ps")).toBeLessThan(order.indexOf("term"));
+	const written = readdirSync(join(DATA, "stuck")).filter(f => f.endsWith("-main.txt"));
+	expect(written.length).toBeGreaterThan(0);
+	const body = written.map(f => readFileSync(join(DATA, "stuck", f), "utf8")).find(b => b.includes(`pid: ${first.pid}\n`))!;
+	expect(body).toBeString();
+	expect(body).toContain("/usr/bin/bun gw.ts --token ***");
+	expect(body).toContain("sleep 1");
+	expect(body).not.toContain("unrelated");
+	expect(body).not.toContain("SECRETVALUE");
+	expect(body).toContain("type=message timestamp=2026-11-10T00:00:00Z");
+	expect(body).not.toContain("PRIVATE-LINE-TEXT");
+	s.o.stop();
+	await quiet(1000);
+});
+
+test("b) the owner abort the process ignores also takes the snapshot before TERM", async () => {
+	order.length = 0;
+	const s = session("main");
+	const first = await turn(s, "owner stops", chat("chat", "m31"));
+	first.endOnAbort = false;
+	s.o.cancelByOwner();
+	await quiet(stuck.ABORT_GRACE_MS);
+	expect(order.indexOf("snap:ps")).toBeGreaterThanOrEqual(0);
+	expect(order.indexOf("snap:ps")).toBeLessThan(order.indexOf("term"));
+	s.o.stop();
+	await quiet(1000);
+});
+
+test("b) at most 20 snapshot files are kept and a failing runner still ends in a file", async () => {
+	for (let i = 0; i < 22; i++) await stuck.takeSnapshot(`keep-${i}`, 4242, undefined);
+	expect(readdirSync(join(DATA, "stuck")).filter(f => f.endsWith(".txt")).length).toBe(stuck.SNAPSHOT_KEEP);
+	stuck.setSnapshotRunner(async () => {
+		throw new Error("boom");
+	});
+	expect(await stuck.takeSnapshot("fail-run", 4242, undefined)).toBeString();
+	stuck.setSnapshotRunner(async cmd => {
+		order.push(`snap:${cmd[0]!.split("/").pop()}`);
+		return cmd[0] === "/bin/ps" ? psOut : "sample line";
+	});
 });

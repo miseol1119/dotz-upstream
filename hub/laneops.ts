@@ -24,7 +24,7 @@ import { parseTone } from "./tone.ts";
 import { activeCount, laneLimits, launchWait, waitingLanes } from "./lanelimits.ts";
 import { trackTimer } from "./shutdown.ts";
 import { diskGuardTick } from "./diskguard.ts";
-import { ABORT_GRACE_MS } from "./stuck.ts";
+import { ABORT_GRACE_MS, takeSnapshot } from "./stuck.ts";
 
 const NAME_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
 
@@ -218,7 +218,8 @@ export function abortLane(name: string): void {
 		if (lane.proc !== p || lane.status !== "working") return;
 		log(`lane ${name} ignored the owner abort; restarting it on the same session`);
 		lane.revive = { text: undefined };
-		p.kill(true);
+		// A diagnostic file first (hub/stuck.ts, a few seconds at most); the kill follows whatever happens to it.
+		void takeSnapshot(`lane:${name}`, p.pid, lane.sessionFile).then(() => lane.proc === p && p.kill(true));
 	}, ABORT_GRACE_MS);
 }
 

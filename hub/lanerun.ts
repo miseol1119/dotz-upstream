@@ -7,7 +7,7 @@ import { markSteers, steerContract, steerToken } from "./steer-mark.ts";
 import { hubChain, Chain, keyedWorker, Reverter, workerKeyEnv } from "./fallback.ts";
 import { pauseExhausted } from "./lanefailover.ts";
 import { statusActivity, endSubagents, runningSubagents } from "./activity.ts";
-import { createStuckWatch } from "./stuck.ts";
+import { createStuckWatch, stuckLine, takeSnapshot } from "./stuck.ts";
 import { readEvents } from "./laneevents.ts";
 import { abandonCompact } from "./context.ts";
 import { report, withHeld } from "./lanereport.ts";
@@ -33,7 +33,7 @@ export function laneStuck(lane: Lane): ReturnType<typeof createStuckWatch> {
 			sessionFile: () => lane.sessionFile,
 			exempt: () => lane.status !== "working" || !lane.proc || runningSubagents(`lane:${lane.name}`) > 0 || lane.ctx.compaction.state === "queued" || lane.ctx.compaction.state === "compacting" || Boolean(lane.pendingAsk),
 			abort: () => lane.proc?.abort(),
-			restart: why => recover(lane, `${why} (턴이 끝나지 않았어요)`, true),
+			restart: why => recover(lane, `${why} (턴이 끝나지 않았어요)`, true, true),
 			stuck: minutes => hooks.notice(lane, `작업이 ${minutes}분 동안 멈춰 있어서 끊고 다시 이어가요.`),
 			capped: minutes => hooks.report(lane, `[lane stuck] 턴이 ${minutes}분 동안 멈춰 있어요. 한 시간 안에 ${RECOVERY_MAX}번 자동 복구했는데 또 멈춰서 더는 건드리지 않아요. 직접 확인해 주세요.`),
 		});
@@ -217,7 +217,7 @@ export function resumeLane(lane: Lane, text: string): void {
 
 // Recovers a lane that cannot go on (a stuck turn that ignored its abort, or a failed compaction) by killing its process,
 // then resumes the same session: a turn that was running is told to continue, an idle lane just comes back idle.
-export function recover(lane: Lane, why: string, wasWorking: boolean): void {
+export function recover(lane: Lane, why: string, wasWorking: boolean, stuck = false): void {
 	if (!lane.proc || !lane.sessionFile || lane.revive) return;
 	const t = Date.now();
 	lane.recoveries = (lane.recoveries ?? []).filter(at => t - at < RECOVERY_WINDOW_MS);
@@ -239,6 +239,12 @@ export function recover(lane: Lane, why: string, wasWorking: boolean): void {
 	log(`lane ${lane.name} recovery ${lane.recoveries.length}/${RECOVERY_MAX}: restarting on the same session`);
 	// Owner messages steered into the cut-off turn may not have been read: they go along with the continue text.
 	const steered = wasWorking ? (lane.steered ?? []) : [];
-	lane.revive = { text: wasWorking ? msg().laneStopped + (steered.length ? `\n\n${msg().laneSteered(steered)}` : "") : undefined };
-	lane.proc.kill(true);
+	// A stuck recovery opens the revive text with the shape of the call the turn froze in, so it is not repeated.
+	const info = stuck ? laneStuck(lane).info() : undefined;
+	const lead = info ? `${stuckLine(info)}\n\n` : "";
+	lane.revive = { text: wasWorking ? lead + msg().laneStopped + (steered.length ? `\n\n${msg().laneSteered(steered)}` : "") : undefined };
+	const p = lane.proc;
+	// A stuck process leaves a diagnostic file first (hub/stuck.ts, a few seconds at most); the kill follows whatever happens to it.
+	if (stuck) void takeSnapshot(`lane:${lane.name}`, p.pid, lane.sessionFile).then(() => lane.proc === p && p.kill(true));
+	else p.kill(true);
 }

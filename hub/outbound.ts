@@ -45,6 +45,7 @@ import { route } from "./notify-route.ts";
 import { isWebLane } from "./discord-post.ts";
 import { repeatAlert } from "./alert-gate.ts";
 import { pendingWaits } from "./auth.ts";
+import { leadWith } from "./stuck.ts";
 
 // Prompt queue: see prompts.ts. Unanswered prompts are kept on disk, so a restart mid-turn replays them on boot.
 const PENDING = join(DATA_DIR, "pending.json");
@@ -615,7 +616,7 @@ setWiring(c => {
 	bg = sessionBg(c.o, q);
 	Object.assign(c, { queue: q, bg });
 	wireAnswers(c);
-	c.o.setRestartedHandler(() => q.reopen(replayWrap));
+	c.o.setRestartedHandler(lead => q.reopen(leadWith(replayWrap, lead)));
 	c.o.setIdleHandler(() => {
 		q.settleTurn(c.o.turnFailed());
 		q.redeliverSteered();

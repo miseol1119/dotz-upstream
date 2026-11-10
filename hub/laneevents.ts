@@ -65,7 +65,7 @@ export async function readEvents(lane: Lane, proc: AgentProcess): Promise<void> 
 	// Whether the turn was running when the current frame's first event arrived (before any of its events took effect).
 	let wasWorking = false;
 	for await (const ev of proc.events) {
-		laneStuck(lane).progress(ev.type);
+		laneStuck(lane).progress(ev.type, ev);
 		emitEventActivity(source, ev);
 		noteEvent(lane.ctx, ev, portOf(lane));
 		switch (ev.type) {
@@ -128,7 +128,7 @@ export async function readEvents(lane: Lane, proc: AgentProcess): Promise<void> 
 				// Our stuck abort ended the turn: the lane is recovered right now on its session; the cut-off turn reports nothing.
 				if (laneStuck(lane).end()) {
 					// A beat for the abort's last frames to land before the process is replaced.
-					setTimeout(() => lane.proc === proc && recover(lane, "턴이 멈춰 있어서 끊었어요", true), STUCK_RECOVER_DELAY_MS);
+					setTimeout(() => lane.proc === proc && recover(lane, "턴이 멈춰 있어서 끊었어요", true, true), STUCK_RECOVER_DELAY_MS);
 					break;
 				}
 				scheduleReport(lane);

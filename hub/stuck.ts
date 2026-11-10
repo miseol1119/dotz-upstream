@@ -3,8 +3,10 @@
 // from the process, growth of its session file, or >= 2 s of CPU time used by its process tree between two samples (a long test
 // run emits no event but burns CPU). Nothing is done while the caller says a wait is legitimate (workers, compaction, an open
 // owner question) or the turn is not open. At most STUCK_CAP recoveries per hour; past that the caller is alerted once.
-import { statSync } from "node:fs";
-import { log, stuckTurnMs } from "./config.ts";
+import { closeSync, fstatSync, mkdirSync, openSync, readdirSync, readSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { DATA_DIR, log, stuckTurnMs } from "./config.ts";
+import type { AgentEvent } from "./runtime/types.ts";
 
 export const ABORT_GRACE_MS = 60_000;
 export const STUCK_CAP = 3;
@@ -55,7 +57,7 @@ export function treeCpuSeconds(ps: string, pid: number): number | undefined {
 export type CpuSampler = (pid: number) => Promise<number | undefined>;
 let sampler: CpuSampler = async pid => {
 	try {
-		const p = Bun.spawn(["ps", "-A", "-o", "pid=,ppid=,time="], { stdout: "pipe", stderr: "ignore" });
+		const p = Bun.spawn(["/bin/ps", "-A", "-o", "pid=,ppid=,time="], { stdout: "pipe", stderr: "ignore" });
 		const out = await new Response(p.stdout).text();
 		await p.exited;
 		return treeCpuSeconds(out, pid);
@@ -65,6 +67,191 @@ let sampler: CpuSampler = async pid => {
 };
 /** Tests replace the CPU sampling. */
 export const setCpuSampler = (fn: CpuSampler): void => void (sampler = fn);
+
+const NAME_RE = /^[\w.:-]{1,40}$/;
+const stringsOf = (v: unknown, out: string[] = []): string[] => {
+	if (typeof v === "string") out.push(v);
+	else if (Array.isArray(v)) for (const x of v) stringsOf(x, out);
+	else if (v && typeof v === "object") for (const x of Object.values(v)) stringsOf(x, out);
+	return out;
+};
+
+/**
+ * The shape of a tool call, never its arguments: the tool name; for `eval` also the cell's language and how many `tool.<name>(` calls it
+ * makes, counted by name ("eval js 셀 안의 tool.bash x4"). `args` is the JSON text of the tool_call row; no code, command or path is copied.
+ */
+export function callShape(tool: string | undefined, args: string | undefined): string {
+	const name = tool && NAME_RE.test(tool) ? tool : "도구";
+	if (name.toLowerCase() !== "eval" || !args) return name;
+	let parsed: unknown = args;
+	try {
+		parsed = JSON.parse(args);
+	} catch {}
+	const lang = parsed && typeof parsed === "object" ? ((parsed as Record<string, unknown>).language ?? (parsed as Record<string, unknown>).lang) : undefined;
+	const counts = new Map<string, number>();
+	for (const text of stringsOf(parsed)) for (const m of text.matchAll(/\btool\.([A-Za-z_]\w{0,39})\(/g)) counts.set(m[1]!, (counts.get(m[1]!) ?? 0) + 1);
+	const calls = [...counts].slice(0, 5).map(([n, c]) => `tool.${n} x${c}`);
+	return `eval ${typeof lang === "string" && /^[A-Za-z]{1,12}$/.test(lang) ? `${lang.toLowerCase()} ` : ""}셀${calls.length ? ` 안의 ${calls.join(", ")}` : ""}`;
+}
+
+export type StuckInfo = { shape: string; minutes: number };
+/** The line that opens the redelivered request after a stuck recovery. */
+export const stuckLine = (i: StuckInfo): string => `앞 턴이 ${i.shape}에서 ${i.minutes}분 멈춰서 끊었어요. 같은 호출 모양을 되풀이하지 마세요.`;
+/** `wrap` with `line` in front of the first text only (one session reads them all). */
+export function leadWith(wrap: (text: string) => string, line: string | undefined): (text: string) => string {
+	let pending = line;
+	return text => {
+		const out = wrap(text);
+		if (!pending) return out;
+		const lead = pending;
+		pending = undefined;
+		return `${lead}\n${out}`;
+	};
+}
+
+const SECRET_WORD = "(token|key|secret|password|auth|cookie)";
+const SECRET_FLAG = new RegExp(SECRET_WORD, "i");
+const SECRET_HEADER = new RegExp(`^[\\w-]*${SECRET_WORD}[\\w-]*:$`, "i");
+/** A command line for a diagnostic file: the binary stays, argument values that look secret (or are long) become ***. */
+export function maskCommand(cmd: string): string {
+	let maskNext = false;
+	return cmd
+		.trim()
+		.split(/\s+/)
+		.map((a, i) => {
+			if (i === 0) return a;
+			if (maskNext && !a.startsWith("-")) {
+				// "Authorization: Bearer <token>": the scheme word is followed by the secret
+				maskNext = /^(bearer|basic)$/i.test(a);
+				return maskNext ? a : "***";
+			}
+			maskNext = false;
+			if (/^(bearer|basic)$/i.test(a) || SECRET_HEADER.test(a)) {
+				maskNext = true;
+				return a;
+			}
+			if (a.startsWith("-")) {
+				const eq = a.indexOf("=");
+				const flag = eq < 0 ? a : a.slice(0, eq);
+				if (SECRET_FLAG.test(flag)) {
+					if (eq >= 0) return `${flag}=***`;
+					maskNext = true;
+					return a;
+				}
+				return a.length > 40 ? (eq >= 0 ? `${flag}=***` : "***") : a;
+			}
+			const env = /^([A-Za-z_][A-Za-z0-9_]*)=/.exec(a);
+			if (env) return `${env[1]}=***`;
+			return a.length > 40 ? "***" : a;
+		})
+		.join(" ");
+}
+
+/** Descendants of `pid` (itself first) from `ps -A -o pid=,ppid=,etime=,time=,command=` output, one masked line each. */
+export function treeLines(ps: string, pid: number): string[] {
+	const rows = new Map<number, string>();
+	const kids = new Map<number, number[]>();
+	for (const line of ps.split("\n")) {
+		const m = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(.*)$/.exec(line);
+		if (!m) continue;
+		const [id, parent] = [Number(m[1]), Number(m[2])];
+		rows.set(id, `${id} ${parent} etime=${m[3]} cpu=${m[4]} ${maskCommand(m[5]!).slice(0, 120)}`);
+		kids.set(parent, [...(kids.get(parent) ?? []), id]);
+	}
+	if (!rows.has(pid)) return [];
+	const out: string[] = [];
+	const seen = new Set<number>();
+	for (const stack = [pid]; stack.length; ) {
+		const id = stack.pop()!;
+		if (seen.has(id)) continue;
+		seen.add(id);
+		out.push(rows.get(id) ?? String(id));
+		stack.push(...[...(kids.get(id) ?? [])].reverse());
+	}
+	return out;
+}
+
+/** The type and timestamp of the session file's last line; its content is never read into the snapshot. */
+function lastLineInfo(file: string | undefined): string {
+	if (!file) return "no session file";
+	try {
+		const fd = openSync(file, "r");
+		try {
+			const size = fstatSync(fd).size;
+			const len = Math.min(size, SNAPSHOT_MAX_BYTES);
+			const buf = Buffer.alloc(len);
+			readSync(fd, buf, 0, len, size - len);
+			const line = buf.toString("utf8").split("\n").filter(l => l.trim()).at(-1);
+			if (!line) return "session file is empty";
+			const o = JSON.parse(line) as Record<string, unknown>;
+			const clean = (v: unknown): string => (typeof v === "string" || typeof v === "number" ? String(v).replace(/[^\w:.+\- ]/g, "").slice(0, 40) : "-");
+			return `session file last line: type=${clean(o.type)} timestamp=${clean(o.timestamp ?? o.ts ?? o.time)}`;
+		} finally {
+			closeSync(fd);
+		}
+	} catch {
+		return "session file last line: unreadable";
+	}
+}
+
+export const SNAPSHOT_MS = 7000;
+export const SAMPLE_MS = 5000;
+export const SNAPSHOT_KEEP = 20;
+export const SNAPSHOT_MAX_BYTES = 256 * 1024;
+
+/** Runs a command and returns its stdout, or undefined when it fails or outlives `timeoutMs`. */
+export type SnapshotRunner = (cmd: string[], timeoutMs: number) => Promise<string | undefined>;
+let snapshotRunner: SnapshotRunner = async (cmd, timeoutMs) => {
+	try {
+		const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "ignore", timeout: timeoutMs, killSignal: "SIGKILL" });
+		return await new Response(p.stdout).text();
+	} catch {
+		return undefined;
+	}
+};
+/** Tests replace the commands a snapshot runs (ps, sample). */
+export const setSnapshotRunner = (fn: SnapshotRunner): void => void (snapshotRunner = fn);
+
+/**
+ * Writes a diagnostic file about a process about to be killed: `<DATA_DIR>/stuck/<ISO time>-<key>.txt` with its masked process tree, the
+ * type and timestamp of its session file's last line and, on macOS, the head of `sample <pid> 3`. Bounded to SNAPSHOT_MS in all; a failure
+ * is logged and ignored, so the caller always goes on to kill. Resolves with the path, or undefined when nothing was written.
+ */
+export async function takeSnapshot(key: string, pid: number | undefined, sessionFile: string | undefined): Promise<string | undefined> {
+	try {
+		const started = Date.now();
+		const sections = [`key: ${key}`, `pid: ${pid ?? "-"}`, lastLineInfo(sessionFile)];
+		let finished = false;
+		const work = (async () => {
+			if (pid !== undefined) {
+				const ps = await snapshotRunner(["/bin/ps", "-A", "-o", "pid=,ppid=,etime=,time=,command="], 2000);
+				const tree = ps ? treeLines(ps, pid) : [];
+				sections.push(`process tree (pid ppid etime cpu command):\n${tree.length ? tree.join("\n") : "unavailable"}`);
+				const room = Math.min(SAMPLE_MS, SNAPSHOT_MS - (Date.now() - started) - 300);
+				if (process.platform === "darwin" && room > 500) {
+					const sample = await snapshotRunner(["/usr/bin/sample", String(pid), "3", "-file", "/dev/stdout"], room);
+					sections.push(`sample ${pid} 3 (first 200 lines):\n${sample ? sample.split("\n").slice(0, 200).join("\n") : "unavailable"}`);
+				}
+			}
+			finished = true;
+		})();
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		await Promise.race([work.catch(e => void log(`stuck: snapshot of ${key} failed: ${e}`)), new Promise<void>(r => (timer = setTimeout(r, SNAPSHOT_MS)))]);
+		clearTimeout(timer);
+		if (!finished) sections.push("(snapshot cut short at its time limit)");
+		const dir = join(DATA_DIR, "stuck");
+		mkdirSync(dir, { recursive: true });
+		const path = join(dir, `${new Date().toISOString()}-${key.replace(/[^\w.-]+/g, "_").slice(0, 60)}.txt`);
+		writeFileSync(path, Buffer.from(sections.join("\n\n") + "\n").subarray(0, SNAPSHOT_MAX_BYTES));
+		const old = readdirSync(dir).filter(f => f.endsWith(".txt")).sort();
+		for (const f of old.slice(0, Math.max(0, old.length - SNAPSHOT_KEEP))) unlinkSync(join(dir, f));
+		log(`stuck: snapshot ${path}`);
+		return path;
+	} catch (e) {
+		log(`stuck: snapshot of ${key} failed: ${e}`);
+		return undefined;
+	}
+}
 
 const sizeOf = (file: string | undefined): number | undefined => {
 	try {
@@ -98,10 +285,20 @@ export function createStuckWatch(o: StuckWatchOpts) {
 	let cpu: number | undefined;
 	let busy = false;
 	let abortedAfter = 0;
+	// Tool calls started and not yet answered, in start order: the last one is what a stuck turn was inside.
+	const open = new Map<string, { tool?: string; shape: string }>();
+	let openSeq = 0;
+	let info: StuckInfo | undefined;
 
-	function progress(signal: string): void {
+	function progress(signal: string, ev?: AgentEvent): void {
 		s.lastAt = Date.now();
 		last = signal;
+		if (ev?.type === "turn_start") open.clear();
+		else if (ev?.type === "activity" && ev.row.type === "tool_call") open.set(ev.row.call_id ?? `#${++openSeq}`, { tool: ev.row.tool, shape: callShape(ev.row.tool, ev.row.args) });
+		else if (ev?.type === "activity" && ev.row.type === "tool_result") {
+			const id = ev.row.call_id ?? [...open].reverse().find(([, c]) => c.tool === ev.row.tool)?.[0];
+			if (id !== undefined) open.delete(id);
+		}
 	}
 	function stop(): void {
 		clearInterval(timer);
@@ -112,6 +309,7 @@ export function createStuckWatch(o: StuckWatchOpts) {
 	/** A turn opens: sampling starts. */
 	function begin(): void {
 		stop();
+		info = undefined;
 		progress("turn start");
 		size = sizeOf(o.sessionFile());
 		every = Math.min(60_000, Math.max(250, stuckTurnMs() / 4));
@@ -160,6 +358,7 @@ export function createStuckWatch(o: StuckWatchOpts) {
 					s.recoveries.push(now);
 					s.abortedAt = now;
 					abortedAfter = minutes;
+					info = { shape: [...open.values()].at(-1)?.shape ?? "도구 호출 밖", minutes };
 					o.stuck(minutes);
 					o.abort();
 					break;
@@ -181,5 +380,6 @@ export function createStuckWatch(o: StuckWatchOpts) {
 			busy = false;
 		}
 	}
-	return { progress, begin, end, reset: stop, tick };
+	/** What the last abort found: the open tool call's shape and the minutes of silence; kept until the next turn starts. */
+	return { progress, begin, end, reset: stop, tick, info: (): StuckInfo | undefined => info };
 }
