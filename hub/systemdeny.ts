@@ -7,6 +7,19 @@ export const SYSTEM_DENY: [RegExp, string][] = [
 	[/\blaunchctl\s+(kickstart|stop|kill|bootout|unload|remove)\b[^;&|\n]*dev\.dotz\.gateway/i, "restarting the gateway cuts every session short; use /restart gateway (POST /api/gateway/restart)"],
 ];
 
+// A turn an outside mail woke (hub/intake.ts puts this token on its first line): the text came from a stranger, so the shell
+// of that turn must not read stored secrets or send anything out (extension/mail-turn.ts applies it until the turn ends).
+export const MAIL_TURN_MARK = "[dotz:mail-turn]";
+const MAIL_TURN_DENY: [RegExp, string][] = [
+	[/secrets-cli|\bsecrets[\/\\]|[\/\\]secrets\b|hub-token|peer-token/i, "it reads stored secrets or the owner token"],
+	[/\b(?:curl|wget)\b[^|;&\n]*(?:\s-[A-Za-z]*[dFTX]|--(?:data[\w-]*|form[\w-]*|json|upload-file|post-data|post-file|body-data|body-file|request|method)\b)/, "it sends data out"],
+	[/\b(?:curl|wget)\b[^|;&\n]*\?[^\s|;&]*=/, "it puts values in a URL"],
+	[/\bzele\b[^|;&\n]*\b(?:send|reply|forward|compose)\b/i, "it sends mail"],
+	[/(?:^|[\s;&|(])gh\s+\S/, "it runs gh"],
+	[/\b(?:draft|comments|mail-cli|mail|sns|voice|cli)\.ts\s+(?:send|send-file|compose|approve|publish)\b/, "it sends through a dotz send command"],
+];
+export const mailTurnDeny = (command: string): string | undefined => MAIL_TURN_DENY.find(([re]) => re.test(command))?.[1];
+
 export { publicPostDeny } from "./public-scrub.ts";
 
 export const systemDeny = (command: string): string | undefined => SYSTEM_DENY.find(([re]) => re.test(command))?.[1];

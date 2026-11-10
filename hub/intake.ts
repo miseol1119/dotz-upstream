@@ -21,6 +21,7 @@ import { errorAnswer } from "./orch-error.ts";
 import { drain, restore } from "./queue.ts";
 import { anthropicUsage } from "./providers.ts";
 import { withTurnLanguage } from "./outlang.ts";
+import { MAIL_TURN_MARK } from "./systemdeny.ts";
 import { channelContext, listSetups } from "./workchannels.ts";
 import { updateNow } from "./update-now.ts";
 import { deliver, awaiting, lastOwner, refOf, newMid, laneFailed, out, expectReply, rateLimitNotice, turnSource } from "./outbound.ts";
@@ -87,7 +88,7 @@ function inboxBody(e: Record<string, any>): string {
 	}
 	if (e.kind === "mail") {
 		const home = typeof e.parent === "string" && e.parent.startsWith("ch:") ? channelContext(e.parent.slice(3)) : "";
-		return [m.inboxMail(e.thread ? `th:${e.thread}` : e.channel), e.text, home].filter(Boolean).join("\n");
+		return [MAIL_TURN_MARK, m.inboxMail(e.thread ? `th:${e.thread}` : e.channel), e.text, home].filter(Boolean).join("\n");
 	}
 	if (e.kind === "schedule") return `${m.inboxSchedule(e.id, e.every, e.channel)}\n${e.text}`;
 	const where = e.thread_name ? m.inboxThread(e.thread_name, e.parent_name) : e.channel_name ? ` #${e.channel_name}` : "";

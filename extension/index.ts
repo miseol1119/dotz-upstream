@@ -21,11 +21,12 @@ import { baseLanguage, detectLanguage, languageName } from "../hub/language.ts";
 import { blockedByFeatures, featurePrompt } from "../hub/featuredirs.ts";
 import { runWithReceipt, summarize } from "../hub/receipts.ts";
 import { mergeGate, recordReview, Refusal, type Scope } from "../hub/mergegate.ts";
-import { publicPostDeny, systemDeny } from "../hub/systemdeny.ts";
+import { MAIL_TURN_MARK, mailTurnDeny, publicPostDeny, systemDeny } from "../hub/systemdeny.ts";
 import { codeLockReason } from "../hub/codeguard.ts";
 import { lockedCodeDir } from "../hub/selfupdate-local.ts";
 import { loadPlugins, pluginDeny } from "../hub/plugins.ts";
 import { createRefusals } from "./refusals.ts";
+import { installMailTurn } from "./mail-turn.ts";
 import { connectText, type ConnectView } from "./connect-view.ts";
 import { staysInTerminal } from "./terminal-input.ts";
 import { installCompactKept } from "./compact-kept.ts";
@@ -86,6 +87,7 @@ const throwaway = () => throwawayReason({ hubPid: hubPid(DATA) });
 function enforceRules(pi: any): void {
 	let ready = false;
 	const refusals = createRefusals();
+	installMailTurn(pi, MAIL_TURN_MARK, mailTurnDeny);
 	// Plugin load and reload lines (a failed reload keeps the old guard) go to hub.log, where the owner reads the gateway's.
 	const pluginLog = (line: string) => {
 		try {
