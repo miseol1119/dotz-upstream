@@ -6,6 +6,7 @@ import { afterAll, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { useClaudeReset } from "./claude-reset.ts";
 import { forgetAccountUsage, refreshQuota, resetQuotaForTest } from "./providers.ts";
 import { routeSettings } from "./routes-settings.ts";
 import { AccountUsage, CLAUDE_USAGE_URL, claudeResets } from "./usage-account.ts";
@@ -186,4 +187,44 @@ test("confirmed but spent, unknown, expired or without an org id: refused, no re
 		expect((await post({ provider: "anthropic", account: "main", confirm: true, ...b })).status).toBe(409);
 		expect(resetsCalls(calls)).toEqual([]);
 	}
+});
+
+test("the reset POST names Claude Code like the usage GET does (the server judges both by surface)", async () => {
+	const calls = upstream(usage());
+	await post({ provider: "anthropic", account: "main", grant_id: "launch-fable", confirm: true });
+	const get = calls.find(c => c.method === "GET")!, used = resetsCalls(calls);
+	expect(used.length).toBe(1);
+	expect(used[0]?.headers["user-agent"]).toMatch(/^claude-cli\/\d+\.\d+\.\d+ \(external, cli\)$/);
+	expect(used[0]?.headers["user-agent"]).toBe(get.headers["user-agent"]);
+	await refreshQuota();
+});
+
+test("ineligible is a refusal: 409, no ok, the pass count unchanged, the reason carried to the owner", async () => {
+	for (const reason of [{ ineligible_reason: "surface" }, { ineligible_reason: "brand_new_reason" }, {}]) {
+		const calls = upstream(usage(), 200, { result: "ineligible", ...reason });
+		const r = await post({ provider: "anthropic", account: "main", grant_id: "launch-fable", confirm: true });
+		expect(resetsCalls(calls).length).toBe(1);
+		expect(r.status).toBe(409);
+		expect(r.body.ok).toBeUndefined();
+		expect(r.body).toMatchObject({ outcome: "ineligible", left: 4 });
+		expect(typeof r.body.error).toBe("string");
+		if (reason.ineligible_reason === "brand_new_reason") expect(r.body.error).toContain("brand_new_reason");
+	}
+});
+
+test("the fetch is injectable: useClaudeReset sends through the one it is given and never the global one", async () => {
+	const seen: Call[] = [];
+	globalThis.fetch = (async () => {
+		throw new Error("the global fetch must not be used");
+	}) as typeof fetch;
+	const fake = (async (input: string | URL | Request, init: RequestInit = {}) => {
+		const url = String(input), method = init.method ?? "GET";
+		seen.push({ url, method, headers: init.headers as Record<string, string>, ...(init.body ? { body: JSON.parse(String(init.body)) } : {}) });
+		return method === "GET" ? Response.json(usage()) : Response.json({ result: "reset" });
+	}) as typeof fetch;
+	expect(await useClaudeReset({ provider: "anthropic", account: "main", grant_id: "launch-fable", confirm: true }, fake)).toEqual({ status: 200, body: { ok: true, outcome: "reset", left: 3 } });
+	const used = seen.filter(c => c.method === "POST");
+	expect(used.map(c => c.url)).toEqual([RESET_URL]);
+	expect(used[0]?.headers["user-agent"]).toMatch(/^claude-cli\//);
+	expect(used[0]?.body).toMatchObject({ program: "cedar_ember", grant_id: "launch-fable" });
 });

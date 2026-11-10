@@ -215,8 +215,10 @@ function resetLine(p, name, k) {
   const use = () => dialog({ confirm: true, title: "리셋권을 쓸까요?",
     body: el("div", { class: "sup", text: `${name} ${what} 지금 다시 채워요. 쓰고 나면 ${label}이 ${held - 1}개 남아요. 되돌릴 수는 없어요.` }),
     actions: [{ label: "취소", onclick: c => c() }, { label: "리셋권 쓰기", kind: "pri", onclick: (c, b) => busy(b, async () => {
-      try { const out = await api("/api/quota/reset-credit", "POST", send); c(); toast(say[out.outcome] || "리셋권을 썼어요"); loadQuota(true); }
-      catch (e) { c(); toast(e.message || "리셋권을 쓰지 못했어요", true); loadQuota(true); }
+      // whatever the answer, the usage is read again so the percent and the 리셋권 count on screen are the server's
+      try { const out = await api("/api/quota/reset-credit", "POST", send); c(); toast(say[out.outcome] || "리셋권을 썼어요"); }
+      catch (e) { c(); toast(e.message || "리셋권을 쓰지 못했어요", true); }
+      finally { loadQuota(true); }
     }) }] });
   return el("div", { class: "lim rc" },
     el("div", { class: "kv" }, el("span", { class: "k", text: label }),

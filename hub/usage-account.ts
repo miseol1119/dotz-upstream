@@ -220,9 +220,9 @@ export function limitsOf(body: Json): Limit[] {
 }
 
 // The usage read. cedar_ember=1 adds the 리셋권 (null without it); the server lists them only to a Claude Code user-agent (with
-// dotz's own it answers ineligible_reason "surface"), so this one GET names the installed Claude Code version, else a known one.
+// dotz's own it answers ineligible_reason "surface"), so this GET, and the reset POST (hub/claude-reset.ts), name the installed Claude Code version, else a known one.
 let cliUa: string | undefined;
-function claudeCliUa(): string {
+export function claudeCliUa(): string {
 	if (cliUa) return cliUa;
 	let v = "2.1.316";
 	try {

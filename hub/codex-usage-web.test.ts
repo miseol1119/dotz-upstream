@@ -23,11 +23,17 @@ const quota = () => ({
 	unavailable: [],
 });
 const posts = inbox<unknown>();
+const quotaReads = inbox<string>();
+let refusal: { error: string; outcome: string; left: number } | undefined;
 const hub = fakeHub({
 	api: async (req, url) => {
-		if (url.pathname === "/api/quota" && req.method === "GET") return json(quota());
+		if (url.pathname === "/api/quota" && req.method === "GET") {
+			quotaReads.push(url.search);
+			return json(quota());
+		}
 		if (url.pathname === "/api/quota/reset-credit" && req.method === "POST") {
 			posts.push(await req.json());
+			if (refusal) return json(refusal, 409);
 			resets = { ...resets, held: resets.held - 1, usable: false };
 			return json({ ok: true, outcome: "reset", left: resets.held });
 		}
@@ -124,5 +130,25 @@ test("a kind that is not usable has its 사용 off while the other stays on", as
 	claude = { held: 4, usable: true, expires_at: EXPIRES, kinds: [{ ...KINDS[0]!, usable: false, grant_id: undefined }, KINDS[1]!], grant: { id: "fable-1", kind: "Fable" } };
 	await open({ held: 2, usable: true, expires_at: EXPIRES });
 	expect((await claudeRows()).map(r => r.off)).toEqual([true, false]);
+	claude = undefined;
+});
+
+test("a refused Claude 리셋권 shows the refusal in a toast that fits a 390px phone, and the usage is read again", async () => {
+	claude = { held: 4, usable: true, expires_at: EXPIRES, kinds: KINDS, grant: { id: "weekly-1", kind: "주간" } };
+	refusal = { error: "리셋이 적용되지 않았고, 리셋권도 쓰지 않았어요 (이 접속 방식으로는 쓸 수 없다고 해요)", outcome: "ineligible", left: 4 };
+	await open({ held: 2, usable: true, expires_at: EXPIRES });
+	quotaReads.length = 0;
+	await useKind("Fable");
+	await posts.until(p => p.length === 1, 5000, "refused POST");
+	await waitFor(v, `document.querySelector(".snack.bad")`);
+	const snack = await q<{ text: string; left: number; right: number; width: number; scroll: number; client: number }>(`const n = document.querySelector(".snack"), r = n.getBoundingClientRect(); return { text: n.textContent, left: r.left, right: r.right, width: innerWidth, scroll: n.scrollWidth, client: n.clientWidth };`);
+	expect(snack.text).toBe(refusal.error);
+	expect(snack.left).toBeGreaterThanOrEqual(0);
+	expect(snack.right).toBeLessThanOrEqual(snack.width);
+	expect(snack.scroll).toBeLessThanOrEqual(snack.client);
+	await waitFor(v, `document.querySelector("#usage .lim.rc")`);
+	await quotaReads.until(r => r.includes("?fresh=1"), 5000, "the usage read again after the refusal");
+	expect((await claudeRows()).map(r => r.count)).toEqual(["1개", "3개"]);
+	refusal = undefined;
 	claude = undefined;
 });
