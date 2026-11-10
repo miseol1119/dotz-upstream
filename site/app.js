@@ -3,24 +3,25 @@ const copyLabel = copyButton ? copyButton.querySelector(".copy-label") : null;
 const copyStatus = document.getElementById("copy-status");
 
 if (copyButton && copyLabel && copyStatus) {
+  const { label, copied, fail, done } = copyButton.dataset;
   let resetTimer;
 
   copyButton.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(copyButton.dataset.copy);
     } catch {
-      copyStatus.textContent = "복사하지 못했습니다. 명령을 직접 선택해 주세요.";
+      copyStatus.textContent = fail;
       return;
     }
 
-    copyLabel.textContent = "복사됨";
-    copyButton.dataset.copied = "true";
-    copyStatus.textContent = "설치 명령을 복사했습니다.";
+    copyLabel.textContent = copied;
+    copyButton.dataset.state = "copied";
+    copyStatus.textContent = done;
 
     clearTimeout(resetTimer);
     resetTimer = setTimeout(() => {
-      copyLabel.textContent = "복사";
-      delete copyButton.dataset.copied;
+      copyLabel.textContent = label;
+      delete copyButton.dataset.state;
     }, 2400);
   });
 }
@@ -34,3 +35,16 @@ osButtons.forEach((button) => {
     windowsSteps.hidden = button.dataset.os !== "windows";
   });
 });
+
+const langMenu = document.querySelector(".lang details");
+
+if (langMenu) {
+  document.addEventListener("click", (event) => {
+    if (!langMenu.contains(event.target)) langMenu.open = false;
+  });
+  langMenu.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    langMenu.open = false;
+    langMenu.querySelector("summary").focus();
+  });
+}

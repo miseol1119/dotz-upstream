@@ -5,6 +5,7 @@ import { Collapse } from './kit/motion/Collapse'
 import { Icon } from './kit/parts/Icon'
 import type { Act } from './kit/act'
 import { AppMark, DraftActions, P, useDark, type Send } from './shared'
+import { strings } from './strings'
 import './hero.css'
 
 // The product's chat screen: sidebar, top bar, one white conversation card.
@@ -46,14 +47,15 @@ async function script(a: Act<S>) {
 
 const ic = { size: 18, strokeWidth: 1.75, absoluteStrokeWidth: true, 'aria-hidden': true } as const
 const NAV = [
-  { name: '홈', icon: <House {...ic} /> },
-  { name: '채팅', icon: <MessageCircle {...ic} />, on: true },
-  { name: '프로젝트', icon: <Folder {...ic} /> },
-  { name: '모니터링', icon: <Activity {...ic} /> },
-  { name: '설정', icon: <SlidersHorizontal {...ic} /> },
+  { icon: <House {...ic} /> },
+  { icon: <MessageCircle {...ic} />, on: true },
+  { icon: <Folder {...ic} /> },
+  { icon: <Activity {...ic} /> },
+  { icon: <SlidersHorizontal {...ic} /> },
 ]
 
 function Sidebar() {
+  const t = strings().hero
   return (
     <div className="hz-side">
       <div className="hz-brand">
@@ -62,15 +64,15 @@ function Sidebar() {
         <ChevronDown className="hz-caret" size={14} aria-hidden />
       </div>
       <nav className="hz-nav">
-        {NAV.map((n) => (
-          <span key={n.name} className="hz-ni" data-on={n.on || undefined}>
+        {NAV.map((n, i) => (
+          <span key={i} className="hz-ni" data-on={n.on || undefined}>
             {n.icon}
-            {n.name}
+            {t.nav[i]}
           </span>
         ))}
       </nav>
       <div className="hz-use">
-        사용량<span className="hz-use__bar"><i /></span><span>7일 18%</span>
+        {t.usage}<span className="hz-use__bar"><i /></span><span>{t.usageValue}</span>
       </div>
     </div>
   )
@@ -78,6 +80,7 @@ function Sidebar() {
 
 export default function HeroScene() {
   const dark = useDark()
+  const { hero: t, tags } = strings()
   return (
     <Stage
       className="dz hz"
@@ -99,59 +102,59 @@ export default function HeroScene() {
             <div className="hz-main">
               <div className="hz-bar">
                 <ChevronLeft className="hz-back" size={layout === 'wide' ? 15 : 20} aria-hidden />
-                <h2>{layout === 'wide' ? '채팅' : 'dotz'}</h2>
-                <span className="hz-cmdk"><Search size={15} aria-hidden /><span>명령</span><kbd>⌘K</kbd></span>
+                <h2>{layout === 'wide' ? t.title : 'dotz'}</h2>
+                <span className="hz-cmdk"><Search size={15} aria-hidden /><span>{t.command}</span><kbd>⌘K</kbd></span>
                 <span className="hz-bell"><Bell size={18} strokeWidth={1.75} aria-hidden /><span className="hz-bd">1</span></span>
               </div>
               <div className="hz-cv">
-                {layout === 'wide' && <div className="hz-cvh"><b>dotz</b><span>대기</span></div>}
+                {layout === 'wide' && <div className="hz-cvh"><b>dotz</b><span>{t.idle}</span></div>}
                 <div className="hz-thread">
                   <div className="hz-msg hz-me">
-                    <span className="hz-bub"><P>{['새 메일이 오면', '요약하고 답장 초안 써 줘']}</P></span>
-                    <span className="hz-mm">오전 9:12</span>
+                    <span className="hz-bub"><P>{t.ask}</P></span>
+                    <span className="hz-mm">{t.askAt}</span>
                   </div>
                   <div className="hz-msg">
-                    <span className="hz-mm"><b>dotz</b> · 오전 9:12</span>
-                    <P className="hz-text">{['알겠어요.', '보내기 전에 꼭 물어볼게요.']}</P>
+                    <span className="hz-mm"><b>dotz</b> · {t.ackAt}</span>
+                    <P className="hz-text">{t.ack}</P>
                   </div>
                   <Collapse open={s.mail} reveal="drop" from="below">
                     <div className="hz-sys">
                       <Icon name="mail" size={13} />
-                      <span>새 메일 · 한지우 · 다음 주 촬영 일정</span>
+                      <span>{t.mail}</span>
                     </div>
                   </Collapse>
                   <Collapse open={s.summary} reveal="drop" from="below">
                     <div className="hz-msg">
-                      <span className="hz-mm"><b>dotz</b> · 오전 9:41</span>
-                      <P className="hz-text">{['한지우 님이', '다음 주 화요일 오후에', '촬영이 되는지 물어봤어요.']}</P>
+                      <span className="hz-mm"><b>dotz</b> · {t.summaryAt}</span>
+                      <P className="hz-text">{t.summary}</P>
                     </div>
                   </Collapse>
                   <Collapse open={s.draft} reveal="drop" from="below">
                     <div className="hz-q">
                       <div className="hz-q__hd">
-                        <span className="hz-mm">답장 초안 · <b>한지우</b></span>
+                        <span className="hz-mm">{t.draftFor}</span>
                         <span className="dz-swap">
-                          <span className="dz-tag dz-tag--warn" data-off={s.send === 'done' || undefined}>확인 필요</span>
-                          <span className="dz-tag dz-tag--ok" data-off={s.send !== 'done' || undefined}>보냈어요</span>
+                          <span className="dz-tag dz-tag--warn" data-off={s.send === 'done' || undefined}>{tags.review}</span>
+                          <span className="dz-tag dz-tag--ok" data-off={s.send !== 'done' || undefined}>{tags.sent}</span>
                         </span>
                       </div>
-                      <P className="hz-q__body">{['화요일 오후 2시 좋아요.', '성수 스튜디오에서 뵐게요.']}</P>
+                      <P className="hz-q__body">{t.draftBody}</P>
                     </div>
                   </Collapse>
                 </div>
                 <Collapse open={s.dock} reveal="drop" from="below">
                   <div className="hz-dock">
                     <div className="hz-dock__q">
-                      <span className="dz-tag dz-tag--warn">확인 필요</span>
-                      <P className="hz-dock__t">{['한지우 님께', '이 답장을 보낼까요?']}</P>
+                      <span className="dz-tag dz-tag--warn">{tags.review}</span>
+                      <P className="hz-dock__t">{t.dock}</P>
                     </div>
-                    <DraftActions send={s.send} at="오전 9:42" />
+                    <DraftActions send={s.send} at={t.sentAt} />
                   </div>
                 </Collapse>
                 <div className="hz-cmp">
                   <div className="hz-box">
                     <Plus size={18} strokeWidth={1.75} aria-hidden />
-                    <span className="hz-ph">메시지 보내기</span>
+                    <span className="hz-ph">{t.composer}</span>
                     <span className="hz-send"><ArrowUp size={16} strokeWidth={2} aria-hidden /></span>
                   </div>
                 </div>

@@ -1,10 +1,13 @@
 # dotz 사이트
 
-정적 파일로 된 한 페이지와, 실제 웹 앱을 그대로 돌리는 데모입니다. 배포할 때 빌드 단계가 없습니다.
+정적 파일로 된 다섯 언어 랜딩 페이지와, 실제 웹 앱을 그대로 돌리는 데모입니다. 배포할 때 빌드 단계가 없습니다.
 
-- `index.html` — 모든 문구와 인라인 SVG
+- `page.html` — 랜딩 템플릿 (`{{키}}`는 이스케이프, `{{{키}}}`는 그대로, `{{#키}}…{{/키}}`는 값이 있을 때만)
+- `i18n/pages.json` — 페이지 문구 전부 (en, ko, ja, zh-cn, es)
+- `build-pages.ts` — 템플릿과 문구로 `index.html`(en), `ko/`, `ja/`, `zh-cn/`, `es/`의 `index.html`을 만듭니다. 결과 파일을 커밋합니다
+- `index.html`, `ko/index.html`, `ja/index.html`, `zh-cn/index.html`, `es/index.html` — 만들어진 랜딩 (직접 고치지 않습니다)
 - `style.css` — 색, 타이포그래피, 라이트·다크 테마
-- `app.js` — 설치 명령 복사 버튼
+- `app.js` — 설치 명령 복사 버튼, OS 전환, 언어 메뉴 (문구는 템플릿의 data 속성에서 읽습니다)
 - `favicon.svg`
 - `demo/` — 실제 웹 앱(`web/`)을 만들어 낸 데이터로 띄우는 데모 (`/demo/`로 열립니다)
 
@@ -26,14 +29,20 @@ bun site/build-demo.ts
 bunx serve site
 ```
 
-히어로와 카드의 움직이는 장면(`js/stageshow.js`)은 `site/stageshow-src`를 고친 뒤 `bun site/stageshow-src/build.ts`로 다시 빌드합니다.
+문구나 `page.html`을 고친 뒤에는 다섯 페이지를 다시 만듭니다.
+
+```sh
+bun site/build-pages.ts
+```
+
+히어로와 카드의 움직이는 장면(`js/stageshow.js`)은 `site/stageshow-src`를 고친 뒤 `bun site/stageshow-src/build.ts`로 다시 빌드합니다. 장면 안의 문구는 `stageshow-src/strings.ts`에 언어별(`ko`, `en`, `ja`, `zh-CN`, `es`)로 모여 있고, `<html lang>`에 따라 골라 씁니다. 스크립트·CSS를 고친 뒤에는 `build-pages.ts`가 자산 해시를 새로 찍으므로 스테이지쇼 빌드 다음에 돌립니다.
 
 ## 배포
 
 Cloudflare Pages에 `site` 폴더를 그대로 올립니다(프로젝트 이름 `dotz`, 사용자 도메인 `ddotz.dev`).
 
 ```sh
-bun site/stamp-landing.ts   # 랜딩과 시제품의 자산 주소에 내용 해시를 찍어, 다시 찾은 브라우저가 옛 CSS나 스크립트와 섞이지 않게 합니다
+bun site/stamp-landing.ts   # 다섯 랜딩과 시제품의 자산 주소에 내용 해시를 찍어, 다시 찾은 브라우저가 옛 CSS나 스크립트와 섞이지 않게 합니다
 rsync -a --delete --exclude AGENTS.md site/ /tmp/dotz-site/   # Pages는 .assetsignore를 안 읽어서, 작업 규칙 파일은 복사본에서 뺍니다
 bunx wrangler pages deploy /tmp/dotz-site --project-name dotz --branch main
 ```

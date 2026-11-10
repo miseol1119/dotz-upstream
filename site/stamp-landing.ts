@@ -6,8 +6,9 @@ import { join } from "node:path";
 
 const SITE = import.meta.dir, assets = ["style.css", "app.js", "js/stageshow.js"];
 const stamp = assets.reduce((h, f) => h.update(readFileSync(join(SITE, f))), createHash("sha1")).digest("hex").slice(0, 12);
-const page = join(SITE, "index.html");
-writeFileSync(page, readFileSync(page, "utf8").replace(/"(style\.css|app\.js|js\/stageshow\.js)(?:\?v=\w+)?"/g, `"$1?v=${stamp}"`));
+for (const page of ["index.html", "ko/index.html", "ja/index.html", "zh-cn/index.html", "es/index.html"].map((p) => join(SITE, p))) {
+  writeFileSync(page, readFileSync(page, "utf8").replace(/"(\/style\.css|\/app\.js|\/js\/stageshow\.js)(?:\?v=\w+)?"/g, `"$1?v=${stamp}"`));
+}
 console.log(`landing assets stamped ${stamp}`);
 
 // The prototype page has the same problem. Each file gets its own hash, and the list is whatever local css and js the page names, so a new file needs no edit here.

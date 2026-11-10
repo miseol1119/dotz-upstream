@@ -6,6 +6,7 @@ import { Icon } from './kit/parts/Icon'
 import { Spinner } from './kit/parts/Spinner'
 import type { Act } from './kit/act'
 import { AppMark, DraftActions, P, useDark } from './shared'
+import { strings } from './strings'
 import './cards.css'
 
 // Three looping examples for the 이렇게 써요 section, each one beat of the
@@ -44,6 +45,8 @@ function CardStage<S extends object>({ name, initial, poster, script, bare, chil
 type Mail = { mail: boolean; summary: boolean; draft: boolean; wait: boolean }
 
 export function MailScene() {
+  const t = strings().mail
+  const { tags } = strings()
   return (
     <CardStage<Mail>
       name="mail"
@@ -70,24 +73,24 @@ export function MailScene() {
       {(s) => (
         <>
           <Collapse open={s.mail} reveal="drop" from="below">
-            <div className="cz-chip"><Icon name="mail" size={13} /><P>{['새 메일 · 한지우', '· 다음 주 촬영 일정']}</P></div>
+            <div className="cz-chip"><Icon name="mail" size={13} /><P>{t.chip}</P></div>
           </Collapse>
           <Collapse open={s.summary} reveal="drop" from="below">
             <div className="cz-head">
               <AppMark size={22} />
-              <P className="cz-text">{['화요일 오후에', '촬영이 되는지 묻는 메일이에요.']}</P>
+              <P className="cz-text">{t.summary}</P>
             </div>
           </Collapse>
           <Collapse open={s.draft} reveal="drop" from="below">
             <div className="dz-draft cz-draft" data-wait={s.wait || undefined}>
               <div className="dz-draft__hd">
-                <span className="dz-draft__title">답장 초안</span>
-                <span className="dz-tag dz-tag--warn">확인 필요</span>
+                <span className="dz-draft__title">{t.draftTitle}</span>
+                <span className="dz-tag dz-tag--warn">{tags.review}</span>
               </div>
               <div className="dz-draft__body">
-                <P>{['화요일 오후 2시 좋아요.']}</P>
+                <P>{t.draftBody}</P>
               </div>
-              <DraftActions send="idle" at="방금" />
+              <DraftActions send="idle" at={t.at} />
             </div>
           </Collapse>
         </>
@@ -97,13 +100,11 @@ export function MailScene() {
 }
 
 type Ask = { ask: boolean; busy: boolean; reply: boolean; rows: number }
-const DAY: [string, string][] = [
-  ['10:00', '팀 주간 회의'],
-  ['13:30', '치과 예약'],
-]
 
 export function PhoneScene() {
   const dark = useDark()
+  const t = strings().phone
+  const DAY = t.events
   return (
     <CardStage<Ask>
       name="phone"
@@ -132,17 +133,17 @@ export function PhoneScene() {
       }}
     >
       {(s) => (
-        <Phone width={304} frame="bezel" time="8:30" dark={dark} wallpaper="var(--surface)" className="cz-phone">
+        <Phone width={304} frame="bezel" time={t.time} dark={dark} wallpaper="var(--surface)" className="cz-phone">
           <div className="cz-chat">
             <div className="cz-chat__hd"><AppMark size={18} /><b>dotz</b></div>
             <Collapse open={s.ask} reveal="drop" from="below">
-              <div className="cz-me"><span>오늘 일정 알려 줘</span></div>
+              <div className="cz-me"><span>{t.ask}</span></div>
             </Collapse>
             <Collapse open={s.busy}>
-              <div className="cz-busy"><Spinner size={12} />확인하는 중</div>
+              <div className="cz-busy"><Spinner size={12} />{t.busy}</div>
             </Collapse>
             <Collapse open={s.reply} reveal="drop" from="below">
-              <P className="cz-text">{['오늘 일정은 두 개예요.']}</P>
+              <P className="cz-text">{[t.reply]}</P>
             </Collapse>
             <div className="cz-list">
               {DAY.map(([t, title], i) => (
@@ -164,6 +165,7 @@ export function PhoneScene() {
 type Watch = { drop: boolean; alert: boolean }
 
 export function WatchScene() {
+  const t = strings().watch
   return (
     <CardStage<Watch>
       name="watch"
@@ -186,35 +188,35 @@ export function WatchScene() {
         <>
           <div className="cz-watch">
             <span className="cz-nt__b">
-              <b>캠핑 의자</b>
-              <span>지켜보는 중</span>
+              <b>{t.item}</b>
+              <span>{t.watching}</span>
             </span>
             <span className="cz-amt">
               <span className="dz-swap">
-                <span data-off={s.drop || undefined}>89,000원</span>
-                <em data-off={!s.drop || undefined}>72,000원</em>
+                <span data-off={s.drop || undefined}>{t.before}</span>
+                <em data-off={!s.drop || undefined}>{t.after}</em>
               </span>
             </span>
           </div>
-          <div className="cz-title">알림</div>
+          <div className="cz-title">{t.notices}</div>
           <div className="cz-nts">
             <Collapse open={s.alert} reveal="drop">
               <div className="cz-nt" data-unread>
                 <span className="cz-nt__dot" />
                 <span className="cz-nt__b">
-                  <b>가격이 바뀌었어요</b>
-                  <span className="cz-price">캠핑 의자 <s>89,000원</s> → <em>72,000원</em></span>
+                  <b>{t.changed}</b>
+                  <span className="cz-price">{t.item} <s>{t.before}</s> → <em>{t.after}</em></span>
                 </span>
-                <span className="cz-nt__time">방금</span>
+                <span className="cz-nt__time">{t.now}</span>
               </div>
             </Collapse>
             <div className="cz-nt">
               <span className="cz-nt__dot" />
               <span className="cz-nt__b">
-                <b>로그인 유지</b>
-                <span>사이트 세 곳 · 바뀐 것 없음</span>
+                <b>{t.keep}</b>
+                <span>{t.keepNote}</span>
               </span>
-              <span className="cz-nt__time">오전 8:00</span>
+              <span className="cz-nt__time">{t.keepAt}</span>
             </div>
           </div>
         </>
