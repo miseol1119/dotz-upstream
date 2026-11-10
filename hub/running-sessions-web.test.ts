@@ -37,13 +37,15 @@ beforeAll(async () => {
 afterAll(() => hub.stop());
 
 const WANT = [["기획팀 · 손익 검토", "답을 기다림"], ["기획팀 · 분기 안건 검토", "진행 중"], ["회의록 정리", "진행 중"]];
-const homeRows = `(() => { renderHomeNow(); return [...document.querySelectorAll('#v-home .hn[data-k="running"] .srow')].map(r => [r.querySelector(".nm").textContent, r.querySelector(".hs").textContent]); })()`;
+const homeRows = `(() => { renderHomeNow(); return [...document.querySelectorAll('#v-home .hn[data-k="running"] .srow')].map(r => [r.querySelector(".nm").textContent, r.getAttribute("aria-label").split(" · ")[2]]); })()`;
 const chatRows = `(() => { const sec = [...document.querySelectorAll("#chat-convo .cv-sec")].find(n => n.textContent === "진행 중"); const above = sec && sec.previousElementSibling; return above === document.querySelector("#chat-convo > *") && [...above.querySelectorAll(".cv-row")].map(r => r.dataset.t).join() === "main,worklog" ? [...sec.nextElementSibling.querySelectorAll(".cv-row")].map(r => [r.querySelector(".cv-n").textContent, r.querySelector(".tag").textContent]) : null; })()`;
 const listed = async (expr: string, want: unknown) => { await waitFor(v, `JSON.stringify(${expr}) === ${JSON.stringify(JSON.stringify(want))}`); };
 
 test("홈 and 채팅, under 땅콩 and 작업내역, list the same sessions: waiting first, named project · title, finished and held ones left out", async () => {
 	await run(v, `go("home")`);
 	await listed(homeRows, WANT);
+	// a running row ends in a time, not in the state word (the aria-label above keeps it)
+	expect(await ev<string[]>(v, `[...document.querySelectorAll('#v-home .hn[data-k="running"] .srow .hs')].map(h => h.textContent).filter(t => /진행 중|작업 중/.test(t))`)).toEqual([]);
 	expect(await ev<number>(v, `document.querySelectorAll('#v-home .hn[data-k="waiting"] [data-t="lane:ask"]').length`)).toBe(0);
 	expect(await ev<number>(v, `document.querySelectorAll('#v-home .hn[data-k="waiting"] [data-t="lane:held"]').length`)).toBe(1);
 	await run(v, `go("chat", "list")`);

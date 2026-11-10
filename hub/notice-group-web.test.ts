@@ -58,15 +58,15 @@ async function open(width: number, height: number) {
 	return v;
 }
 
-test("the send approvals of every app are no 답변 필요 rows or groups; one 답장 대기 row counts the items, and the nav badge is the same number", async () => {
+test("the send approvals of every app are no 답변 필요 rows or groups; one 답장 초안 확인 row counts the items, and the nav badge is the same number", async () => {
 	const v = await open(390, 900);
-	const got = await q<{ groups: number; draftRows: number; row: string; badge: string; waiting: number }>(v, `const box = document.querySelector("#home-now");
-		return { groups: box.querySelectorAll(".ntg").length, draftRows: [...box.querySelectorAll(".hr")].filter(r => r.dataset.nid).length, row: box.querySelector('.hr[data-k="replies"]').textContent,
+	const got = await q<{ groups: number; draftRows: number; row: string; rows: number; badge: string; waiting: number }>(v, `const box = document.querySelector("#home-now");
+		return { groups: box.querySelectorAll(".ntg").length, draftRows: [...box.querySelectorAll(".hr")].filter(r => r.dataset.nid).length, row: box.querySelector('.hr[data-k="replies"] .nb').textContent, rows: box.querySelectorAll('.hr[data-k="replies"]').length,
 			badge: document.querySelector("#nav-mon").textContent, waiting: rqWaiting() };`);
 	expect(got.groups).toBe(0);
 	expect(got.draftRows).toBe(0);
-	expect(got.row).toContain("답장 대기");
-	expect(got.row).toContain("6건");
+	expect(got.rows).toBe(1);
+	expect(got.row).toBe("6");   // the total is the badge at the row's right
 	expect(got.waiting).toBe(6);
 	expect(got.badge).toBe("6");
 });

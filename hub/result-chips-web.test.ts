@@ -99,7 +99,8 @@ test("home: the marker comes before the row's 완료 or time, which stay in one 
 	expect(r.before).toEqual([true, true, true]);
 	expect(r.made).toEqual(r.none);
 	expect(r.gap).toEqual([4, 4, 8]);
-	expect((r.words as string[])[0]).toBe("완료");
+	// a finished row ends in how long ago it ended, not in the word 완료 (the dot and the aria-label say that)
+	expect((r.words as string[])[0]).toMatch(/전$|^방금$/);
 });
 
 test("home: the marker opens the row's three chips under it, one row at a time; a second click or Escape closes them", async () => {

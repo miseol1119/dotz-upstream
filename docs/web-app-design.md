@@ -211,7 +211,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 홈 화면 (`#v-home`)
 - 목적: 이 컴퓨터의 상태를 한 화면에 모으고, 카드마다 눌러서 해당 화면이나 대화로 가요.
-- 구성: `#v-home` 안에 위에서 아래로 `#home-now`(인사, 경고 줄, 답변 필요, 답장 대기), `#home-cards`(보드 카드 격자, 위에 `.bbar` 막대), `#home-ended`(끝난 세션 그룹). 카드 격자 순서는 알림, 지금 진행 중, 대기 중(있을 때), 최근 끝난 작업(있을 때), 모니터링, 작업내역, 사용량, 컨텍스트, 공급자, 오너 커스텀 카드예요.
+- 구성: `#v-home` 안에 위에서 아래로 `#home-now`(인사, 답변 필요), `#home-cards`(보드 카드 격자, 위에 `.bbar` 막대), `#home-ended`(끝난 세션 그룹). 카드 격자 순서는 할일(줄이 있을 때), 알림(새 알림이 있을 때), 지금 진행 중, 대기 중(있을 때), 최근 끝난 작업(있을 때), 모니터링, 작업내역, 사용량, 컨텍스트, 공급자, 오너 커스텀 카드예요.
 - 기능: 카드 전체가 `tapCard`(role=link, Enter/Space로도 열림)라서 눌러 이동해요. 카드 머리의 ⋯ 버튼은 `menuBtn`/`homeMenu`예요. 화면에 들어올 때 `go("home")`가 `renderHome()`과 `loadHomeData()`를 불러요. 홈이 열려 있으면 60초마다 `loadHomeData` 재실행. 홈 맨 위로 스크롤은 `homeTop`.
 - 상태: 제목은 `titles.home` = `홈`. 첫 `loadHomeData`가 끝나기 전에는 `HOME_READY=false`라서 새로 생기는 행에 올라오는 모션을 안 줘요. 상태(`S`)가 아직 없으면 인사말 상태 단어가 `연결 중`. 메뉴가 열려 있으면(`openMenu`가 카드 안) 카드 격자는 닫힐 때까지 다시 그리지 않아요. 폰/데스크톱: 22-shell.css의 `@media (max-width: 1023px)`에서 `#v-home` 안쪽 여백이 줄어요. 카드 격자는 폭 719px 이하(또는 coarse 포인터이면서 767px 이하)에서 한 열로 바뀌어요(`narrowMQ`, 07-board.js 항목 참고). 다른 컴퓨터(peer) 항목은 홈에 안 그려요: `!i.pc`, `!x.pc` 필터(08-home.js:361)이고 다른 컴퓨터는 모니터링 화면 담당이에요.
 - 데이터: `GET /api/quota`, `loadProviderData()`(공급자), `loadMonitors()`(모니터링), `pqLoad()`(다른 컴퓨터 스냅샷을 미리 읽기만 함). 상태는 `S`(`/api/state`의 `orchestrator`, `lanes`, `runs`, `work`, `deferred`, `convs`), `C`(컨텍스트 프로세스), `P`(공급자), `M`(모델), `NT`(알림), `NM`(모니터), `INTG`(앱 연동). SSE는 `activity`, `subagents`, `quota`, `notice` 계열을 받아 홈을 다시 그려요(`homeSoon`, `subsChanged`, `quotaLive`).
@@ -227,14 +227,13 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 - 근거: web/js/08-home.js:330 `homeGreeting`, 08-home.js:321 `homeWord`, 08-home.js:308 `homeGreetWord`, 08-home.js:311 `homeRunning`, 08-home.js:458 `restartOrch`, 08-home.js:464 `abortOrch`.
 - css: 22-shell.css(`.hgreet`, `.hgreet-fb`), 03-base.css(`.smodel`), 05-log.css(`.subline`).
 
-### 홈 경고 줄 (`homeStrip`)
-- 목적: 카드 위에 한 줄로, 로그인이 풀린 앱이나 가장 최근에 안 읽은 알림 하나를 보여요.
-- 구성: `button.li.hstrip` 안에 `.lead`(점), `.tx`(`.hd` 제목, `.sup` 부제), `.end`(`.tag` 라벨, 화살표).
-- 기능: 누르면 로그인이 풀린 경우 `go("monitoring", "i:{앱키}")`, 알림이면 `noticeOpen(n)`.
-- 상태: 로그인 풀림(`INTG.items`에 `state === "disconnected"`) 우선: 제목 `{앱 라벨 또는 앱} 로그인이 풀렸어요`, 부제 `경고 · 다시 로그인해야 이어서 볼 수 있어요`, 태그 `경고`(빨강). 아니면 안 읽은 `cls === "alert"` 알림 중 최신 하나: 실패 톤이면 태그 `경고`(빨강), 그 외 `알림`. 둘 다 없으면 줄이 없어요(null).
-- 데이터: `INTG.items`, `NT.items`(`ntHomeAlert`, `ntAt`, `ntWhen`).
-- 근거: web/js/08-home.js:342 `homeStrip`, 08-home.js:350 `homeStripRow`.
-- css: 22-shell.css(`.hstrip`), 02-cards-lists-tags.css(`.li`, `.tag`).
+### 홈 로그인 풀림 줄 (`nyLogins`)
+- 목적: 로그인이 풀린 것을 카드 위 띠가 아니라 답변 필요 카드의 첫 줄로 한 번만 보여요.
+- 구성: 답변 필요 목록의 맨 앞 `.hr.hrx` 줄. 제목 `{앱} 로그인이 풀렸어요`, 부제 `{앱} · {시각}`, 오른쪽 글자 `다시 로그인`. 앞 점과 `경고` 태그는 없어요.
+- 기능: 알림에서 온 줄은 `noticeOpen(n)`, 앱 연동에서 온 줄은 `go("monitoring", "i:{앱키}")`.
+- 상태: 허브가 로그인을 기다린다고 한 알림(`n.waits === "login"`, hub/notices-rules.ts)이 먼저예요. 읽어도 로그인이 돌아올 때까지 남아요. 그런 알림이 없는데 `INTG.items`에 `state === "disconnected"`인 앱이 있으면 그 앱 줄(부제 `다시 로그인해야 이어서 볼 수 있어요`). 이 줄이 된 알림은 알림 카드에서 빠져요.
+- 데이터: `NT.items`, `INTG.items`.
+- 근거: web/js/09-needs-you.js `nyLogins`, `nyLoginRow`, `nyDownRow`; 08-home.js `renderHomeNow`, `homeAlertCard`.
 
 ### 홈 답변 필요 (`nyList`, `nyListNode`)
 - 목적: 오너만 할 수 있는 일을 중요한 순서로 모아요.
@@ -245,14 +244,14 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 - 근거: web/js/09-needs-you.js:154 `NY`, 09-needs-you.js:156 `nyOf`, 09-needs-you.js:170 `nyMonFails`, 09-needs-you.js:177 `nyList`, 09-needs-you.js:186 `nyRows`, 09-needs-you.js:210 `nyMonRow`, 09-needs-you.js:219 `nyListNode`; 08-home.js:373 (머리 렌더).
 - css: 22-shell.css(`.hneeds`, `.ny-more`), 05-log.css(`.hn-h`, `.hn`, `.hr`, `.ny-more`), 02-cards-lists-tags.css(`.tag`).
 
-### 홈 답장 대기 블록 (`답장 대기`)
-- 목적: 오너가 답장해야 하는 앱 항목과 보내기 전 확인할 답장 초안이 있다는 걸 알려요.
-- 구성: `.hn-h.hsub` 머리(`h2` `답장 대기`, 미답장 합계 pill `미답장 {n}`), 목록 `.hn[data-k=replies]`. 행은 `답장 확인`(초안) 하나와 앱별 미답장 행들이에요.
-- 기능: 초안 행은 `rqOpen()`(답장 확인 큐). 앱 행은 `go("monitoring", 앱키)`.
-- 상태: 초안 행 `답장 확인` / `보내기 전에 확인할 답장 초안이 있어요` / 태그 `{n}건`, aria-label `답장 확인 {n}건`. 앱 행 `답장을 기다리는 것이 있어요` / 태그 `미답장 {n}`, aria-label `{앱} · 미답장 {n}건`. 해당 항목이 없으면 블록 자체를 안 그려요. 이 컴퓨터 것만(`!i.pc`, `!x.pc`).
-- 데이터: `monItems()`(`i.app`, `i.unreplied`), `rqAll()`(답장 초안). SSE `mail_unreplied` 등은 99-boot.js에서 별도 처리.
-- 근거: web/js/08-home.js:258 `homeOwedRow`, 08-home.js:264 `homeRepliesRow`, 08-home.js:361-374.
-- css: 05-log.css(`.hr`), 22-shell.css(`.hsub`).
+### 홈 답장 두 줄 (`homeRepliesRow`, `homeOwedRow`)
+- 목적: 확인을 기다리는 답장 초안과 답하지 않은 댓글이 있다는 걸 답변 필요 카드의 마지막 두 줄로 알려요.
+- 구성: 답변 필요 목록 끝의 `.hr[data-k=replies]`(`답장 초안 확인`)와 `.hr[data-k=owed]`(`답 안 한 댓글`). 부제는 출처별 수(많은 순, 0은 빼요: `메일 1 · 유튜브 1`), 오른쪽 `.nb` 배지는 합계(99 넘으면 `99+`). 따로 머리는 없어요.
+- 기능: 초안 줄은 `rqOpen()`. 댓글 줄은 출처가 하나면 `go("monitoring", 앱키)`, 둘 이상이면 `go("monitoring")`.
+- 상태: 수가 0인 줄은 그리지 않아요. 답변 필요 머리의 숫자는 카드 안 줄 수라 이 두 줄도 세요. 이 컴퓨터 것만(`!i.pc`).
+- 데이터: `rqRows()`(보낸 것 제외), `monItems()`(`i.app`, `i.unreplied`).
+- 근거: web/js/08-home.js `homeCountRow`, `homeRepliesRow`, `homeOwedRow`, `renderHomeNow`.
+- css: 05-log.css(`.hr`), 22-shell.css(`.hneeds`).
 
 ### 홈 지금 진행 중 (카드 `now:running`)
 - 목적: 지금 돌고 있는 것만 보여요: 세션 턴, 앱 대화의 작업, 백그라운드 작업, 한도 리셋을 기다리는 작업.

@@ -169,8 +169,11 @@ function capLists(root, kept) {
     if (row) row.focus({ preventScroll: true });
   }
 }
-function homeAlertCard() {
-  const fresh = hcRecent(hcFyi), state = hcState(), none = !!state || !fresh.length;
+// 알림 is a card only while it has something to say: a loaded, empty one is not drawn (a loading or failed one stays, and so does every card while one is being moved).
+// taken: the notices that are already a row of 답변 필요 (homeLogins), so one notice is on 홈 once.
+function homeAlertCard(taken) {
+  const fresh = hcRecent(hcFyi).filter(n => !taken.has(n.id)), state = hcState(), none = !!state || !fresh.length;
+  if (!state && !fresh.length && !homeEdit) return null;
   return hcCard(nscGo, hcHead("알림", { menu: "notices:alert", n: !state && fresh.length ? String(fresh.length) : null }),
     none ? hcNone(state || "새 알림이 없어요") : hcNotices(fresh, "alert"));
 }
@@ -192,6 +195,7 @@ function homeMonitorCard() {
 }
 
 let homeBoard = null;
+let homeEdit = false;   // a card is being moved (07-board.js opts.onEdit): the cards that are hidden while empty show, so one can be placed too
 // Every card is as tall as its content (07-board.js fit): only the width is sized, half of the 12 columns by default so the cards make the prototype's two-column grid.
 const HOME_FIT = { fit: true, min: { w: 6, h: 1 }, max: { w: 12, h: 1 } };
 // Kinds of home items that can be bundled into one card (title, view the card opens); the bundled kinds are kept per browser.
@@ -246,7 +250,8 @@ function askOf(t) {
 }
 // A row's preview is the conversation's state said in Korean (the run line above the composer, 41-runstate.js), not its last message.
 const homeRunLine = t => { const r = S && S.runs && S.runs[t === MAIN ? "main" : t]; return r ? runText(r) : ""; };
-function homeNowRow(t, label, tone, head) {
+// end: the right end of the row. Not given: the state word. A text: a time (the dot says the state; the aria-label keeps the word). "": nothing.
+function homeNowRow(t, label, tone, head, end) {
   const i = targetInfo(t), st = tone === "att" ? "warn" : targetState(t)[1], subs = SUBS[sourceOf(t)] || [], done = subs.filter(s => s.status !== "running").length;
   const lane = isLaneT(t) && S ? S.lanes.find(x => x.name === laneOf(t)) : null;
   if (lane && !homeRunLine(t)) laneLastFetch(lane.name);
@@ -254,36 +259,58 @@ function homeNowRow(t, label, tone, head) {
   const line = (tone === "att" && i.ask && friendlyLine(i.ask.text)) || homeRunLine(t) || nowLine(t) || modelChipText(String(liveModel(t).sel || "").split(":")[0]) || targetState(t)[0];
   // A session moved to a fallback model says so on its row (the board has no session card): the model it runs now and why.
   const lv = lane ? liveModel(t) : null, extra = lv && lv.fallback ? el("span", { class: "smodel" }, selText(lv.sel), fbTag(lv.fallback, lv.conf)) : null;
-  if (lane) return sessionRow(lane, { line, extra, head, ...(tone === "att" ? { word: label, tone: "warn" } : {}) });   // a session: title, project, status, one tap to its chat
-  return el("button", { class: "hr", type: "button", onclick: () => openTarget(t, lastChatView()), "aria-label": `${targetName(t)} · ${label}` },
+  // a session: title, project, status, one tap to its chat
+  const row = lane ? sessionRow(lane, { line, extra, head, ...(tone === "att" ? { word: label, tone: "warn" } : {}) }) : el("button", { class: "hr", type: "button", onclick: () => openTarget(t, lastChatView()), "aria-label": `${targetName(t)} · ${label}` },
     el("span", { class: `dot ${st}` }),
     el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: targetName(t) })), el("span", { class: "ha", text: line })),
     subs.length ? el("span", { class: "hp", title: "서브에이전트 끝난 수 / 전체", text: `서브에이전트 ${done}/${subs.length}` }) : null,
     el("span", { class: `hs ${st}`, text: label }));
+  return end === undefined ? row : homeEnd(row, end);
 }
+function homeEnd(row, time) {
+  const hs = row.querySelector(":scope > .hs");
+  if (hs && time) hs.replaceWith(el("span", { class: "hs", text: time })); else if (hs) hs.remove();
+  return row;
+}
+// How long a running conversation has run, and how long ago a finished one ended (the gateway's clock, 06-subagents.js workNow).
+function homeSince(t) {
+  const r = runOf(t), s = r && (r.kind === "working" || r.kind === "waiting") && r.since ? runSince(r.since) : "";
+  return s === "방금" ? "방금 시작" : s ? `${s}째` : "";
+}
+function homeAgo(at) {
+  const m = workMin(workNow() - at);
+  return m < 1 ? "방금" : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`;
+}
+const homeDoneAgo = t => { const r = runOf(t), at = r && Date.parse(r.since || ""); return at ? homeAgo(at) : ""; };
 // An app conversation with a session of its own (a mail, a project channel, an app's settings: /api/state `convs`) runs apart from the
 // assistant, so while its turn or its worker runs it is a row here: its title (the mail's subject, the app or project name), what it
 // does now (its run line: the tool-call intent or plan task, elapsed), one tap to that conversation in its app view (go: a mail opens in 모니터링).
 const convWebT = t => t === "web:alert" ? "alert" : t === "web:worklog" ? "worklog" : t;
 const convRunning = c => { const r = runOf(c.target); return !!r && (r.kind === "working" || runBusy(c.target)); };
 function homeConvRow(c) {
-  const t = convWebT(c.target), r = runOf(c.target), name = c.name || targetName(t), state = r.kind === "working" ? "작업 중" : "진행 중";
+  const t = convWebT(c.target), r = runOf(c.target), name = c.name || targetName(t), state = r.kind === "working" ? "작업 중" : "진행 중", end = homeSince(c.target);
   return el("button", { class: "hr", type: "button", "data-t": t, onclick: () => go("chat", t), "aria-label": `${name} · ${state} · 대화 열기` },
     el("span", { class: "dot pri" }),
     el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: name })), el("span", { class: "ha", text: runText(r) })),
-    el("span", { class: "hs pri", text: state }));
+    end ? el("span", { class: "hs", text: end }) : null);
 }
-// 미답장 (hub/unreplied.ts): the apps whose items still wait for the owner's reply, each one row, apart from the read/unread counts.
-function homeOwedRow(it) {
-  return el("button", { class: "hr", type: "button", onclick: () => go("monitoring", it.key), "aria-label": `${it.name} · 미답장 ${it.unreplied}건` },
-    el("span", { class: "dot unreplied" }), el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: it.name })), el("span", { class: "ha", text: "답장을 기다리는 것이 있어요" })),
-    unrepCount(it.unreplied));
+// The two rows of 답변 필요 for what the apps hold: a title, the count per source under it (most first, none with 0) and the total as a badge at the right.
+function homeCountRow(k, title, by, n, open) {
+  const sub = [...by].filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1]).map(([name, c]) => `${name} ${c}`).join(" · ");
+  return el("button", { class: "hr", type: "button", "data-k": k, onclick: open, "aria-label": `${title} · ${n}건` },
+    el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: title })), el("span", { class: "ha", text: sub })),
+    el("span", { class: "nb unreplied", "aria-hidden": "true", text: n > 99 ? "99+" : String(n) }));
 }
-// 답장 대기: what waits on the owner in the apps (a draft to send or a failed send, of every computer), one row that opens the screen (30-replies.js).
-function homeRepliesRow(n) {
-  return el("button", { class: "hr", type: "button", "data-k": "replies", onclick: () => rqOpen(), "aria-label": `답장 대기 ${n}건` },
-    el("span", { class: "dot att" }), el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: "답장 대기" })), el("span", { class: "ha", text: "확인할 답장이 있어요" })),
-    el("span", { class: "hs warn", text: `${n}건` }));
+// 미답장 (hub/unreplied.ts): the comments the owner has not answered, per app; a tap opens the app when it is the only source, else 모니터링.
+function homeOwedRow(owed) {
+  const by = new Map(owed.map(it => [it.name, it.unreplied]));
+  return homeCountRow("owed", "답 안 한 댓글", by, owed.reduce((c, it) => c + it.unreplied, 0), () => go("monitoring", owed.length === 1 ? owed[0].key : undefined));
+}
+// 답장 대기: the drafts that wait for the owner's check (a draft to send or a failed send, of every computer; rqRows, 30-replies.js), per source; a tap opens the screen.
+function homeRepliesRow(rows) {
+  const by = new Map();
+  for (const r of rows) { const k = r.app || "기타"; by.set(k, (by.get(k) || 0) + 1); }
+  return homeCountRow("replies", "답장 초안 확인", by, rows.length, () => rqOpen());
 }
 // 할일 (/api/state `waitlist`, hub/waitlist.ts): what was received but has not started, oldest first. A row is its place in line and a plain title;
 // work deferred to the usage-limit reset also says when it resumes (resume_at). It leaves by itself once the work starts.
@@ -371,7 +398,7 @@ function resultHide(b) {
   b.setAttribute("aria-expanded", "false");
   homeResOpen = "";
 }
-/* The prototype's home (site/prototype/s-work.js): a full-width column of the greeting, the one alert row and 답변 필요, then the
+/* The prototype's home (site/prototype/s-work.js): a full-width column of the greeting and 답변 필요, then the
    two-column card grid. Every card keeps the product's data, links and empty states; the board (07-board.js) still moves and sizes them. */
 const homeGreetWord = () => { const h = new Date().getHours(); return h < 5 ? "편안한 밤이에요" : h < 12 ? "좋은 아침이에요" : h < 18 ? "좋은 오후예요" : "좋은 저녁이에요"; };
 // What runs on this computer now: the rows of 지금 진행 중 and the greeting's word both read this, so they cannot disagree. ask: nothing may run while a
@@ -418,21 +445,6 @@ function homeGreeting(h) {
     el("div", { class: "meta", text: line }),
     live.fallback ? el("div", { class: "hgreet-fb" }, fbTag(live.fallback, live.conf)) : null, subLine("orchestrator"));
 }
-// The one row above the cards: a login that dropped (the prototype's 경고 strip), else the newest unread alert notice.
-function homeStrip() {
-  const down = (typeof INTG !== "undefined" ? INTG.items : []).find(i => i.state === "disconnected");
-  if (down) return homeStripRow(`${down.label || "앱"} 로그인이 풀렸어요`, "경고 · 다시 로그인해야 이어서 볼 수 있어요", "경고", "err", () => go("monitoring", `i:${down.key}`));
-  const n = (typeof NT !== "undefined" ? NT.items : []).filter(x => x.id && !x.read && ntHomeAlert(x) && x.cls === "alert").sort((a, b) => ntAt(b) - ntAt(a))[0];
-  if (!n) return null;
-  const fail = n.tone === "fail";
-  return homeStripRow(hcLine(n), ntWhen(n), fail ? "경고" : "알림", fail ? "err" : "", () => noticeOpen(n));
-}
-function homeStripRow(title, sup, tag, tone, open) {
-  return el("button", { class: "li hstrip", type: "button", onclick: open },
-    el("span", { class: "lead" }, el("span", { class: `dot ${tone}` })),
-    el("span", { class: "tx" }, el("span", { class: "hd", text: title }), el("span", { class: "sup", text: sup })),
-    el("span", { class: "end" }, el("span", { class: `tag ${tone}`, text: tag }), icon("chev", "chev")));
-}
 // While no model account is connected the bot cannot answer: one line and one button to the settings accounts screen, on 홈 and in the empty chat.
 // It waits for the first read of /api/providers (P), so it never flashes while the list loads.
 function acctConnectRow() {
@@ -446,26 +458,26 @@ function renderHomeNow() {
   if (!now || !box) return;
   const kept = capPlaces(), needs = nyList(), crit = needs.filter(x => x.crit).length;   // 09-needs-you.js: what only the owner can do, critical first
   // 홈 is this computer's alone (owner 2026-10-31): the other computers' items live in 모니터링, and the computer chip's dot says they want something.
-  const owed = monItems().filter(i => i.app && i.unreplied && !i.pc), owedN = owed.reduce((c, i) => c + i.unreplied, 0), drafts = rqWaiting();
-  const waiting = needs.length;
+  // A login that dropped is the first row of 답변 필요 card, the notice itself is left out of 알림 (taken); the drafts and the unanswered comments close the list as one row each.
+  const logins = nyLogins(), taken = new Set(logins.map(x => x.id));
+  const owed = monItems().filter(i => i.app && i.unreplied && !i.pc), drafts = rqRows().filter(r => r.state !== "sent");
+  const list = nyListNode(needs, logins.map(x => x.node), [...(drafts.length ? [homeRepliesRow(drafts)] : []), ...(owed.length ? [homeOwedRow(owed)] : [])]);
+  const waiting = list.querySelectorAll(":scope > .hr").length;
   // Four groups, and an item sits in exactly one (the table in docs/ui-spec.md): 할일 was received and has not started; 지금 진행 중 runs now (a turn, a
   // background worker); 대기 중 started and stopped; 최근 끝난 작업 ended within the hour (실패 · 이유 · 다시 맡기기). A session resting with nothing left is in none.
   // A session the run line calls busy (41-runstate.js runBusy: waiting on its own worker) runs too, so its 진행 중 label sits in this section, and one waiting on the owner stays on top of it.
   const h = homeRunning(), { all, runT, waitT, convWork, runW, n: working } = h, restT = all.filter(t => !runT.includes(t) && !waitT.includes(t));
   const settled = hcSettled(), bg = [...runW, ...settled], over = workEnded().filter(w => !settled.includes(w)), todo = (S && S.waitlist) || [];
   const heldT = restT.filter(homeHeld), heldW = over.filter(homeWorkHeld), ended = over.filter(w => !homeWorkHeld(w)), doneT = restT.filter(t => !heldT.includes(t) && homeLaneDone(t));
-  const restRow = t => homeNowRow(t, targetState(t)[0], ""), doneRow = t => withResults(restRow(t), resultChips(laneResult(t)), `t:${t}`);
-  // Above the grid, the prototype's full-width column: the greeting, the one alert row and 답변 필요. The replies the owner owes stay in
-  // that card under its list, as the prototype's 답변 필요 rows do; each row still opens its own item.
-  const running = el("div", { class: "hn", "data-k": "running", "data-cap": "running" }, ...waitT.map(t => homeNowRow(t, SESSION_WORD.wait[0], "att", true)), ...runT.map(t => homeNowRow(t, targetState(t)[0], "", true)), ...convWork.map(x => x.conv ? workRow(x) : homeConvRow(x)), ...bg.map(workRow),
+  const restRow = t => homeNowRow(t, targetState(t)[0], ""), doneRow = t => withResults(homeNowRow(t, targetState(t)[0], "", undefined, homeDoneAgo(t)), resultChips(laneResult(t)), `t:${t}`);
+  // Above the grid, the prototype's full-width column: the greeting and 답변 필요. The replies the owner owes are the last two rows of that
+  // card (the drafts to check, the comments not answered), each with a count per source; every row still opens its own item.
+  const running = el("div", { class: "hn", "data-k": "running", "data-cap": "running" }, ...waitT.map(t => homeNowRow(t, SESSION_WORD.wait[0], "att", true)), ...runT.map(t => homeNowRow(t, targetState(t)[0], "", true, homeSince(t))), ...convWork.map(x => x.conv ? workRow(x) : homeConvRow(x)), ...bg.map(workRow),
     ...(working || waitT.length || bg.length ? [] : [hcNone(S && S.seeded ? "불러오는 중…" : "진행 중인 작업이 없어요")]));
-  const owedBlock = owed.length || drafts ? [
-    el("div", { class: "hn-h hsub" }, el("h2", { text: "답장" }), owedN ? unrepCount(owedN) : null),
-    el("div", { class: "hn", "data-k": "replies", "data-cap": "replies" }, ...(drafts ? [homeRepliesRow(drafts)] : []), ...owed.map(homeOwedRow))] : [];
-  clear(now).append(homeGreeting(h), ...[acctConnectRow(), homeStrip()].filter(Boolean),
+  clear(now).append(homeGreeting(h), ...[acctConnectRow()].filter(Boolean),
     el("div", { class: "hneeds" },
       el("div", { class: "hn-h hneeds-h" }, el("h2", { text: "답변 필요" }), waiting ? el("span", { class: "sup", text: `${waiting}` }) : null, crit ? el("span", { class: "tag warn", text: `중요 ${crit}` }) : null),
-      nyListNode(needs), ...owedBlock));
+      list));
   for (const w of settled) { const s = HC_SETTLE.get(w.id), row = s && !s.swapped ? now.querySelector(`[data-work="${CSS.escape(w.id)}"]`) : null; if (row) { s.swapped = true; motionSwap(row, () => {}); } }
   if (S && NT.loaded && HOME_READY) {
     const rows = [...now.querySelectorAll(".hr")], keys = rows.map(r => `${(r.closest(".hn") || {}).dataset?.k || ""}|${r.dataset.t || r.dataset.wait || r.dataset.work || r.dataset.mon || r.dataset.id || r.dataset.k || (r.querySelector(".nm") || {}).textContent || ""}`);
@@ -479,9 +491,14 @@ function renderHomeNow() {
   if (!homeBoard || (openMenu && box.contains(openMenu.anchor))) { capLists($("#v-home"), kept); return; }   // a ⋯ menu is open: repaint after it closes
   const items = [], seen = new Set();
   const add = (id, node) => { if (!seen.has(id)) { seen.add(id); items.push({ id, node, head: ".ch", def: { w: 6, h: 1 }, ...HOME_FIT }); } };
-  add("now:todo", el("div", { class: "card" }, hcHead("할일", { n: todo.length ? `${todo.length}개` : null }), el("div", { class: "hn", "data-k": "todo", "data-cap": "todo" }, ...todo.map(homeTodoRow), ...(todo.length ? [] : [hcNone("아직 시작 전인 일이 없어요")]))));
-  items[0].pin = true;
-  add("notices:alert", homeAlertCard());
+  // 할일 is drawn while it has rows, while it loads, and while a card is moved; it stays first (pin).
+  const todoLoaded = !!S && !S.seeded;
+  if (todo.length || !todoLoaded || homeEdit) {
+    add("now:todo", el("div", { class: "card" }, hcHead("할일", { n: todo.length ? `${todo.length}개` : null }), el("div", { class: "hn", "data-k": "todo", "data-cap": "todo" }, ...todo.map(homeTodoRow), ...(todo.length ? [] : [hcNone(todoLoaded ? "아직 시작 전인 일이 없어요" : "불러오는 중…")]))));
+    items[0].pin = true;
+  }
+  const alertCard = homeAlertCard(taken);
+  if (alertCard) add("notices:alert", alertCard);
   add("now:running", el("div", { class: "card" }, hcHead("지금 진행 중", { n: working ? `${working}개 작업 중` : null }), running));
   if (heldT.length || heldW.length) add("now:waiting", el("div", { class: "card" }, hcHead("대기 중"), el("div", { class: "hn", "data-k": "waiting", "data-cap": "waiting" }, ...heldT.map(restRow), ...heldW.map(workRow))));
   if (ended.length || doneT.length) add("now:ended", el("div", { class: "card" }, hcHead("최근 끝난 작업"), el("div", { class: "hn", "data-k": "ended-work", "data-cap": "ended-work" }, ...doneT.map(doneRow), ...ended.map(workRow))));
@@ -543,7 +560,7 @@ function renderHome() {
   const box = $("#home-cards");   // not id="home": the address #home would scroll the page down to that element, not to the top
   if (!box || current !== "home") return;
   $("#title").textContent = titles.home;
-  if (!homeBoard) homeBoard = makeBoard(box, "home", { px: true, rows: true, actions: [{ label: "카드 추가", run: () => window.dotzCustom && dotzCustom.add() }], onReset: () => { if (window.dotzCustom) dotzCustom.unhide(); setTimeout(renderHome, 0); } });
+  if (!homeBoard) homeBoard = makeBoard(box, "home", { px: true, rows: true, onEdit: on => { homeEdit = on; renderHomeNow(); }, actions: [{ label: "카드 추가", run: () => window.dotzCustom && dotzCustom.add() }], onReset: () => { if (window.dotzCustom) dotzCustom.unhide(); setTimeout(renderHome, 0); } });
   renderHomeNow();
   window.dotzCustom && dotzCustom.home();
 }
@@ -639,12 +656,14 @@ function workRow(w) {
   // stalled: OmO still says running but the worker stopped working (hub/bgwork.ts); its session was woken to take it over.
   const run = w.status === "running", done = w.status === "done", rec = workRecovering(w), stall = w.status === "stalled", tone = workTone(w);
   const state = run ? "작업 중" : stall ? "멈춤" : done ? "완료" : w.cancelled ? "중단됨" : rec ? "이어서 처리 중" : "실패";
-  const line = run ? [workElapsed(w), w.model].filter(Boolean).join(" · ") : stall ? `${w.reason || "활동이 없어요"} · ${workAgo(w)}` : done ? `끝남 · ${workAgo(w)}` : `${workFailText(w)} · ${workAgo(w)}`;
+  // The right end of a running or finished row is a time (the dot and the aria-label say the state); a stopped or failed one keeps its word.
+  const line = run || done ? w.model || "" : stall ? `${w.reason || "활동이 없어요"} · ${workAgo(w)}` : `${workFailText(w)} · ${workAgo(w)}`;
+  const end = run ? workElapsed(w) : done ? workAgo(w) : state;
   const act = w.cancelled ? ["다시 맡기기", b => workRetry(w.id, b)] : null;
   const m = el("button", { class: "hrx-m", type: "button", onclick: () => workGo(w), "aria-label": `${w.description} · ${state} · ${run || stall || rec ? "대화로 가기" : "결과 보기"}` },
     el("span", { class: `dot ${tone}` }),
     el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: w.description })), el("span", { class: "ha", text: line })),
-    el("span", { class: `hs ${tone}`, text: state }));
+    el("span", { class: run || done ? "hs" : `hs ${tone}`, text: end }));
   const row = el("div", { class: "hr hrx", "data-work": w.id }, m,
     act ? el("button", { class: "btn text", type: "button", style: "flex:none;margin-right:var(--sp-2)", "data-act": "retry", onclick: ev => act[1](ev.currentTarget), text: act[0] }) : null);
   return done ? markerFirst(row, m, resultMarker(`w:${w.id}`, resultChips(w))) : row;

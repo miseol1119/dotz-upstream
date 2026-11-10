@@ -99,7 +99,7 @@ body { display: flow-root; }
 
 
 /* ---------- 홈: the prototype's layout (site/prototype/s-work.js home, proto.css .view / .col / .grid2 / .card) ----------
-   One full-width column on top (greeting, alert row, 답변 필요) and the card grid below it (two cards to a row from 720px,
+   One full-width column on top (greeting, 답변 필요) and the card grid below it (two cards to a row from 720px,
    one below). The grid is the home board (07-board.js), so the cards still drag and resize; the card sizes are the prototype's. */
 #v-home { display: flex; flex-direction: column; gap: var(--sp-3); padding: var(--sp-2) var(--sp-6) var(--sp-10); }
 #home-now { display: flex; flex-direction: column; gap: var(--sp-3); order: 1; }
@@ -122,23 +122,22 @@ body { display: flow-root; }
 .hstrip { min-height: 48px; background: var(--card); border-radius: var(--r-card); }
 .hstrip .tx { display: flex; flex-direction: column; gap: var(--sp-05); }
 @media (hover: hover) { .hstrip:hover { background: var(--card-hover); } }
-.hstrip .sup { color: var(--fg-2); }
 .hstrip .end { flex: none; display: flex; align-items: center; }
 
-/* 답변 필요: the prototype's full-width card, its count an orange badge after the title, 답장 대기 a quieter second list in it */
+/* 답변 필요: the prototype's full-width card, its count an orange badge after the title; every row (a login, a question, the drafts, the comments) starts on one left line */
 .hneeds { display: flex; flex-direction: column; min-width: 0; }
 .hneeds .hn-h { margin-top: 0; padding: var(--sp-4) var(--sp-5) var(--sp-1); }
 .hneeds .hn-h h2 { order: 0; font: 600 16px/22px var(--font); letter-spacing: -.01em; }
 .hneeds .hn-h .sup { order: 1; margin-left: 0; min-width: 18px; height: 18px; padding: 0 var(--sp-15); border-radius: 9px; background: var(--warn); color: var(--bg); font: 600 11px/18px var(--font); text-align: center; }
 .hneeds .hn-h .tag { order: 2; }
 .hneeds .hn { border-radius: 0 0 var(--r-card) var(--r-card); }
-.hneeds .hn:has(+ .hn-h) { border-radius: 0; padding-bottom: var(--sp-1); }
 /* nothing to answer: the same box as an empty grid card (20px around, the state line 8px under the title) */
 .hneeds:has(> .hn > .hc-none) > .hn-h:first-child { padding: var(--sp-5) var(--sp-5) 0; }
 .hneeds .hn:has(> .hc-none) { padding: 0 var(--sp-5) var(--sp-5); }
-.hneeds .hn-h.hsub { padding: var(--sp-3) var(--sp-5) var(--sp-1); border-top: 1px solid var(--line); border-radius: 0; }
-.hneeds .hn-h.hsub h2 { font: 600 13px/18px var(--font); color: var(--fg-2); }
 .hneeds .hn > .hr { padding-left: var(--sp-5); padding-right: var(--sp-5); }
+.hneeds .hn > .hr.hrx { padding-left: 0; padding-right: 0; }
+.hneeds .hn > .hr.hrx > .hrx-m { padding-left: var(--sp-5); }
+.hneeds .hn > .hr.hrx > .hrx-m:last-child { padding-right: var(--sp-5); }
 
 /* the grid cards keep the prototype's card box: 20px padding, the header 8px above its list, rows to the card's edge; a row is as tall
    as its taller card (07-board.js rows mode) but each card is as tall as its content, so an empty card beside a long one leaves no blank

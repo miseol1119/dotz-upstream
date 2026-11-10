@@ -159,10 +159,9 @@ describe("홈 cards at 1100px", () => {
 		const same = JSON.parse((await view.evaluate(`JSON.stringify((() => {
 			const s = sel => getComputedStyle(document.querySelector(sel));
 			const pick = c => [c.paddingTop, c.paddingLeft, c.borderRadius, c.fontSize, c.color];
-			return [pick(s('.bi[data-id="custom:memo"] .card')), pick(s('.bi[data-id="notices:alert"] .card')), pick(s('.bi[data-id="notices:worklog"] .card'))];
+			return [pick(s('.bi[data-id="custom:memo"] .card')), pick(s('.bi[data-id="notices:worklog"] .card'))];   // 알림 is not drawn while it is empty
 		})())`)) as string) as string[][];
 		expect(same[0]).toEqual(same[1]);
-		expect(same[0]).toEqual(same[2]);
 		// a status card with nothing to list is its head and one state line: the head's body gap is gone, so the line sits 8px under it
 		const emptyCard = JSON.parse((await view.evaluate(`JSON.stringify((() => {
 			const box = document.querySelector('.bi[data-id="notices:worklog"]'), head = box.querySelector(".ch").getBoundingClientRect(), line = box.querySelector(".card > .hc-none").getBoundingClientRect();

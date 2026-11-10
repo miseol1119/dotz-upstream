@@ -73,8 +73,64 @@ test("a background task has one colour on every list", async () => {
 test("an empty list's one line is not clipped by the list's rounded corner and starts under the head", async () => {
 	await greet({});
 	const got = JSON.parse(await view.evaluate(`JSON.stringify([...document.querySelectorAll('#v-home .hn:has(> .hc-none)')].map(l => ({ k: l.dataset.k, overflow: getComputedStyle(l).overflow, off: l.querySelector('.hc-none').getBoundingClientRect().left - l.closest('.card, .hneeds').querySelector('.ch, h2').getBoundingClientRect().left })))`) as string) as { k: string; overflow: string; off: number }[];
-	expect(got.map(l => l.k).sort()).toEqual(["needs", "running", "todo"]);
+	// 할일 and 알림 have nothing to say, so their cards are not drawn; 답변 필요 and 지금 진행 중 keep their one line
+	expect(got.map(l => l.k).sort()).toEqual(["needs", "running"]);
 	for (const l of got) expect(l).toMatchObject({ overflow: "visible", off: 0 });
+});
+
+const cards = async () => JSON.parse(await view.evaluate(`JSON.stringify([...document.querySelectorAll("#home-cards .bi")].map(b => b.dataset.id))`) as string) as string[];
+
+test("a loaded, empty 할일 and 알림 are not in the page; a card that is still loading or failed, and every card while one is moved, are", async () => {
+	await greet({});
+	expect(await cards()).not.toContain("now:todo");
+	expect(await cards()).not.toContain("notices:alert");
+	expect(await cards()).toContain("now:running");
+	await view.evaluate(`(() => { homeEdit = true; renderHomeNow(); })()`);
+	expect(await cards()).toEqual(expect.arrayContaining(["now:todo", "notices:alert"]));
+	await view.evaluate(`(() => { homeEdit = false; S.seeded = true; renderHomeNow(); })()`);
+	expect(await cards()).toContain("now:todo");
+	await view.evaluate(`(() => { S.seeded = false; NT.loaded = false; NT.failed = true; renderHomeNow(); })()`);
+	expect(await cards()).toContain("notices:alert");
+	expect(await view.evaluate(`document.querySelector('.bi[data-id="notices:alert"] .hc-none').textContent`)).toBe("불러오지 못했어요");
+	await view.evaluate(`(() => { NT.loaded = true; NT.failed = false; renderHomeNow(); })()`);
+	expect(await cards()).not.toContain("notices:alert");
+});
+
+test("a login that dropped is the first row of 답변 필요 once: no strip above, no dot, the word 다시 로그인, and not again in 알림", async () => {
+	await greet({});
+	await view.evaluate(`(() => { const ts = new Date().toISOString(); NT.items = [
+		{ id: "login1", kind: "alert", cls: "alert", tone: "fail", waits: "login", title: "인스타그램 로그인이 풀렸어요", text: "인스타그램 로그인이 풀렸어요", ts },
+		{ id: "news1", kind: "alert", cls: "alert", title: "새 소식", text: "새 소식", ts }]; renderHomeNow(); })()`);
+	const got = JSON.parse(await view.evaluate(`(() => { const l = document.querySelector('#v-home [data-k="needs"]'), r = l.firstElementChild;
+		return JSON.stringify({ strip: [...document.querySelectorAll(".hstrip")].some(e => e.textContent.includes("로그인이 풀렸어요")), nm: r.querySelector(".nm").textContent, ha: r.querySelector(".ha").textContent, hs: r.querySelector(".hs").textContent, dots: l.querySelectorAll(".dot").length,
+			once: (document.querySelector("#v-home").textContent.match(/로그인이 풀렸어요/g) || []).length, sup: document.querySelector("#home-now .hneeds-h .sup").textContent,
+			alert: [...document.querySelectorAll('.bi[data-id="notices:alert"] .hc-row')].map(e => e.textContent) }); })()`) as string);
+	expect(got).toMatchObject({ strip: false, nm: "인스타그램 로그인이 풀렸어요", hs: "다시 로그인", dots: 0, once: 1, sup: "1" });
+	expect(got.ha.startsWith("인스타그램 · ")).toBe(true);
+	expect(got.alert).toHaveLength(1);
+	expect(got.alert[0]).toContain("새 소식");
+	// read but still waiting on the login (the hub's waits): the row stays until the login is back
+	await view.evaluate(`(NT.items[0].read = true, renderHomeNow(), 0)`);
+	expect(await view.evaluate(`document.querySelector('#v-home [data-k="needs"]').firstElementChild.querySelector(".hs").textContent`)).toBe("다시 로그인");
+	await view.evaluate(`(NT.items = [], renderHomeNow(), 0)`);
+});
+
+test("the drafts to check and the comments not answered are two closing rows of 답변 필요, each with its count per source; a count of 0 is no row", async () => {
+	await greet({});
+	const set = (drafts: object[], owed: object[]) => view.evaluate(`(() => { window.keep ||= [rqRows, monItems]; rqRows = () => ${JSON.stringify(drafts)}; monItems = () => ${JSON.stringify(owed)}; renderHomeNow(); })()`);
+	try {
+	await set([{ app: "메일", state: "open" }, { app: "유튜브", state: "open" }], [{ app: true, key: "yt", name: "유튜브", unreplied: 5 }, { app: true, key: "ig", name: "인스타그램", unreplied: 3 }, { app: true, key: "web", name: "웹사이트", unreplied: 1 }]);
+	const rowOf = (k: string) => view.evaluate(`(r => [r.querySelector(".nm").textContent, r.querySelector(".ha").textContent, r.querySelector(".nb").textContent])(document.querySelector('#v-home .hr[data-k="${k}"]'))`);
+	expect(await rowOf("replies")).toEqual(["답장 초안 확인", "메일 1 · 유튜브 1", "2"]);
+	expect(await rowOf("owed")).toEqual(["답 안 한 댓글", "유튜브 5 · 인스타그램 3 · 웹사이트 1", "9"]);
+	expect(await view.evaluate(`[...document.querySelector('#v-home [data-k="needs"]').children].map(r => r.dataset.k).join()`)).toBe("replies,owed");
+	expect(await view.evaluate(`document.querySelector("#home-now .hneeds-h .sup").textContent`)).toBe("2");
+	expect(await view.evaluate(`!!document.querySelector("#v-home .hn-h.hsub")`)).toBe(false);
+	await set([], []);
+	expect(await view.evaluate(`document.querySelectorAll('#v-home .hr[data-k="replies"], #v-home .hr[data-k="owed"]').length`)).toBe(0);
+	} finally {
+		await view.evaluate(`([rqRows, monItems] = window.keep, renderHomeNow(), 0)`);
+	}
 });
 
 test("지금 진행 중 stops at six rows, scrolls inside its card and keeps its place across a refresh", async () => {
@@ -105,7 +161,7 @@ const fill = (n: number) => view.evaluate(`(n => {
 	P = { providers: ids.map(i => ({ id: "g" + i, name: "공급자 " + i, auth: "api_key" })) };
 	renderHomeNow();
 })(${n})`);
-const LISTS = ["needs", "replies", "todo", "running", "waiting", "ended-work", "alert", "worklog", "watch", "group:limit", "group:ctx", "group:prov"];
+const LISTS = ["needs", "todo", "running", "waiting", "ended-work", "alert", "worklog", "watch", "group:limit", "group:ctx", "group:prov"];
 const cap = (key: string) => view.evaluate(`(l => JSON.stringify(l && { n: l.children.length, client: l.clientHeight, scroll: l.scrollHeight, six: l.children[5] ? l.children[5].offsetTop + l.children[5].offsetHeight : 0, y: getComputedStyle(l).overflowY, bar: getComputedStyle(l).scrollbarWidth, fade: getComputedStyle(l).maskImage.includes("linear-gradient"), over: getComputedStyle(l).overscrollBehaviorY, card: l.closest(".card, .hneeds").offsetHeight, inCard: !!l.closest("#v-home") }))(document.querySelector('#v-home [data-cap="${key}"]'))`).then(s => JSON.parse(s as string)) as Promise<{ n: number; client: number; scroll: number; six: number; y: string; bar: string; over: string; card: number; inCard: boolean } | null>;
 
 test.each(LISTS)("%s holds every row, shows six and scrolls inside its card, and five rows stay as they are", async key => {

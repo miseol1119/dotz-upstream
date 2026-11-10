@@ -308,10 +308,8 @@ describe.each([[390, 844], [1280, 900]])("답장 대기 at %ipx", (width, height
 		const v = await boot(width, height);
 		await run(v, `go("home")`);
 		await waitFor(v, `document.querySelector('#home-now .hr[data-k="replies"]') && RQ.loaded`);
-		const home = await q<string>(v, `return document.querySelector('#home-now .hr[data-k="replies"]').textContent`);
-		expect(home).toContain("답장 대기");
-		expect(home).not.toContain("답장 확인");
-		expect(home).toContain("11건");
+		// one row for every draft that waits, its total the badge at the right
+		expect(await q<string[]>(v, `return [...document.querySelectorAll('#home-now .hr[data-k="replies"] .nb')].map(b => b.textContent)`)).toEqual(["11"]);
 		await run(v, `document.querySelector('#home-now .hr[data-k="replies"]').click()`);
 		await waitFor(v, `current === "monitoring" && MON.sel === "replies" && document.querySelectorAll("#mon-tl .rq-r.ask").length === 5`);
 		// an app's row opens the screen on that app's items of that computer

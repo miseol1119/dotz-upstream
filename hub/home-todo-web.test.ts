@@ -30,12 +30,13 @@ const paint = (s: { lanes?: Lane[]; work?: BgWork[]; runs?: object; deferred?: P
 const seen = async (title: string) => JSON.parse((await view.evaluate(`JSON.stringify({
 	groups: [...document.querySelectorAll("#v-home .hn")].filter(l => [...l.querySelectorAll(".nm")].some(n => n.textContent.includes(${JSON.stringify(title)}))).map(l => l.dataset.k),
 	first: [...document.querySelectorAll("#home-cards .bi")].sort((a, b) => a.style.order - b.style.order)[0].dataset.id,
-	todo: document.querySelector('#v-home [data-k="todo"]').textContent,
-})`)) as string) as { groups: string[]; first: string; todo: string };
+	cards: [...document.querySelectorAll("#home-cards .bi")].map(b => b.dataset.id),
+	todo: document.querySelector('#v-home [data-k="todo"]')?.textContent ?? null,
+})`)) as string) as { groups: string[]; first: string; cards: string[]; todo: string | null };
 
 const job = (more: Partial<BgWork>): BgWork => ({ id: "w1", description: "사진첩 고치기", status: "running", started_at: NOW - 1000, ...more });
 
-test("a worker is in one group at every step, and the 할일 card stays first and fixed", async () => {
+test("a worker is in one group at every step, and the 할일 card is first while it holds a row and is not drawn when empty", async () => {
 	await paint({ work: [job({ queued: true })] });
 	let s = await seen("사진첩 고치기");
 	expect(s.groups).toEqual(["todo"]);
@@ -45,13 +46,13 @@ test("a worker is in one group at every step, and the 할일 card stays first an
 	await paint({ work: [job({})] });
 	s = await seen("사진첩 고치기");
 	expect(s.groups).toEqual(["running"]);
-	expect(s.first).toBe("now:todo");
-	expect(s.todo).toContain("아직 시작 전인 일이 없어요");
+	expect(s.cards).not.toContain("now:todo");
+	expect(s.todo).toBeNull();
 
 	await paint({ work: [job({ status: "done", ended_at: NOW - 60_000 })] });
 	s = await seen("사진첩 고치기");
 	expect(s.groups).toEqual(["ended-work"]);
-	expect(s.first).toBe("now:todo");
+	expect(s.cards).not.toContain("now:todo");
 });
 
 test("a session is in one group at every step, and a finished one never reads as waiting", async () => {
@@ -108,8 +109,8 @@ test("a session whose only worker is queued is not running; its worker is the on
 
 test("at desktop width, cards appearing behind the pinned 할일 still pair up, two to a row", async () => {
 	await view.resize(1280, 900);
-	await paint({ work: [job({}), job({ id: "w2", status: "failed", cancelled: true, ended_at: NOW }), job({ id: "w3", status: "done", ended_at: NOW - 60_000 })] });
+	await paint({ work: [job({ id: "w4", queued: true }), job({}), job({ id: "w2", status: "failed", cancelled: true, ended_at: NOW }), job({ id: "w3", status: "done", ended_at: NOW - 60_000 })] });
 	const y = (id: string) => `document.querySelector("#home-cards .bi[data-id='${id}']")?.getBoundingClientRect().top`;
-	await waitFor(`${y("now:running")} === ${y("now:waiting")} && ${y("now:todo")} === ${y("notices:alert")}`);
+	await waitFor(`${y("now:todo")} !== undefined && ${y("now:todo")} === ${y("now:running")} && ${y("now:waiting")} === ${y("now:ended")}`);
 	await view.resize(390, 844);
 });

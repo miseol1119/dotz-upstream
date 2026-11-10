@@ -56,6 +56,8 @@ const waitFor = (expr: string, ms = 10_000) =>
 const q = async <T = unknown>(code: string): Promise<T> => JSON.parse((await view.evaluate(`JSON.stringify((() => { ${code} })())`)) as string) as T;
 const LIST = `document.querySelector('#home-now [data-k="needs"]')`;
 const rows = () => q<{ name: string; act: string; crit: boolean }[]>(`return [...${LIST}.children].filter(r => r.matches(".hr, .ntg, .srow, button, div") && r.querySelector(".hs, .sw, [data-k]")).filter(r => !r.matches('[data-k="ny-more"]')).map(r => ({ name: (r.querySelector(".nm") || r).textContent.trim(), act: (r.querySelector(".hs") || r.querySelector(".sw") || {}).textContent || "", crit: r.classList.contains("crit") }))`);
+// the asked rows only: the last row of the list is the drafts to check (data-k="replies"), counted apart
+const asked = async () => (await rows()).filter(x => x.name !== "답장 초안 확인");
 const boot = async (w: number, h: number) => {
 	await view.resize?.(w, h);
 	await view.evaluate(`(() => { try { localStorage.removeItem("dotz-ntf-done"); } catch {} })()`);
@@ -68,16 +70,19 @@ for (const [w, h] of [[390, 844], [1280, 900]] as const) {
 	describe(`답변 필요 at ${w}px`, () => {
 		test("one list, critical first and marked, each row says what to do; gateway-handled notices and rate limits are not asked", async () => {
 			await boot(w, h);
-			expect(await q(`return document.querySelector("#home-now .hn-h .sup").textContent`)).toBe("7");   // the 3 send approvals are 답장 대기's, not 답변 필요's
-			const r = await rows();
+			expect(await q(`return document.querySelector("#home-now .hn-h .sup").textContent`)).toBe("8");   // the number is the rows in the card: the 7 asked and the one row for the 3 send approvals
+			const r = await asked();
 			expect(r).toHaveLength(7);
 			expect(r.slice(0, 3).map(x => x.crit)).toEqual([true, true, true]);
 			expect(r.slice(3).every(x => !x.crit)).toBe(true);
 			expect(r.slice(0, 3).map(x => x.act)).toEqual(["로그인", "선택", "로그인"]);   // newest first within a rank
 			expect(r[3]!.act).toBe("선택");
 			expect(await q(`return ${LIST}.textContent`)).not.toContain("보내기 확인");
-			// the same 3 are the one 답장 대기 row of 홌
-			expect(await q(`return document.querySelector('#home-now .hr[data-k="replies"]').textContent`)).toContain("3건");
+			// the same 3 are the one 답장 초안 확인 row, the last of the list: the count per source under its title and the total at its right
+			expect(await q(`const r = document.querySelector('#home-now .hr[data-k="replies"]'); return [r === ${LIST}.lastElementChild, r.querySelector(".nm").textContent, r.querySelector(".ha").textContent, r.querySelector(".nb").textContent]`)).toEqual([true, "답장 초안 확인", "기타 3", "3"]);   // the fixture's drafts name no app, so they count under 기타
+			expect(await q(`return ${LIST}.querySelectorAll(":scope > .hr").length`)).toBe(8);
+			// no row of the card starts with a dot
+			expect(await q(`return ${LIST}.querySelectorAll(".dot").length`)).toBe(0);
 			expect(await q(`return ${LIST}.textContent`)).not.toContain("업데이트");
 			expect(await q(`return ${LIST}.textContent`)).not.toContain("한도 걸림");
 			expect(await q(`return document.querySelector("#home-now .hn-h .tag.warn").textContent`)).toBe("중요 3");
@@ -89,10 +94,10 @@ for (const [w, h] of [[390, 844], [1280, 900]] as const) {
 
 		test("a long list holds every row and scrolls past six; the count stays the item count", async () => {
 			expect(await q(`return getComputedStyle(${LIST}).overflowY`)).toBe("auto");
-			const r = await rows();
+			const r = await asked();
 			expect(r).toHaveLength(7);
 			expect(r.slice(-4).map(x => x.act)).toEqual(["선택", "답변", "답변", "답변"]);
-			expect(await q(`return document.querySelector("#home-now .hn-h .sup").textContent`)).toBe("7");
+			expect(await q(`return document.querySelector("#home-now .hn-h .sup").textContent`)).toBe("8");
 		});
 
 		test("the session questions waiting at page open are one toast with their count, and it opens 홈", async () => {

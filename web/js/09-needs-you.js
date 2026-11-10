@@ -189,25 +189,52 @@ function nyRows(items) {
     if (it.n && it.n.pc) for (const h of node.querySelectorAll(".hrx-m .hn1")) h.append(el("span", { class: "tag mon-pc", text: it.n.pc.name }));   // another computer's question names it
     for (const hs of node.querySelectorAll(".hrx-m .hs")) hs.textContent = it.act;
     for (const b of node.querySelectorAll(".hrx-m")) b.setAttribute("aria-label", b.getAttribute("aria-label").replace(/답변 필요$/, it.crit ? `중요 · ${it.act}` : it.act));
-    if (it.crit) { node.classList.add("crit"); if (it.n && it.n.tone === "fail") for (const e of node.querySelectorAll(".hs, .dot")) e.classList.add("err"); }   // a login stays orange; only a failure is red
-    return node;
+    if (it.crit) { node.classList.add("crit"); if (it.n && it.n.tone === "fail") for (const e of node.querySelectorAll(".hs")) e.classList.add("err"); }   // a login stays orange; only a failure is red
+    return nyBare(node);
   };
-  for (const it of items) out.push({ node: it.n ? mark(ntHomeRow(it.n), it) : it.m ? nyMonRow(it) : homeNowRow(it.t, it.act, "att"), count: 1 });
+  for (const it of items) out.push({ node: it.n ? mark(ntHomeRow(it.n), it) : it.m ? nyMonRow(it) : nyBare(homeNowRow(it.t, it.act, "att")), count: 1 });
   return out;
+}
+// The rows of 답변 필요 have no dot in front, so every title starts at the same left line.
+function nyBare(node) {
+  for (const d of node.querySelectorAll(":scope > .dot, :scope > .hrx-m > .dot")) d.remove();
+  return node;
+}
+// A login that dropped is the first row of 답변 필요, not a strip above it: the notice the hub says still waits on a login (waits, hub/notices-rules.ts;
+// id: the notice, which 알림 then leaves out), else an app whose login is gone. The word at the right opens what the strip used to open.
+// A notice the hub has not classed (the demo's fixtures) is told by its unread title.
+const NY_LOGIN_LOST = /로그인이 풀렸어요/;
+const nyLoginLost = n => n.waits === "login" || (!n.read && n.cls === "alert" && n.tone !== "done" && NY_LOGIN_LOST.test(`${n.title || ""}\n${n.text || ""}`));
+function nyLogins() {
+  const ns = NT.items.filter(n => n.id && !n.ignored && !n.dismissed && ntHomeAlert(n) && !ntNeeds(n) && nyLoginLost(n)).sort((a, b) => ntAt(b) - ntAt(a));
+  const out = ns.map(n => ({ id: n.id, node: nyLoginRow(n) }));
+  for (const i of typeof INTG !== "undefined" ? INTG.items : []) if (i.state === "disconnected" && !ns.some(n => i.label && hcLine(n).includes(i.label))) out.push({ id: `i:${i.key}`, node: nyDownRow(i) });
+  return out;
+}
+function nyLoginRow(n) {
+  const node = nyBare(ntHomeRow(n, "다시 로그인")), app = (/^(.*?)\s*로그인이 풀렸어요/.exec(hcLine(n)) || [])[1], ha = node.querySelector(".ha");
+  if (app && ha) ha.textContent = `${app} · ${ntWhen(n)}`;
+  return node;
+}
+function nyDownRow(i) {
+  const title = `${i.label || "앱"} 로그인이 풀렸어요`;
+  return el("div", { class: "hr hrx", "data-login": i.key },
+    el("button", { class: "hrx-m", type: "button", onclick: () => go("monitoring", `i:${i.key}`), "aria-label": `${title} · 다시 로그인` },
+      el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: title })), el("span", { class: "ha", text: "다시 로그인해야 이어서 볼 수 있어요" })),
+      el("span", { class: "hs warn", text: "다시 로그인" })));
 }
 // A monitor failing again and again: its name, the computer, how many times in a row; a tap opens it in 모니터링.
 function nyMonRow(it) {
   const m = it.m, who = it.pc ? it.pc.name : pqSelf(), title = monTitle(m);
   return el("button", { class: "hr", type: "button", "data-mon": it.key, onclick: () => go("monitoring", it.key), "aria-label": `${title} · ${it.act}` },
-    el("span", { class: "dot att" }),
     el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: title }), who ? el("span", { class: "tag mon-pc", text: who }) : null),
       el("span", { class: "ha", text: [`${m.fails}번 연속 실패했어요`, monClean(m.last_summary || "")].filter(Boolean).join(" · ") })),
     el("span", { class: "hs warn", text: it.act }));
 }
-// The list of the 홈 card: every row, six in sight (08-home.js capLists).
-function nyListNode(items) {
-  const rows = nyRows(items);
-  return el("div", { class: "hn", "data-k": "needs", "data-cap": "needs" }, ...rows.map(r => r.node), ...(rows.length ? [] : [hcNone("답변할 항목이 없어요")]));
+// The list of the 홈 card: every row, six in sight (08-home.js capLists). lead: the login rows above what is asked; tail: the rows that close it.
+function nyListNode(items, lead = [], tail = []) {
+  const rows = [...lead, ...nyRows(items).map(r => r.node), ...tail];
+  return el("div", { class: "hn", "data-k": "needs", "data-cap": "needs" }, ...rows, ...(rows.length ? [] : [hcNone("답변할 항목이 없어요")]));
 }
 function attnChanged() {
   renderBars();

@@ -76,7 +76,7 @@ describe("custom cards on 홈", () => {
 	test("the card is a board item with a grip, a drag handle and a ⋯ menu", async () => {
 		await boot();
 		expect(await view.evaluate(`!!document.querySelector('.bi[data-id="custom:kakao"] .brz.se') && !!document.querySelector('.bi[data-id="custom:kakao"] .ch.bhead') && !!document.querySelector('.bi[data-id="custom:kakao"] .ch .ib')`)).toBe(true);
-		const w = await width(), ref = (await view.evaluate(`document.querySelector('.bi[data-id="notices:alert"]').getBoundingClientRect().width`)) as number;
+		const w = await width(), ref = (await view.evaluate(`document.querySelector('.bi[data-id="notices:worklog"]').getBoundingClientRect().width`)) as number;
 		expect(w).toBeLessThan(500);
 		expect(Math.abs(w - ref)).toBeLessThan(2);
 	});

@@ -80,9 +80,14 @@ test("홈: 지금 진행 중 is only what runs; waiting rows say their state in 
 	expect(s["ended-work"]!.find(r => r.includes("빌드 고치기"))).toContain("실패 · 작업 폴더를 git 저장소로 읽지 못해 시작하지 못했어요");
 	expect(s["ended-work"]!.some(r => r.includes("이미 다룬 실패"))).toBe(false);
 	expect(await v.evaluate(`document.querySelector('#v-home [data-work="st_fail"] .dot').className`)).toBe("dot pri");
-	expect(s["ended-work"]!.find(r => r.includes("요약 쓰기"))).toContain("완료");
-	// The session is a row above, not also a card on the board.
-	await waitFor(v, `document.querySelector('#home-cards [data-id="notices:alert"]')`);
+	// A running or finished row ends in a time, not in a state word; the word stays in the aria-label (the dot says it to the eye).
+	expect(s["ended-work"]!.find(r => r.includes("요약 쓰기"))).not.toContain("완료");
+	expect(await v.evaluate(`document.querySelector('#v-home [data-work="st_done"] .hrx-m').getAttribute("aria-label")`)).toContain("완료");
+	expect(await v.evaluate(`document.querySelector('#v-home [data-work="st_run"] .hs').textContent`)).toMatch(/째$|^방금 시작$/);
+	expect(await v.evaluate(`document.querySelector('#v-home [data-work="st_run"] .hrx-m').getAttribute("aria-label")`)).toContain("작업 중");
+	// The session is a row above, not also a card on the board; 알림 and 할일 have nothing to say here, so neither card is drawn.
+	await waitFor(v, `document.querySelector('#home-cards [data-id="now:running"]')`);
+	expect(await v.evaluate(`!!document.querySelector('#home-cards [data-id="notices:alert"], #home-cards [data-id="now:todo"]')`)).toBe(false);
 	expect(await v.evaluate(`!!document.querySelector('#home-cards [data-id="lane:fix"], #home-cards [data-id="group:lane"]')`)).toBe(false);
 	expect(await v.evaluate(`document.querySelectorAll('#v-home [data-act="retry"]').length`)).toBe(1);
 	const p__api_workers_st_stop_retry = posted("/api/workers/st_stop/retry");
@@ -103,7 +108,8 @@ test("홈: a session the run line calls 진행 중 (waiting on its own worker) i
 		const s = await sections(v);
 		expect(s.running).toHaveLength(1);
 		expect(s.running![0]).toContain("알림 분류 업데이트 마무리");
-		expect(s.running![0]).toContain("진행 중");
+		expect(await v.evaluate(`document.querySelector('#v-home [data-t="lane:bgw"] .hs').textContent`)).toMatch(/째$|^방금 시작$/);
+		expect(await v.evaluate(`document.querySelector('#v-home [data-t="lane:bgw"]').getAttribute("aria-label")`)).toContain("진행 중");
 		expect(s.waiting).toBeUndefined();
 		expect(await v.evaluate(`document.querySelector('#v-home .card:has([data-k="running"]) .hc-n').textContent`)).toBe("1개 작업 중");
 	} finally {

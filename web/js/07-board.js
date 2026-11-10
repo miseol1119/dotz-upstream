@@ -70,6 +70,14 @@ function makeBoard(container, key, opts = {}) {
   // carry it across a data change (a card leaving collapses the two columns to one row and x would decide).
   let userOrder = rawStore && rawStore._g === "rows" && Array.isArray(rawStore._order) ? rawStore._order : null;
   const wraps = new Map(), fitH = new Map();
+  // opts.onEdit(on): a card is lifted or resized (on), then dropped (off). The owner's cards that are hidden while empty show for that time,
+  // so the board is rebuilt while the lift is still being set up (editing lets set and measure run with a card in hand).
+  let editing = false, edited = false;
+  function edit(on) {
+    if (!opts.onEdit || edited === on) return;
+    edited = on; editing = true;
+    try { opts.onEdit(on); } finally { editing = false; }
+  }
   const ph = el("div", { class: "bph", hidden: true });
   const bar = el("div", { class: "bbar" }, ...(opts.actions || []).map(a => el("button", { class: "btn text sm", type: "button", onclick: () => a.run() }, a.label)), el("button", { class: "btn text sm", type: "button", onclick: () => reset() }, "배치 초기화"));
   container.classList.add("board");
@@ -125,7 +133,7 @@ function makeBoard(container, key, opts = {}) {
   const shown = new Set();   // card ids already drawn: only a card that newly arrives rises in
   // The fit cards' heights are read from the page: each takes its content's height, then the cards below slide up (no transition) and are saved.
   function measure() {
-    if (!px || act || narrowMQ.matches) return;
+    if (!px || (act && !editing) || narrowMQ.matches) return;
     if (opts.rows) return measureRows();
     let changed = false;
     for (const r of lay) {
@@ -174,7 +182,7 @@ function makeBoard(container, key, opts = {}) {
   }
   const ro = px && typeof ResizeObserver === "function" ? new ResizeObserver(() => measure()) : null;
   function set(raw, keep = () => false) {
-    if (act) { pending = [raw, keep]; return; }
+    if (act && !editing) { pending = [raw, keep]; return; }
     raw0 = raw;
     const items = raw.map(norm);
     cur = items;
@@ -238,6 +246,8 @@ function makeBoard(container, key, opts = {}) {
     if (views.scrollTop !== before) track();
   }
   function begin() {
+    edit(true);
+    act.base = lay.map(x => ({ ...x })); act.r = lay.find(x => x.id === act.id);
     const wr = act.w.getBoundingClientRect();
     act.on = true; act.ox = act.x0 - wr.left; act.oy = act.y0 - wr.top; act.w0 = wr.width; act.h0 = wr.height; act.s0 = views.scrollTop;
     closeMenu(false);
@@ -343,6 +353,7 @@ function makeBoard(container, key, opts = {}) {
       swallow = true; setTimeout(() => { swallow = false; }, 60);
     }
     settle();
+    edit(false);
     if (on && a.mode !== "order" && opts.rows) measureRows();   // a free drop settles back into the two-column rows
   }
   // The pointer was lost (the browser took it for a scroll) or Esc was pressed: the card goes back where it was.
@@ -353,6 +364,7 @@ function makeBoard(container, key, opts = {}) {
     const a = finish();
     if (on) { a.next = null; swallow = true; setTimeout(() => { swallow = false; }, 60); }
     settle();
+    edit(false);
   }
   container.addEventListener("pointerdown", ev => {
     if (act || (ev.pointerType === "mouse" ? ev.button !== 0 : !ev.isPrimary)) return;   // a second finger never starts a drag
