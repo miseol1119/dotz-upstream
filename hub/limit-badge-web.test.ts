@@ -45,5 +45,6 @@ test("once the work starts (the waitlist is empty) the row and its badge are gon
 	waitlist = [];
 	await view.evaluate(`refreshState()`);
 	await waitFor(`!${ROW}`);
-	expect(await q(`return document.querySelector('#v-home [data-k="todo"]').textContent`)).not.toContain("한도 리셋되면 재개");
+	// the 할일 card is not drawn once it has no row, so the whole home is read
+	expect(await q(`return document.querySelector("#v-home").textContent`)).not.toContain("한도 리셋되면 재개");
 }, 15_000);

@@ -165,18 +165,23 @@ const dotsOf = (v: View, sel: string) => q<Dot[]>(v, `
 		return { text, kind: "before", w: parseFloat(b.width), h: parseFloat(b.height), round: b.borderRadius === "50%", painted: !clear(b.backgroundColor), gap: parseFloat(cs.columnGap) || 99 };
 	});`);
 const hasDot = (d: Dot) => { expect(d.kind).not.toBe("none"); expect(d.w).toBeGreaterThanOrEqual(6); expect(d.w).toBeLessThanOrEqual(12); expect(d.h).toBe(d.w); expect(d.round).toBe(true); expect(d.painted).toBe(true); expect(d.gap).toBeLessThanOrEqual(8); };
-test("390px: the home row's 진행 중 word has a round colored dot right before it and keeps the accent color", async () => {
-	const v = await page(390, "light", `go("home")`, `!!document.querySelector("#home-cards .hr .hs.pri")`);
-	await v.evaluate(`void document.querySelector(".hr .hs.pri").scrollIntoView({ block: "center" })`);
+test("390px: a running home row leads with a round accent dot and ends in its time, inside the screen", async () => {
+	const ROW = '#home-cards .hn[data-k="running"] .hr:has(> .dot.pri)';
+	const v = await page(390, "light", `go("home")`, `!!document.querySelector(${JSON.stringify(ROW)})`);
+	await v.evaluate(`void document.querySelector(${JSON.stringify(ROW)}).scrollIntoView({ block: "center" })`);
 	await shot(v, "6-home-pri");
-	const dots = await dotsOf(v, ".hr .hs.pri");
+	const dots = await dotsOf(v, ROW);
 	expect(dots.length).toBeGreaterThan(0);
-	dots.forEach(hasDot);
-	const c = await q<{ fg: string; accent: string; right: number }>(v, `
-		const e = document.querySelector(".hr .hs.pri"), probe = document.createElement("i"); probe.style.color = "var(--accent)"; document.body.append(probe);
+	// a row's lead dot sits a row gap before the name, so only its own shape is held here
+	for (const d of dots) { expect(d.kind).toBe("span"); expect(d.w).toBeGreaterThanOrEqual(6); expect(d.w).toBeLessThanOrEqual(12); expect(d.h).toBe(d.w); expect(d.round).toBe(true); expect(d.painted).toBe(true); }
+	const c = await q<{ dot: string; accent: string; words: string[]; right: number }>(v, `
+		const rows = [...document.querySelectorAll(${JSON.stringify(ROW)})], probe = document.createElement("i"); probe.style.color = "var(--accent)"; document.body.append(probe);
 		const accent = getComputedStyle(probe).color; probe.remove();
-		return { fg: getComputedStyle(e).color, accent, right: Math.round(e.getBoundingClientRect().right) };`);
-	expect(c.fg).toBe(c.accent);
+		return { dot: getComputedStyle(rows[0].querySelector(":scope > .dot")).backgroundColor, accent, words: rows.map(r => r.querySelector(":scope > .hs")?.textContent ?? ""),
+			right: Math.max(...rows.map(r => Math.round(r.getBoundingClientRect().right))) };`);
+	expect(c.dot).toBe(c.accent);
+	// the dot says the row is running; the row's end is a time or nothing, never the state word again
+	for (const w of c.words) expect(["진행 중", "작업 중"]).not.toContain(w);
 	expect(c.right).toBeLessThanOrEqual(390);
 });
 test("390px: the chat task card's 완료 pill is a green dot plus the word, like 진행 중", async () => {

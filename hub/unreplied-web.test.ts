@@ -140,12 +140,12 @@ for (const [width, height] of [[390, 844], [1280, 800]] as const) {
 
 describe("home and the peer's mail", async () => {
 	const v = await open(390, 844);
-	test("the home 답변 필요 list counts this computer's 미답장 apart from unread (the other computer's stay in 모니터링)", async () => {
+	test("the home 답변 필요 list counts this computer's 미답장 in one row, each app's count under it and the total as its badge (the other computer's stay in 모니터링)", async () => {
 		await boot(v, "light", `go("home")`);
-		await waitFor(v, `current === "home" && PQ.loaded && document.querySelectorAll("#home-now .hr .nb.unreplied").length === 3`);
-		const t = await q<{ head: string; rows: string[] }>(v, `return { head: document.querySelector("#home-now .hn-h .nb.unreplied").textContent, rows: [...document.querySelectorAll("#home-now .hr .nb.unreplied")].map(n => n.textContent) }`);
-		expect(t.head).toBe("미답장 4");
-		expect(t.rows).toEqual(["미답장 2", "미답장 1", "미답장 1"]);
+		await waitFor(v, `current === "home" && PQ.loaded && document.querySelector('#home-now .hr[data-k="owed"] .nb.unreplied')`);
+		const t = await q<{ rows: number; total: string; by: number[] }>(v, `const rows = document.querySelectorAll('#home-now .hr[data-k="owed"]'), r = rows[0];
+			return { rows: rows.length, total: r.querySelector(".nb.unreplied").textContent, by: r.querySelector(".ha").textContent.split(" · ").map(s => Number(s.match(/(\\d+)$/)[1])) }`);
+		expect(t).toEqual({ rows: 1, total: "4", by: [2, 1, 1] });
 		await shot(v, "home-390-light.png");
 	});
 	// A count is a badge, a state is a dot and a word (web/DESIGN.md): the unread count and the 미답장 count read the same on an app row, a home row and a comments row.
@@ -157,9 +157,8 @@ describe("home and the peer's mail", async () => {
 		expect(appUnread.bg).not.toBe("rgba(0, 0, 0, 0)");
 		expect(appUnread.bg).not.toBe(appOwed.bg);
 		await run(v, `go("home")`);
-		await waitFor(v, `current === "home" && PQ.loaded && document.querySelector("#home-now .hr .nb.unreplied")`);
-		expect(await look("#home-now .hr .nb.unreplied")).toEqual(appOwed);
-		expect(await look("#home-now .hn-h .nb.unreplied")).toEqual(appOwed);
+		await waitFor(v, `current === "home" && PQ.loaded && document.querySelector('#home-now .hr[data-k="owed"] .nb.unreplied')`);
+		expect(await look('#home-now .hr[data-k="owed"] .nb.unreplied')).toEqual(appOwed);
 		await run(v, `go("monitoring", "i:youtube")`);
 		await waitFor(v, `!$("#cm").hidden && CM.loaded && document.querySelector("#cm .kk-row .nb.unreplied")`);
 		expect(await look("#cm .kk-row .nb:not(.unreplied)")).toEqual(appUnread);
