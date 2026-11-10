@@ -20,6 +20,7 @@
 <p align="center">
   <img alt="최신 버전" src="https://img.shields.io/github/v/tag/ddotz/dotz?label=version&color=3182f6">
   <img alt="macOS, Linux, Windows(WSL) 지원" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows%20(WSL)-191f28">
+  <img alt="MIT 라이선스" src="https://img.shields.io/badge/license-MIT-191f28">
 </p>
 
 <p align="center">
@@ -54,3 +55,4 @@ curl -fsSL https://raw.githubusercontent.com/ddotz/dotz/main/install.sh | sh
 - [맥락 검색](docs/context-search.md)
 - [내 설정으로 바꾸기](docs/customization.md)
 - [구조](docs/ARCHITECTURE.md) · [개발 가이드](docs/development.md) · [서드파티 고지](THIRD_PARTY_NOTICES.md)
+- [라이선스(MIT)](LICENSE)

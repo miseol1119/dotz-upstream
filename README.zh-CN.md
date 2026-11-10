@@ -20,6 +20,7 @@
 <p align="center">
   <img alt="最新版本" src="https://img.shields.io/github/v/tag/ddotz/dotz?label=version&color=3182f6">
   <img alt="支持 macOS、Linux 和 Windows（WSL）" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows%20(WSL)-191f28">
+  <img alt="MIT 许可证" src="https://img.shields.io/badge/license-MIT-191f28">
 </p>
 
 <p align="center">
@@ -55,3 +56,4 @@ curl -fsSL https://raw.githubusercontent.com/ddotz/dotz/main/install.sh | sh
 - [自定义](docs/customization.md)
 - [开发指南](docs/development.md)
 - [第三方声明](THIRD_PARTY_NOTICES.md)
+- [许可证（MIT）](LICENSE)

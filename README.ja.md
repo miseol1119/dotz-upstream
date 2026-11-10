@@ -20,6 +20,7 @@
 <p align="center">
   <img alt="最新バージョン" src="https://img.shields.io/github/v/tag/ddotz/dotz?label=version&color=3182f6">
   <img alt="macOS、Linux、Windows（WSL）に対応" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows%20(WSL)-191f28">
+  <img alt="MIT ライセンス" src="https://img.shields.io/badge/license-MIT-191f28">
 </p>
 
 <p align="center">
@@ -55,3 +56,4 @@ macOS と Linux ではターミナルで、Windows では WSL 2 の中で実行�
 - [カスタマイズ](docs/customization.md)
 - [開発ガイド](docs/development.md)
 - [サードパーティーの表示](THIRD_PARTY_NOTICES.md)
+- [ライセンス（MIT）](LICENSE)

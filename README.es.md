@@ -20,6 +20,7 @@
 <p align="center">
   <img alt="Última versión" src="https://img.shields.io/github/v/tag/ddotz/dotz?label=version&color=3182f6">
   <img alt="Funciona en macOS, Linux y Windows (WSL)" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows%20(WSL)-191f28">
+  <img alt="Licencia MIT" src="https://img.shields.io/badge/license-MIT-191f28">
 </p>
 
 <p align="center">
@@ -55,3 +56,4 @@ La configuración está en inglés y coreano, y el asistente responde en el idio
 - [Personalización](docs/customization.md)
 - [Desarrollo](docs/development.md)
 - [Avisos de terceros](THIRD_PARTY_NOTICES.md)
+- [Licencia (MIT)](LICENSE)
