@@ -970,9 +970,9 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 					return json({ ok: true, to: MAIN, answers_in: sender.primary });
 				}
 				const c = convs.get(key)!;
-				// Main's request goes in as that conversation's next turn with no reply_to: its answer is posted into the conversation.
-				convs.deliverTo(key, `[main session] ${text}`, { target: c.primary, from: MAIN });
-				return json({ ok: true, to: key, answers_in: c.primary });
+				// Main's request is that conversation's next turn with no reply_to: its answer is posted there; only back:true marks it handed work, answered to main (handBack).
+				convs.deliverTo(key, `[main session] ${text}`, { target: c.primary, ...(b.back === true ? { from: MAIN } : {}) });
+				return json({ ok: true, to: key, answers_in: b.back === true ? MAIN : c.primary });
 			}
 		}
 		if (req.method === "POST" && url.pathname === "/api/send") {

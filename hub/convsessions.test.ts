@@ -23,7 +23,7 @@ const tmp = (): string => {
 
 type Fake = { o: Orchestrator; delivered: string[]; parked: number; applied: number; started(): boolean };
 
-function setup(opts: { on?: boolean; maxLive?: number; idleMin?: number; dir?: string; history?: HubEvent[]; queue?: Prompts; kindModel?: (key: string) => string | undefined } = {}) {
+function setup(opts: { on?: boolean; maxLive?: number; idleMin?: number; dir?: string; history?: HubEvent[]; log?: string[]; queue?: Prompts; kindModel?: (key: string) => string | undefined } = {}) {
 	const dir = opts.dir ?? tmp();
 	let clock = 1_000_000;
 	const fakes = new Map<string, Fake>();
@@ -102,7 +102,7 @@ function setup(opts: { on?: boolean; maxLive?: number; idleMin?: number; dir?: s
 		workers: () => 0,
 		workerPin: () => "main-pin",
 		kindModel: key => opts.kindModel?.(key),
-		log: () => {},
+		log: line => void opts.log?.push(line),
 		now: () => clock,
 	});
 	main();
@@ -316,4 +316,15 @@ test("a mail conversation runs on the mail default, not on main's model; without
 	expect(t.fakes.get("mail:k1")!.applied).toBe(2);
 	expect(existsSync(pin("mail:k1"))).toBe(false);
 	expect(t.fakes.get("ch:1")!.applied).toBe(1);
+});
+
+test("a prompt that names no target goes to the conversation session's own conversation with one log line, main's stays as it is", () => {
+	const log: string[] = [];
+	const { registry, delivered } = setup({ log });
+	registry.deliverTo("mail:k1", "[main session] 이거 확인해 줘", undefined);
+	expect(delivered).toEqual([{ key: "mail:k1", text: "[main session] 이거 확인해 줘", target: "mail:k1" }]);
+	expect(log.filter(l => l.includes("named no target"))).toEqual(["prompt for mail:k1 named no target; its answer goes to mail:k1"]);
+	registry.deliverTo(MAIN, "hello", undefined);
+	expect(delivered.at(-1)).toEqual({ key: MAIN, text: "hello", target: undefined });
+	expect(log).toHaveLength(1);
 });

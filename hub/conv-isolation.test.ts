@@ -104,7 +104,19 @@ test("2026-11-10 case 2: main's answer to work handed by ch:X is not posted to c
 	expect(w.q.deferredOpen()).toEqual([]);
 });
 
-test("main -> conversation: a conversation session's answer to main's handed prompt goes back to main; the handed-back prompt is marked and cannot be handed on", async () => {
+// Work main hands over (dotz_conv send, hub/routes.ts) has no `from` and is answered in the conversation: 2026-11-10, the answers of two mail sessions never showed.
+test("main -> conversation: the answer to work main handed over is posted once in that conversation, handed back to nobody", async () => {
+	const t = setup({ home: "ch:X" });
+	t.startTurn("[main session] 이거 확인해 줘", { target: "ch:X" });
+	expect(t.q.current()).not.toHaveProperty("from");
+	t.q.onAnswer("확인했어요");
+	await Promise.resolve();
+	expect(t.targets()).toEqual([["ch:X", undefined]]);
+	expect(t.state.handBacks).toEqual([]);
+	expect(t.open()).toEqual([]);
+});
+
+test("main -> conversation with back: true: a conversation session's answer to main's handed prompt goes back to main; the handed-back prompt is marked and cannot be handed on", async () => {
 	const t = setup({ home: "ch:X" });
 	t.startTurn("[main session] 이거 확인해 줘", { target: "ch:X", from: "main" });
 	expect(t.q.current()).toMatchObject({ from: "main" });

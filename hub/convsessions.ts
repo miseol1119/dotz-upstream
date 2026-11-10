@@ -235,6 +235,11 @@ export function createConvSessions(d: ConvDeps) {
 	/** Delivers a prompt into the session `key` (spawning or resuming it); true when it was steered into its running turn. */
 	function deliverTo(key: string, text: string, reply?: Reply): boolean {
 		const c = ensure(key);
+		// A conversation session's turn always has a place for its answer: with none named it is the session's own conversation, never dropped.
+		if (c.key !== MAIN && !reply?.target) {
+			d.log(`prompt for ${c.key} named no target; its answer goes to ${c.primary}`);
+			reply = { ...reply, target: c.primary };
+		}
 		if (reply?.owner && c.key !== MAIN) {
 			c.meta.lastOwnerAt = new Date(now()).toISOString();
 			saveMeta(c);
