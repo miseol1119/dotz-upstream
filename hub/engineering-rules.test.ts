@@ -13,7 +13,10 @@ import {
 // only new violations fail. A fix lowers the number (or removes the entry); never raise one to get a change past this test. A count that has dropped
 // below its ceiling is logged by ratchet() so the ceiling can follow it down.
 type Counts = Record<string, number>;
-const M = metrics(loadTree(join(import.meta.dir, "..")));
+// The tree and its import graph are read once; rule 15 reuses both.
+const TREE = loadTree(join(import.meta.dir, ".."));
+const GRAPH = importGraph(prodOf(TREE));
+const M = metrics(TREE, GRAPH);
 
 // Files over 800 lines are one reviewer's working memory too many; each is capped at its size rounded up to the next 25, room for a fix, not a feature.
 const FILE_LINE_LIMIT = 800;
@@ -93,14 +96,23 @@ const entryModules = (files: readonly Src[]): string[] => {
 	for (const f of files) {
 		if (!isTestSide(f.path) || !f.path.endsWith(".ts")) continue;
 		const dir = posix.dirname(f.path);
+		// First "const|let id =" of the file per id, indexed once per file instead of one RegExp per identifier per spawn.
+		let defs: Map<string, number> | undefined;
+		const defEnd = (id: string): number | undefined => {
+			if (!defs) {
+				defs = new Map();
+				for (const d of f.text.matchAll(/(?:const|let)\s+([A-Za-z_]\w*)\s*(?::[^=]+)?=/g)) if (!defs.has(d[1] ?? "")) defs.set(d[1] ?? "", d.index + d[0].length);
+			}
+			return defs.get(id);
+		};
 		for (const m of f.text.matchAll(SPAWN_CALL)) {
 			const call = f.text.slice(m.index, endOf(f.text, m.index + m[0].length - 1, true));
 			if (/\benv\b/.test(call)) continue;
 			// A path or a "-e" script held in a variable counts through the variable's own assignment.
 			let text = call;
 			for (const id of new Set(call.match(/\b[A-Za-z_]\w*\b/g))) {
-				const def = new RegExp(`(?:const|let)\\s+${id}\\s*(?::[^=]+)?=`).exec(f.text);
-				if (def) text += "\n" + f.text.slice(def.index + def[0].length, endOf(f.text, def.index + def[0].length, false));
+				const at = defEnd(id);
+				if (at !== undefined) text += "\n" + f.text.slice(at, endOf(f.text, at, false));
 			}
 			for (const j of text.matchAll(/join\(\s*([\w.]+)\s*((?:,\s*"[^"]*")+)\s*\)/g)) {
 				found.add(posix.join(j[1] === "import.meta.dir" ? dir : "", ...[...(j[2] ?? "").matchAll(/"([^"]*)"/g)].map(s => s[1] ?? "")));
@@ -118,10 +130,8 @@ const reaches = (graph: Map<string, string[]>, from: string, to: string): boolea
 	}
 	return false;
 };
-const configImporters = (files: readonly Src[]): string[] => {
-	const graph = importGraph(prodOf(files));
-	return entryModules(files).filter(e => reaches(graph, e, CONFIG_MODULE));
-};
+const configImporters = (files: readonly Src[], graph = importGraph(prodOf(files))): string[] =>
+	entryModules(files).filter(e => reaches(graph, e, CONFIG_MODULE));
 // Child entries that reach hub/config.ts today; fix one by giving the child an env (or dropping the import), then remove it. Never add one to get a change past this test.
 const CONFIG_IMPORTERS: string[] = [];
 
@@ -164,7 +174,7 @@ describe("engineering rules on the real tree", () => {
 	test("13 same-name helpers", () => expect(overCeilings("copies", M.helperCopies, HELPER_COPY_CEILINGS)).toEqual([]));
 	test("14 pasted blocks", () => expect(overCeilings("blocks", { blocks: M.pastedBlocks.length }, { blocks: PASTED_BLOCKS })).toEqual([]));
 	test("15 a module a test starts as a child without an env does not reach hub/config.ts", () => {
-		expect(listErrors("child entry importing hub/config.ts", configImporters(loadTree(join(import.meta.dir, ".."))), CONFIG_IMPORTERS)).toEqual([]);
+		expect(listErrors("child entry importing hub/config.ts", configImporters(TREE, GRAPH), CONFIG_IMPORTERS)).toEqual([]);
 	});
 });
 

@@ -290,9 +290,9 @@ export function pastedBlocks(prod: readonly Src[]): string[] {
 	return [...new Set([...blocks].map(b => b.slice(0, b.lastIndexOf(" | "))))].sort();
 }
 
-export function metrics(files: readonly Src[]) {
+export function metrics(files: readonly Src[], graph?: Map<string, string[]>) {
 	const prod = prodOf(files);
-	const graph = importGraph(prod);
+	graph ??= importGraph(prod);
 	return {
 		fileLines: sorted(oversizeFiles(prod, 800)),
 		longFunctions: sorted(longFunctions(prod, 300)),
