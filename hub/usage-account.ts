@@ -23,6 +23,8 @@ const USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
 type SubscriptionAccount = { name: string; pinned: boolean; sticky?: boolean; token: string; expiresAt: number | null; plan?: string };
 type AccountProblem = "expired" | "rate_limited" | "failed";
 type Limit = { id: string; label: string; window: { id: string; label: string; durationMs: number; resetsAt?: number }; amount: { used: number; limit: number; remaining: number; usedFraction: number; remainingFraction: number; unit: "percent" }; status: string };
+// One limit as GET /api/quota carries it (hub/providers.ts buildQuota, hub/codex-usage.ts).
+export type QuotaLimit = { id: string; label: string; window: string; used: number | null; limit: number | null; remaining: number | null; unit: string; resets_at: number | null; status: string };
 // Shaped like one `omp usage --json` report, plus whose numbers they are.
 export type AccountReport = { provider: "anthropic"; account: string; via: "omo-pinned" | "omo-sticky" | "omo-pool" | "omp"; limits: Limit[]; fetchedAt?: number; problem?: AccountProblem; retryAt?: number; plan?: string };
 

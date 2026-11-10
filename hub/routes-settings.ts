@@ -14,6 +14,7 @@ import { mailboxRoute } from "./routes-mailbox.ts";
 import { harnessGraph, readHarnessFile } from "./harness.ts";
 import { lastReport, RUNTIME_IDS, runtimesView, startVerify, UseRefused, useRuntime, verifyState, type UseRole } from "./runtime/verify.ts";
 import { json, body, terminals, BodyError } from "./routes-util.ts";
+import { useResetCredit } from "./codex-usage.ts";
 import { budgetSettings, deleteAdminKey, monthlyLimitOf, saveAdminKey, saveMonthlyLimit } from "./api-budget.ts";
 import { postSettings, savePostSettings } from "./discord-post.ts";
 import { discordConnectionRoute } from "./discord-connection.ts";
@@ -162,6 +163,12 @@ export async function routeSettings(req: Request, url: URL, parts: string[]): Pr
 		return json({ source, history: page.items.length > 0, items: [...page.items, ...live], more: page.more });
 	}
 	if (req.method === "GET" && url.pathname === "/api/quota") return json(await (url.searchParams.has("fresh") ? refreshQuota() : quota()));
+	// Spends one Codex 리셋권, only with confirm: true from the usage screen's confirm step (hub/codex-usage.ts); then the usage is read again.
+	if (req.method === "POST" && url.pathname === "/api/quota/reset-credit") {
+		const r = await useResetCredit(await body(req));
+		if (r.status === 200) void refreshQuota().catch(e => log(`usage refresh failed: ${(e as Error).message}`));
+		return json(r.body, r.status);
+	}
 	// The monthly API limit and the admin key behind the usage screen's spend figure (hub/api-budget.ts): the key is never returned, only its mask.
 	if (url.pathname === "/api/api-budget" && (req.method === "GET" || req.method === "PUT")) {
 		try {

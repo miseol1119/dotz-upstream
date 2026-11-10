@@ -13,7 +13,8 @@ import { writeOmoPin } from "./omo-pin.ts";
 import { hardPinned, stickyAccount } from "./account-sticky.ts";
 import { labeledAccountView } from "./accounts-api.ts";
 import { apiBudget } from "./api-budget.ts";
-import { type AccountReport, AccountUsage, cliTokensSettled, fromOmp, runtimeIdOf, subscriptionAccount, subscriptionAccounts } from "./usage-account.ts";
+import { codexUsage, withCodex } from "./codex-usage.ts";
+import { type AccountReport, AccountUsage, type QuotaLimit, cliTokensSettled, fromOmp, runtimeIdOf, subscriptionAccount, subscriptionAccounts } from "./usage-account.ts";
 
 // omp provider id -> the env var omp reads its API key from (omp docs: providers.md, "Environment variables").
 const PROVIDER_ENV: Record<string, string> = {
@@ -696,7 +697,6 @@ export function removeOmoLogin(provider: string, now = Date.now()): boolean {
 }
 const ompHasCredential = async (provider: string): Promise<boolean> => ((await ompJson<{ credentials?: OmpCredential[] }>(["auth", "export"]))?.credentials ?? []).some(c => c.provider === provider);
 
-type QuotaLimit = { id: string; label: string; window: string; used: number | null; limit: number | null; remaining: number | null; unit: string; resets_at: number | null; status: string };
 // Pure: maps the usage reports to the API shape; providers holding credentials but absent from the reports
 // (or reporting no limits) are listed as unavailable with a plain reason.
 export function buildQuota(reports: OmpUsageReport[], credentialed: string[]): { providers: { provider: string; account?: string; account_label?: string; plan?: string; limits: QuotaLimit[] }[]; unavailable: { provider: string; reason: string }[] } {
@@ -729,8 +729,8 @@ async function readQuota() {
 	const rows = (await listProviders(new Set())).providers;
 	const anthropic = await anthropicUsage();
 	const reports = [...(anthropic ? [anthropic] : []), ...(await usageReports()).filter(r => r.provider !== "anthropic")];
-	const budget = await apiBudget().catch(() => undefined);
-	return { fetched_at: Date.now(), ...buildQuota(reports, rows.filter(r => r.auth !== "none").map(r => r.id)), ...(budget ? { budget } : {}), ...(runtimeIdOf("orchestrator") === "omo" ? { account: labeledAccountView() } : {}) };
+	const [budget, codex] = await Promise.all([apiBudget().catch(() => undefined), codexUsage()]);
+	return { fetched_at: Date.now(), ...withCodex(buildQuota(reports, rows.filter(r => r.auth !== "none").map(r => r.id)), codex), ...(budget ? { budget } : {}), ...(runtimeIdOf("orchestrator") === "omo" ? { account: labeledAccountView() } : {}) };
 }
 
 // GET /api/quota answers from the last read, never waiting on a CLI, the keychain or the usage endpoint (only the very first

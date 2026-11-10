@@ -196,6 +196,24 @@ async function startLogin(p, pending) {
 
 /* ---------- usage ---------- */
 let quotaTimer;
+// 리셋권 of one account (hub/codex-usage.ts): how many it holds and the nearest expiry. 사용 works only with one held and a limit reached,
+// and asks first, naming the limits it refills and how many stay; only that confirm sends POST /api/quota/reset-credit with confirm: true.
+function resetRow(p, name) {
+  const r = p.resets, wins = (p.limits || []).map(limitName).join("와 ");
+  const why = r.held && !r.usable ? "한도에 걸리면 쓸 수 있어요" : "";
+  const sub = [r.held && r.expires_at ? `${dayLabel(r.expires_at)} 만료` : "", why].filter(Boolean).join(" · ");
+  const say = { reset: "한도를 다시 채웠어요", nothing_to_reset: "다시 채울 한도가 없어서 쓰지 않았어요", no_credit: "남은 리셋권이 없어요", already_redeemed: "이미 쓴 리셋권이에요" };
+  const use = () => dialog({ confirm: true, title: "리셋권을 쓸까요?",
+    body: el("div", { class: "sup", text: `${name} ${p.account}의 ${wins || "한도"}를 지금 다시 채워요. 쓰고 나면 리셋권이 ${r.held - 1}개 남아요. 되돌릴 수는 없어요.` }),
+    actions: [{ label: "취소", onclick: c => c() }, { label: "리셋권 쓰기", kind: "pri", onclick: (c, b) => busy(b, async () => {
+      try { const out = await api("/api/quota/reset-credit", "POST", { account: p.account, confirm: true }); c(); toast(say[out.outcome] || "리셋권을 썼어요"); loadQuota(true); }
+      catch (e) { c(); toast(e.message || "리셋권을 쓰지 못했어요", true); loadQuota(true); }
+    }) }] });
+  return el("div", { class: "lim rc" },
+    el("div", { class: "kv" }, el("span", { class: "k", text: "리셋권" }),
+      el("span", { class: "rc-end" }, el("b", { text: `${r.held}개` }), el("button", { class: "btn tonal inrow", type: "button", disabled: !(r.held > 0 && r.usable), "aria-label": `${name} 리셋권 사용`, onclick: use }, "사용"))),
+    sub ? el("div", { class: "sup", text: sub }) : null);
+}
 async function loadQuota(fresh) {
   clearTimeout(quotaTimer);
   const box = $("#usage");
@@ -211,7 +229,8 @@ async function loadQuota(fresh) {
   const grid = el("div", { class: "grid" });
   for (const p of q.providers || []) {
     // a subscription names its plan as Anthropic does (Pro, Max 5x, Max 20x, Ultra, ...; hub/usage-account.ts planName)
-    const card = el("div", { class: "card" }, el("div", { class: "ch" }, el("h3", { text: p.plan ? `${providerName(p.provider)} · ${p.plan}` : providerName(p.provider) })));
+    const name = p.name || providerName(p.provider);
+    const card = el("div", { class: "card" }, el("div", { class: "ch" }, el("h3", { text: p.plan ? `${name} · ${p.plan}` : name })));
     for (const l of p.limits || []) {
       card.append(el("div", { class: "lim" },
         el("div", { class: "kv" }, el("span", { class: "k", text: limitName(l) }), el("b", { text: pctText(l) })),
@@ -219,6 +238,7 @@ async function loadQuota(fresh) {
         l.resets_at ? el("div", { class: "sup", text: rel(l.resets_at) }) : null));
     }
     if (!(p.limits || []).length) card.append(el("div", { class: "sup", text: "없어요" }));
+    if (p.resets) card.append(resetRow(p, name));
     grid.append(card);
   }
   // The monthly API spend limit the owner set on the platform console, and how much of it is used (hub/api-budget.ts).
@@ -253,7 +273,7 @@ async function loadQuota(fresh) {
   }
   if ((q.unavailable || []).length) {
     box.append(el("div", { class: "sec", text: "정보가 없어요" }));
-    box.append(el("div", { class: "list" }, ...q.unavailable.map(u => el("div", { class: "li", style: "display:block" }, el("div", { class: "hd", text: providerName(u.provider) }), el("div", { class: "sup", text: u.reason })))));
+    box.append(el("div", { class: "list" }, ...q.unavailable.map(u => el("div", { class: "li", style: "display:block" }, el("div", { class: "hd", text: u.name || providerName(u.provider) }), el("div", { class: "sup", text: u.reason })))));
   }
   if (!(q.providers || []).length && !(q.unavailable || []).length) box.append(emptyNode("사용량 정보가 없어요"));
 }
