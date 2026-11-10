@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { featurePrompt } from "../featuredirs.ts";
 import { activityItems } from "../events.ts";
 import { modeFile } from "../i18n.ts";
+import { limitAlertsFile } from "../limit-alert.ts";
 import { advance, flush } from "./test-clock.ts";
 
 const DATA = process.env.DOTZ_DIR!;
@@ -110,6 +111,8 @@ export async function orchestratorScenario(): Promise<Trace> {
 	FakeProc.all = [];
 	const restore = mockSpawn();
 	rmSync(join(DATA, "orchestrator.json"), { force: true });
+	// Blocked-episode records live in the process-wide data dir; a told "limit" episode another file left there silences this scenario's owner alert.
+	rmSync(limitAlertsFile(), { force: true });
 	// The activity buffer is shared by everything running in this process; only rows added by this scenario count.
 	const rowsBefore = activityItems("orchestrator", 300).length;
 	const o = await import("../orchestrator.ts");

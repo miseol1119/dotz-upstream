@@ -8,6 +8,7 @@ import { join } from "node:path";
 import type * as Lanes from "../lanes.ts";
 import type * as Orchestrator from "../orchestrator.ts";
 import { cfg } from "../config.ts";
+import { limitAlertsFile } from "../limit-alert.ts";
 import { adapters, runtimeFor } from "./index.ts";
 import { omo } from "./omo.ts";
 import { omp } from "./omp.ts";
@@ -90,6 +91,7 @@ beforeAll(() => {
 });
 afterAll(() => {
 	delete adapters.fake;
+	rmSync(limitAlertsFile(), { force: true });   // the rate-limit tests end with a told episode; later files in this process must not see it
 	Object.assign(cfg, savedCfg);
 	patchable.spawn = realSpawn;
 });
