@@ -42,7 +42,7 @@
 .ans-files .fbox > .fatt + .fdl { top: 50%; right: 0; transform: translateY(-50%); }
 .ans-ev { display: flex; flex-wrap: wrap; column-gap: var(--sp-3); margin-top: var(--sp-3); padding: 0 var(--sp-1); color: var(--fg-3); font-size: var(--fs-meta); line-height: var(--lh-meta); }
 .ans-ev code { padding: 0; background: none; font-size: var(--fs-meta); }
-@media (max-width: 759px) {
+@container tlcol (max-width: 559.98px) {
   .ans-wordy .rc-row { display: block; }
   .ans-wordy .rc-k { display: block; width: auto; line-height: var(--lh-sec); }
 }

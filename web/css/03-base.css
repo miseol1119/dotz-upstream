@@ -258,9 +258,10 @@ body:has(.upd-bar) .app { padding-top: 0; margin-top: var(--ubh); height: calc(1
      lane reports and alerts = tonal card (--layer + hairline); work in between folds into one quiet summary row
    - secondary text uses --fg-2 (AA on both themes); --fg-3 stays for non-text only */
 .chatbox { position: relative; flex: 1; min-height: 0; }
-.timeline { height: 100%; overflow-y: auto; overflow-x: hidden; padding-inline: var(--sp-2); margin-inline: calc(var(--sp-2) * -1); }   /* the 8px gutter (padding, given back as margin) is room for the notice highlight's ring and bar: overflow-x hidden would clip them at the column edge (09-notices.css) */
+/* container tlcol: the narrow rules of everything drawn inside a timeline ask this column's width, not the window's, so a 340 pane lays cards out like a 390 phone; 560px is where the column of a phone-wide window (<= ~615px) ends */
+.timeline { container: tlcol / inline-size; height: 100%; overflow-y: auto; overflow-x: hidden; padding-inline: var(--sp-2); margin-inline: calc(var(--sp-2) * -1); }   /* the 8px gutter (padding, given back as margin) is room for the notice highlight's ring and bar: overflow-x hidden would clip them at the column edge (09-notices.css) */
 .tl-in { display: flex; flex-direction: column; gap: var(--sp-4); width: 100%; max-width: var(--col); min-width: 0; margin: 0 auto; padding: var(--sp-2) 0 var(--sp-8); }
-@media (max-width: 639px) { .tl-in { padding: 0 0 var(--sp-6); } .tl-in > .bm { padding: var(--sp-3) var(--sp-4); } }
+@container tlcol (max-width: 559.98px) { .tl-in { padding: 0 0 var(--sp-6); } .tl-in > .bm { padding: var(--sp-3) var(--sp-4); } }
 /* a clamped text that has a 더 보기 / 펼치기 button fades out over its last two lines instead of a hard cut (owner 2026-11-04); open removes .clamp, so the fade goes with it.
    .ub.clamp here, .rq-body.clamp and .rq-orig.clamp in 15-reply-card.css use the same gradient with their own --fade (the height the fade covers). */
 .ub.clamp { --fade: calc(2 * var(--lh-chat)); padding-bottom: 0; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent); }

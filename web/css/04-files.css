@@ -7,7 +7,7 @@ two separate paths under their own chips and a long one ends in an ellipsis. */
 .fpath, .lb-p, .tv-p { display: block; width: 0; min-width: 100%; max-width: 100%; padding: 0; border: 0; background: none; color: var(--fg-3); font: 400 12px/18px var(--font); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: copy; }
 .fpath { margin-top: var(--sp-1); }
 @media (hover: hover) { .fpath:hover, .lb-p:hover, .tv-p:hover { color: var(--fg-2); } }
-.fbox > .fatt { padding-right: var(--sp-12); max-width: 260px; }
+.fbox > .fatt { padding-right: var(--sp-12); max-width: min(260px, 90cqw); }
 .fdl { position: absolute; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 16px; color: var(--fg-2); text-decoration: none; }
 .fdl svg { width: 16px; height: 16px; }
 .fbox > .fatt + .fdl { top: 12px; right: 8px; }
@@ -114,7 +114,7 @@ dialog.lbox::backdrop { background: transparent; }
 /* the session-result card sits straight in the timeline column: as wide as the replies and the composer, not the 560px a command answer gets */
 .bm.res > .ccard { max-width: none; }
 .bm.res .cc-hd + .md { margin-top: var(--sp-2); }
-@media (max-width: 639px) { .tl-in > .bm.res { padding: 0; } .bm.res > .mt { padding: 0 var(--sp-4); } }
+@container tlcol (max-width: 559.98px) { .tl-in > .bm.res { padding: 0; } .bm.res > .mt { padding: 0 var(--sp-4); } }
 /* a message from another computer's gateway (01-peer-msg.js): the computer, the kind, then the words */
 .bm.pmc > .ccard { padding: var(--sp-3) var(--sp-4); background: var(--layer); }
 .pmc-hd .mt { margin: 0 0 0 auto; flex: none; }
@@ -127,7 +127,7 @@ dialog.lbox::backdrop { background: transparent; }
 .pmc-b.clamp { max-height: calc(6 * var(--lh-chat)); overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 2 * var(--lh-chat)), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 2 * var(--lh-chat)), transparent); }
 .pmc-b + .ubm { display: block; margin-left: auto; }
 .pmc-n { margin-top: var(--sp-2); color: var(--fg); }
-@media (max-width: 639px) { .tl-in > .bm.pmc { padding: 0; } }
+@container tlcol (max-width: 559.98px) { .tl-in > .bm.pmc { padding: 0; } }
 .cc-hd { display: flex; align-items: center; gap: var(--sp-2); font-size: 16px; line-height: 22px; font-weight: 600; }
 .cc-facts { display: grid; grid-template-columns: fit-content(40%) minmax(0, 1fr); gap: var(--sp-1) var(--sp-4); margin: var(--sp-2) 0 0; font-size: 14px; line-height: 22px; }
 .cc-facts dt { color: var(--fg-3); }
@@ -135,7 +135,7 @@ dialog.lbox::backdrop { background: transparent; }
 .cc-note { margin-top: var(--sp-2); color: var(--fg-3); font-size: 13px; line-height: 20px; white-space: pre-line; }
 .cc-act { margin-top: var(--sp-3); }
 .cc-act .btn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 420px) { .cc-facts { grid-template-columns: minmax(0, 1fr); gap: 0; } .cc-facts dd { margin-bottom: var(--sp-2); } }
+@container tlcol (max-width: 420px) { .cc-facts { grid-template-columns: minmax(0, 1fr); gap: 0; } .cc-facts dd { margin-bottom: var(--sp-2); } }
 .cmdbox pre { margin: 0 0 var(--sp-1); font-family: var(--mono); }
 .lv { min-width: 0; font-size: var(--fs-chat); line-height: var(--lh-chat); }
 .lv[role="button"] { cursor: pointer; }
@@ -190,7 +190,7 @@ details.work.live .wdot { display: block; }
 .tl-in > .a-div { margin: var(--sp-2) 0 0; font: 500 12px/16px var(--font); color: var(--fg-2); }
 .tl-in > .a-div:first-child { margin-top: 0; }
 .tl-in > details.work:not([open]) + .bm { margin-top: calc(var(--sp-15) * -1); }
-@media (max-width: 639px) { .um { max-width: 90%; } .bm pre { padding: var(--sp-2) var(--sp-3); } .bm.rep, .bm.alert { padding: var(--sp-2) var(--sp-3) var(--sp-3); } }
+@container tlcol (max-width: 559.98px) { .um { max-width: 90%; } .bm pre { padding: var(--sp-2) var(--sp-3); } .bm.rep, .bm.alert { padding: var(--sp-2) var(--sp-3) var(--sp-3); } }
 :root { --col: 736px; }
 .composer { flex: none; width: 100%; max-width: var(--col); margin: 0 auto; padding: 0 0 max(var(--sp-4), env(safe-area-inset-bottom)); }
 .composer.tmode { max-width: var(--col); }

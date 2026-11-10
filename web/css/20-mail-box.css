@@ -33,7 +33,7 @@ span.mr-star:not(.on) { opacity: .45; }
 /* the open mail's top bar (30-mail-box.js mailOpenBar): one row of icons on its own tinted strip across the card (prototype #mail/1) that separates
    it from the mail header, sticky while the mail scrolls. The card's padding is a variable so the strip can run edge to edge. */
 .tl-in > .bm.rc.mopen { --mpx: 18px; gap: var(--sp-1); padding: 0 var(--mpx) var(--sp-4); }
-@media (max-width: 639px) { .tl-in > .bm.rc.mopen { --mpx: 16px; padding-bottom: var(--sp-3); } }
+@container tlcol (max-width: 559.98px) { .tl-in > .bm.rc.mopen { --mpx: 16px; padding-bottom: var(--sp-3); } }
 .mtop { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 0; height: 40px; margin: 0 calc(var(--mpx) * -1) var(--sp-2); padding: 0 calc(var(--mpx) - var(--sp-2)); border-radius: var(--r-card) var(--r-card) var(--r-ctl) var(--r-ctl); background: var(--layer); }
 .mtop .mtop-b { flex: 0 1 36px; min-width: 32px; width: 36px; height: 32px; border-radius: var(--r-ctl); color: var(--fg-2); }
 .mtop .mtop-b .ic { width: 16px; height: 16px; }

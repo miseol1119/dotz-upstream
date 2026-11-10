@@ -54,7 +54,9 @@
 .mb-txt .mt-kv > div + div { border-top: 1px solid var(--line); }
 .mb-txt .mt-kv dt { margin: 0; color: var(--fg-3); font-size: 13px; line-height: 22px; }
 .mb-txt .mt-kv dd { margin: 0; min-width: 0; font-size: 14px; line-height: 22px; }
-@media (max-width: 520px) { .mb-txt .mt-kv > div { grid-template-columns: 1fr; gap: 0; } }
+/* the mail text is also drawn in the draft sheet (no timeline there), which keeps the window query; inside a timeline the column decides */
+@media (max-width: 520px) { .mb-txt:not(.timeline *) .mt-kv > div { grid-template-columns: 1fr; gap: 0; } }
+@container tlcol (max-width: 520px) { .mb-txt .mt-kv > div { grid-template-columns: 1fr; gap: 0; } }
 .mb-txt .mt-tbl { max-width: 100%; margin: 0 0 var(--sp-3); overflow-x: auto; border: 1px solid var(--line-2); border-radius: 12px; }
 .mb-txt .mt-tbl table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 20px; }
 .mb-txt .mt-tbl th, .mb-txt .mt-tbl td { padding: var(--sp-2) var(--sp-3); text-align: left; vertical-align: top; overflow-wrap: normal; word-break: keep-all; white-space: nowrap; }
@@ -71,7 +73,8 @@
 .mb-txt .mt-nt .up { color: var(--err); }
 .mb-txt .mt-nt .dn { color: var(--accent); }
 .mb-txt .mt-nt td:nth-child(n+4) { color: var(--fg-2); }
-@media (max-width: 520px) { .mb-txt .mt-nt th, .mb-txt .mt-nt td { padding: var(--sp-15); } .mb-txt .mt-nt { font-size: 13px; } }
+@media (max-width: 520px) { .mb-txt:not(.timeline *) .mt-nt th, .mb-txt:not(.timeline *) .mt-nt td { padding: var(--sp-15); } .mb-txt:not(.timeline *) .mt-nt { font-size: 13px; } }
+@container tlcol (max-width: 520px) { .mb-txt .mt-nt th, .mb-txt .mt-nt td { padding: var(--sp-15); } .mb-txt .mt-nt { font-size: 13px; } }
 .mb-txt blockquote.mt-quote { margin: 0 0 var(--sp-3); padding-left: var(--sp-3); border-left: 3px solid var(--line-2); }
 .mb-txt .mt-quote-body, .mb-txt .mt-fold-body { color: var(--fg-2); }
 .mb-txt .mt-quote-body > :last-child, .mb-txt .mt-fold-body > :last-child { margin-bottom: 0; }

@@ -21,7 +21,7 @@
 .nt-hl::after { animation: nt-hl 1.8s ease-in-out .2s both; }
 /* Plain text: the phone's message already has 16px side padding, so the tint sits in it. From 640px up the tint hangs 8px past each side, into the timeline's gutter. */
 .nt-hl.nt-bar::after { border-radius: var(--r-ctl); box-shadow: none; }
-@media (min-width: 640px) { .tl-in > .nt-hl.nt-bar::after { inset-inline: calc(var(--sp-2) * -1); } }
+@container tlcol (min-width: 560px) { .tl-in > .nt-hl.nt-bar::after { inset-inline: calc(var(--sp-2) * -1); } }
 @keyframes nt-hl { 0% { opacity: 0; } 14% { opacity: 1; } 50% { opacity: 1; } 100% { opacity: 0; } }
 /* Reduced motion: no fade or scroll animation, just a still tint for a moment (a step animation; !important beats the global animation: none). */
 @media (prefers-reduced-motion: reduce) {
