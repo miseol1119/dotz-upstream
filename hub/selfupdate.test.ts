@@ -96,7 +96,7 @@ test("hotfix track: a forced version is newer than its base and older than the n
 describe("against temp git repos", () => {
 	let r: Repos;
 	let work: string, pusher: string, logDir: string;
-	const opts = (exec?: Exec) => ({ dir: work, remote: "origin", branch: "main", testCmd, logDir, exec });
+	const opts = (exec?: Exec) => ({ dir: work, remote: "origin", branch: "main", testCmd, logDir, exec, alert: () => {} }); // these tags are unsigned: the signature alert has its own tests
 	// An exec that runs for real and records each command line.
 	const spy = () => {
 		const seen: string[] = [];

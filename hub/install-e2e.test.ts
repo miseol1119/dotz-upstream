@@ -6,6 +6,8 @@ import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync,
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { installDotzCommand } from "./dotz-command.ts";
+import { git } from "./selfupdate-fixture.ts";
+import { newKey, signTag } from "./test-signing.ts";
 
 const REPO = join(import.meta.dir, "..");
 let root: string, release: string, env: Record<string, string>;
@@ -193,7 +195,7 @@ test("a GitHub install without DOTZ_REF downloads the newest release tag, whatev
 	expect(s.requests).toContain("/commits/v261101.2.1");
 	expect(s.requests).not.toContain("/commits/main");
 	expect(s.stamp).toContain("ref=v261101.2.1\n");
-});
+}, 60_000);
 
 test("a GITHUB_TOKEN install asks for the tags with the token and downloads the tag", () => {
 	const s = githubInstall("gh-token", ["v261101.1"], { GITHUB_TOKEN: "stub-token" });
@@ -201,14 +203,39 @@ test("a GITHUB_TOKEN install asks for the tags with the token and downloads the 
 	expect(s.requests).toContain("/tarball/" + "a".repeat(40));
 	expect(s.stamp).toContain("ref=v261101.1\n");
 	expect(s.stamp).toContain("auth=token\n");
-});
+}, 60_000);
 
 test("a GitHub install where no tag can be read falls back to main, and DOTZ_REF still wins over the tags", () => {
 	expect(githubInstall("gh-none", null).requests).toContain("/commits/main");
 	const pinned = githubInstall("gh-pinned", ["v261101.1"], { DOTZ_REF: "v261030.9" });
 	expect(pinned.requests).toContain("/commits/v261030.9");
-	expect(pinned.requests).not.toContain("/tags");
-});
+	expect(pinned.requests).not.toContain("/tags?");
+}, 60_000);
+
+// The release signature at install time (the key in install.sh is the real one, so only failures can be made here; the verified path is
+// hub/selfupdate-signature.test.ts): warn goes on with a warning, DOTZ_VERIFY=enforce stops before anything is installed.
+test("git install: an unsigned tag warns and installs, enforce stops; a tag signed by another key stops under enforce", () => {
+	const origin = originWith("origin-sig", ["v261101.1"]);
+	const warn = installer({ DOTZ_HOME: join(root, "app-sig-warn"), DOTZ_GIT_URL: origin }, "--git");
+	if (warn.code !== 0) throw new Error(warn.out);
+	expect(warn.out).toContain("warning: cannot verify the release signature");
+	const hard = installer({ DOTZ_HOME: join(root, "app-sig-hard"), DOTZ_GIT_URL: origin, DOTZ_VERIFY: "enforce" }, "--git");
+	expect(hard.code).not.toBe(0);
+	expect(existsSync(join(root, "app-sig-hard", "hub"))).toBe(false);
+
+	const keys = mkdtempSync(join(root, "sigkeys-"));
+	git(origin, "tag", "-d", "v261101.1");
+	signTag(origin, "v261101.1", newKey(keys, "other"));
+	const other = installer({ DOTZ_HOME: join(root, "app-sig-other"), DOTZ_GIT_URL: origin, DOTZ_VERIFY: "enforce" }, "--git");
+	expect(other.code).not.toBe(0);
+	expect(other.out).toContain("not signed by an allowed key");
+	expect(existsSync(join(root, "app-sig-other", "hub"))).toBe(false);
+}, 60_000);
+
+test("GitHub tarball install: a tag with no signed tag object stops under enforce", () => {
+	expect(() => githubInstall("gh-sig-hard", ["v261101.1"], { DOTZ_VERIFY: "enforce" })).toThrow("DOTZ_VERIFY=enforce");
+	expect(existsSync(join(root, "app-gh-sig-hard", "hub"))).toBe(false);
+}, 60_000);
 
 // The web onboarding branch (docs/web-onboarding.md, "설치 스크립트 분기"). launchctl, systemctl, open and xdg-open are stubs first on PATH that only
 // log their calls, so no real service, browser or the live label dev.dotz.gateway is ever touched. --no-open keeps the run from waiting for a gateway.

@@ -42,6 +42,7 @@ const github = (tgz: string, seen: Seen[] = [], accept: (auth: string | undefine
 	seen.push({ url, auth });
 	if (!accept(auth)) return new Response(JSON.stringify({ message: auth ? "Bad credentials" : "Not Found" }), { status: auth ? 401 : 404 });
 	if (url.includes("/tags?")) return Response.json(tags);
+	if (url.includes("/git/ref/tags/")) return Response.json({ object: { type: "commit", sha: NEW } });
 	if (url.includes("/tar.gz/") || url.includes("/tarball/")) return new Response(Bun.file(tgz));
 	return new Response("not found", { status: 404 });
 };
@@ -127,7 +128,7 @@ test("a refused token falls through to gh, then to no auth; the one that worked 
 	expect(ghCalls[0].slice(0, 3)).toEqual(["gh", "api", "repos/o/r/tags?per_page=30"]);
 	expect(seen[1].auth).toBeUndefined();
 	// the tags request goes straight to the credential that worked: no second stale-token attempt, no second gh
-	expect(seen).toHaveLength(2);
+	expect(seen.map(s => s.auth)).toEqual([seen[0].auth, undefined, undefined]);
 	expect(ghCalls).toHaveLength(1);
 });
 

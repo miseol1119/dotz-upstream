@@ -31,6 +31,7 @@
 #   DOTZ_GIT_URL  clone URL for --git                   (default https://github.com/$DOTZ_REPO.git)
 #   DOTZ_PORT     first port to try for the web app on a fresh install; the next free one is used (default 7420)
 #   DOTZ_OPEN_WAIT  seconds to wait for the gateway before opening the browser (default 30)
+#   DOTZ_VERIFY   warn | enforce: what an unverifiable release signature does (default warn: say so and go on; enforce: stop)
 #   GITHUB_TOKEN / GH_TOKEN   token for a private repo (else an existing `gh` login is used)
 # Options: --git --service --no-service --setup --no-setup --answers FILE --tailscale --no-open --uninstall --purge --yes
 set -eu
@@ -191,6 +192,68 @@ KIND=github AUTH=public SHA='' TARBALL_URL=''
 newest_tag() { grep -E '^v[0-9]{6}\.[0-9]+(\.[0-9]+)?$' | sort -t. -k1.2,1n -k2,2n -k3,3n | tail -n 1; }
 tag_names() { grep -o '"name": *"v[^"]*"' | sed 's/.*"\(v[^"]*\)"$/\1/'; }
 valid_sha() { case $1 in *[!0-9a-f]*) return 1 ;; esac; [ "${#1}" -eq 40 ]; }
+# Release signature (hub/release-verify.ts): the tag's SSH signature against the signer below, which is the repo's release-signers file.
+# A failure warns and goes on; DOTZ_VERIFY=enforce stops. A ref that is no signed tag (branch, commit, lightweight tag, DOTZ_TARBALL) is "unsigned".
+SIGNERS='dotz-release namespaces="git" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOOzpm+y2V872aUW+u+8F3sBG2MUPPKx2XRn6K0JgIyN dotz-release'
+VERIFY=${DOTZ_VERIFY:-warn}
+case $VERIFY in warn | enforce) ;; *) die "DOTZ_VERIFY must be warn or enforce" ;; esac
+VSHA='' # the commit a verified tag points at; the tarball is fetched by it
+sig_fail() {
+	[ "$VERIFY" != enforce ] || die "cannot verify the release signature: $1 (DOTZ_VERIFY=enforce)"
+	say "warning: cannot verify the release signature: $1"
+}
+# $TMP/raw (a tag object) -> $TMP/payload (the signed bytes) and $TMP/sig (empty when unsigned)
+split_tag() {
+	sed '/^-----BEGIN SSH SIGNATURE-----$/,$d' "$TMP/raw" >"$TMP/payload"
+	sed -n '/^-----BEGIN SSH SIGNATURE-----$/,/^-----END SSH SIGNATURE-----$/p' "$TMP/raw" >"$TMP/sig"
+}
+# sig_check TAG COMMIT: $TMP/payload and $TMP/sig against the signer. COMMIT empty = take the signed one. Sets SIG_WHY, SIG_OBJ.
+sig_check() {
+	SIG_WHY='' SIG_OBJ=''
+	have ssh-keygen || { SIG_WHY="ssh-keygen is not installed"; return 1; }
+	printf '%s\n' "$SIGNERS" >"$TMP/signers"
+	who=$(ssh-keygen -Y find-principals -s "$TMP/sig" -f "$TMP/signers" 2>/dev/null | head -n 1 || true)
+	[ -n "$who" ] || { SIG_WHY="$1 is not signed by an allowed key"; return 1; }
+	ssh-keygen -Y verify -f "$TMP/signers" -I "$who" -n git -s "$TMP/sig" <"$TMP/payload" >/dev/null 2>&1 || { SIG_WHY="the signature of $1 does not match"; return 1; }
+	SIG_OBJ=$(sed -n '/^$/q;s/^object //p' "$TMP/payload" | head -n 1)
+	kind=$(sed -n '/^$/q;s/^type //p' "$TMP/payload" | head -n 1)
+	name=$(sed -n '/^$/q;s/^tag //p' "$TMP/payload" | head -n 1)
+	valid_sha "$SIG_OBJ" && [ "$kind" = commit ] && [ "$name" = "$1" ] || { SIG_WHY="the signed tag does not name $1 and a commit"; return 1; }
+	[ -z "$2" ] || [ "$SIG_OBJ" = "$2" ] || { SIG_WHY="the signature of $1 covers another commit than the one to install"; return 1; }
+	say "signature: $1 signer=$who result=verified"
+}
+# git clone: the tag object is in the clone.
+verify_git_ref() {
+	vr=$1
+	vk=$(git -C "$CLONE" cat-file -t "refs/tags/$vr" 2>/dev/null || true)
+	[ -n "$vk" ] || { sig_fail "unsigned ref: $vr is not a tag"; return 0; }
+	[ "$vk" = tag ] || { sig_fail "unsigned ref: $vr is a lightweight tag"; return 0; }
+	git -C "$CLONE" cat-file tag "refs/tags/$vr" >"$TMP/raw" || { sig_fail "cannot read the tag object of $vr"; return 0; }
+	split_tag
+	[ -s "$TMP/sig" ] || { sig_fail "unsigned ref: $vr has no signature"; return 0; }
+	sig_check "$vr" "$(git -C "$CLONE" rev-parse "refs/tags/$vr^{commit}")" || sig_fail "$SIG_WHY"
+}
+# GitHub API (the credential order of the downloads): GET a path under /repos/$REPO.
+api_json() {
+	if [ -n "$TOKEN" ]; then curl -fsSL -H "Authorization: Bearer $TOKEN" "$API/$1"
+	elif curl -fsSL "$API/$1" 2>/dev/null; then :
+	elif have gh && gh auth status >/dev/null 2>&1; then gh api "repos/$REPO/$1"
+	else return 1; fi
+}
+jfield() { F=$1 bun -e 'let v = JSON.parse(require("fs").readFileSync(0, "utf8")); for (const k of process.env.F.split(".")) v = v == null ? v : v[k]; process.stdout.write(v == null ? "" : String(v))'; }
+# Tarball install of a tag: the ref and tag objects carry the signed bytes (GitHub's own "verified" flag is not used). Sets VSHA when verified.
+verify_api_ref() {
+	vr=$1
+	vj=$(api_json "git/ref/tags/$vr" 2>/dev/null) || { sig_fail "unsigned ref: $vr is not a tag"; return 0; }
+	[ "$(printf '%s' "$vj" | jfield object.type 2>/dev/null)" = tag ] || { sig_fail "unsigned ref: $vr is not an annotated tag"; return 0; }
+	vo=$(printf '%s' "$vj" | jfield object.sha 2>/dev/null || true)
+	vj=$(api_json "git/tags/$vo" 2>/dev/null) || { sig_fail "cannot read the tag object of $vr"; return 0; }
+	printf '%s' "$vj" | jfield verification.payload >"$TMP/payload" 2>/dev/null || : >"$TMP/payload"
+	printf '%s' "$vj" | jfield verification.signature >"$TMP/sig" 2>/dev/null || : >"$TMP/sig"
+	[ -s "$TMP/sig" ] || { sig_fail "unsigned ref: $vr has no signature"; return 0; }
+	[ -s "$TMP/payload" ] || { sig_fail "GitHub gave no signed text for $vr"; return 0; }
+	if sig_check "$vr" ''; then VSHA=$SIG_OBJ; else sig_fail "$SIG_WHY"; fi
+}
 sha256_of() { if have shasum; then shasum -a 256 "$1" | cut -d' ' -f1; elif have sha256sum; then sha256sum "$1" | cut -d' ' -f1; fi; }
 if [ -n "$GIT" ]; then
 	have git || die "--git needs git"
@@ -212,6 +275,7 @@ if [ -n "$GIT" ]; then
 	fi
 	TAG=
 	[ -n "$PINNED" ] || TAG=$(git -C "$CLONE" tag -l 'v*' | newest_tag)
+	verify_git_ref "${TAG:-$REF}"
 	if [ -n "$TAG" ]; then
 		REF=$TAG
 		SRC="$GIT_URL@$REF (git clone)"
@@ -236,6 +300,7 @@ else
 		esac
 		SRC=$TARBALL
 		SHA=$(sha256_of "$TGZ")
+		sig_fail "unsigned source: DOTZ_TARBALL is no release tag"
 	else
 		API=https://api.github.com/repos/$REPO
 		if [ -z "$PINNED" ]; then
@@ -249,19 +314,21 @@ else
 			if [ -n "$TAG" ]; then REF=$TAG; say "installing the newest release, $REF"; fi
 		fi
 		SRC="github.com/$REPO@$REF"
+		verify_api_ref "$REF"
+		SHA=$VSHA # a verified tag is fetched by the commit it signs; else the commit is resolved first
 		# The commit is resolved first and the tarball fetched by that SHA, so the stamp is exactly what was installed.
 		if [ -n "$TOKEN" ]; then
 			AUTH=token
-			SHA=$(curl -fsSL -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github.sha" "$API/commits/$REF" 2>/dev/null || true)
+			[ -n "$SHA" ] || SHA=$(curl -fsSL -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github.sha" "$API/commits/$REF" 2>/dev/null || true)
 			valid_sha "$SHA" || SHA=
 			curl -fsSL -H "Authorization: Bearer $TOKEN" -o "$TGZ" "$API/tarball/${SHA:-$REF}" || die "download failed with GITHUB_TOKEN: $SRC (token without read access to $REPO?)"
 		else
-			SHA=$(curl -fsSL -H "Accept: application/vnd.github.sha" "$API/commits/$REF" 2>/dev/null || true)
+			[ -n "$SHA" ] || SHA=$(curl -fsSL -H "Accept: application/vnd.github.sha" "$API/commits/$REF" 2>/dev/null || true)
 			valid_sha "$SHA" || SHA=
 			if curl -fsSL -o "$TGZ" "https://codeload.github.com/$REPO/tar.gz/${SHA:-$REF}" 2>/dev/null; then :
 			elif have gh && gh auth status >/dev/null 2>&1; then
 				AUTH=gh
-				SHA=$(gh api -H "Accept: application/vnd.github.sha" "repos/$REPO/commits/$REF" 2>/dev/null || true)
+				[ -n "$SHA" ] || SHA=$(gh api -H "Accept: application/vnd.github.sha" "repos/$REPO/commits/$REF" 2>/dev/null || true)
 				valid_sha "$SHA" || SHA=
 				gh api "repos/$REPO/tarball/${SHA:-$REF}" >"$TGZ" || die "gh could not download $SRC"
 			else

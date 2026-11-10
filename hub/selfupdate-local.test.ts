@@ -13,7 +13,7 @@ let root: string, work: string, pusher: string, logDir: string;
 const push = (file: string, text: string, msg: string) => r.release(file, text, msg);
 const branches = () => sh(work, "branch", "--list", "dotz-local/*").split("\n").filter(Boolean);
 const logFiles = () => (existsSync(logDir) ? readdirSync(logDir) : []);
-const opts = () => ({ dir: work, remote: "origin", branch: "main", testCmd: failFileTestCmd, logDir, dataDir: root });
+const opts = () => ({ dir: work, remote: "origin", branch: "main", testCmd: failFileTestCmd, logDir, dataDir: root, alert: () => {} });
 // Runs the daily auto-check and returns what the orchestrator would have been told about saved local work.
 const autoCheckSaved = async () => {
 	const saved: { file: string; text: string; turn: string }[] = [];

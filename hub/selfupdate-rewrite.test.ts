@@ -12,7 +12,7 @@ const key = (sha: string) => new Bun.CryptoHasher("sha256").update(sha).digest("
 
 let r: Repos;
 let root: string, work: string, pusher: string, logDir: string;
-const opts = () => ({ dir: work, remote: "origin", branch: "main", testCmd: failFileTestCmd, logDir, dataDir: root });
+const opts = () => ({ dir: work, remote: "origin", branch: "main", testCmd: failFileTestCmd, logDir, dataDir: root, alert: () => {} });
 const branches = () => sh(work, "branch", "--list", "dotz-local/*").split("\n").map(b => b.trim()).filter(Boolean);
 const isAncestor = (a: string, b: string) => Bun.spawnSync(["git", "merge-base", "--is-ancestor", a, b], { cwd: work }).exitCode === 0;
 

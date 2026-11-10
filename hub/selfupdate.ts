@@ -26,6 +26,7 @@ import { issueBlock } from "./choices.ts";
 import { CONFIG_FILE, cfg, DATA_DIR, HUB_TOKEN, log, PORT, writeAtomic } from "./config.ts";
 import { FORMAT, type Keep, keepLine, openTrial, parseCommits, type Saved, saveLocal, savedNote, splitEquivalent, writeSavedSummary } from "./selfupdate-local.ts";
 import { compareReleases, diskRelease, failedTestNames, failureBlocks, gateIn, parseRelease, releaseTags, testFailure, testSummary } from "./selfupdate-parse.ts";
+import { type FetchJson, type SigMode, type Signature, signatureAlert as signatureText, signed, verifyGitTag, verifyGithubTag, wantOf } from "./release-verify.ts";
 import { trackTimer } from "./shutdown.ts";
 import type { Pending } from "./update-watchdog.ts";
 
@@ -58,6 +59,7 @@ export type CheckResult = {
 	// Local work that cannot be carried onto the new version by itself (already saved): settings shows the 'keep and update' button.
 	keep?: Keep;
 	rewrite?: { saved?: Saved }; // this install is on a history the remote rewrote (hub/history-rewrite.ts); `saved` holds its local commits
+	signature?: Signature; // the newest release tag checked against the release-signers of the version installed now (hub/release-verify.ts)
 };
 type Job = {
 	id: number;
@@ -86,6 +88,9 @@ export type Options = {
 	dataDir?: string;
 	// Set when the running gateway applies an update to its own code: arm the rollback watchdog for this gateway pid and port.
 	watch?: Watch;
+	signatures?: SigMode; // tests: instead of self_update.signatures
+	sshKeygen?: string; // tests: the ssh-keygen to run
+	alert?: (text: string) => void; // tests: where the once-per-tag signature alert goes
 };
 // spawn: starts the watchdog detached (default spawnDetached); tests pass a fake.
 export type Watch = { pid: number; port: number; spawn?: (cmd: string[]) => void };
@@ -160,8 +165,10 @@ function settings() {
 		remote: typeof o.remote === "string" && o.remote ? o.remote : "origin",
 		branch: typeof o.branch === "string" && o.branch ? o.branch : "main",
 		keep_local: typeof o.keep_local === "boolean" ? o.keep_local : undefined,
+		signatures: o.signatures === "enforce" ? ("enforce" as const) : ("warn" as const),
 	};
 }
+const sigMode = (o: Options): SigMode => o.signatures ?? settings().signatures;
 
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, "");
 function record(logDir: string, text: string): void {
@@ -369,6 +376,7 @@ async function checkTarball(o: Options, v: Tarball, base: CheckResult): Promise<
 	r.summary = `${v.release ?? "설치본"} → ${newest.release.text}`;
 	r.incoming = [{ sha: newest.sha, short: newest.sha.slice(0, 7), date: "", subject: `릴리스 ${newest.tag}` }];
 	r.incomingTotal = 1;
+	r.signature = signed(newest.tag, await verifyGithubTag(gh.json as FetchJson, v.repo, wantOf(o.dir, newest.tag, newest.sha, o.sshKeygen)), sigMode(o), t => record(logDir, t));
 	record(logDir, `check: ${v.release ?? "?"} → ${newest.release.text} (${newest.tag}), ${newest.sha.slice(0, 7)} (${tagsRes.cred.how})`);
 	return r;
 }
@@ -417,7 +425,7 @@ async function applyTarball(o: Options, c: CheckResult, v: Tarball, j: Job, step
 	let to = c.remoteHead as string;
 	let auth = v.auth;
 	// The tarball of the released tag itself (never a branch head): its contents are the released version.
-	const ref = c.available ? `v${c.available}` : to;
+	const ref = c.signature?.status === "verified" ? to : c.available ? `v${c.available}` : to; // a verified release is fetched by the commit that was verified
 	rmSync(stage, { recursive: true, force: true });
 	mkdirSync(join(stage, "x"), { recursive: true });
 	const tgz = join(stage, "src.tgz");
@@ -547,6 +555,7 @@ export async function check(o: Options): Promise<CheckResult> {
 		dirty: dirty.out.split("\n").filter(Boolean).map(l => (/^\S /.test(l) ? ` ${l}` : l)).slice(0, 40),
 		...(old ? { ahead: old.local, incoming: [], incomingTotal: 0, rewrite: old.local.length ? { saved: await saveLocal(exec, dir, logDir, old.local, false).catch(e => (record(logDir, `check: save failed: ${e}`), undefined)) } : {} } : {}),
 	};
+	r.signature = signed(newest.tag, await verifyGitTag(exec, dir, tagRef, wantOf(dir, newest.tag, r.remoteHead ?? "", o.sshKeygen)), sigMode(o), t => record(logDir, t));
 	if (v.branch !== branch) r.blocked.push(`지금 브랜치가 ${v.branch}이에요. ${branch}에서만 업데이트해요.`);
 	if (r.remoteHead && (r.ahead.length || r.dirty.length)) {
 		let why: string | undefined;
@@ -605,6 +614,10 @@ export async function apply(o: Options, how: { keep?: boolean; auto?: boolean } 
 	if (!c.ok || (v.kind !== "git" && v.kind !== "tarball")) return end("failed", `확인 실패: ${c.error?.reason ?? "?"}`);
 	const from = v.commit.sha;
 	j.from = from;
+	if (c.signature && c.signature.status !== "verified") {
+		signalSignature(o, c);
+		if (c.signature.mode === "enforce") return end("refused", signatureText(c.signature));
+	}
 	if (v.kind === "tarball") {
 		if (!updateAvailable(c) || !c.remoteHead) return end("current", `이미 최신이에요 (${v.commit.short}).`);
 		return applyTarball(o, c, v, j, step, end);
@@ -754,7 +767,7 @@ export async function applyAndSave(o: Options = { dir: REPO_DIR }): Promise<Job>
 	return j;
 }
 
-type State = { lastCheck?: CheckResult; notified?: string; autoFailed?: string; autoRefused?: string };
+type State = { lastCheck?: CheckResult; notified?: string; autoFailed?: string; autoRefused?: string; signatureNotified?: string };
 const readState = (): State => {
 	try {
 		return existsSync(STATE_FILE) ? JSON.parse(readFileSync(STATE_FILE, "utf8")) : {};
@@ -780,6 +793,15 @@ const settled = (c: CheckResult) => {
 // What auto_apply needs from main.ts: a worklog post, an alert, and the idle restart gate (never launchctl).
 export type AutoHooks = { worklog: (text: string) => void; alert: (text: string) => void; restartIdle: () => string };
 let autoHooks: AutoHooks | undefined;
+
+// One owner alert per release tag that could not be verified (warn applies anyway, enforce refuses); self-update.json remembers the tag.
+function signalSignature(o: Options, c: CheckResult, hooks: Pick<AutoHooks, "alert"> | undefined = autoHooks): void {
+	const s = c.signature;
+	const send = o.alert ?? hooks?.alert ?? (notifyFn && ((t: string) => notifyFn?.(t, 0)));
+	if (!s || s.status === "verified" || !send || readState().signatureNotified === s.tag) return;
+	send(signatureText(s));
+	saveState({ ...readState(), signatureNotified: s.tag });
+}
 
 const autoChoice = (): string =>
 	issueBlock("dotz 자동 업데이트를 어떻게 할까요?", [
@@ -814,12 +836,13 @@ async function autoApply(o: Options, c: CheckResult, s: State, hooks: AutoHooks)
 	}
 	if (j.status === "failed") s.autoFailed = remoteHead;
 	if (j.status === "refused") s.autoRefused = remoteHead;
-	if (j.status === "current") return;
+	if (j.status === "current" || (j.status === "refused" && j.check?.signature?.status !== "verified" && j.check?.signature)) return; // the signature alert already told the owner
 	hooks.alert(`dotz 자동 업데이트를 하지 못했어요 (${rel}): ${j.message}\n${autoChoice()}`);
 }
 
 export async function autoCheck(o: Options, hooks: AutoHooks | undefined = autoHooks): Promise<void> {
 	const c = await check(o);
+	signalSignature(o, c, hooks);
 	const s = readState();
 	s.lastCheck = c;
 	settled(c);
