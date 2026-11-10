@@ -114,7 +114,7 @@ const SPECS: Record<string, Spec> = {
 		landed: (now, c) => now === c.latest,
 	},
 	omo: {
-		label: "실행 하네스",
+		label: "작업 프로그램",
 		check: checkOmo,
 		version: versionOf(OMO),
 		install: t => bunAdd("omo-ai@latest", t),
@@ -227,7 +227,7 @@ if (import.meta.main) {
 		const t = { run: defaultRun, latest: npmLatest };
 		const ids = activeHarness().ids.filter(id => SPECS[id]);
 		for (const id of ids) console.log(describe(await SPECS[id].check(t), SPECS[id].label));
-		if (!ids.length) console.log("업데이트를 확인할 실행 하네스가 없어요.");
+		if (!ids.length) console.log("업데이트를 확인할 작업 프로그램이 없어요.");
 		process.exit(0);
 	} else if (process.argv.includes("--telemetry-off")) {
 		for (const l of telemetryOff()) console.log(l);

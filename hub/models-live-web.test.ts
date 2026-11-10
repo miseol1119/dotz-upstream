@@ -8,7 +8,7 @@ import { REPLY_DEFAULT } from "./reply-model.ts";
 import { appAsset, indexPage } from "./webapp.ts";
 
 // The model a target really answers on (home cards, the composer chip, 모델·폴백's 실제로 쓰는 모델): the running process's model first,
-// with 폴백 중 and why when it is not the configured one. Headless Bun.WebView against a stub gateway.
+// with 대체 모델 사용 중 and why when it is not the configured one. Headless Bun.WebView against a stub gateway.
 const SHOTS = process.env.MODELS_SHOTS;
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 const OPUS = "anthropic/claude-opus-5-5";
@@ -86,14 +86,14 @@ const boot = async () => {
 };
 
 describe("REQ1: home cards and the composer chip show the model in use", () => {
-	test("the greeting shows the fallback model and 폴백 중 with the reason and return time, not the configured model", async () => {
+	test("the greeting shows the fallback model and 대체 모델 사용 중 with the reason and return time, not the configured model", async () => {
 		const v = await boot();
 		await run(v, `go("home"); renderHome()`);
 		await waitFor(v, `document.querySelector("#home-now .hgreet .meta")`);
 		const r = await q<{ meta: string; tag: string }>(v, `const g = document.querySelector("#home-now .hgreet"); return { meta: g.querySelector(".meta").textContent, tag: (g.querySelector(".tag.warn") || {}).textContent || "" }`);
 		expect(r.meta).toContain("Sonnet 5.5");
 		expect(r.meta).not.toContain("Opus");
-		expect(r.tag).toStartWith("폴백 중 · 한도 소진 · ");
+		expect(r.tag).toStartWith("대체 모델 사용 중 · 한도 소진 · ");
 		expect(r.tag).toEndWith("에 복귀");
 		await shot(v, "home.png");
 	});
@@ -101,15 +101,15 @@ describe("REQ1: home cards and the composer chip show the model in use", () => {
 		const v = await boot();
 		const r = await q<{ model: string; tag: string }>(v, `const n = document.querySelector("#v-home .smodel"); return { model: n ? n.firstChild.textContent : "", tag: n ? n.querySelector(".tag.warn").textContent : "" }`);
 		expect(r.model).toEndWith("Sonnet 5.5 · 높음");
-		expect(r.tag).toStartWith("폴백 중 · 한도 소진");
+		expect(r.tag).toStartWith("대체 모델 사용 중 · 한도 소진");
 	});
-	test("the composer chip names the model in use and shows 폴백 중 beside it; the configured model is gone", async () => {
+	test("the composer chip names the model in use and shows 대체 모델 사용 중 beside it; the configured model is gone", async () => {
 		const v = await boot();
 		await run(v, `target = MAIN; renderCtxRing()`);
 		const r = await q<{ model: string; fb: string; hidden: boolean; title: string }>(v, `const f = document.querySelector("#c-fb"); return { model: document.querySelector("#c-model").textContent, fb: f.textContent, hidden: f.hidden, title: f.title }`);
 		expect(r.model).toBe("Sonnet 5.5");
 		expect(r.hidden).toBe(false);
-		expect(r.fb).toStartWith("폴백 중 · 한도 소진");
+		expect(r.fb).toStartWith("대체 모델 사용 중 · 한도 소진");
 		expect(r.title).toContain("Opus 5.5");
 	});
 	test("a project conversation's row reads as main's; its model chip shows its own choice and the menu leads back to main's", async () => {
@@ -147,10 +147,10 @@ describe("REQ2/REQ3/REQ5 on 모델·폴백", () => {
 		expect(rows.map(r => r.key)).toEqual(["main", "background", "lookups", "lanes", "lane:pay", "workers", "replies", "reply:mail", "outlang"]);
 		const by = Object.fromEntries(rows.map(r => [r.key, r]));
 		expect(by.main!.model).toBe("Sonnet 5.5 · 높음");
-		expect(by.main!.tag).toStartWith("폴백 중 · 한도 소진");
+		expect(by.main!.tag).toStartWith("대체 모델 사용 중 · 한도 소진");
 		expect(by.background!.model).toBe("Sonnet 5.5 · 높음");
 		expect(by.lookups!.model).toBe("Sonnet 5.5 · 보통");
-		expect(by["lane:pay"]!.tag).toStartWith("폴백 중");
+		expect(by["lane:pay"]!.tag).toStartWith("대체 모델 사용 중");
 		expect(by["reply:mail"]!.model).toBe("Opus 5.5 · 낮음");
 		expect(by.replies!.model).toBe("Sonnet 5.5 · 높음");
 		for (const k of ["main", "background", "lanes", "lane:pay", "workers", "replies", "reply:mail"]) expect(by[k]!.btn).toBe(true);

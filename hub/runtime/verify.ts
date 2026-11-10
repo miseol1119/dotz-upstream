@@ -55,12 +55,12 @@ const ADJUST: Record<string, { result: "adapted" | "disabled"; note: string }> =
 	handover: { result: "adapted", note: "허브가 저장된 세션에서 최근 대화를 읽어 새 세션 첫 프롬프트로 넘겨요" },
 	compaction_events: { result: "adapted", note: "허브가 토큰 수치로 직접 컴팩션 시점을 정해요" },
 	steer_abort: { result: "adapted", note: "끼어들기는 현재 턴이 끝난 뒤 이어서 보내고, 중단은 프로세스 종료로 처리해요" },
-	guard_extension: { result: "disabled", note: "가드 확장(브리핑·패치·예산 점검)은 이 런타임에서 돌지 않아요. 차단 명령은 '차단 명령 적용' 항목이 따로 막아요" },
-	dotz_tools: { result: "disabled", note: "게이트웨이 도구(레인·기억 등)를 이 런타임에서는 쓰지 않아요" },
+	guard_extension: { result: "disabled", note: "가드 확장(브리핑·패치·예산 점검)은 이 작업 프로그램에서 돌지 않아요. 차단 명령은 '차단 명령 적용' 항목이 따로 막아요" },
+	dotz_tools: { result: "disabled", note: "게이트웨이 도구(레인·기억 등)를 이 작업 프로그램에서는 쓰지 않아요" },
 	tool_intent: { result: "disabled", note: "도구 호출의 의도 줄을 보여주지 않아요" },
 	workers_spawn: { result: "disabled", note: "작업자(서브에이전트) 기능을 꺼요" },
 	workers_isolated_patch: { result: "disabled", note: "격리 작업자와 패치 병합을 꺼요" },
-	fallback_chain: { result: "disabled", note: "모델 폴백 체인을 이 런타임에서는 쓰지 않아요. 한도·오류 때는 기존처럼 기다렸다가 같은 모델로 다시 시도해요" },
+	fallback_chain: { result: "disabled", note: "대체 모델 순서를 이 작업 프로그램에서는 쓰지 않아요. 한도·오류 때는 기존처럼 기다렸다가 같은 모델로 다시 시도해요" },
 };
 
 export function verdictOf(items: CheckItem[]): VerifyReport["verdict"] {
@@ -98,7 +98,7 @@ export async function detectAll(refresh = false): Promise<Detected[]> {
 			const adapter = Object.hasOwn(adapters, id) ? adapters[id] : undefined;
 			const d = await (adapter ?? DETECT_ONLY[id]).detect();
 			const hasAdapter = !!adapter;
-			const reason = !d.installed ? "설치 안 됨" : !hasAdapter ? "어댑터 없음" : undefined;
+			const reason = !d.installed ? "설치 안 됨" : !hasAdapter ? "아직 지원 안 해요" : undefined;
 			return { id, label: RUNTIME_LABEL[id], ...d, hasAdapter, usable: d.installed && hasAdapter, reason };
 		}),
 	);
@@ -135,7 +135,7 @@ export async function verifyRuntime(id: RuntimeId, o: VerifyOpts = {}): Promise<
 		mkdirSync(dir(), { recursive: true });
 		const version = o.version ?? (await detectAll()).find(d => d.id === id)?.version;
 		if (!adapter) {
-			for (const c of CHECKLIST) raw.push({ ...c, result: "fail", note: "어댑터 없음" });
+			for (const c of CHECKLIST) raw.push({ ...c, result: "fail", note: "아직 지원 안 해요" });
 		} else {
 			const probes = o.probes ?? (adapter as Probing).probes ?? {};
 			const model = o.model ?? selectorOf(orchestratorModel());
@@ -147,7 +147,7 @@ export async function verifyRuntime(id: RuntimeId, o: VerifyOpts = {}): Promise<
 				const probe = Object.hasOwn(probes, c.id) ? probes[c.id] : undefined;
 				let r: { result: CheckResult; note: string };
 				// omp is the harness the hub was first built on: without probes of its own its items are the baseline.
-				if (!probe) r = id === "omp" ? { result: "ok", note: "기준 하네스예요" } : { result: "unsupported", note: "이 런타임에서 확인하는 방법이 없어요" };
+				if (!probe) r = id === "omp" ? { result: "ok", note: "처음에 쓰던 작업 프로그램이에요" } : { result: "unsupported", note: "이 작업 프로그램에서는 확인할 방법이 없어요" };
 				else {
 					note(`probe ${c.id} start`);
 					try {
@@ -199,16 +199,16 @@ export class UseRefused extends Error {}
 // ever chosen explicitly. The default runtime (OmO) needs its report like any other, but going back to it when it is
 // installed is never refused, so a failed check cannot strand the gateway on an opt-in runtime.
 export function refusalFor(id: string, detected: Detected | undefined, report: VerifyReport | undefined): string | undefined {
-	if (!RUNTIME_IDS.includes(id as RuntimeId)) return `알 수 없는 실행 하네스예요: ${id}`;
+	if (!RUNTIME_IDS.includes(id as RuntimeId)) return `알 수 없는 작업 프로그램이에요: ${id}`;
 	if (id === "omp") return undefined;
 	if (id === DEFAULT_RUNTIME && detected?.installed && detected.hasAdapter) return undefined;
 	if (!detected?.installed) return "설치되어 있지 않아요";
-	if (!detected.hasAdapter) return "이 하네스용 어댑터가 없어요";
-	if (states.get(id)?.running) return "호환성 검사가 아직 끝나지 않았어요";
-	if (!report) return "호환성 검사를 먼저 해야 해요";
+	if (!detected.hasAdapter) return "dotz가 아직 지원하지 않아요";
+	if (states.get(id)?.running) return "작동 검사가 아직 끝나지 않았어요";
+	if (!report) return "작동 검사를 먼저 해야 해요";
 	// The stored verdict is not trusted: it is recomputed, and a report missing a core item counts as blocked.
 	const missingCore = CHECKLIST.some(c => c.core && !report.items.some(i => i.id === c.id));
-	if (missingCore || verdictOf(report.items) === "blocked") return "호환성 검사에서 막혔어요. 핵심 항목이 통과해야 해요";
+	if (missingCore || verdictOf(report.items) === "blocked") return "작동 검사에서 막혔어요. 핵심 항목이 통과해야 해요";
 	if (detected.version && report.version !== detected.version) return `검사한 뒤 버전이 바뀌었어요 (${report.version ?? "알 수 없음"} → ${detected.version}). 다시 검사해 주세요`;
 	return undefined;
 }

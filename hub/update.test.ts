@@ -39,7 +39,7 @@ test("a new omo-ai installs, verifies and asks for one restart", async () => {
 	const h = harness({ run: omo.run, latest: "5.1.40" });
 	const lines = await runHarnessUpdate(h.deps);
 	expect(adds(omo.state.calls)).toEqual([[process.execPath, "add", "-g", "omo-ai@latest"]]);
-	expect(lines).toEqual(["실행 하네스 5.1.38 → 5.1.40 올리고 재시작해요 (하던 일이 끝나면)."]);
+	expect(lines).toEqual(["작업 프로그램 5.1.38 → 5.1.40 올리고 재시작해요 (하던 일이 끝나면)."]);
 	expect(h.posts).toEqual(lines);
 	expect(h.alerts).toEqual([]);
 	expect(h.restarts()).toBe(1);
@@ -136,5 +136,5 @@ test("version order and the owner-facing check line", () => {
 	expect(newer("5.1.40", "5.1.38")).toBe(true);
 	expect(newer("5.1.38", "5.1.38")).toBe(false);
 	expect(newer("5.1.9", "5.1.10")).toBe(false);
-	expect(describe({ status: "new", current: "5.1.38", latest: "5.1.40" }, "실행 하네스")).toBe("실행 하네스 새 버전이 있어요 (5.1.38 → 5.1.40).");
+	expect(describe({ status: "new", current: "5.1.38", latest: "5.1.40" }, "작업 프로그램")).toBe("작업 프로그램 새 버전이 있어요 (5.1.38 → 5.1.40).");
 });

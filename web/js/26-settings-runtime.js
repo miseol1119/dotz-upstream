@@ -14,12 +14,12 @@ function rtSection() {
   const others = RT.runtimes.filter(r => r.installed).map(r => ({ value: r.id, label: r.label, sub: [r.version ? `v${r.version}` : "", r.roles.length ? "현재 쓰는 중" : ""].filter(Boolean).join(" · ") || undefined }));
   const rows = RT.runtimes.filter(r => r.roles.length > 0).map(r => {
     const sub = [r.version ? `v${r.version}` : "", r.roles.length === 2 ? "사용 중" : `${r.roles.map(k => RT_ROLE[k]).join("·")} 사용 중`].filter(Boolean).join(" · ");
-    const b = el("button", { class: "li tap", type: "button", "data-runtime": r.id, "aria-haspopup": "listbox", "aria-expanded": "false", "aria-label": `실행 하네스: ${r.label}. 눌러서 바꾸기` },
+    const b = el("button", { class: "li tap", type: "button", "data-runtime": r.id, "aria-haspopup": "listbox", "aria-expanded": "false", "aria-label": `작업 프로그램: ${r.label}. 눌러서 바꾸기` },
       el("span", { class: "lead" }, icon(RT_ICON[r.id] || "harness")), el("span", { class: "tx" }, el("div", { class: "hd", text: r.label }), el("div", { class: "sup", text: sub })), icon("drop"));
     b.addEventListener("click", () => showMenu(b, others.filter(o => o.value !== r.id), { onPick: id => rtFlow(RT.runtimes.find(x => x.id === id)) }));
     return b;
   });
-  return [el("div", { class: "sec", text: "실행 하네스" }), el("div", { class: "list" }, ...rows), el("div", { class: "note", text: "바꾼 뒤에는 어시스턴트와 세션을 다시 시작해야 적용돼요." })];
+  return [el("div", { class: "sec", text: "작업 프로그램" }), el("div", { class: "list" }, ...rows), el("div", { class: "note", text: "바꾼 뒤에는 어시스턴트와 세션을 다시 시작해야 적용돼요." })];
 }
 function rtBadge(it) {
   const [label, tone] = RT_RESULT[it.result] || [it.result, ""];
@@ -29,7 +29,7 @@ function rtReportView(r, report) {
   const core = report.items.filter(i => i.core && (i.result === "fail" || i.result === "unsupported"));
   const changed = report.items.filter(i => i.result === "adapted" || i.result === "disabled").length;
   const stale = !!(r.version && report.version !== r.version);
-  const sum = !r.hasAdapter ? "이 하네스용 어댑터가 없어서 바꿀 수 없어요."
+  const sum = !r.hasAdapter ? "dotz가 아직 지원하지 않아서 바꿀 수 없어요."
     : report.verdict === "blocked" ? `핵심 항목이 통과하지 못해서 바꿀 수 없어요: ${core.map(i => i.label).join(", ")}`
     : stale ? `검사한 뒤 버전이 바뀌었어요 (v${report.version || "?"} → v${r.version}). 다시 검사해 주세요.`
     : report.verdict === "adjusted" ? `핵심 항목은 모두 통과했어요. ${changed}개 기능은 게이트웨이가 대신 처리하거나 꺼요.` : "모든 항목이 통과했어요.";
@@ -61,14 +61,14 @@ function rtFlow(r) {
     clear(box);
     const running = checking || (st && st.running);
     if (r.id !== "omp") {
-      if (running) box.append(el("div", {}, el("p", { text: `호환성을 검사하는 중이에요${st && st.current ? ` · ${st.current}` : ""}` }), el("div", { class: "bar" }, el("i", { style: `width:${st && st.total ? Math.round((st.done / st.total) * 100) : 4}%` })), el("div", { class: "note", text: st && st.total ? `${st.done}/${st.total} 항목` : "시작하는 중…" })));
+      if (running) box.append(el("div", {}, el("p", { text: `작동을 검사하는 중이에요${st && st.current ? ` · ${st.current}` : ""}` }), el("div", { class: "bar" }, el("i", { style: `width:${st && st.total ? Math.round((st.done / st.total) * 100) : 4}%` })), el("div", { class: "note", text: st && st.total ? `${st.done}/${st.total} 항목` : "시작하는 중…" })));
       else if (report) box.append(rtReportView(r, report));
-      else if (r.id === "omo" && r.hasAdapter) box.append(el("p", { text: "OmO는 기본 하네스라서 검사 없이 돌아갈 수 있어요. 호환성 검사로 항목별 상태도 볼 수 있어요." }));
-      else box.append(el("p", { text: r.hasAdapter ? "바꾸기 전에 호환성을 검사해요. 짧은 실행을 실제로 해 보기 때문에 1~2분쯤 걸릴 수 있어요." : "이 하네스용 어댑터가 없어서 이 하네스로는 바꿀 수 없어요. 호환성 검사를 하면 어떤 항목이 막히는지 볼 수 있어요." }));
-    } else box.append(el("p", { text: "omp는 옵션 하네스예요. 처음 기준이었던 하네스라 검사 없이 바꿀 수 있어요." }));
+      else if (r.id === "omo" && r.hasAdapter) box.append(el("p", { text: "OmO는 기본 작업 프로그램이라서 검사 없이 쓸 수 있어요. 작동 검사로 항목별 상태도 볼 수 있어요." }));
+      else box.append(el("p", { text: r.hasAdapter ? "바꾸기 전에 잘 작동하는지 검사해요. 짧은 작업을 실제로 돌려 보기 때문에 1~2분쯤 걸릴 수 있어요." : "dotz가 아직 지원하지 않아서 바꿀 수 없어요. 작동 검사를 하면 어떤 항목이 막히는지 볼 수 있어요." }));
+    } else box.append(el("p", { text: "omp는 선택해서 쓰는 작업 프로그램이에요. 처음에 쓰던 것이라 검사 없이 바꿀 수 있어요." }));
     if (r.hasAdapter) box.append(roleBar());
     const acts = [{ label: "취소", onclick: c => c() }];
-    if (r.id !== "omp" && !running) acts.push({ label: report ? "다시 검사" : "호환성 검사", kind: report ? "text" : "tonal", onclick: () => check() });
+    if (r.id !== "omp" && !running) acts.push({ label: report ? "다시 검사" : "작동 검사", kind: report ? "text" : "tonal", onclick: () => check() });
     acts.push({ label: r.id === "omp" ? "사용" : "조정 후 사용", kind: "pri", disabled: running || !usable() || !roles.size, onclick: (c, btn) => busy(btn, async () => {
       try { const res = await api(`/api/runtimes/${r.id}/use`, "POST", { roles: [...roles] }); toast(res.applies); c(); }
       catch (e) { await pull(); throw e; } }) });

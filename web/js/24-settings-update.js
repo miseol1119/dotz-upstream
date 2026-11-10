@@ -136,7 +136,7 @@ async function hvCheck(btn) {
   await busy(btn, async () => {
     HV.info = await api("/api/harness/update/check", "POST");
     const n = hvNew();
-    toast(n ? `실행 하네스 새 버전 ${n}개가 있어요` : "실행 하네스는 최신이에요");
+    toast(n ? `작업 프로그램 새 버전 ${n}개가 있어요` : "작업 프로그램은 최신이에요");
   });
   paintUpdBadge();
   renderSettings();
@@ -215,7 +215,7 @@ function hvSwitcher(h) {
   const rt = hvRt().find(r => r.id === h.id);
   const others = hvRt().filter(r => r.installed && r.id !== h.id).map(r => ({ value: r.id, label: r.label, sub: [r.version ? `v${r.version}` : "", hvRoles(r)].filter(Boolean).join(" · ") || undefined }));
   if (!rt || !others.length) return null;
-  return el("button", { class: "btn tonal inrow", type: "button", "aria-label": `${h.name} 바꾸기`, "aria-haspopup": "listbox", "aria-expanded": "false", title: "실행 하네스 바꾸기", onclick: ev => showMenu(ev.currentTarget, others, { onPick: id => rtFlow(hvRt().find(x => x.id === id)) }) }, icon("drop"));
+  return el("button", { class: "btn tonal inrow", type: "button", "aria-label": `${h.name} 바꾸기`, "aria-haspopup": "listbox", "aria-expanded": "false", title: "작업 프로그램 바꾸기", onclick: ev => showMenu(ev.currentTarget, others, { onPick: id => rtFlow(hvRt().find(x => x.id === id)) }) }, icon("drop"));
 }
 const hvNote = text => el("div", { class: "note", text });
 function hvJobLine(j) {
@@ -245,8 +245,8 @@ function hvSection() {
   if (pending) list.push(hvJobLine(pending));
   else for (const h of hs) if (h.job && h.job.status !== "current") list.push(hvJobLine(h.job));
   const notes = [hvNote("6시간마다 새 버전을 확인해요. 업데이트는 하던 일이 끝난 뒤에 설치하고, 새 버전으로 다시 시작해요. 설치가 실패하면 지금 버전을 그대로 써요.")];
-  if (running.length) notes.push(hvNote("바꾼 뒤에는 어시스턴트와 세션을 다시 시작해야 적용돼요. 바꾸기 전에 호환성을 검사해요."));
-  return [el("div", { class: "sec sec-act" }, el("span", { text: "하네스 버전" }), hvNew() ? el("span", { class: "tag warn upd-new", text: "새 버전" }) : null,
+  if (running.length) notes.push(hvNote("바꾼 뒤에는 어시스턴트와 세션을 다시 시작해야 적용돼요. 바꾸기 전에 작동을 검사해요."));
+  return [el("div", { class: "sec sec-act" }, el("span", { text: "작업 프로그램 버전" }), hvNew() ? el("span", { class: "tag warn upd-new", text: "새 버전" }) : null,
     el("button", { class: "btn tonal sm", type: "button", disabled: !!(HV.info && HV.info.checking), onclick: ev => hvCheck(ev.currentTarget) }, "확인")), el("div", { class: "list" }, ...list), ...notes];
 }
 function updateSection() {

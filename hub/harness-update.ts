@@ -285,7 +285,7 @@ export async function applyHarness(id: string, t: Tools): Promise<Job> {
 	};
 	try {
 		const st = (await checkHarness(t, { force: true, ids: [id] }))[0];
-		if (!st) return end("failed", "업데이트할 실행 하네스를 찾지 못했어요.");
+		if (!st) return end("failed", "업데이트할 작업 프로그램을 찾지 못했어요.");
 		j.from = st.current ?? undefined;
 		if (st.installMethod === "managed") return end("failed", `${st.name}는 ${st.managedBy ?? "다른 프로그램"}이 관리해서 여기서 바꾸지 않아요. 그 프로그램에서 업데이트해 주세요.`);
 		if (st.installMethod === "app") return end("failed", `${st.name}는 앱으로 설치돼 있어서 여기서 바꾸지 않아요. 앱에서 업데이트해 주세요.`);
@@ -373,7 +373,7 @@ export async function harnessUpdateRoute(req: Request, url: URL, deps: RouteDeps
 	if (req.method === "POST" && p === "/api/harness/update/apply") {
 		const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 		const id = typeof b.id === "string" ? b.id : "";
-		if (!SUPPORTED.includes(id)) return json({ error: "알 수 없는 실행 하네스예요" }, 400);
+		if (!SUPPORTED.includes(id)) return json({ error: "알 수 없는 작업 프로그램이에요" }, 400);
 		// A background badge check may still be reading the registry: let it finish, then the apply's own check runs.
 		if (isChecking()) await ensureChecked(t).catch(() => []);
 		const running = jobOf(id);

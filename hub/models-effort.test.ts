@@ -212,7 +212,7 @@ describe("the in-use card is compact", () => {
 		expect(g.text).toBe("");
 		expect(g.label).toBe("메인 어시스턴트 바꾸기");
 		expect(g.title).toContain("V4.1 flash ultrafast · 보통");
-		expect(g.tagTitle).toContain("폴백 중 · 한도 소진");
+		expect(g.tagTitle).toContain("대체 모델 사용 중 · 한도 소진");
 		expect(g.tagTitle).toContain("기본 모델 Opus 5.5 · 높음 대신 쓰는 중");
 		await shot(v, "after-1280.png");
 		const noAct = await q<boolean>(v, `return !document.querySelector('.mt-use-row[data-use="lookups"] .mt-use-act') && !document.querySelector('.mt-use-row[data-use="outlang"] .mt-use-act')`);

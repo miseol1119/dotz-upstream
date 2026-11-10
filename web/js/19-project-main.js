@@ -510,7 +510,7 @@ async function loadContext(quiet) {
 // "<model>:<thinking>" selector -> readable "model · thinking".
 function selLabel(sel) {
   const i = sel.lastIndexOf(":"), level = sel.slice(i + 1);
-  return i > 0 && ((M && M.thinking_levels) || []).includes(level) ? `${modelName(sel.slice(0, i))} · ${level}` : modelName(sel);
+  return i > 0 && ((M && M.thinking_levels) || []).includes(level) ? `${modelName(sel.slice(0, i))} · ${thinkKo(level)}` : modelName(sel);
 }
 function renderContext() {
   const box = $("#context");
@@ -566,7 +566,7 @@ function ctxModels() {
 }
 function ctxDialog(m) {
   const L = C.limits || {};
-  const win = input({ type: "text", inputmode: "numeric", value: m.window ? String(m.window) : "", placeholder: m.window_default ? `기본 ${num(m.window_default)}` : "기본 (런타임 값)" });
+  const win = input({ type: "text", inputmode: "numeric", value: m.window ? String(m.window) : "", placeholder: m.window_default ? `기본 ${num(m.window_default)}` : "기본값" });
   const at = input({ type: "text", inputmode: "numeric", value: m.compact_at ? String(m.compact_at) : "", placeholder: `기본 ${num(m.compact_at_default)}` });
   const err = el("p", { class: "sup err-t", role: "alert" });
   const save = (c, btn, body, msg) => busy(btn, async () => {

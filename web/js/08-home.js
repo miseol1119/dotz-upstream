@@ -45,7 +45,7 @@ function homeMenu(anchor, id, inChat) {
     if (cur) {
       add("모델 변경…", () => showMenu(anchor, modelItems(key, cur.model, ""), { value: cur.model, onPick: v => busy(null, () => putModel(key, name, { model: v }, restartNote, `${modelName(v)} · ${cur.thinking}`)) }));
       add("추론 강도…", () => showMenu(anchor, effortItems(cur.model, cur.thinking), { value: cur.thinking, onPick: v => busy(null, () => putModel(key, name, { thinking: v }, restartNote, `${modelName(cur.model)} · ${thinkKo(v)}`)) }));
-      add("모델 · 폴백 설정", () => openModels(key));
+      add("모델 설정", () => openModels(key));
     }
     if (id === MAIN) {
       if (S && S.orchestrator && S.orchestrator.status === "working") add("중단", () => abortOrch(null));

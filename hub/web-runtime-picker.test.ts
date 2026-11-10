@@ -44,7 +44,7 @@ function harness(runtimes = RUNTIMES) {
 	return { g, calls, menus, dialogs };
 }
 
-describe("settings: 실행 하네스 picker", () => {
+describe("settings: 작업 프로그램 picker", () => {
 	test("renders only the running harness, not the whole list", async () => {
 		const { g } = harness();
 		await g.loadRuntimes();

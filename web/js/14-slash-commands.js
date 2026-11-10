@@ -450,7 +450,7 @@ function renderCtxRing() {
 }
 /* ---------- composer chips: model / effort / context of the current target (GET/PUT /api/target) ---------- */
 // The chips are quick switches; the last row of each opens the 모델 · 폴백 screen at this target (fallback order lives there).
-const MODELS_LINK = { value: "__models", label: "모델 · 폴백 설정", sub: "폴백 순서까지" };
+const MODELS_LINK = { value: "__models", label: "모델 설정", sub: "대체 모델 순서까지" };
 const targetParam = () => isLaneT(target) || isProjT(target) ? target : "main";
 // The context ring and its 압축 stay on the session they read; the hub maps the target to it (hub/control.ts convOf).
 const ctxParam = () => target;

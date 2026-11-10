@@ -91,7 +91,7 @@ export async function routeSettings(req: Request, url: URL, parts: string[]): Pr
 	if (parts[0] === "api" && parts[1] === "runtimes") {
 		if (req.method === "GET" && parts.length === 2) return json(await runtimesView(url.searchParams.get("refresh") === "1"));
 		const id = parts[2];
-		if (!RUNTIME_IDS.includes(id as never)) return json({ error: `알 수 없는 실행 하네스예요: ${id}` }, 404);
+		if (!RUNTIME_IDS.includes(id as never)) return json({ error: `알 수 없는 작업 프로그램이에요: ${id}` }, 404);
 		if (req.method === "GET" && parts.length === 3) return json({ id, report: lastReport(id) ?? null, state: verifyState(id) ?? null });
 		if (req.method === "POST" && parts[3] === "verify" && parts.length === 4) {
 			const b = await body(req);

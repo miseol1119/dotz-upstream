@@ -6,7 +6,7 @@ const SET_PAGE = {
   notifications: { title: "앱과 알림", ic: "bell", build: () => pushSection() },
   display: { title: "표시", ic: "settings", build: () => displayPage() },
   update: { title: "업데이트", ic: "download", build: () => updateSection() },
-  runtime: { title: "실행 하네스", ic: "term", build: () => { const s = hvSection(); return s.length ? s : [emptyNode(UPD.info && UPD.info.error ? "실행 하네스를 확인하지 못했어요" : "실행 하네스를 확인하는 중이에요")]; } },
+  runtime: { title: "작업 프로그램", ic: "term", build: () => { const s = hvSection(); return s.length ? s : [emptyNode(UPD.info && UPD.info.error ? "작업 프로그램을 확인하지 못했어요" : "작업 프로그램을 확인하는 중이에요")]; } },
 };
 for (const [id, p] of Object.entries(SET_PAGE)) {
   views.push(id); SUB.add(id); titles[id] = p.title; VIEW_ICON[id] = p.ic;
@@ -75,7 +75,7 @@ function settingsList(go) {
   const nodes = [
     stSec("모델"), stList(
       stRow("key", "계정", [stAccountSub(), connected != null ? `${connected}개 연결` : ""].filter(Boolean).join(" · "), () => go("accounts")),
-      stRow("model", "모델 · 폴백", om ? [modelName(om.model), thinkKo(om.thinking)].filter(Boolean).join(" · ") : "", () => openModels("orchestrator")),
+      stRow("model", "모델", om ? [modelName(om.model), thinkKo(om.thinking)].filter(Boolean).join(" · ") : "", () => openModels("orchestrator")),
       stRow("usage", "사용량과 월 한도", stUsageSub(), () => go("usage")),
       stRow("context", "컨텍스트", "", () => go("context"))),
     stSec("연결"), stList(
@@ -91,7 +91,7 @@ function settingsList(go) {
       stRow(themeIc(), "표시", `${themeIs() === "dark" ? "다크" : "라이트"} · 대화 탭 ${chatTabMode() === "main" ? "메인" : "마지막"}`, () => go("display"))),
     stSec("시스템"), stList(
       stRow("download", "업데이트", stUpdateSub(), () => go("update"), updRestartPending() ? stTag("재시작 필요") : updAvailable() ? stTag("새 버전") : undefined),
-      stRow("term", "실행 하네스", stRuntimeSub(), () => go("runtime"), hvNew() ? stTag("새 버전") : undefined),
+      stRow("term", "작업 프로그램", stRuntimeSub(), () => go("runtime"), hvNew() ? stTag("새 버전") : undefined),
       stRow("harness", "구성", "시스템 지도", () => go("harness"))),
   ];
   return nodes;

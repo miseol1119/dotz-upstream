@@ -210,14 +210,14 @@ function fbParts(L) {
       else if (list.some(x => x.model === v && !x.key_file) || fbBase(v) === prim) toast("이미 있는 모델이에요", true);
       else { fbOpen = { layer: L.id, i: list.length, draft: fbDraftOf({ model: v }) }; fbSave(L.id, [...list, { model: v }]); }
     } });
-  } }, icon("add"), full ? "더 넣을 수 없어요" : "폴백 추가");
+  } }, icon("add"), full ? "더 넣을 수 없어요" : "대체 모델 추가");
   const how = L.id === "workers" ? "실행 중인 서브에이전트는 다음 시작부터 반영돼요."
     : F.harness && F.harness.id === "claude" ? "Claude Code는 Anthropic 모델만, 조건 없이 넘어가요."
     : "";
   return {
     sub: L.sub,
     chain: (pick, notes) => el("div", { class: "mt-fb" },
-      el("ol", { class: "fb-list", "aria-label": `${L.title()} 폴백 순서` },
+      el("ol", { class: "fb-list", "aria-label": `${L.title()} 대체 모델 순서` },
         el("li", { class: `fb-item base${used.has(prim) ? " in-use" : ""}` }, el("span", { class: "fb-n", text: "1" }), pick),
         notes.length ? el("li", { class: "fb-sub" }, ...notes) : null,
         ...list.flatMap((e, i) => (open(i) ? [itemFor(e, i), fbEditor(L, F, list, i, move)] : [itemFor(e, i)]))),
