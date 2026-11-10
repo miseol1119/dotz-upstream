@@ -91,6 +91,16 @@ export const closedInfo = (n: Notice, how: ClosedCard["how"]): ClosedCard | unde
 };
 export const refOf = (e: HubEvent): string | undefined => (typeof e.reply_to === "string" && e.reply_to ? e.reply_to : undefined);
 export const hasChoice = (i: Notice) => !!i.decision && i.decision.options.length > 0 && !i.decision.assumed;
+// Whether a typed message answers a decision that has real options: it opens with an option's number ("2", "2)", "2번", "1-1") or is the option's
+// label (alone, or followed by a comma / full stop). Anything else is another subject, so the decision stays open.
+const LEAD_NUMBERS = /^(\d+)(?:\s*-\s*(\d+))?\s*(?:[).:\]]|번)?(?=\s|$)/;
+const bare = (s: string) => s.replace(/\s*…\s*$/, "").trim().toLowerCase();
+export function answersOption(options: { n: number; label: string; say?: string }[], text: string): boolean {
+	const t = text.trim().toLowerCase();
+	const lead = LEAD_NUMBERS.exec(t);
+	if (lead && options.some(o => o.n === Number(lead[1]) || (lead[2] !== undefined && o.n === Number(lead[2])))) return true;
+	return options.some(o => [o.label, o.say ?? ""].some(w => bare(w) && (t === bare(w) || (t.startsWith(bare(w)) && /^[,.!~)]/.test(t.slice(bare(w).length))))));
+}
 
 export function authorOf(e: HubEvent): string | undefined {
 	if (e.kind === "lane_report") return typeof e.lane === "string" && e.lane ? `lane:${e.lane}` : undefined;

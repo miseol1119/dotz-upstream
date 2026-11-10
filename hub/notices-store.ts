@@ -13,7 +13,7 @@ import { describeOutput, humanLabel, isIssue, itemRefOf, LOGIN_BLOCKED_KO, match
 import { resolveItem, type WatchItem } from "./watchitem.ts";
 import type { Decision, DecisionOpt, Notice, NoticeKind, NoticeTone } from "./notices-types.ts";
 import { appBlocked, appOf, closedHooks, decisionHooks, orchestratorUp, stampApp, summarizeWatch, unreadHooks, watchLabelOf } from "./notices-wiring.ts";
-import { BACKFILL_DAYS, DAY_MS, FOLD_MS, LOUD, MESSAGE_PREVIEW, NOTICE_CAP, REASK_MS, REPEATS_MAX, REPEAT_TEXT, RESTART_PREFIX, authorOf, clean, closedInfo, coveredByRead, hasChoice, hasExpired, isAsking, isOpenDecision, keepWatchNewest, laneTone, needsAnswer, originOf, refOf, systemTitle, twinOf, waitKind, waitsOf } from "./notices-rules.ts";
+import { BACKFILL_DAYS, DAY_MS, FOLD_MS, LOUD, MESSAGE_PREVIEW, NOTICE_CAP, REASK_MS, REPEATS_MAX, REPEAT_TEXT, RESTART_PREFIX, answersOption, authorOf, clean, closedInfo, coveredByRead, hasChoice, hasExpired, isAsking, isOpenDecision, keepWatchNewest, laneTone, needsAnswer, originOf, refOf, systemTitle, twinOf, waitKind, waitsOf } from "./notices-rules.ts";
 import { GENERIC_TITLES, channelLanes, channelTitle, laneExists, laneOfNotice, laneTitle, launchTitles, noteLaunch, readChannelMap, recordedCwd, stoppedSince } from "./notices-lanes.ts";
 import { type ResultFile, type ResultLink, resultFiles, resultLinks } from "./result-refs.ts";
 import { broadcast, summary } from "./notices-read.ts";
@@ -390,7 +390,8 @@ export function settleDecision(item: Notice, answer: string, at = now(), resolve
 }
 
 // The owner wrote in a chat or session: every open decision there is answered by it, unless the message names its decision
-// (a button answer carries `decision`), which then settles only that one.
+// (a button answer carries `decision`), which then settles only that one. A decision with real options takes only a message that answers
+// one of them (answersOption): another subject (2026-11-10: "그건 그렇고 날씨 어때?") leaves it open.
 function ownerReplied(e: HubEvent): void {
 	// A peer gateway's line arrives as a web message under the owner's login, but he said nothing (2026-11-05: it answered an [ask] nobody had seen).
 	if (isPeerMessage(e)) return;
@@ -399,7 +400,7 @@ function ownerReplied(e: HubEvent): void {
 	const text = String(e.text ?? "").trim();
 	// A typed message is not the answer to a waiting send-approval card (2026-10-31: "19번 카드는 위에 있어", "마지막 카드 어디?" closed it):
 	// the card stays open until its buttons answer it or the draft is handled elsewhere (settleHandledDrafts).
-	for (const i of items) if (isOpenDecision(i) && !i.decision!.to.startsWith("auth:") && (id ? i.id === id : i.decision!.to === to && !i.decision!.draft)) settleDecision(i, text, e.ts);
+	for (const i of items) if (isOpenDecision(i) && !i.decision!.to.startsWith("auth:") && (id ? i.id === id : i.decision!.to === to && !i.decision!.draft && (!hasChoice(i) || answersOption(i.decision!.options, text)))) settleDecision(i, text, e.ts);
 }
 
 function readIds(ids: string[]): void {
