@@ -395,16 +395,28 @@ export function settleDecision(item: Notice, answer: string, at = now(), resolve
 
 // The owner wrote in a chat or session: every open decision there is answered by it, unless the message names its decision
 // (a button answer carries `decision`), which then settles only that one. A decision with real options takes only a message that answers
-// one of them (answersOption): another subject (2026-11-10: "그건 그렇고 날씨 어때?") leaves it open.
+// one of them (answersOption): another subject (2026-11-10: "그건 그렇고 날씨 어때?") leaves it open. A message that quotes the asking message of
+// a one-question decision (reply.id is that message's ts, the decision's reply_to) is its answer in any words (2026-11-10 19:05: "사이트 배포는 기존에 하던 방식으로 해").
 function ownerReplied(e: HubEvent): void {
 	// A peer gateway's line arrives as a web message under the owner's login, but he said nothing (2026-11-05: it answered an [ask] nobody had seen).
 	if (isPeerMessage(e)) return;
 	const to = eventTarget(e) ?? "main";
 	const id = typeof e.decision === "string" ? e.decision : "";
 	const text = String(e.text ?? "").trim();
+	const quoted = (e.reply as { id?: unknown } | undefined)?.id;
+	const quotesAsk = (i: Notice) => typeof quoted === "string" && quoted !== "" && i.decision!.reply_to === quoted && i.decision!.group === 1;
 	// A typed message is not the answer to a waiting send-approval card (2026-10-31: "19번 카드는 위에 있어", "마지막 카드 어디?" closed it):
 	// the card stays open until its buttons answer it or the draft is handled elsewhere (settleHandledDrafts).
-	for (const i of items) if (isOpenDecision(i) && !i.decision!.to.startsWith("auth:") && (id ? i.id === id : i.decision!.to === to && !i.decision!.draft && (!hasChoice(i) || answersOption(i.decision!.options, text)))) settleDecision(i, text, e.ts);
+	for (const i of items) if (isOpenDecision(i) && !i.decision!.to.startsWith("auth:") && (id ? i.id === id : i.decision!.to === to && !i.decision!.draft && (!hasChoice(i) || answersOption(i.decision!.options, text) || quotesAsk(i)))) settleDecision(i, text, e.ts);
+}
+
+// The titles of the choice questions still open in conversation `target` (the newest `max` first): what the bot is told with the owner's next message there.
+export function openChoiceTitles(target: string, max = 3): string[] {
+	return items
+		.filter(i => isOpenDecision(i) && hasChoice(i) && !i.decision!.draft && i.decision!.to === target)
+		.sort((a, b) => b.updated.localeCompare(a.updated))
+		.slice(0, max)
+		.map(i => i.title);
 }
 
 function readIds(ids: string[]): void {

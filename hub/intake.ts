@@ -6,7 +6,8 @@ import * as livestatus from "./livestatus.ts";
 import { msg } from "./i18n.ts";
 import { recordCorrection } from "./corrections.ts";
 import { recipeAnswer } from "./recipes.ts";
-import { askedText, emit, emitDelivery, onEmit } from "./events.ts";
+import { askedText, emit, emitDelivery, eventTarget, isPeerMessage, onEmit, type HubEvent } from "./events.ts";
+import { openChoiceTitles } from "./notices.ts";
 import { attachmentLine, attachmentLines, type Upload } from "./files.ts";
 import { pickedLines, type Picked } from "./picked.ts";
 import { abortLane, approvesBudget, lanes, ownerNotes, sendToLane } from "./lanes.ts";
@@ -77,6 +78,13 @@ function decisionLines(p: Record<string, any>): string[] {
 	return out;
 }
 
+// The owner's message holds no answer by itself when it lands in a conversation with open choice questions: the bot is told which, and closes them with `resolves`.
+const TITLE_MAX = 60;
+const openQuestionLines = (target: string): string[] => {
+	const titles = openChoiceTitles(target).map(t => t.slice(0, TITLE_MAX));
+	return titles.length ? [msg().openQuestions(titles)] : [];
+};
+
 function inboxBody(e: Record<string, any>): string {
 	const m = msg();
 	if (e.kind === "lane_report") return `${m.inboxLaneReport(e.lane)}\n${e.text}`;
@@ -104,6 +112,7 @@ function inboxBody(e: Record<string, any>): string {
 		if (p.refs?.length) lines.push(...p.refs);
 		lines.push(...decisionLines(p));
 	}
+	if (e.kind === "message" && !isPeerMessage(e as HubEvent)) lines.push(...openQuestionLines(eventTarget(e as HubEvent) ?? "main"));
 	if (e.plugin_note) lines.push(e.plugin_note);
 	const home = e.parent?.startsWith("ch:") ? e.parent : e.channel;
 	const ctx = home?.startsWith("ch:") ? channelContext(home.slice(3)) : "";
@@ -270,7 +279,7 @@ export async function sendWeb(s: WebSend): Promise<void> {
 		// gateway message in the session's chat, not only as the request's error.
 		try {
 			if (approvesBudget(name, s.text)) sendToLane(name, "/budget-ok");
-			const how = sendToLane(name, [`[owner via web] ${s.text}`, ...(s.picks?.length ? decisionLines({ picks: s.picks, reply_to: s.replyTo, decision: s.decision }) : []), s.reply ? replyLine(s.reply) : "", s.files?.length ? attachmentLines(s.files) : "", s.elements?.length ? pickedLines(s.elements) : "", ...(s.refs ?? [])].filter(Boolean).join("\n"), mid);
+			const how = sendToLane(name, [`[owner via web] ${s.text}`, ...(s.picks?.length ? decisionLines({ picks: s.picks, reply_to: s.replyTo, decision: s.decision }) : []), ...openQuestionLines(channel), s.reply ? replyLine(s.reply) : "", s.files?.length ? attachmentLines(s.files) : "", s.elements?.length ? pickedLines(s.elements) : "", ...(s.refs ?? [])].filter(Boolean).join("\n"), mid);
 			emitDelivery(channel, mid, how);
 			// The web shows the receipt as the message's delivery state only (no canned receipt message, owner 2026-10-17).
 			livestatus.begin(channel, channel, true);

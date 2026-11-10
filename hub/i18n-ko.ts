@@ -298,6 +298,7 @@ export const ko: Catalog = {
 	replyingTo: (author, content) => `(${author}의 메시지에 대한 답장: "${content}")`,
 	decisionAnswer: picks => `결정 답: ${picks.map((p, i) => `${picks.length > 1 ? `${i + 1}) ` : ""}${p.q || "-"} → ${p.n}) ${p.label}${p.note ? ` - ${p.note}` : ""}`).join("; ")}`,
 	decisionAsked: quote => `(당신이 한 이 질문에 대한 답이에요: "${quote}")`,
+	openQuestions: titles => `(이 대화에 아직 열린 질문: ${titles.map(t => `"${t}"`).join(", ")}. 이 글이 그 답이면 일을 마친 보고에 dotz_send의 resolves로 닫고, 다른 얘기면 그대로 두세요.)`,
 	workChannels: list => `(작업 채널 목록, 이 메시지의 채널은 아님: ${list.length ? list.join("; ") : "아직 없음"})`,
 	channelNames: { chat: "대화", alert: "알림", worklog: "작업로그", mail: "메일", workCategory: name => `${name} 작업` },
 	threadDone: "작업을 마쳤어요. 이 스레드는 1시간 뒤 보관할게요.",

@@ -311,6 +311,7 @@ export const en = {
 	// A decision answer: each block's question with the chosen option, and the start of the message that asked (hub/intake.ts).
 	decisionAnswer: (picks: { q: string; n: number; label: string; note?: string }[]) => `Decision answer: ${picks.map((p, i) => `${picks.length > 1 ? `${i + 1}) ` : ""}${p.q || "-"} -> ${p.n}) ${p.label}${p.note ? ` - ${p.note}` : ""}`).join("; ")}`,
 	decisionAsked: (quote: string) => `(this answers your question: "${quote}")`,
+	openQuestions: (titles: string[]) => `(still open for the owner in this conversation: ${titles.map(t => `"${t}"`).join(", ")}. If this message answers one, close it with dotz_send's resolves on the report that finishes the work; if it is another subject, leave it.)`,
 	workChannels: (list: string[]) => `(work channel list, not this message's channel: ${list.length ? list.join("; ") : "none yet"})`,
 	// Discord channel names the gateway creates, and the done marker of a lane thread.
 	channelNames: { chat: "chat", alert: "alerts", worklog: "worklog", mail: "mail", workCategory: (name: string) => `${name} work` },

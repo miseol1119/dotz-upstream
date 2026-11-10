@@ -82,6 +82,7 @@ export function authSettled(id: string, status: string): void {
 //  3. a watch posts "recovered" (watchRecovered);
 //  4. the bot says so (resolveNotices: POST /api/notices/resolve, or dotz_send's `resolves`);
 //  and, as before, the owner answering by a button, a reply in that chat or session (ownerReplied), or the login request ending.
+//  A decision with options also closes when the owner quotes its one-question asking message in any words (ownerReplied, reply.id = reply_to, group 1).
 // A decision with options is the owner's to pick (a phone check, an approval): signals 1-3 never touch it; only the owner's answer / x, or the
 // bot naming that notice (ids / match in signal 4). A resolved decision is marked `resolved` and holds no answer text.
 
