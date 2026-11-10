@@ -183,6 +183,7 @@ body:has(.upd-bar) .app { padding-top: 0; margin-top: var(--ubh); height: calc(1
 .snack.bad::before { content: ""; display: inline-block; flex: none; width: 7px; height: 7px; margin-right: var(--sp-2); border-radius: 50%; background: var(--err); vertical-align: 1px; }
 .snack.act { display: flex; align-items: center; gap: var(--sp-3); }
 .snack .sa { flex: none; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; text-decoration: underline; }
+:root[data-theme="dark"] .snack, :root[data-theme="dark"] .upd-bar.failed { background: var(--active); color: var(--fg); box-shadow: inset 0 1px 0 rgb(255 255 255 / .07), 0 0 0 1px rgb(255 255 255 / .06), 0 8px 24px -4px rgb(0 0 0 / .55); }
 @media (max-width: 639px) { .snack { bottom: var(--snack-b, calc(60px + max(2px, calc(env(safe-area-inset-bottom) - 16px)))); } }
 /* floating notices (alert / worklog / lane report events): compact cards top-right; each leaves ~4s after the owner
    has actually seen it (tab visible and window focused), hover pauses, a dismissed one never comes back */

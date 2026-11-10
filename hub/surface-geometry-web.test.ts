@@ -92,3 +92,28 @@ test("390px: a conversation row whose time cell is very long keeps its title rea
 	expect(rows.length).toBeGreaterThan(1);
 	expect(rows.filter(r => r.title < 96 || r.cellOut > 0).length).toBe(0);
 });
+
+const openToast = (theme: "light" | "dark", msg: string) => page(390, theme, `toast(${JSON.stringify(msg)}, true, { label: "다시 시도", onclick() {} })`, `!!document.querySelector(".snack .sa")`);
+test("390px: a toast with a very long message stays inside the screen and its text clears the action button", async () => {
+	const v = await openToast("light", TOKEN);
+	await shot(v, "3-toast-long");
+	const g = await q<{ left: number; right: number; textRight: number; btnLeft: number }>(v, `
+		const s = document.querySelector(".snack").getBoundingClientRect(), t = document.querySelector(".snack > span").getBoundingClientRect(), b = document.querySelector(".snack .sa").getBoundingClientRect();
+		return { left: s.left, right: s.right, textRight: t.right, btnLeft: b.left };`);
+	expect(g.left).toBeGreaterThanOrEqual(0);
+	expect(g.right).toBeLessThanOrEqual(390);
+	expect(g.textRight).toBeLessThanOrEqual(g.btnLeft + 0.5);
+});
+test("390px dark: a toast is a dark surface with readable text, not a bright patch", async () => {
+	const v = await openToast("dark", "저장하지 못했어요");
+	await shot(v, "3-toast-dark");
+	const g = await q<{ lum: number; cr: number }>(v, `
+		const probe = document.createElement("i"); document.body.append(probe);
+		const rgb = c => { probe.style.color = c; return getComputedStyle(probe).color.match(/[\\d.]+/g).map(Number); };
+		const lum = ([r, g, b]) => { const f = x => { x /= 255; return x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4; }; return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
+		const cs = getComputedStyle(document.querySelector(".snack")), bg = lum(rgb(cs.backgroundColor)), fg = lum(rgb(cs.color));
+		probe.remove();
+		return { lum: bg, cr: (Math.max(bg, fg) + .05) / (Math.min(bg, fg) + .05) };`);
+	expect(g.lum).toBeLessThan(0.6);
+	expect(g.cr).toBeGreaterThanOrEqual(4.5);
+});
