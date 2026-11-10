@@ -171,15 +171,14 @@ const monUnread = list => list.reduce((c, n) => c + (n.read ? 0 : 1), 0);
 // its row and its conversation show.
 const MON_FEED = "감시 소식";
 // An app's row says what waits on the owner, never the latest item's title. `needs` = {drafts, unread, sentToday, unreplied} from GET /api/integrations (hub/integrations.ts):
-// at most two parts, the most important first (drafts, 미답장, 안 읽음, sent today); the badge is the count that waits on him (drafts first, else unread).
+// at most two parts, the most important first (drafts, sent today); 미답장 and 안 읽음 are the row's own counts (31-conversations.js), so the line does not say them again (owner 2026-11-10).
+// The badge is the count that waits on him (drafts first, else unread). A row with only unread says when the last item came (`when`, ntTime of the newest), else 새 소식이 있어요.
 // "확인할 것 없어요" only for a connected app with every count 0; `down` (the app is disconnected) says 연결 끊김 instead.
-function monNeedLine(n, down) {
+function monNeedLine(n, down, when) {
   const parts = [];
   if (n.drafts) parts.push(`답장 대기 ${n.drafts}건`);
-  if (n.unreplied) parts.push(`미답장 ${n.unreplied}건`);
-  if (n.unread) parts.push(`안 읽음 ${n.unread}`);
   if (n.sentToday) parts.push(`오늘 자동 답장 ${n.sentToday}건 보냄`);
-  return parts.slice(0, 2).join(" · ") || (down ? "연결 끊김" : "확인할 것 없어요");
+  return parts.join(" · ") || (n.unreplied ? "답장을 기다리는 것이 있어요" : n.unread ? (when ? `마지막 소식 ${when}` : "새 소식이 있어요") : down ? "연결 끊김" : "확인할 것 없어요");
 }
 // A watch an app owns (it.watches / it.watchesNot of GET /api/integrations, hub/integrations.ts) belongs to that app: no row of its own in 일반 모니터링,
 // its status is in the app's panel and a failing one marks the app's row.
@@ -203,7 +202,7 @@ function monItems() {
     for (const n of notices) shown.add(n.id);
     const cands = [...notices.map(n => ({ at: monNoticeAt(n), text: monLine(n) })), ...mails.filter(t => CONV.get(t)).map(t => ({ at: CONV.get(t).ts, text: (MAILS.get(t) || {}).subject || CONV.get(t).text }))].sort((a, b) => b.at.localeCompare(a.at));
     const needs = it.needs || { drafts: 0, unread: monUnread(notices.filter(n => !mails.includes(n.open) && !mails.includes(n.src))) + mails.filter(t => (ts(t).unread | 0) > 0).length, sentToday: 0 }, conn = it.state === "disconnected", own = owned.get(it.key) || [], bad = own.some(m => m.last_result === "fail");
-    items.push({ key: `i:${it.key}`, group: MON_GROUP[it.kind || "app"] || MON_GROUP.app, name: it.label, ic: it.icon, notices, mails, app: true, conn, inst: it.key, drafts: needs.drafts | 0, unread: needs.drafts || needs.unread, unreplied: needs.unreplied | 0, hint: conn && it.hint ? it.hint : bad ? "확인이 실패했어요" : monNeedLine(needs, conn), at: cands[0] ? cands[0].at : "", owned: own, msig: conn ? "conn" : bad ? "fail" : "",
+    items.push({ key: `i:${it.key}`, group: MON_GROUP[it.kind || "app"] || MON_GROUP.app, name: it.label, ic: it.icon, notices, mails, app: true, conn, inst: it.key, drafts: needs.drafts | 0, unread: needs.drafts || needs.unread, unreplied: needs.unreplied | 0, hint: conn && it.hint ? it.hint : bad ? "확인이 실패했어요" : monNeedLine(needs, conn, cands[0] ? ntTime(cands[0].at) : ""), at: cands[0] ? cands[0].at : "", owned: own, msig: conn ? "conn" : bad ? "fail" : "",
       badge: conn ? ["연결 끊김", "err"] : monFail(owned.get(it.key) || []) });
   }
   const ownedNames = new Set([...owned.values()].flat());

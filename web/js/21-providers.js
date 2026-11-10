@@ -230,7 +230,7 @@ async function loadQuota(fresh) {
   for (const p of q.providers || []) {
     // a subscription names its plan as Anthropic does (Pro, Max 5x, Max 20x, Ultra, ...; hub/usage-account.ts planName)
     const name = p.name || providerName(p.provider);
-    const card = el("div", { class: "card" }, el("div", { class: "ch" }, el("h3", { text: p.plan ? `${name} · ${p.plan}` : name })));
+    const card = el("div", { class: "card" }, el("div", { class: "ch lo" }, el("h3", { text: p.plan ? `${name} · ${p.plan}` : name })));
     for (const l of p.limits || []) {
       card.append(el("div", { class: "lim" },
         el("div", { class: "kv" }, el("span", { class: "k", text: limitName(l) }), el("b", { text: pctText(l) })),

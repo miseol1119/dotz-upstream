@@ -16,7 +16,7 @@ const between = (src: string, from: string, to: string) => {
 };
 type Status = { key: string; text: string; tone: string };
 const monStatus = new Function(`${between(monitoring, "const MON_PTAG =", "// Wording (one pair)")}; return monStatus;`)() as (m: object, now?: number) => Status;
-const monNeedLine = new Function(`${between(monitoring, "function monNeedLine", "// A watch an app owns")}; return monNeedLine;`)() as (n: object, down?: boolean) => string;
+const monNeedLine = new Function(`${between(monitoring, "function monNeedLine", "// A watch an app owns")}; return monNeedLine;`)() as (n: object, down?: boolean, when?: string) => string;
 
 const NOW = Date.parse("2026-10-27T12:00:00Z"), past = new Date(NOW - 3600_000).toISOString(), soon = new Date(NOW + 600_000).toISOString();
 describe("monStatus: connection > paused > fail > late > changed > ok > not run", () => {
@@ -37,11 +37,15 @@ describe("monStatus: connection > paused > fail > late > changed > ok > not run"
 	});
 });
 
-describe("monNeedLine: drafts > 미답장 > 안 읽음 > sent today, at most two", () => {
-	test("미답장 is counted and ranks before 안 읽음", () => {
-		expect(monNeedLine({ drafts: 0, unreplied: 2, unread: 0, sentToday: 0 })).toBe("미답장 2건");
-		expect(monNeedLine({ drafts: 1, unreplied: 2, unread: 3, sentToday: 4 })).toBe("답장 대기 1건 · 미답장 2건");
-		expect(monNeedLine({ drafts: 0, unreplied: 2, unread: 3, sentToday: 4 })).toBe("미답장 2건 · 안 읽음 3");
+describe("monNeedLine: drafts > sent today; 미답장 and 안 읽음 are the row's own counts", () => {
+	test("미답장 and 안 읽음 are not said again on the line; a row with only 미답장 says a reply is waiting", () => {
+		expect(monNeedLine({ drafts: 0, unreplied: 2, unread: 0, sentToday: 0 })).toBe("답장을 기다리는 것이 있어요");
+		expect(monNeedLine({ drafts: 1, unreplied: 2, unread: 3, sentToday: 4 })).toBe("답장 대기 1건 · 오늘 자동 답장 4건 보냄");
+		expect(monNeedLine({ drafts: 0, unreplied: 2, unread: 3, sentToday: 4 })).toBe("오늘 자동 답장 4건 보냄");
+	});
+	test("a row with only unread says when the last item came, never the count", () => {
+		expect(monNeedLine({ drafts: 0, unreplied: 0, unread: 3, sentToday: 0 }, false, "14:05")).toBe("마지막 소식 14:05");
+		expect(monNeedLine({ drafts: 0, unreplied: 0, unread: 3, sentToday: 0 })).toBe("새 소식이 있어요");
 	});
 	test("확인할 것 없어요 only when connected and every count is 0", () => {
 		expect(monNeedLine({ drafts: 0, unreplied: 0, unread: 0, sentToday: 0 })).toBe("확인할 것 없어요");
@@ -144,12 +148,12 @@ describe("screens", () => {
 		expect(got.lateState).toBe("늦어짐");
 	});
 
-	test("app rows count 미답장 and say 연결 끊김 for a disconnected app; 확인할 것 없어요 only for a connected one with nothing", async () => {
+	test("app rows leave 미답장 to the row's count and say 연결 끊김 for a disconnected app; 확인할 것 없어요 only for a connected one with nothing", async () => {
 		const v = await open();
 		await v.evaluate(`(go("monitoring"), 0)`);
 		await v.evaluate(until(`PQ.loaded && monItems().some(i => i.pc)`, "peer rows not merged"));
 		const rows = await q<[string, string][]>(v, `return monRows(monItems(), null).filter(r => r.k && /^(i:|p:.*[|]i:)/.test(r.k)).map(r => [r.k, r.hint]);`);
-		expect(rows).toEqual([["i:mail", "답장 대기 1건 · 미답장 2건"], ["i:kakao", "연결 끊김"], ["i:youtube", "확인할 것 없어요"], ["p:http://peer-b.invalid|i:mail", "답장 대기 2건"]]);
+		expect(rows).toEqual([["i:mail", "답장 대기 1건"], ["i:kakao", "연결 끊김"], ["i:youtube", "확인할 것 없어요"], ["p:http://peer-b.invalid|i:mail", "답장 대기 2건"]]);
 	});
 
 	test("the 모니터링 nav badge is the one 답장 대기 number (rqWaiting); failing and disconnected rows are not in it but show as the small dot while it is 0", async () => {

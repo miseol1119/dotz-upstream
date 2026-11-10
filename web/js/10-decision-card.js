@@ -538,9 +538,9 @@ function renderDecision(box, dc, picks, step) {
   dcHold(box, !!st);
   // A draft message starts with its quoted draft, so the question is the block's own title without the draft's id.
   const qText = dc.draft ? draftQ(dc.blocks[0] && dc.blocks[0].title) : dc.question;
-  // ONE tight header (owner 2026-11-03): 확인 필요 · 답 기다림 on one line, then the short question; the card asks only what it must.
+  // ONE tight header (owner 2026-11-03): the status 답 기다림 on one line, then the short question as the card's one lead (a 확인 필요 label said it twice); the card asks only what it must.
   const head = el("div", { class: "dc-hd" }, el("div", { class: "dc-tt" },
-    el("div", { class: "dc-meta" }, el("span", { class: "dc-ey", text: "확인 필요" }), el("span", { class: "tag warn dc-wt", text: "답 기다림" })),
+    el("div", { class: "dc-meta" }, el("span", { class: "tag warn dc-wt", text: "답 기다림" })),
     qText ? mdNode(qText, "md dc-q") : null, decideNode(dc.draft)),
     el("div", { class: "dc-hb" },
       el("button", { class: "dc-fold", type: "button", "aria-expanded": String(!fold), "aria-label": fold ? "펼치기" : "접기", onclick: () => { DC.fold[dc.t] = !fold; paintDecision(); } }, icon("drop"))));

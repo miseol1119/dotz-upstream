@@ -40,8 +40,9 @@ function nscSummary(n, text = n.text) {
   if (chg) return el("span", {}, el("s", { text: chg[2] }), " → ", chg[3]);
   if (n.decision) return n.decision.draft ? ntPlain(n.decision.draft.body.split("\n").find(l => l.trim()) || "") : `${ntDecCtx(n)} · 답을 기다리고 있어요`;
   if (n.kind === "watch" && n.item) return (n.item.card && n.item.card.subject) || ntPlain(hcLine(n));   // a mail report says the mail
-  if (n.kind === "watch") return monSummary({ ...n, text }, []);   // the feed's own summary: the name is not said twice
   const title = ntPlain(hcLine(n)), src = n.src || n.open;
+  // the feed's own summary: the name is not said twice, nor the title when the summary opens with it
+  if (n.kind === "watch") { const s = monSummary({ ...n, text }, []); return typeof s === "string" && title && s.startsWith(title) ? s.slice(title.length).replace(/^[.\s·]+/, "") || s : s; }
   return String(text || "").split("\n").map(ntPlain).find(l => l && l !== title) || ntLaneNote(n) || (src ? pcTargetName(src, n.pc) : "알림");
 }
 // The time at the row's end stays short: 방금, the hour today, 어제, then the date.

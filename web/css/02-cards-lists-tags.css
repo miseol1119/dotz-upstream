@@ -12,6 +12,8 @@
 code.path-short { display: inline-block; max-width: 100%; vertical-align: bottom; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ch { display: flex; align-items: center; gap: var(--sp-2); min-height: 20px; margin-bottom: var(--sp-3); }
 .ch h3 { flex: 1; min-width: 0; margin: 0; font: 600 var(--fs-card)/var(--lh-card) var(--font); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a quiet card head: on a screen of several cards only the lead card keeps the card-title step, the rest take the section-label step (docs/ui-principles.md 1) */
+.ch.lo h3 { font: 600 var(--fs-sec)/var(--lh-sec) var(--font); color: var(--fg-2); }
 .ch .chev { width: 14px; height: 14px; color: var(--fg-3); }
 @media (hover: hover) { .card.tap:hover .chev { color: var(--fg); } }
 .big { font: 700 var(--fs-big)/var(--lh-big) var(--font); letter-spacing: -.01em; }

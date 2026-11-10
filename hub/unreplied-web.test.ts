@@ -85,7 +85,9 @@ for (const [width, height] of [[390, 844], [1280, 800]] as const) {
 			expect(rows["i:kakao"]).toEqual({ nb: [], unreplied: ["미답장 1"] });
 			expect(rows["peer:i:mail"]!.unreplied).toEqual(["미답장 2"]);
 			expect(await fg(v, '#mon-side .nb.unreplied')).toBe("rgb(194, 65, 12)");
-			expect(await bg(v, '#mon-side .cv-row[data-k="i:youtube"] .nb:not(.unreplied)')).toBe("rgb(49, 130, 246)");
+			// light: the unread count is a grey number with no fill, blue is only for what you press
+			expect(await bg(v, '#mon-side .cv-row[data-k="i:youtube"] .nb:not(.unreplied)')).toBe("rgba(0, 0, 0, 0)");
+			expect(await fg(v, '#mon-side .cv-row[data-k="i:youtube"] .nb:not(.unreplied)')).toBe("rgb(78, 89, 104)");
 			expect(await bg(v, "#nav-upd")).toBe("rgb(49, 130, 246)");
 			expect(await q<boolean>(v, `return document.documentElement.scrollWidth <= ${width}`)).toBe(true);
 			await shot(v, `app-list-${width}-light.png`);

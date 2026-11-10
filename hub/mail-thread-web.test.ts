@@ -163,11 +163,13 @@ test("at 1280px the original is the page's own scroll, the header names everyone
 	// a row of the panel opens that mail
 	await v.evaluate(`document.querySelectorAll("#mail-thread .mth-row")[1].click()`);
 	await v.evaluate(until(`location.hash === "#monitoring/c:mail%3Afx-3"`, "the panel row did not open fx-3"));
-	await v.evaluate(until(`document.querySelector("#tl .rc-title") && document.querySelector("#tl .rc-title").textContent === "3주 차 점검"`, "fx-3 not drawn"));
-	const after = await ev(v, `({ hash: location.hash, on: [...document.querySelectorAll("#mail-thread .mth-row.on")].map(r => r.dataset.t), title: document.querySelector("#tl .rc-title") && document.querySelector("#tl .rc-title").textContent })`);
+	// the conversation is named after the mail, so its head says the subject and the open card does not say it again
+	await v.evaluate(until(`document.querySelector("#tl .mopen") && document.querySelector("#thead .val") && document.querySelector("#thead .val").textContent === "3주 차 점검"`, "fx-3 not drawn"));
+	const after = await ev(v, `({ hash: location.hash, on: [...document.querySelectorAll("#mail-thread .mth-row.on")].map(r => r.dataset.t), title: document.querySelector("#thead .val").textContent, cardTitle: !!document.querySelector("#tl .mopen .rc-title") })`);
 	expect(after.hash).toBe("#monitoring/c:mail%3Afx-3");
 	expect(after.on).toEqual(["mail:fx-3"]);
 	expect(after.title).toBe("3주 차 점검");
+	expect(after.cardTitle).toBe(false);
 	// a text mail shows the same header
 	expect(await ev(v, `[...document.querySelectorAll("#tl .mhd .mhd-r")].map(r => r.textContent)`)).toEqual(["보낸 사람Alex Sender <sender@example.com>", "받는 사람나 <me@example.com>, 팀 <team@example.com> 외 1명", "참조Lee <lee@example.com>, Park <park@example.com>"]);
 }, 30_000);
@@ -200,7 +202,7 @@ test("at 390px the thread is a chip at the end of the recipients line that opens
 
 	await v.evaluate(`document.querySelectorAll("#tl .mth-m .mth-row")[3].click()`);
 	await v.evaluate(until(`location.hash === "#monitoring/c:mail%3Afx-1"`, "the phone thread row did not open fx-1"));
-	await v.evaluate(until(`document.querySelector("#tl .rc-title") && document.querySelector("#tl .rc-title").textContent === "1주 차 점검"`, "fx-1 not drawn"));
+	await v.evaluate(until(`document.querySelector("#tl .mopen") && document.querySelector("#thead .val") && document.querySelector("#thead .val").textContent === "1주 차 점검" && !document.querySelector("#tl .mopen .rc-title")`, "fx-1 not drawn"));
 }, 30_000);
 
 test("a mail with no related mail shows no thread and still names who it is for", async () => {

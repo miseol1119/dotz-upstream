@@ -284,7 +284,10 @@ function msgNode(e) {
         if (card && key) {
           const hd = card.querySelector(".rc-hd"), title = card.querySelector(".rc-title"), meta = mailMetaNode(`mail:${key}`, e);
           card.classList.add("mopen");
-          if (hd) { if (title) hd.before(title); hd.after(meta); } else card.append(meta);
+          // a mail conversation is named after this mail (hub/mail.ts postMail) and its header says the subject, so the card does not say it again
+          const named = isMailT(e.conv || "");
+          if (title && named) title.remove();
+          if (hd) { if (title && !named) hd.before(title); hd.after(meta); } else card.append(meta);
           card.prepend(mailOpenBar(`mail:${key}`, card));
           if (MT_READY) mailThreadSync();
         }
