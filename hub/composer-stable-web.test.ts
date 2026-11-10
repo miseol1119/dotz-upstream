@@ -5,13 +5,13 @@ import { webBuild } from "./webapp.ts";
 // The owner types on a phone (390px, on-screen keyboard) while the page keeps getting updates. Typing must survive all of them: the composer is
 // never replaced, never loses focus or text, and its box does not move. A new web build must not reload a page the owner is typing on.
 const send = (e: object) => hub.push(e);
-const STATE = { web_build: webBuild(), status: "idle" };
+const STATE = { web_build: webBuild(), status: "idle", lanes: [] as object[] };
 const hub = fakeHub({
 	stream: "fake",
 	api: (req, url) => {
 		const { pathname } = url;
 		if (pathname === "/sw.js") return new Response("no", { status: 404 });   // no worker: a build change reaches the page's own check at once
-		if (pathname === "/api/state") return Response.json({ name: "dotz", web_build: STATE.web_build, orchestrator: { status: STATE.status }, lanes: [], terminals: {}, channels: { work: [] }, discord: {}, notices_unread: 0 });
+		if (pathname === "/api/state") return Response.json({ name: "dotz", web_build: STATE.web_build, orchestrator: { status: STATE.status }, lanes: STATE.lanes, terminals: {}, channels: { work: [] }, discord: {}, notices_unread: 0 });
 	},
 });
 const view = await hub.view({ width: 390, height: 844 });
@@ -23,7 +23,7 @@ const reloads = async () => Number(await view.evaluate(`window.__reloads`));
 const setHidden = (hidden: boolean) => view.evaluate(`(() => { Object.defineProperty(document, "visibilityState", { configurable: true, get: () => ${hidden ? '"hidden"' : '"visible"'} }); document.dispatchEvent(new Event("visibilitychange")); })()`);
 
 beforeEach(async () => {
-	STATE.web_build = webBuild(); STATE.status = "idle";
+	STATE.web_build = webBuild(); STATE.status = "idle"; STATE.lanes = [];
 	const opened = hub.nextStream();
 	await view.navigate(`${hub.origin}/`);
 	await waitFor(`typeof S === "object" && S && S.web_build`);
@@ -244,4 +244,41 @@ describe("typing on the phone composer while the page updates", () => {
 		expect(await kbFor(371, 0, 1.067)).toBe("0px");
 		await view.resize(390, 844);
 	}, 30_000);
+	// A session that ends while its composer holds text or the focus: if it can still be written to (resumable), the view stays on it until the owner has left the box with nothing in it.
+	// One that cannot (gone from the list, ended for good) carries the text into the main conversation instead, after that conversation's own draft.
+	test("an ended session that can be resumed keeps the typed text and focus; one that cannot carries them into main", async () => {
+		const refresh = () => view.evaluate(`refreshState().then(() => 0)`);
+		const open = async (name: string) => {
+			STATE.lanes = [{ name, status: "idle", live: true, alive: true }];
+			await refresh();
+			await view.evaluate(`(go("chat", "lane:${name}"), 0)`);
+			await waitFor(`target === "lane:${name}"`);
+			await view.click("#text");
+			await waitFor(`document.activeElement === window.__ta`);
+		};
+		const state = async () => JSON.parse((await view.evaluate(`JSON.stringify({ target, value: ta.value, focus: document.activeElement === ta })`)) as string) as { target: string; value: string; focus: boolean };
+
+		await open("x");
+		await view.type("끝나기 전에 쓰던 글");
+		STATE.lanes = [];   // the session leaves the list: nowhere to send, so the text moves to main
+		await refresh();
+		expect(await state()).toEqual({ target: "main", value: "끝나기 전에 쓰던 글", focus: true });
+		await view.evaluate(`(ta.value = "", ta.dispatchEvent(new Event("input")), ta.blur(), 0)`);
+
+		await open("z");
+		await view.type("이어 쓸 수 있는 글");
+		STATE.lanes = [{ name: "z", status: "exited", live: false, alive: false, resumable: true }];   // ended but resumable: still written to
+		await refresh();
+		expect(await state()).toEqual({ target: "lane:z", value: "이어 쓸 수 있는 글", focus: true });
+		await view.evaluate(`(ta.value = "", ta.dispatchEvent(new Event("input")), ta.blur(), 0)`);
+		await waitFor(`target === "main"`);
+
+		await open("y");
+		await view.evaluate(`(ts("main").draft = "앞에 쓴 글", 0)`);
+		await view.type("메모");
+		STATE.lanes = [{ name: "y", status: "exited", live: false, alive: false, resumable: false }];   // ended, and the composer would be off
+		await refresh();
+		expect(await state()).toEqual({ target: "main", value: "앞에 쓴 글\n메모", focus: true });
+	}, 30_000);
+
 });

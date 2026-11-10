@@ -14,6 +14,34 @@ function setConn(ok) {
 }
 const cameByAuto = new URLSearchParams(location.search).has("auto");
 if (cameByAuto) { const u = new URL(location.href); u.searchParams.delete("auto"); history.replaceState(history.state, "", u.pathname + u.search + u.hash); }
+// A lane that exits disappears at once: the view falls back to the main assistant (it stays reachable from ⌘K), unless a tapped notice opened that session's report (ntKeep).
+// A project's work channel that was deleted falls back the same way. While the owner has text in the composer or the focus there, the move waits (endedHold)
+// until the box is blurred and empty; a session that cannot be written to (gone from the list, ended for good, a deleted project) carries the text into main instead.
+let endedHold = "";
+function endedNow(t) {
+  if (isLaneT(t)) return !S.lanes.some(l => `lane:${l.name}` === t) || (t !== ntKeep && targetInfo(t).status === "exited" && (endedHold === t || (!!PREV[t] && PREV[t] !== "exited")));
+  return isProjT(t) && !projTargets().includes(t);
+}
+function endedLeave() {
+  const t = target, held = document.activeElement === ta, text = ta.value;
+  if (!text.trim() && !held) { endedHold = ""; setTarget(MAIN); return; }
+  const i = targetInfo(t);
+  if (isLaneT(t) && i.known && (i.alive || i.resumable)) { endedHold = t; return; }   // it can still be written to: stay while there is text or focus
+  endedHold = "";
+  setTarget(MAIN);
+  try { localStorage.removeItem(DRAFT_KEY(t)); } catch {}
+  ts(t).draft = "";
+  ta.value = [ta.value, text].filter(x => x.trim()).join("\n");
+  saveDraft(); autosize(); updateHints();
+  if (held) { ta.focus({ preventScroll: true }); ta.setSelectionRange(ta.value.length, ta.value.length); }
+}
+function endedSettle() {
+  if (!endedHold) return;
+  if (endedHold !== target || !S || !endedNow(target)) { endedHold = ""; return; }
+  if (!ta.value.trim() && document.activeElement !== ta) endedLeave();
+}
+ta.addEventListener("blur", endedSettle);
+ta.addEventListener("input", endedSettle);
 let autoTried = false;
 function autoSwitch() {
   const other = typeof prFailover === "function" ? prFailover() : null;
@@ -37,9 +65,7 @@ async function refreshState() {
     webBuildCheck(S.web_build);
     ntSync(S);
     if (S.name && S.name !== botName) { botName = S.name; setBrand(); if (current === "home") $("#title").textContent = botName; if (ts(target).hLoaded) renderAll(); }
-    // A lane that exits disappears at once: the view falls back to the main assistant (it stays reachable from ⌘K), unless a tapped notice opened that session's report (ntKeep).
-    if (isLaneT(target) && (!S.lanes.some(l => `lane:${l.name}` === target) || (PREV[target] && PREV[target] !== "exited" && target !== ntKeep && targetInfo(target).status === "exited"))) setTarget(MAIN);
-    if (isProjT(target) && !projTargets().includes(target)) setTarget(MAIN);   // its work channel was deleted
+    if (endedNow(target)) endedLeave();
     noteStatus(); paintAuth(); paintDecision(); paintOrchError(); paintPause(); paintRunState();
     renderBars(); renderWorking(); paintSysLines(); updateComposerMeta(); dskPaint();
     if (current === "project") pmPaint();
