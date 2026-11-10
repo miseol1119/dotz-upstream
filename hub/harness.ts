@@ -21,7 +21,7 @@ import { FIRST_AFTER_MS } from "./livestatus.ts";
 import { WORKTREE_EVERY_MS } from "./hygiene.ts";
 import { RESTART_NOTICE_MS } from "./restart.ts";
 import { NO_ACCOUNT_RETRY_MS, zeleState } from "./zele.ts";
-import { loadGuardConfig, SUB_COMPACT_STOP, SUB_COMPACT_WRAP_UP } from "../extension/guard-config.ts";
+import { loadGuardConfig, SUB_COMPACT_STOP, SUB_COMPACT_WRAP_UP } from "./lanegates.ts";
 import { harnessProjects, denyLines } from "./harnessprojects.ts";
 import { listSetups } from "./workchannels.ts";
 import { allWatches, FAIL_ALERT_AFTER, FAIL_ALERT_EVERY_MS } from "./watch.ts";

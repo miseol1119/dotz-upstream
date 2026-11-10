@@ -10,6 +10,7 @@ import { recover } from "./lanerun.ts";
 import { prompt } from "./laneprompt.ts";
 import { msg } from "./i18n.ts";
 import { revertWhy } from "./fallback.ts";
+import { noteModelChange } from "./model-guard.ts";
 import { runtimeFor } from "./runtime/index.ts";
 
 // A lane started with a fallback chain: after a failed request the runtime may move to the next model by itself and redo
@@ -160,6 +161,7 @@ export async function readEvents(lane: Lane, proc: AgentProcess): Promise<void> 
 			case "fallback": {
 				log(`lane ${lane.name} model fallback${ev.worker ? " (task worker)" : ""}: ${ev.from} -> ${ev.to}${ev.reason ? ` (${ev.reason.replace(/\s+/g, " ").slice(0, 200)})` : ""}`);
 				let line = msg().modelFallback(ev.from, ev.to, ev.reason, ev.worker);
+				if (!ev.worker) noteModelChange(`lane:${lane.name}`, ev.from, ev.to, "fallback");
 				if (ev.worker) lane.activeWorkerModel = ev.to;
 				else {
 					clearTimeout(lane.errorHold);

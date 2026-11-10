@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { HUB_TOKEN, workerModel } from "./config.ts";
 import { modelsView } from "./control.ts";
+import { emit } from "./events.ts";
 import { dir, lanes, type Lane } from "./lanestate.ts";
 import { laneModels, laneSummary } from "./laneviews.ts";
 import { makeRoute } from "./routes.ts";
@@ -16,8 +17,15 @@ const DEEPSEEK = "deepseek/deepseek-v4.1-flash-ultrafast:high", SONNET = "anthro
 let sent: [string, string][] = [];
 const lane = (name: string, status: Lane["status"]): Lane => ({ name, cwd: "/tmp", model: "anthropic/claude-opus-5-5:high", workerModel: DEEPSEEK, activeWorkerModel: DEEPSEEK, status, startedAt: "", reports: 0, ctx: {} as Lane["ctx"], lastText: "", proc: { send: (t: string, how: string) => sent.push([t, how]) } as unknown as Lane["proc"] });
 const route = makeRoute({ busyNow: () => [], restartGateway: () => "", restartGatewayNow: () => "" });
+// A token request changes a model only on an owner message that says so (hub/model-guard.ts): the owner asks in the target's own conversation.
+let asks = 0;
+const ownerAsk = (body: Record<string, unknown>): string => {
+	const mid = `ask-${++asks}`, lane = String(body.target).startsWith("lane:") ? String(body.target).slice(5) : undefined;
+	emit("inbox", { ts: new Date(Date.now()).toISOString(), kind: lane ? "lane_message" : "message", source: "web", mid, text: `워커 모델은 ${body.worker_model}로`, ...(lane ? { lane } : {}) });
+	return mid;
+};
 const put = async (body: Record<string, unknown>) => {
-	const res = await route(new Request("http://127.0.0.1/api/target", { method: "PUT", headers: { "x-dotz-token": HUB_TOKEN }, body: JSON.stringify(body) }));
+	const res = await route(new Request("http://127.0.0.1/api/target", { method: "PUT", headers: { "x-dotz-token": HUB_TOKEN }, body: JSON.stringify({ ...body, owner_message: ownerAsk(body) }) }));
 	return { status: res.status, body: (await res.json()) as { applied?: string; worker_model?: string; error?: string } };
 };
 const view = (name: string) => ({ chip: laneSummary().find(l => l.name === name)!.worker_model, active: laneModels().find(l => l.name === name)!.active_worker_model });

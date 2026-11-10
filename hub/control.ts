@@ -17,6 +17,7 @@ import { keepHome, laneWorkerModel } from "./lanestate.ts";
 import { convs, type Conv } from "./convsessions.ts";
 import { isProjectTarget } from "./projectchat.ts";
 import { MAIN } from "./session-key.ts";
+import { convOfTarget, grantExpensive, noteModelChange, ownerGate } from "./model-guard.ts";
 import { abortLane, applyChainChange as applyLaneChain, compactLane, laneLive, laneModels, lanes, restartLane, resumeByName, setLaneModel, setLaneWorkerModel, stopLane } from "./lanes.ts";
 import { cancelByOwner, applyChainChange as applyOrchestratorChain, applyModelChange, compact as compactOrchestrator, orch, restart as restartOrchestrator } from "./orchestrator.ts";
 import { midConvoEffort } from "./mid-effort.ts";
@@ -233,15 +234,23 @@ export async function targetView(target: string) {
 // Changes the target in place: model and/or effort (setModel's rules: a running lane needs force), or compacts its context.
 // `workerModel` changes the model a lane's task workers run on (a lane target) or models.workers ("workers"); `byLane`
 // marks a switch the lane itself made on the owner's word (hub/lane-cli.ts), which the lane is not told about again.
-export async function changeTarget(target: string, change: { model?: string; thinking?: string; compact?: boolean; force?: boolean; workerModel?: string; byLane?: boolean; inherit?: boolean }) {
+export async function changeTarget(target: string, change: { model?: string; thinking?: string; compact?: boolean; force?: boolean; workerModel?: string; byLane?: boolean; inherit?: boolean; req?: Request; ownerMessage?: unknown }) {
 	const key = targetKey(target);
-	if (change.inherit && key.startsWith("ch:")) return inheritMain(key);
+	let by = "owner";
+	// inherit puts a conversation back on main's model: a model change like any other.
+	const inherits = change.inherit && key.startsWith("ch:");
+	if (change.req && (change.model || change.thinking || change.workerModel || inherits)) {
+		const gate = ownerGate(change.req, { conv: convOfTarget(target === "workers" ? target : key), model: inherits ? orchestratorModel().model : (change.model ?? change.workerModel), thinking: inherits ? undefined : change.thinking }, change.ownerMessage);
+		if ("denied" in gate) throw new ControlError(gate.denied, 403);
+		by = gate.by;
+	}
+	if (inherits) return inheritMain(key);
 	if (change.compact) {
 		const r = compactTarget(key.replace(/^lane:/, ""));
 		return { ok: true, target: key, compaction: r.compaction.state, note: r.message };
 	}
-	if (change.workerModel) return target === "workers" ? setModel(target, change.workerModel) : setLaneWorker(key, change.workerModel, change.byLane === true);
-	return setModel(key, change.model, change.thinking, change.force === true);
+	if (change.workerModel) return target === "workers" ? setModel(target, change.workerModel, undefined, false, by) : setLaneWorker(key, change.workerModel, change.byLane === true);
+	return setModel(key, change.model, change.thinking, change.force === true, by);
 }
 
 async function setLaneWorker(target: string, input: string, byLane: boolean) {
@@ -299,7 +308,7 @@ const MID_CONVO_EFFORT = /claude-(opus-5|opus-5-5|sonnet-5-5|haiku-5-5|fable-5-1
 const keepsCacheOnEffort = (runtime: string, model: string) => runtime === "omo" && midConvoEffort(model, MID_CONVO_EFFORT);
 
 // `modelInput` may carry the thinking level as "<model>:<level>"; an explicit `thinkingInput` wins.
-export async function setModel(target: string, modelInput?: string, thinkingInput?: string, force = false): Promise<ModelChange> {
+export async function setModel(target: string, modelInput?: string, thinkingInput?: string, force = false, by = "owner"): Promise<ModelChange> {
 	const split = modelInput ? splitThinking(modelInput) : undefined;
 	const model = split?.model;
 	const thinking = thinkingInput ?? split?.thinking;
@@ -313,9 +322,12 @@ export async function setModel(target: string, modelInput?: string, thinkingInpu
 	else if (projectOf(target)) current = convModel(target);
 	else throw new ControlError(`target must be "orchestrator", "lanes", "workers" or "lane:<name>" of an existing lane (got "${target}")`);
 	const next = { model: model ? resolveModel(model, await availableModels()) : current.model, thinking: thinking ?? current.thinking };
-	const done = (applied: ModelChange["applied"], note: string): ModelChange => ({ ok: true, target, ...next, applied, note });
+	const done = (applied: ModelChange["applied"], note: string): ModelChange => {
+		noteModelChange(target, selectorOf(current), selectorOf(next), by);
+		return { ok: true, target, ...next, applied, note };
+	};
 	// models.workers re-picked as it is still pulls running lanes off their launch-time worker value (below).
-	if (next.model === current.model && next.thinking === current.thinking && target !== "workers" && (!projectOf(target) || ownModelOf(target))) return done("live", "unchanged");
+	if (next.model === current.model && next.thinking === current.thinking && target !== "workers" && (!projectOf(target) || ownModelOf(target))) return { ok: true, target, ...next, applied: "live", note: "unchanged" };
 	if (projectOf(target)) return done(projectApplied(convs.setOwnModel(target, selectorOf(next))), PROJECT_NOTE);
 	if (target === "orchestrator") {
 		updateModels("orchestrator", next);
@@ -382,12 +394,12 @@ export async function setFallback(target: string, chain: unknown[]) {
 	return { ok: true, target, chain: clean.map(entryView), applied, note: FALLBACK_NOTE };
 }
 
-export const COMMANDS = ["help", "status", "context", "compact", "lanes", "model", "effort", "restart", "stop", "resume", "abort", "providers", "login", "logout", "quota", "account"];
+export const COMMANDS = ["help", "status", "context", "compact", "lanes", "model", "effort", "restart", "stop", "resume", "abort", "providers", "login", "logout", "quota", "account", "fable-ok"];
 
 // "/name args" or "!name args" with a known command name; anything else is not a command but an ordinary message, on every path
 // (web/js/14-slash-commands.js isSlashCommand is this test for the page, which also has commands of its own).
 export function parseCommand(text: string): { name: string; args: string[]; rest: string } | undefined {
-	const m = text.trim().match(/^[/!]([a-z]+)(?:\s+([\s\S]*))?$/i);
+	const m = text.trim().match(/^[/!]([a-z][a-z-]*)(?:\s+([\s\S]*))?$/i);
 	const name = m?.[1].toLowerCase();
 	if (!m || !name || !COMMANDS.includes(name)) return undefined;
 	const rest = (m[2] ?? "").trim();
@@ -534,24 +546,49 @@ function changedCard(r: ModelChange): CommandCard {
 }
 
 // /model and /effort in a project conversation, or naming one (a card's button): the same change as its chip. Target names are still main's or a lane's.
-async function projectCommand(key: string, kind: "model" | "effort", first?: string, second?: string, force = false): Promise<CommandCard> {
+async function projectCommand(key: string, kind: "model" | "effort", first?: string, second?: string, force = false, by = "owner"): Promise<CommandCard> {
 	if (!first) return targetCard(key, kind);
 	if (first === "inherit") return changedCard(inheritMain(key));
 	const level = (THINKING_LEVELS as readonly string[]).includes(first);
-	return changedCard(await setModel(key, level ? undefined : first, level ? first : second, force));
+	return changedCard(await setModel(key, level ? undefined : first, level ? first : second, force, by));
+}
+// The conversation /fable-ok typed in `from` allows: main, a project chat (ch:<id>) or a session (lane:<name>).
+function grantKeyOf(from: string): string {
+	if (isProjectTarget(from)) return from;
+	const name = from.replace(/^lane:/, "");
+	if (lanes.has(name)) return `lane:${name}`;
+	const key = convOf(from);
+	if (!key) return "main";
+	throw new ControlError("/fable-ok works in the main chat, a project chat or a session");
+}
+
+// What a /model or /effort command would change (same reading as execute), or undefined when it only shows: the guard asks an agent for an owner message by it.
+export function modelCommandChange(text: string, from?: string): { target: string; model?: string; thinking?: string } | undefined {
+	const cmd = parseCommand(text);
+	if (!cmd || (cmd.name !== "model" && cmd.name !== "effort")) return undefined;
+	const [first, second, third] = cmd.args.filter(a => a !== "--force" && a !== "force");
+	const isLevel = (v?: string) => !!v && (THINKING_LEVELS as readonly string[]).includes(v);
+	const inProject = (key: string, a?: string, b?: string) => (!a || a === "inherit" ? undefined : isLevel(a) ? { target: key, thinking: a } : { target: key, model: a, ...(b ? { thinking: b } : {}) });
+	if (first && projectOf(first)) return inProject(first, second, third);
+	const here = from && projectOf(from);
+	if (here && !(first && namesTarget(first))) return inProject(here, first, second);
+	if (!first || !second) return undefined;
+	const target = normalizeTarget(first);
+	if (cmd.name === "effort") return { target, thinking: second };
+	return isLevel(second) && !third ? { target, thinking: second } : { target, model: second, ...(third ? { thinking: third } : {}) };
 }
 const namesTarget = (a: string) => a === "orchestrator" || a === "lanes" || a === "workers" || lanes.has(a.replace(/^lane:/, ""));
 
 // `from`: the conversation the command was written in.
-export async function runCommand(text: string, from?: string): Promise<CommandCard> {
+export async function runCommand(text: string, from?: string, by = "owner"): Promise<CommandCard> {
 	try {
-		return await execute(text, from);
+		return await execute(text, from, by);
 	} catch (e) {
 		return errorCard(e, text);
 	}
 }
 
-async function execute(text: string, from?: string): Promise<CommandCard> {
+async function execute(text: string, from?: string, by = "owner"): Promise<CommandCard> {
 	const cmd = parseCommand(text);
 	if (!cmd) throw new ControlError(`unknown command "${text.trim().split(/\s+/)[0]}"; /help lists them`);
 	const t = T();
@@ -560,9 +597,9 @@ async function execute(text: string, from?: string): Promise<CommandCard> {
 	const [first, second, third] = cmd.args.filter(a => !isForce(a));
 	const here = from ? convOf(from) : undefined;
 	if (cmd.name === "model" || cmd.name === "effort") {
-		if (first && projectOf(first)) return projectCommand(first, cmd.name, second, third, force);
+		if (first && projectOf(first)) return projectCommand(first, cmd.name, second, third, force, by);
 		const here = from && projectOf(from);
-		if (here && !(first && namesTarget(first))) return projectCommand(here, cmd.name, first, second, force);
+		if (here && !(first && namesTarget(first))) return projectCommand(here, cmd.name, first, second, force, by);
 	}
 	switch (cmd.name) {
 		case "help": {
@@ -608,15 +645,20 @@ async function execute(text: string, from?: string): Promise<CommandCard> {
 			if (first && second) {
 				const target = normalizeTarget(first);
 				const levelOnly = !third && (THINKING_LEVELS as readonly string[]).includes(second);
-				return changedCard(await setModel(target, levelOnly ? undefined : second, levelOnly ? second : third, force));
+				return changedCard(await setModel(target, levelOnly ? undefined : second, levelOnly ? second : third, force, by));
 			}
 			if (first) return targetCard(first, "model");
 			const targets = ["orchestrator", "lanes", "workers", ...lanes.keys()].map(normalizeTarget);
 			return card(t.modelsTitle, targets.map(tg => ({ label: whoIs(tg), value: `${currentOf(tg).model} · ${currentOf(tg).thinking}` })), { actions: await modelActions("orchestrator", orchestratorModel().model), note: t.modelsNote });
 		}
 		case "effort": {
-			if (first && second) return changedCard(await setModel(normalizeTarget(first), undefined, second, force));
+			if (first && second) return changedCard(await setModel(normalizeTarget(first), undefined, second, force, by));
 			return targetCard(first ?? "orchestrator", "effort");
+		}
+		case "fable-ok": {
+			const conv = from ? grantKeyOf(from) : "main";
+			const g = grantExpensive(conv, by);
+			return card(t.fableOkTitle(conv), [{ label: t.fableOkUntil, value: clock(Date.parse(g.until)) }], { tone: "ok" });
 		}
 		case "restart":
 			if (first === "gateway") {

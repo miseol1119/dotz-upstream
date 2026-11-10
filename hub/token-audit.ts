@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cfg, DATA_DIR, DEFAULTS, HOME, log, writeAtomic } from "./config.ts";
 import { issueBlock } from "./choices.ts";
-import { expensiveMatch, loadGuardConfig } from "../extension/guard-config.ts";
+import { expensiveMatch, loadGuardConfig } from "./lanegates.ts";
 import { addBigContext, addToolCalls, addTurn, addWake, collectSessions, newStreaks, OMO_WAKE, projectLabel as labelOf, type Src } from "./session-sources.ts";
 import { trackTimer } from "./shutdown.ts";
 

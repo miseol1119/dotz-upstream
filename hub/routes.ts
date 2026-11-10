@@ -67,7 +67,7 @@ import { updateNow } from "./update-now.ts";
 import { harnessUpdateRoute } from "./harness-update.ts";
 import { appAsset, committedText, indexPage, setAppName, webBuild } from "./webapp.ts";
 import { forgetRoute, listPeers, ownLogin } from "./peers.ts";
-import { ambientWrite, entryHost, ownTailnetName, refuse, tokenOk } from "./entry-check.ts";
+import { AGENT_AUTHOR, ambientWrite, entryHost, ownTailnetName, refuse, tokenOk } from "./entry-check.ts";
 import { peerProjects } from "./peer-projects.ts";
 import { relayRoute, relayRows } from "./relay-route.ts";
 import { handlePair, PAIR_PATH } from "./peer-pair.ts";
@@ -843,7 +843,7 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 				if (req.method === "GET") return json(await targetView(url.searchParams.get("target") ?? "main"));
 				if (req.method === "PUT") {
 					const b = await body(req);
-					return json(await changeTarget(String(b.target ?? "main"), { model: b.model ? String(b.model) : undefined, thinking: b.thinking ? String(b.thinking) : undefined, compact: b.compact === true, force: b.force === true, inherit: b.inherit === true, workerModel: b.worker_model ? String(b.worker_model) : undefined, byLane: b.by === "lane" }));
+					return json(await changeTarget(String(b.target ?? "main"), { req, ownerMessage: b.owner_message, model: b.model ? String(b.model) : undefined, thinking: b.thinking ? String(b.thinking) : undefined, compact: b.compact === true, force: b.force === true, inherit: b.inherit === true, workerModel: b.worker_model ? String(b.worker_model) : undefined, byLane: b.by === "lane" }));
 				}
 			} catch (error) {
 				return fail(error);
@@ -869,7 +869,7 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 			});
 			if (!String(b.text ?? "").trim() && !files.length && !elements.length) return json({ error: "text required" }, 400);
 			const text = String(b.text ?? "");
-			const login = req.headers.get("tailscale-user-login") ?? "local";
+			const login = peer === "none" && tokenOk(req) ? AGENT_AUTHOR : (req.headers.get("tailscale-user-login") ?? "local"); // an agent's own post is never the owner's word (hub/model-guard.ts)
 			// mode: none (main takes it as the next message, a working lane is steered), "steer" (into the running turn
 			// now), "interrupt" (abort the running turn, then send as a new prompt), "queue" (a working target gets it
 			// when its turn ends, see queue.ts; an idle target gets it now).

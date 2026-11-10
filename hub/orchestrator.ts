@@ -24,6 +24,7 @@ import { errorAskHold, noteErrorAsked, type OrchError, plainError } from "./orch
 import { LATER_LINE, stripLater } from "./tone.ts";
 import { checkSoon as checkAccountSoon } from "./account-rules.ts";
 import { handover, lastAnswerAt, newOrchState, recallText } from "./orchestrator-parts.ts";
+import { noteModelChange } from "./model-guard.ts";
 
 const ROTATE_BYTES = 50e6;
 // The compaction point of a session: the running model's own (config context.models, the 컨텍스트 screen) or
@@ -520,7 +521,7 @@ export function createOrchestrator(opts: OrchOpts) {
 					const line = msg().modelFallback(ev.from, ev.to, ev.reason, ev.worker);
 					if (!ev.worker) {
 						clearTimeout(errorHold);
-						orch.activeModel = ev.to;
+						orch.activeModel = noteModelChange(opts.key === "main" ? "orchestrator" : opts.key, ev.from, ev.to, "fallback");
 					}
 					if (ev.worker || chain) onNotice(line);
 					else {
