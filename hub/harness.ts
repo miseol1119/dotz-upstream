@@ -297,7 +297,7 @@ export async function harnessGraph(opts: { terminals?: number; light?: boolean }
 	// -- provider quota (one 2.5 s try; the usage call finishes in the background and the next refresh has it)
 	const q = opts.light ? undefined : await Promise.race([quota().catch(() => undefined), sleep(2500, undefined)]);
 	const used = [...new Set([om.model, lm.model, wm.model].map(m => m.split("/")[0]))];
-	const limits = (q?.providers ?? []).filter(p => used.includes(p.provider)).flatMap(p => p.limits.filter(l => l.limit && l.remaining != null).map(l => ({ p: p.provider, label: l.label, pct: Math.round((l.remaining! / l.limit!) * 100) })));
+	const limits = (q?.providers ?? []).filter(p => used.includes(p.provider)).flatMap(p => p.limits.filter(l => !l.scope && l.limit && l.remaining != null).map(l => ({ p: p.provider, label: l.label, pct: Math.round((l.remaining! / l.limit!) * 100) })));
 	const low = limits.length ? Math.min(...limits.map(l => l.pct)) : undefined;
 
 	const nodes: HarnessNode[] = [

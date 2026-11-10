@@ -41,7 +41,7 @@ const stTag = (text, tone = "warn") => el("span", { class: `tag ${tone}${tone ==
 /* ---------- one-line summaries under the link rows ---------- */
 function stUsageSub() {
   const q = typeof SQ !== "undefined" && SQ ? SQ : null;
-  const lims = q ? (q.providers || []).flatMap(p => (p.limits || []).map(l => ({ l, f: limitFrac(l) }))).filter(x => x.f != null) : [];
+  const lims = q ? (q.providers || []).flatMap(p => (p.limits || []).filter(l => !l.scope).map(l => ({ l, f: limitFrac(l) }))).filter(x => x.f != null) : [];
   const low = lims.sort((a, b) => a.f - b.f)[0];
   return [low ? `${limitName(low.l)} ${pctText(low.l)}` : "", budgetSub()].filter(Boolean).join(" · ");
 }

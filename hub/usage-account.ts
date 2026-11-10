@@ -23,9 +23,9 @@ const USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
 
 type SubscriptionAccount = { name: string; pinned: boolean; sticky?: boolean; token: string; expiresAt: number | null; plan?: string };
 type AccountProblem = "expired" | "rate_limited" | "failed";
-type Limit = { id: string; label: string; window: { id: string; label: string; durationMs: number; resetsAt?: number }; amount: { used: number; limit: number; remaining: number; usedFraction: number; remainingFraction: number; unit: "percent" }; status: string };
+type Limit = { id: string; label: string; window: { id: string; label: string; durationMs: number; resetsAt?: number }; amount: { used: number; limit: number; remaining: number; usedFraction: number; remainingFraction: number; unit: "percent" }; status: string; scope?: string; active?: boolean };
 // One limit as GET /api/quota carries it (hub/providers.ts buildQuota, hub/codex-usage.ts).
-export type QuotaLimit = { id: string; label: string; window: string; used: number | null; limit: number | null; remaining: number | null; unit: string; resets_at: number | null; status: string };
+export type QuotaLimit = { id: string; label: string; window: string; used: number | null; limit: number | null; remaining: number | null; unit: string; resets_at: number | null; status: string; scope?: string; active?: boolean };
 // Shaped like one `omp usage --json` report, plus whose numbers they are.
 export type AccountReport = { provider: "anthropic"; account: string; via: "omo-pinned" | "omo-sticky" | "omo-pool" | "omp"; limits: Limit[]; fetchedAt?: number; problem?: AccountProblem; retryAt?: number; plan?: string; resets?: ClaudeResets };
 // The account's 리셋권 (Anthropic's "limit reset", program cedar_ember): how many are left, by kind (주간, Fable), the nearest expiry,
@@ -196,7 +196,7 @@ const WINDOWS: [key: string, id: string, label: string, windowId: string, durati
 
 // Pure: the oauth/usage answer as omp-shaped limits (percent of the window used).
 export function limitsOf(body: Json): Limit[] {
-	return WINDOWS.flatMap(([key, id, label, windowId, durationMs]): Limit[] => {
+	const main = WINDOWS.flatMap(([key, id, label, windowId, durationMs]): Limit[] => {
 		const w = body?.[key];
 		const used = typeof w?.utilization === "number" && Number.isFinite(w.utilization) ? Math.round(Math.min(100, Math.max(0, w.utilization)) * 10) / 10 : undefined;
 		if (used === undefined) return [];
@@ -204,6 +204,19 @@ export function limitsOf(body: Json): Limit[] {
 		const remaining = Math.round((100 - used) * 10) / 10;
 		return [{ id, label, window: { id: windowId, label: windowId === "5h" ? "5 Hour" : "7 Day", durationMs, ...(Number.isNaN(resetsAt) ? {} : { resetsAt }) }, amount: { used, limit: 100, remaining, usedFraction: used / 100, remainingFraction: remaining / 100, unit: "percent" }, status: used >= 100 ? "exhausted" : "ok" }];
 	});
+	// limits[] kind "weekly_scoped": a window of its own for one model or surface (the name the entry carries). scope + active mark it
+	// so nothing reads it as the weekly or the 5-hour window; active is the API's is_active, passed on unread.
+	const scoped = (Array.isArray(body?.limits) ? body.limits : []).flatMap((e: Json): Limit[] => {
+		const scope = e?.scope?.model?.display_name ?? e?.scope?.surface?.display_name;
+		if (e?.kind !== "weekly_scoped" || typeof scope !== "string" || !scope || typeof e.percent !== "number" || !Number.isFinite(e.percent)) return [];
+		const used = Math.round(Math.min(100, Math.max(0, e.percent)) * 10) / 10;
+		const resetsAt = typeof e.resets_at === "string" ? Date.parse(e.resets_at) : Number.NaN;
+		const remaining = Math.round((100 - used) * 10) / 10;
+		const durationMs = 7 * 86400_000;
+		return [{ id: `anthropic:7d:${scope.toLowerCase()}`, label: `Claude 7 Day (${scope})`, window: { id: "7d", label: "7 Day", durationMs, ...(Number.isNaN(resetsAt) ? {} : { resetsAt }) }, amount: { used, limit: 100, remaining, usedFraction: used / 100, remainingFraction: remaining / 100, unit: "percent" }, status: used >= 100 ? "exhausted" : "ok", scope, ...(typeof e.is_active === "boolean" ? { active: e.is_active } : {}) }];
+	});
+	const at = main.findIndex(l => l.id === "anthropic:7d") + 1;
+	return at ? [...main.slice(0, at), ...scoped, ...main.slice(at)] : [...main, ...scoped];
 }
 
 // The usage read. cedar_ember=1 adds the 리셋권 (null without it); the server lists them only to a Claude Code user-agent (with

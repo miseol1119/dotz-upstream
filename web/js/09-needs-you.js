@@ -225,7 +225,7 @@ const limitWord = l => {
 function tightLimit(q) {
   const provs = (q.providers || []).filter(p => (p.limits || []).length), an = provs.filter(p => /anthropic|claude/i.test(p.provider));
   let best = null;
-  for (const p of an.length ? an : provs) for (const l of p.limits) { const f = limitFrac(l); if (f != null && (!best || f < best.f)) best = { l, f }; }
+  for (const p of an.length ? an : provs) for (const l of p.limits) { if (l.scope) continue; const f = limitFrac(l); if (f != null && (!best || f < best.f)) best = { l, f }; }
   return best;
 }
 function paintStrip() {

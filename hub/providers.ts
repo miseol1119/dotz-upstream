@@ -81,7 +81,7 @@ export function secretValues(): string[] {
 
 type OmpModel = { kind?: string; selector: string; id?: string; name?: string; provider: string; reasoning?: boolean; thinking?: unknown };
 type OmpCredential = { provider: string; credential?: Record<string, unknown> };
-type OmpLimit = { id: string; label?: string; window?: { id?: string; label?: string; resetsAt?: number }; amount?: { used?: number; limit?: number; remaining?: number; unit?: string }; status?: string };
+type OmpLimit = { id: string; label?: string; window?: { id?: string; label?: string; resetsAt?: number }; amount?: { used?: number; limit?: number; remaining?: number; unit?: string }; status?: string; scope?: string; active?: boolean };
 type OmpUsageReport = { provider: string; limits?: OmpLimit[]; metadata?: { email?: string }; account?: string; plan?: string; resets?: ClaudeResets };
 
 async function ompJson<T>(args: string[], timeoutMs = 30_000): Promise<T | undefined> {
@@ -709,7 +709,7 @@ export function buildQuota(reports: OmpUsageReport[], credentialed: string[]): {
 			limits: r.limits.map((l): QuotaLimit => ({
 				id: String(l.id), label: String(l.label ?? l.id), window: String(l.window?.id ?? l.window?.label ?? ""),
 				used: num(l.amount?.used), limit: num(l.amount?.limit), remaining: num(l.amount?.remaining), unit: String(l.amount?.unit ?? ""),
-				resets_at: num(l.window?.resetsAt), status: String(l.status ?? "unknown"),
+				resets_at: num(l.window?.resetsAt), status: String(l.status ?? "unknown"), ...(typeof l.scope === "string" ? { scope: l.scope } : {}), ...(typeof l.active === "boolean" ? { active: l.active } : {}),
 			})),
 		}));
 	const reported = new Set(providers.map(p => p.provider));

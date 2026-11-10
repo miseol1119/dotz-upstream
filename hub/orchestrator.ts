@@ -37,11 +37,14 @@ export const RESTART_WINDOW_MS = 10 * 60_000;
 // start was announced, its end is announced once a turn succeeds on a non-key entry).
 type Saved = { sessionFile?: string; model?: string; runtime?: string; pausedUntil?: string; pausedKind?: "owner"; pausedAuth?: number; activeModel?: string; apiSince?: string };
 
+// Only the 5-hour and weekly windows: a scoped one (one model's slice, `scope`) is no reason to call the subscription unusable.
+export const limitsUsable = (limits: { scope?: string; amount: { remaining: number } }[]): boolean => limits.filter(l => !l.scope).every(l => l.amount.remaining >= 1);
+
 export const subscriptionCheck = {
 	usable: async (): Promise<boolean | undefined> => {
 		const r = await anthropicUsage("orchestrator").catch(() => undefined);
 		if (!r || r.problem || !r.limits.length) return undefined;
-		return r.limits.every(l => l.amount.remaining >= 1);
+		return limitsUsable(r.limits);
 	},
 };
 

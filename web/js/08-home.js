@@ -494,6 +494,7 @@ function renderHomeNow() {
   if (HQ && !HQ.error) {
     const provs = (HQ.providers || []).filter(p => (p.limits || []).length), multi = provs.length > 1;
     for (const pr of provs) for (const l of pr.limits) {
+      if (l.scope) continue;
       const id = `limit:${pr.provider}:${l.id}`, f = limitFrac(l), name = limitLabel(pr, l, multi);
       const tone = limitHit(l) || (f != null && f <= .2) ? "warn" : "";
       E.limit.push({ id, tone, open: () => go("usage"),
