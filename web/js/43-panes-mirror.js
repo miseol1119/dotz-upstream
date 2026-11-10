@@ -14,29 +14,14 @@ function paneLeave(p) {
   if (p.kind === "chat" && current === "chat" && target === p.t) {
     p.at = chatAnchor(); p.stick = chatStick;
     PNS.set(p.id, { n: tl.cloneNode(true), keys: new Set(ts(p.t).mk) });
-  } else if (p.kind === "project" && current === "project" && ppCur === p.t) PNS.set(p.id, { n: $("#v-project").cloneNode(true) });
-  else if (p.kind === "app" && current === "monitoring") {
-    // It keeps the room, thread or DM it ended on, unless another pane holds that one: then only its item (no app shown twice).
-    const k = paneAppKey(), dup = paneLeaves().some(x => x !== p && x.kind === "app" && x.t === k);
-    p.t = dup ? paneAppParts(k).key : k;
-    PNS.set(p.id, { n: $("#v-monitoring").cloneNode(true) });
-  }
+  } else if (p.kind === "app" && current === "monitoring") PNS.set(p.id, { n: $("#v-monitoring").cloneNode(true) });
   else PNS.delete(p.id);
 }
 
-// An app pane is named by its room, thread or DM, else its 모니터링 item, else 모니터링 (the list); the state line names what holds it.
-const paneAppItem = t => { const { key } = paneAppParts(t); return (key !== "list" && monItems().find(i => i.key === key)) || null; };
-function paneAppSubName(t) {
-  const { kind, a, b, c } = paneAppParts(t);
-  if (kind === "kk") return (KK.rooms.find(r => r.chatId === a) || {}).name || "대화방";
-  if (kind === "cm") return c || "댓글";
-  return kind === "dm" ? b || "DM" : "";
-}
-const paneAppLabel = t => paneAppSubName(t) || (paneAppItem(t) || {}).name || "모니터링";
-const paneName = p => (p.kind === "app" ? paneAppLabel(p.t) : p.t === "builtin:custom" ? "커스텀" : targetName(p.t));
+// An app pane is a KakaoTalk room: named by it, the state line says where it is from.
+const paneName = p => (p.kind === "app" ? (KK.rooms.find(r => r.chatId === paneKkId(p.t)) || {}).name || "대화방" : targetName(p.t));
 function paneState(p) {
-  if (p.kind === "project") return "프로젝트";
-  if (p.kind === "app") return p.t === "list" ? "" : paneAppSubName(p.t) ? (paneAppItem(p.t) || {}).name || "모니터링" : "모니터링";
+  if (p.kind === "app") return "카카오톡";
   const i = targetInfo(p.t);
   return isRelayT(p.t) ? RELAY.note[p.t] || "" : isFixedT(p.t) ? FIXED_DESC[p.t] : i.alive ? statusKo(i.status) : "종료됨";
 }
@@ -64,7 +49,7 @@ function paneMirror(p) {
     m.node = el("div", { class: `pane-mir pane-chat${p.t === "alert" ? " no-composer" : ""}` }, head, m.todo, el("div", { class: "chatbox" }, m.wrap), m.subs, paneComposerEl(m));
     if (!TD.by[p.t]) loadTodo(p.t);
   } else {
-    m.node = el("div", { class: "pane-mir" }, head, el("div", { class: "pane-pj" }, snap ? paneBare(snap.n) : el("div", { class: "empty", text: p.kind === "app" ? "이 창을 누르면 모니터링이 열려요" : "이 창을 누르면 프로젝트가 열려요" })));
+    m.node = el("div", { class: "pane-mir" }, head, el("div", { class: "pane-pj" }, snap ? paneBare(snap.n) : el("div", { class: "empty", text: "이 창을 누르면 대화방이 열려요" })));
   }
   PNM.set(p.id, m);
   if (m.k) paneStrip(m);
@@ -118,7 +103,7 @@ function paneHeadEl(p) {
   dot.hidden = !p.dot;
   const x = chat ? null : el("button", { class: "ib pane-x", type: "button", "aria-label": "창 닫기", title: "창 닫기", onclick: () => paneClose(p.id) }, icon("close"));
   const acts = chat && (isLaneT(p.t) || (isProjT(p.t) && pmOfTarget(p.t))) ? el("span", { class: "cv-hd-a" }, el("button", { class: "ib cvmenu", type: "button", tabindex: "-1", "aria-label": "세션 메뉴" }, icon("more"))) : null;
-  return { head: el("div", { class: chat ? "cv-head pane-hd" : "pane-hd" }, el("span", { class: "cv-hd-b" }, el("span", { class: "cv-hd-t", title: name }, dot, name), s || p.kind !== "app" ? state : null), acts, x), dot, state };
+  return { head: el("div", { class: chat ? "cv-head pane-hd" : "pane-hd" }, el("span", { class: "cv-hd-b" }, el("span", { class: "cv-hd-t", title: name }, dot, name), state), acts, x), dot, state };
 }
 // A mirror without a copy (the page was reloaded, or the pane lost its screen to another pane): drawn from the messages the page holds.
 function paneFill(m) {

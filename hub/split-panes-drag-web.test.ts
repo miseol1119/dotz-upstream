@@ -101,7 +101,16 @@ test("nothing splits up or down: the bottom edge of a pane is its middle, and a 
 	expect(await ids(v)).toEqual(["main", "lane:가나"]);
 });
 
-test("a menu tab is only pressed, never dragged; `앱 관리` says a pane cannot hold it; the 모니터링 screen is an app pane with a head", async () => {
+const LIT = `[...document.querySelectorAll("#nav .ni.on")].map(b => b.dataset.view)`;
+// A mail owing a reply and a watched KakaoTalk room owing one: the 메일 · 카카오톡 card of the chat list (31-conversations.js convWaiting).
+const owed = async (v: V) => {
+	await run(v, `MAILS.set("mail:abc123", { from: "민수", subject: "견적 문의", at: new Date().toISOString(), dir: "in", unreplied: true });
+		KK.rooms.push({ chatId: "77", name: "가족방", kind: "group", watched: true, unreplied: true, unread: 1, lastAt: Date.now() });
+		convSig = ""; convPaint();`);
+	await waitFor(v, `!!document.querySelector('#chat-convo .cv-row[data-k="w:mail:abc123"]') && !!document.querySelector('#chat-convo .cv-row[data-k="w:kk:77"]')`);
+};
+
+test("a menu tab is only pressed, never dragged; `앱 관리` says a pane cannot hold it; 모니터링's screen is no pane", async () => {
 	const v = await open();
 	await run(v, `go("chat", "lane:가나")`);
 	await waitFor(v, `target === "lane:가나" && CV.placed`);
@@ -118,24 +127,72 @@ test("a menu tab is only pressed, never dragged; `앱 관리` says a pane cannot
 	await waitFor(v, `!document.querySelector(".pn-ghost")`);
 	expect(await ev(v, `[paneCount(), current]`)).toEqual([0, "chat"]);
 
-	await run(v, `paneSplit("list", "app", "right")`);
-	await waitFor(v, `paneCount() === 2 && current === "monitoring" && !!$("#split .pane.on > .pane-hd") && $("#split .pane.on").contains($("#v-monitoring")) && $("#split .pane-side").contains(convSide)`);
-	expect(await ev(v, `[paneList().map(p => p.kind + ":" + p.t), $("#split .pane.on > .pane-hd .cv-hd-t").textContent]`)).toEqual([["chat:lane:가나", "app:list"], "모니터링"]);
-	await run(v, `paneFocus(paneList()[0].id)`);
-	await waitFor(v, `current === "chat" && $("#v-monitoring").parentNode === $("#views") && !!$("#split .pane[data-kind='app'] .pane-mir")`);
-	await run(v, `go("monitoring")`);
-	await waitFor(v, `current === "monitoring" && paneList().find(p => p.active).kind === "app"`);
+	// 모니터링's screen and a project are not what a chat list row opens: no pane, split or replaced
+	expect(await ev(v, `[paneSplit("list", "app", "right"), paneSplit("i:kakao", "app", "right"), paneSplit("builtin:custom", "project", "right"), paneCount()]`)).toEqual(["", "", "", 0]);
 });
+
+test("off the chat tab nothing makes a pane: the key, a dragged row and a split call all do nothing, and the drag says why", async () => {
+	const v = await open();
+	await run(v, `go("monitoring")`);
+	await waitFor(v, `current === "monitoring"`);
+	await key(v, "Backslash", "altKey: true,");
+	expect(await ev(v, `[paneCount(), !!$("#split"), paneSplit("lane:가나", "chat", "right"), paneCount()]`)).toEqual([0, false, "", 0]);
+	// a list row on the project tab is dragged to the one screen; its ghost refuses with one line
+	await run(v, `document.body.append(el("button", { class: "cv-row pv", type: "button", "data-t": "lane:가나", id: "off-row", style: "position: fixed; left: 300px; top: 300px; width: 200px" }, el("span", { class: "cv-b" }, el("span", { class: "cv-n", text: "가나" }))))`);
+	await drag(v, "#off-row", `$("#v-monitoring").getBoundingClientRect()`, 0.95, 0.5, false);
+	await waitFor(v, `!!document.querySelector(".pn-ghost.no")`);
+	expect(await ev(v, `[$(".pn-ghost .pn-gh").textContent, !!document.querySelector(".pn-zone")]`)).toEqual(["분할은 채팅 탭에서만 할 수 있어요", false]);
+	await run(v, `document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: 900, clientY: 400, pointerId: 1, button: 0 })); $("#off-row").remove()`);
+	await waitFor(v, `!document.querySelector(".pn-ghost")`);
+	expect(await ev(v, `[paneCount(), current, !!$("#split")]`)).toEqual([0, "monitoring", false]);
+
+	// two panes, then another tab: the keys leave them alone there
+	await run(v, `go("chat")`);
+	await waitFor(v, `current === "chat" && CV.placed`);
+	await split(v, "lane:가나");
+	await run(v, `go("monitoring")`);
+	await waitFor(v, `current === "monitoring" && $("#split").hidden`);
+	await key(v, "KeyW", "altKey: true,");
+	await key(v, "Digit1", "altKey: true,");
+	expect(await ev(v, `[paneCount(), paneList().map(p => p.t + (p.active ? "*" : ""))]`)).toEqual([2, ["main", "lane:가나*"]]);
+});
+
+test("a mail and a KakaoTalk room of the chat list drop into a pane and the chat tab stays lit; another tab hides the split and the way back shows the same two", async () => {
+	const v = await open();
+	await owed(v);
+	// the mail row: the right edge of the one conversation makes a second pane
+	await drag(v, ROW("lane:가나"), ONE, 0.95, 0.5);
+	await waitFor(v, `paneCount() === 2 && document.querySelectorAll("#split .pane").length === 2 && CV.placed`);
+	await waitFor(v, SETTLED);
+	await drag(v, '#chat-convo .cv-row[data-k="w:mail:abc123"]', PANE("main"), 0.5, 0.5);
+	await waitFor(v, `paneList().some(p => p.t === "mail:abc123")`);
+	expect(await ev(v, `[paneCount(), ${LIT}, monCtx]`)).toEqual([2, ["chat"], ""]);
+	// the KakaoTalk room replaces the other
+	await drag(v, '#chat-convo .cv-row[data-k="w:kk:77"]', PANE("lane:가나"), 0.5, 0.5);
+	await waitFor(v, `paneList().some(p => p.kind === "app" && p.t === "i:kakao#kk:77") && current === "monitoring"`);
+	expect(await ev(v, `[paneCount(), ${LIT}, document.querySelectorAll("#split .pane").length]`)).toEqual([2, ["chat"], 2]);
+
+	// another tab: one screen, the panes wait; the chat tab brings the same two back
+	const before = await ev<string[]>(v, `paneList().map(p => p.kind + ":" + p.t + (p.active ? "*" : ""))`);
+	await run(v, `$('#nav .ni[data-view="home"]').click()`);
+	await waitFor(v, `current === "home" && $("#split").hidden && $("#v-chat").parentNode === $("#views") && $("#v-monitoring").parentNode === $("#views")`);
+	expect(await ev(v, `[${LIT}, paneCount()]`)).toEqual([["home"], 2]);
+	await run(v, `$('#nav .ni[data-view="chat"]').click()`);
+	await waitFor(v, `!$("#split").hidden && document.querySelectorAll("#split .pane").length === 2`);
+	expect(await ev(v, `paneList().map(p => p.kind + ":" + p.t + (p.active ? "*" : ""))`)).toEqual(before);
+	expect(await ev(v, `${LIT}`)).toEqual(["chat"]);
+});
+
 test("a KakaoTalk room of the chat list drops as an in-app pane: 모니터링 opens on 카카오톡 with that room", async () => {
 	const v = await open();
-	// a 미답장 room of the chat list (31-conversations.js: k "w:kk:<chatId>"). On the body, where no list repaint takes it away.
-	await run(v, `document.body.append(el("button", { class: "cv-row pv", type: "button", "data-k": "w:kk:77", id: "kk-room", style: "position: fixed; left: 300px; top: 300px; width: 200px" }, el("span", { class: "cv-b" }, el("span", { class: "cv-n", text: "가족방" }))))`);
-	await drag(v, "#kk-room", ONE, 0.95, 0.5, false);
+	await owed(v);
+	await drag(v, '#chat-convo .cv-row[data-k="w:kk:77"]', ONE, 0.95, 0.5, false);
 	await waitFor(v, `PD && PD.hit && PD.hit.side === "right"`);
 	expect(await ev(v, `[PD.src.kind, PD.src.t, $(".pn-ghost .pn-gh").textContent]`)).toEqual(["app", "i:kakao#kk:77", "오른쪽에 새 칸"]);
-	await run(v, `{ const r = PD.hit.r; document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.right - 4, clientY: r.top + r.height / 2, pointerId: 1, button: 0 })); $("#kk-room").remove(); }`);
+	await run(v, `{ const r = PD.hit.r; document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: r.right - 4, clientY: r.top + r.height / 2, pointerId: 1, button: 0 })); }`);
 	await waitFor(v, `paneCount() === 2 && current === "monitoring" && MON.sel === "i:kakao" && $("#split .pane.on").contains($("#v-monitoring"))`);
 	expect(await ev(v, `paneList().map(p => p.kind + ":" + p.t + (p.active ? "*" : ""))`)).toEqual(["chat:main", "app:i:kakao#kk:77*"]);
+	expect(await ev(v, LIT)).toEqual(["chat"]);
 });
 
 test("a drop opens the new pane by growing it from nothing and a cancel sends the ghost back; with reduced motion both are instant", async () => {

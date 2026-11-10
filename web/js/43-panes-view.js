@@ -1,7 +1,9 @@
 /* ---------- 분할 창: the screen (docs/split-panes.md) ----------
-   #split sits in #views from the second pane on, on a wide screen only: [list column][tree of panes]. The active pane holds the real #v-chat / #v-project
-   (go() finds the sections by id), the list column holds convSide / #v-projects. Back to one pane or a narrow window: every node goes where it was and #split goes. */
-let PNV = { el: null, side: null, tree: null, sig: "", order: null, list: "chat", cmp: null };
+   #split sits in #views from the second pane on, on a wide screen and the chat tab only: the tree of panes takes the whole width (the list column is folded,
+   owner 8f7c8c3d), and the chat list (convSide) lies over the panes from the left when the active pane's 목록 button asks for it. The active pane holds the
+   real #v-chat (go() finds the sections by id). Another tab, back to one pane or a narrow window: every node goes where it was (the tab, #split hidden
+   with the panes kept) or #split goes (one pane, narrow). */
+let PNV = { el: null, side: null, tree: null, sig: "", order: null, cmp: null, open: false };
 
 function paneRoot() {
   if (PNV.el) return PNV.el;
@@ -10,40 +12,74 @@ function paneRoot() {
   PNV.tree = el("div", { class: "pane-tree" });
   PNV.el = el("div", { id: "split", class: "view fill split", hidden: true }, PNV.side, PNV.tree);
   $("#views").append(PNV.el);
+  // a row of the list that lies over the panes is a pick: the list closes (the row itself opens in the active pane, 31-conversations.js)
+  convSide.addEventListener("click", ev => { if (PNV.open && ev.target.closest(".cv-row")) paneListShut(); });
   return PNV.el;
+}
+
+// The chat list over the panes (the 목록 button of the active pane): it lies from the left edge at its own width, so neither pane moves. It closes on a pick,
+// a press outside it and Esc. It comes in the way a sheet does (280ms, the motion curve) and instantly under reduced motion.
+const paneListOutside = ev => { if (!ev.target.closest("#chat-convo, .pane-ls")) paneListShut(); };
+const paneListKey = ev => { if (ev.key === "Escape") paneListShut(); };
+function paneListMark() {
+  const b = PNV.el && PNV.el.querySelector(".pane-ls");
+  if (b) b.setAttribute("aria-expanded", String(PNV.open));
+}
+function paneListOpen() {
+  if (!PNV.el || PNV.el.hidden || PNV.open) return;
+  PNV.open = true;
+  convSide.getAnimations().forEach(a => a.cancel());
+  PNV.el.classList.add("ls-open");
+  paneListMark();
+  if (!reducedMotion()) convSide.animate([{ opacity: 0, transform: "translateX(-16px)" }, { opacity: 1, transform: "none" }], { duration: 280, easing: M_EASE });
+  document.addEventListener("pointerdown", paneListOutside, true);
+  document.addEventListener("keydown", paneListKey, true);
+}
+function paneListShut() {
+  if (!PNV.open) return;
+  PNV.open = false;
+  document.removeEventListener("pointerdown", paneListOutside, true);
+  document.removeEventListener("keydown", paneListKey, true);
+  paneListMark();
+  motionOut(convSide, "fade", M_MS.fast).then(() => { if (!PNV.open && PNV.el) { PNV.el.classList.remove("ls-open"); convSide.getAnimations().forEach(a => a.cancel()); } });
 }
 // Called at the end of go()'s view switch, on a resize across 1100px, and by the model after every change.
 function paneSync() {
   if (!PNV.el && paneCount() < 2) return;
   if (paneCount() < 2 || narrowChat()) { paneTeardown(); return; }
-  const show = current === "chat" || current === "project" || paneAppIn();
+  const show = paneTabOk();
   if (show) paneAdopt();
   paneRoot().hidden = !show;
-  if (!show) return;
+  if (!show) { paneAway(); return; }
   $("#views").classList.remove("pp");
   const sig = paneSig();
   if (sig !== PNV.sig) { PNV.sig = sig; paneDraw(); }
   paneHeadSync();
 }
-// The active screen's head follows the screen without a redraw (a 모니터링 item opened inside it).
+// Not on the chat tab: the panes wait (targets, places, the active one and the mirrors are kept) and every section is where it belongs on its own screen.
+function paneAway() {
+  if (!PNV.sig) return;
+  paneRelease();
+  PNV.sig = "";
+  paneListShut();
+}
+// The active screen's head follows the screen without a redraw (the KakaoTalk room open inside it).
 function paneHeadSync() {
-  const a = paneFind(PN.active), n = a.kind === "app" && PNV.el.querySelector(".pane.on > .pane-hd .cv-hd-t"), name = n && paneName(a);
+  const a = paneFind(PN.active), n = PNV.el && a.kind === "app" && PNV.el.querySelector(".pane.on > .pane-hd .cv-hd-t"), name = n && paneName(a);
   if (n && n.lastChild.textContent !== name) { n.lastChild.textContent = name; n.title = name; }
 }
 matchMedia("(max-width: 1099px)").addEventListener("change", paneSync);
 
-// 모니터링 is in the split only while a pane holds it (the active one or another); otherwise it takes the whole page as before and the panes wait.
-const paneAppOf = () => paneLeaves().find(p => p.kind === "app") || null;
-const paneAppIn = () => current === "monitoring" && (paneFind(PN.active).kind === "app" || !!paneAppOf());
+// The tab that is lit while 모니터링's screen sits in an app pane: 채팅 (go() in 05-command-palette.js).
+const paneLit = name => name === "monitoring" && !!PNV.el && !PNV.el.hidden && paneTabOk();
 // The real 모니터링 screen sits in a pane: as narrow as a phone's column, so its back arrow closes an open room first (30-kakao.js kkBack).
 const paneMonIn = () => $("#v-monitoring").classList.contains("in-pane");
 
 // What the active pane shows is whatever the page shows: go() and openTarget() change its content (a target open in another pane activates that pane instead).
 function paneAdopt() {
   const a = paneFind(PN.active), h = paneHere();
-  if (!a || PN.going || (a.kind === h.kind && a.t === h.t)) return;
-  // Moving inside 모니터링 stays in the active app pane; coming to it from a conversation goes to an app pane.
-  const dup = paneOpenIn(h.kind, h.t) || (h.kind === "app" && a.kind !== "app" && paneAppOf());
+  if (!a || PN.going || current !== "chat" || (a.kind === h.kind && a.t === h.t)) return;
+  const dup = paneOpenIn(h.kind, h.t);
   if (dup) { PN.active = dup.id; dup.t = h.t; dup.dot = ""; paneForget(dup.id); }
   else Object.assign(a, { kind: h.kind, t: h.t, at: null, stick: true, dot: "" });
   paneForget(a.id);
@@ -59,7 +95,7 @@ function paneHome(n) {
   views.insertBefore(n, next || null);
 }
 function paneRelease() {
-  for (const n of [$("#v-chat"), $("#v-project"), $("#v-projects"), $("#v-monitoring")]) {
+  for (const n of [$("#v-chat"), $("#v-monitoring")]) {
     n.classList.remove("in-pane");
     if (n.parentNode !== $("#views")) paneHome(n);
   }
@@ -69,22 +105,18 @@ function paneTeardown() {
   if (!PNV.el) return;
   const chat = current === "chat", at = chat ? chatAnchor() : null, stick = chatStick;
   paneRelease();
+  paneListShut();
   PNV.el.remove(); PNV.el = PNV.side = PNV.tree = null; PNV.sig = "";
   paneMirrorsClear();
-  const pp = current === "project" && ppWide();
-  $("#views").classList.toggle("pp", pp);
-  $("#v-projects").hidden = !(pp || current === "projects");
   if (chat) paneLand(at, stick);
 }
 function paneDraw() {
   const chat = current === "chat", at = chat ? chatAnchor() : null, stick = chatStick;
   paneRelease();
   PNV.cmp = $("#composer");   // the open pane's section leaves the document while its pane is built, so the mirrors take the composer from here
-  const kind = paneFind(PN.active).kind, sec = $(kind === "project" ? "#v-project" : kind === "app" ? "#v-monitoring" : "#v-chat");
+  const kind = paneFind(PN.active).kind, sec = $(kind === "app" ? "#v-monitoring" : "#v-chat");
   sec.classList.add("in-pane");
-  // 모니터링 keeps the list that was there, so focusing it does not move every pane sideways.
-  if (kind !== "app") PNV.list = kind;
-  PNV.side.replaceChildren(PNV.list === "project" ? $("#v-projects") : convSide);
+  PNV.side.replaceChildren(convSide);
   PNV.tree.replaceChildren(paneNode(PN.root, sec));
   paneMirrorsPlace();
   if (chat) paneLand(at, stick);
@@ -107,7 +139,9 @@ function paneShare(n, box) {
 function paneLeafEl(p, sec) {
   const on = p.id === PN.active;
   const x = el("button", { class: "ib pane-x", type: "button", "aria-label": "창 닫기", title: "창 닫기", onclick: () => paneClose(p.id) }, icon("close"));
-  const kids = !on ? (p.kind === "chat" ? [paneMirror(p), x] : [paneMirror(p)]) : p.kind === "app" ? [paneHeadEl(p).head, sec] : [sec, x];
+  // the active pane's 목록 button sits at its head's left, over the head (the head leaves room for it, 26-panes.css)
+  const ls = on && el("button", { class: "ib pane-ls", type: "button", "aria-label": "대화 목록", "aria-expanded": String(PNV.open), title: "대화 목록", onclick: () => (PNV.open ? paneListShut() : paneListOpen()) }, icon("list"));
+  const kids = !on ? (p.kind === "chat" ? [paneMirror(p), x] : [paneMirror(p)]) : p.kind === "app" ? [paneHeadEl(p).head, sec, ls] : [sec, x, ls];
   const box = el("div", { class: `pane${on ? " on" : ""}`, "data-id": p.id, "data-kind": p.kind }, ...kids);
   box.addEventListener("pointerdown", ev => {
     if (ev.button !== 0 || p.id === PN.active || ev.target.closest(".pane-x")) return;

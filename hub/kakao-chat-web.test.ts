@@ -1199,10 +1199,12 @@ describe("카카오톡 in a split pane (1280x800)", async () => {
 	test("the request bar stays on the pane's floor, active and inactive", async () => {
 		await boot(v);
 		await openRoom(v);
-		await run(v, `paneSplit("main", "chat", "left")`);
-		await waitFor(v, `paneCount() === 2 && current === "chat"`);
+		// a split is the chat tab's (owner 8f7c8c3d): the room goes into a pane from there, the way its row of the chat list does
+		await run(v, `go("chat", "main")`);
+		await waitFor(v, `current === "chat" && target === "main" && CV.placed`);
+		await run(v, `paneSplit(paneKkT("100"), "app", "right")`);
+		await waitFor(v, `paneCount() === 2 && paneList().some(p => p.kind === "app" && p.active)`);
 		try {
-			await run(v, `paneFocus(paneList().find(p => p.kind === "app").id)`);
 			await waitFor(v, `current === "monitoring" && KK.open === "100" && KK.placed && document.querySelector(".kk-drafts .kk-draft")`);
 			expect(await bar("#split .pane.on")).toEqual({ inside: true, floor: true, below: false, shown: true });
 			await run(v, `paneFocus(paneList().find(p => p.kind === "chat").id)`);

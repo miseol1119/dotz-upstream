@@ -1,38 +1,26 @@
 /* ---------- 분할 창: dragging (docs/split-panes.md 배치) ----------
-   A row of any list (conversations, sessions, projects, mail, 모니터링) or a pane's head is pulled over a pane: after 6px a ghost of the title follows
+   A row of the chat list (conversations, sessions, mail, KakaoTalk) or a pane's head is pulled over a pane: after 6px a ghost of the title follows
    the pointer and the hovered zone (the outer quarter at an edge, or the middle) is drawn over that pane. A row with nothing a pane can show says so in its ghost
-   and draws no zone. Pointer events on the document, so nothing is added to the rows; Escape cancels. The motion is 43-panes-motion.js. */
+   and draws no zone; so does any row off the chat tab (owner 8f7c8c3d: a split is the chat tab's). Pointer events on the document, so nothing is added to the rows; Escape cancels. The motion is 43-panes-motion.js. */
 const PD_MOVE = 6;
 let PD = null;   // {src, x, y, on, dead, ghost, zone, hit, from}
 
-// The room, thread or DM row of an in-app app (30-kakao.js kkRow, 30-monitoring-comments.js cmRow, 30-monitoring-comments-dm.js dmRow): its app pane.
-function paneInAppItem(row) {
-  const { chat, thread, conv } = row.dataset;
-  if (chat) return { kind: "app", t: `${MON.sel}#kk:${enc(chat)}` };
-  const th = thread && CM.threads.find(x => x.thread === thread), c = conv && DM.convs.find(x => x.id === conv);
-  if (th) return { kind: "app", t: `${MON.sel}#cm:${enc(th.source)}:${enc(th.thread)}:${enc(th.title || "")}` };
-  return c ? { kind: "app", t: `${MON.sel}#dm:${enc(c.id)}:${enc(c.peer || "")}` } : null;
-}
-// What a list row opens: its conversation (data-t, a mail of the chat list w:<target>, a 모니터링 item that has one), a 모니터링 item's own screen,
-// or an in-app room, thread or DM. null for a row a pane cannot hold: 앱 관리 (a sheet).
+// What a row of the chat list opens: its conversation (data-t, a mail w:<target>) or a KakaoTalk room (w:kk:<room>, an app pane). null for a row a pane cannot hold.
 function paneRowItem(row) {
   const { t, k = "" } = row.dataset;
   if (t) return validTarget(t) ? { kind: "chat", t } : null;
-  if (k.startsWith("w:kk:")) return { kind: "app", t: `${KK_KEY}#kk:${enc(k.slice(5))}` };
+  if (k.startsWith("w:kk:")) return { kind: "app", t: paneKkT(k.slice(5)) };
   if (k.startsWith("w:")) return validTarget(k.slice(2)) ? { kind: "chat", t: k.slice(2) } : null;
-  if (!k && current === "monitoring" && MON.sel) return paneInAppItem(row);
-  const it = k && k !== "add-app" && monItems().find(i => i.key === k), c = it ? monChatOf(it) : "";
-  return c && validTarget(c) ? { kind: "chat", t: c } : it ? { kind: "app", t: k } : null;
+  return null;
 }
 const paneRowLabel = row => (row.querySelector(".cv-n, .pl-n") || {}).textContent || (row.getAttribute("aria-label") || row.textContent).split(" · ")[0].trim();
-// What a pressed row would put in a pane: {kind, t, label}, {no: true, label} when a pane cannot hold it, null when it is not a row.
+// What a pressed row would put in a pane: {kind, t, label}, {no: true, label} when a pane cannot hold it (off: true when the tab is not 채팅), null when it is not a row.
 // The menu's tabs are not rows: they are only pressed (owner 78c482b1).
 function paneDragItem(t) {
-  const pj = t.closest(".pl-row[data-key]");
-  if (pj) return PRJ && PRJ.projects.some(p => p.key === pj.dataset.key) ? { kind: "project", t: pj.dataset.key, label: paneRowLabel(pj) } : null;
-  const row = t.closest(".cv-row, .hr[data-t], .mr[data-t]");
+  const row = t.closest(".pl-row[data-key], .cv-row, .hr[data-t], .mr[data-t]");
   if (!row || row.closest("#tl, .pane-tl")) return null;
-  const it = paneRowItem(row);
+  if (!paneTabOk()) return { no: true, off: true, label: paneRowLabel(row) };
+  const it = row.matches(".pl-row") ? null : paneRowItem(row);
   return it ? { ...it, label: it.kind === "chat" ? targetName(it.t) : paneRowLabel(row) } : { no: true, label: paneRowLabel(row) };
 }
 function paneDragSource(ev) {
@@ -50,11 +38,9 @@ document.addEventListener("pointerdown", ev => {
   for (const [type, fn] of PD_EVENTS) document.addEventListener(type, fn, true);
 }, true);
 
-// Where the pointer can drop: every pane when split, else the open conversation (head to composer) or the project page.
+// Where the pointer can drop: every pane when split, else the open conversation (head to composer) on the chat tab.
 function paneDragBoxes() {
   if (paneCount() > 1 && PNV.el && !PNV.el.hidden) return [...PNV.el.querySelectorAll(".pane")].map(n => ({ id: n.dataset.id, r: n.getBoundingClientRect() }));
-  if (current === "project") return [{ id: "", r: $("#v-project").getBoundingClientRect() }];
-  if (current === "monitoring") return [{ id: "", r: $("#v-monitoring").getBoundingClientRect() }];
   if (current !== "chat") return [];
   const a = $("#cv-head").getBoundingClientRect(), b = $("#composer").getBoundingClientRect();
   return [{ id: "", r: new DOMRect(a.left, a.top, a.width, b.bottom - a.top) }];
@@ -79,6 +65,7 @@ const PD_SIDE = { left: "왼쪽", right: "오른쪽" };
 // The ghost's second line says what letting go does.
 function paneDragHint() {
   const { src, hit } = PD;
+  if (src.off) return "분할은 채팅 탭에서만 할 수 있어요";
   if (src.no) return "칸에 넣을 수 없어요";
   if (!hit) return "";
   if (src.pane) return hit.side === "center" ? "자리 바꾸기" : `${PD_SIDE[hit.side]}으로 옮기기`;
@@ -156,6 +143,7 @@ const PD_EVENTS = [["pointermove", paneDragMove], ["pointerup", paneDragUp], ["p
 function paneDrop(src, { id, side }) {
   if (src.pane) { paneMove(src.pane, id, side); return; }
   const { kind, t } = src;
+  paneListShut();
   if (paneCount() > 1) {
     const dup = paneOpenIn(kind, t);
     if (dup) paneFocus(dup.id);
@@ -165,5 +153,7 @@ function paneDrop(src, { id, side }) {
   }
   const here = paneHere();
   if (here.kind === kind && here.t === t) return;
-  if (side === "center") paneGo(kind, t); else paneSplit(t, kind, side);
+  if (side !== "center") paneSplit(t, kind, side);
+  else if (kind === "app") { go("monitoring", KK_KEY); kkOpen(paneKkId(t)); }   // one pane: the row opens as a click on it does
+  else go("chat", t);
 }

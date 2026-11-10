@@ -130,6 +130,7 @@ function go(name, tgt) {
   closeMenu(false);
   [name, tgt] = routeAlias(name, tgt);
   NSC.pass = 0;
+  if (!PN.going) PN.app = false;   // 모니터링 is a pane's screen only while the pane machinery lends it (43-panes.js paneGoApp)
   const viaRow = NSC.arm > Date.now();
   NSC.arm = 0;
   if (name === "notices") NSC.ret = false;
@@ -138,8 +139,8 @@ function go(name, tgt) {
   const inChat = name === "chat" || name === "activity";
   let mc = false;
   if (name === "monitoring" && tgt && tgt.startsWith("c:")) { if (validTarget(tgt.slice(2))) { name = "chat"; tgt = tgt.slice(2); mc = true; } else tgt = undefined; }
-  else if (inChat && (tgt ? tgt !== "list" && monOwned(tgt) : monOwned(target))) { name = "chat"; mc = true; }
-  else if (inChat && !tgt && monCtx && target === monCtx) mc = true;
+  else if (inChat && !paneKeeps(tgt && tgt !== "list" ? tgt : target) && (tgt ? tgt !== "list" && monOwned(tgt) : monOwned(target))) { name = "chat"; mc = true; }
+  else if (inChat && !tgt && monCtx && target === monCtx && !paneKeeps(target)) mc = true;
   monCtx = mc ? tgt || target : "";
   if (mc) { const k = monItemOf(tgt || target); if (k) MON.sel = k; MON.list = false; }
   if (!views.includes(name) || navOff(name)) name = "home";
@@ -154,6 +155,7 @@ function go(name, tgt) {
   if (tgt && name !== "project" && name !== "accounts" && name !== "cardform" && tgt !== target && validTarget(tgt)) setTarget(tgt);
   if (name === "activity" && (!LOG_VIEW || isFixedT(target) || isRelayT(target))) name = "chat";   // 알림 / 작업 기록 have no terminal view; LOG_VIEW off: no log view at all
   if (name !== current) prevView = current;
+  if (current === "chat" && name !== "chat") paneStash();
   current = name;
   relayPaint();
   if (name === "apps") appsOpen(tgt);   // after current is set: appsRender draws only the shown 앱 tab
@@ -167,7 +169,7 @@ function go(name, tgt) {
   $("#views").classList.toggle("pp", pp);
   paneSync();
   if ((name === "chat" || name === "activity") && !chatList) try { localStorage.setItem(isLaneT(target) ? `dotz-lane-view:${target}` : CHAT_MODE_KEY, name); } catch {}
-  document.querySelectorAll("#nav .ni").forEach(b => { const on = b.dataset.view === navView(SUB.has(name) ? "settings" : mc ? "monitoring" : name); b.classList.toggle("on", on); b.setAttribute("aria-current", on ? "page" : "false"); });
+  document.querySelectorAll("#nav .ni").forEach(b => { const on = b.dataset.view === navView(SUB.has(name) ? "settings" : mc ? "monitoring" : paneLit(name) ? "chat" : name); b.classList.toggle("on", on); b.setAttribute("aria-current", on ? "page" : "false"); });
   $("#appbar").classList.toggle("tv", tv);
   const th = $("#thead"), mode = name === "chat" ? "chat" : "term";
   th.hidden = !tv; $("#vtog").hidden = !tv || !LOG_VIEW;

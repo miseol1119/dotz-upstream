@@ -763,7 +763,7 @@ function kkClose() {
   KK.open = ""; KK.seq++; KK.loading = false; KK.roomErr = ""; KK.edit = null;
   kkPaintAll(); convTitle();
 }
-// Phone, or a split pane (43-panes-view.js paneMonIn): the app bar's back arrow leaves the chat for the room list first (04-state.js #back).
+// Phone, or a KakaoTalk room in a split pane (43-panes-view.js paneMonIn): the app bar's back arrow leaves the chat for the room list first (04-state.js #back).
 function kkBack() {
   if (!(KK.vis && KK.open && (narrowChat() || paneMonIn()) && current === "monitoring" && !MON.list)) return false;
   kkClose();

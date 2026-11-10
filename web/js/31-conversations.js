@@ -357,9 +357,9 @@ function convWaiting() {
   const letter = name => el("span", { class: "cv-av", "aria-hidden": "true", text: [...String(name || "?").trim()][0] || "?" });
   const mails = [...MAILS].filter(([t, m]) => !PQ.of.has(t) && m.dir !== "out" && !m.archived && (m.reply === "draft" || m.unreplied)).map(([t, m]) => {
     const who = mailSender(m.from), owed = !!m.unreplied;
-    return { at: Date.parse(m.at) || 0, k: `w:${t}`, name: m.subject || "(제목 없음)", hint: m.reply === "draft" ? `${who} · 답장 초안이 기다려요` : who, last: { ts: m.at }, bold: mailUnread(t, m), need: true, sel: current === "chat" && target === t, av: letter(who), chips: owed ? [["미답장", "unreplied"]] : undefined, open: () => go("monitoring", `c:${t}`) };
+    return { at: Date.parse(m.at) || 0, k: `w:${t}`, name: m.subject || "(제목 없음)", hint: m.reply === "draft" ? `${who} · 답장 초안이 기다려요` : who, last: { ts: m.at }, bold: mailUnread(t, m), need: true, sel: current === "chat" && target === t, av: letter(who), chips: owed ? [["미답장", "unreplied"]] : undefined, open: () => paneRowOpen("chat", t) || go("monitoring", `c:${t}`) };
   });
-  const rooms = KK.rooms.filter(r => r.watched && r.unreplied).map(r => ({ at: r.lastAt || 0, k: `w:kk:${r.chatId}`, name: r.name, hint: kkSubLine(r), last: r.lastAt ? { ts: new Date(r.lastAt).toISOString() } : null, bold: r.unread > 0, need: true, av: letter(r.name), chips: [["미답장", "unreplied"]], open: () => { go("monitoring", "i:kakao"); kkOpen(r.chatId); } }));
+  const rooms = KK.rooms.filter(r => r.watched && r.unreplied).map(r => ({ at: r.lastAt || 0, k: `w:kk:${r.chatId}`, name: r.name, hint: kkSubLine(r), last: r.lastAt ? { ts: new Date(r.lastAt).toISOString() } : null, bold: r.unread > 0, need: true, av: letter(r.name), chips: [["미답장", "unreplied"]], open: () => { if (paneRowOpen("app", paneKkT(r.chatId))) return; go("monitoring", "i:kakao"); kkOpen(r.chatId); } }));
   return [...mails, ...rooms].sort((a, b) => b.at - a.at).slice(0, 5);
 }
 // Rows in their cards: a section label stands on the page, every run of rows between them is one card.

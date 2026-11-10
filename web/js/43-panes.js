@@ -1,6 +1,7 @@
 /* ---------- 분할 창 (docs/split-panes.md): the model ----------
-   Panes are leaves {id, kind: "chat"|"project"|"app", t, at, stick, dot} (an app pane is 모니터링: t is "list", an item key, or an item key and
-   "#kk:<room>" / "#cm:<source>:<thread>:<title>" / "#dm:<id>:<peer>" for a room, thread or DM of an in-app app, owner 78c482b1) of a tree: one pane, or two side by side as {dir: "row", a, b, r} (r = a's share, 0.2..0.8;
+   A split exists only on the chat tab, and a pane holds only what a row of the chat list opens (owner 8f7c8c3d): a conversation, or a KakaoTalk room of the
+   chat list's 메일 · 카카오톡 card. Panes are leaves {id, kind: "chat"|"app", t, at, stick, dot} (an app pane is that KakaoTalk room in 모니터링's own screen:
+   t is "i:kakao#kk:<room>") of a tree: one pane, or two side by side as {dir: "row", a, b, r} (r = a's share, 0.2..0.8;
    at most two, left and right only, owner 950d715f);
    one is active and holds the real section. The screen is 43-panes-view.js, the inactive panes are 43-panes-mirror.js. With one pane (or none) nothing here touches the page. */
 const PANE_KEY = "dotz-panes", PANE_MAX = 2;
@@ -12,37 +13,42 @@ function paneList() { return paneLeaves().map(p => ({ id: p.id, kind: p.kind, t:
 const paneFind = id => paneLeaves().find(p => p.id === id) || null;
 const paneOpenIn = (kind, t) => paneLeaves().find(p => p.kind === kind && p.t === t) || null;
 const paneNew = (kind, t) => ({ id: `p${++PN.seq}`, kind, t, at: null, stick: true, dot: "" });
-// The room, thread or DM open in an in-app app (30-kakao.js, 30-monitoring-comments*.js), as the part of an app pane's t after "#".
-function paneAppSub() {
-  const sel = monItems().find(i => i.key === MON.sel);
-  if (kkItem(sel) && KK.open) return `kk:${enc(KK.open)}`;
-  if (!sel || !cmAppOf(sel.key) || CM.app !== cmAppOf(sel.key)) return "";   // CM still holds the last app's thread until this item paints
-  return DM.open ? `dm:${enc(DM.open.id)}:${enc(DM.open.peer || "")}` : CM.open ? `cm:${enc(CM.open.source)}:${enc(CM.open.thread)}:${enc(CM.open.title || "")}` : "";
-}
-// The 모니터링 screen as a pane's content: its list, or the item open in it with its room, thread or DM.
-function paneAppKey() {
-  if (MON.list || !MON.sel) return "list";
-  const sub = paneAppSub();
-  return sub ? `${MON.sel}#${sub}` : MON.sel;
-}
-const paneAppParts = t => { const [key, sub = ""] = String(t).split("#"), [kind = "", a = "", b = "", c = ""] = sub.split(":").map(decodeURIComponent); return { key, kind, a, b, c }; };
-// Opens an app pane's item, then its room, thread or DM the way its row would.
-// Midway (the item open, its room not yet) the page is neither: the active pane does not follow it (paneAdopt) and takes t once it is there.
+// The KakaoTalk room of an app pane: t is "i:kakao#kk:<room>". Nothing else of 모니터링 is a pane.
+const paneKkT = id => `${KK_KEY}#kk:${enc(id)}`;
+const paneKkId = t => (String(t).startsWith(`${KK_KEY}#kk:`) ? decodeURIComponent(String(t).slice(KK_KEY.length + 4)) : "");
+// What a pane can hold: a conversation, or a KakaoTalk room.
+const paneCanHold = (kind, t) => (kind === "chat" ? validTarget(t) : kind === "app" && !!paneKkId(t));
+// The chat tab is lit: the conversation view (not a mail opened from 모니터링), or 모니터링's screen lent to an app pane (PN.app, set by paneGoApp,
+// cleared by the next go() that does not come from a pane).
+const paneTabOk = () => (current === "chat" && !monCtx) || (current === "monitoring" && !!PN.app && paneCount() > 1 && paneFind(PN.active).kind === "app");
+// Opens a KakaoTalk room's app pane: 모니터링 on 카카오톡 with that room, and the tab stays 채팅 (43-panes-view.js paneLit).
 function paneGoApp(t) {
-  const { key, kind, a, b, c } = paneAppParts(t);
-  PN.going = true;
+  const id = paneKkId(t);
+  PN.going = true; PN.app = true;
   try {
-    go("monitoring", key);
-    if (kind === "kk") kkOpen(a);
-    else if (kind === "cm") { cmTab("comments"); cmOpen(CM.threads.find(x => x.source === a && x.thread === b) || { source: a, thread: b, title: c }); }
-    else if (kind === "dm") { cmTab("dm"); dmOpen(DM.convs.find(c => c.id === a) || { id: a, peer: b }); }
+    go("monitoring", KK_KEY);
+    if (id) kkOpen(id);
   } finally { PN.going = false; }
   const p = paneFind(PN.active);
-  if (p && p.kind === "app") { p.t = t; paneHeadSync(); panePersist(); }
+  if (p && p.kind === "app") { p.t = paneKkT(id); paneHeadSync(); panePersist(); }
 }
-// What the page shows now, as a pane's content (the terminal view and the other screens count as the chat).
-const paneHere = () => (current === "project" ? { kind: "project", t: ppCur } : current === "monitoring" ? { kind: "app", t: paneAppKey() } : { kind: "chat", t: target });
-const paneGo = (kind, t) => (kind === "app" ? paneGoApp(t) : go(kind, t));
+// What the page shows now, as a pane's content.
+const paneHere = () => (current === "monitoring" ? { kind: "app", t: KK.open ? paneKkT(KK.open) : (paneFind(PN.active) || {}).t || "" } : { kind: "chat", t: target });
+// A row of the chat list pressed while the panes are shown opens in the active pane (a pane that already shows it only takes the focus), and the tab stays 채팅.
+function paneRowOpen(kind, t) {
+  if (paneCount() < 2 || !paneTabOk() || !PNV.el || PNV.el.hidden) return false;
+  const dup = paneOpenIn(kind, t);
+  if (dup) paneFocus(dup.id); else paneReplace(PN.active, t, kind);
+  return true;
+}
+// go() keeps a mail a pane shows in the chat view (the chat tab lit, the chat list), where a mail opened by itself belongs to 모니터링.
+const paneKeeps = t => !!PN.going || (paneCount() > 1 && !narrowChat() && !!paneOpenIn("chat", t));
+// A conversation is opened by the pane machinery, so go() keeps the chat tab and the chat list even for a mail (05-command-palette.js).
+function paneGo(kind, t) {
+  if (kind === "app") { paneGoApp(t); return; }
+  PN.going = true;
+  try { go("chat", t); } finally { PN.going = false; }
+}
 function paneParent(n, p) {
   if (paneLeaf(n)) return null;
   return n.a === p || n.b === p ? n : paneParent(n.a, p) || paneParent(n.b, p);
@@ -59,7 +65,9 @@ function panePersist() {
 }
 
 // Opens t next to the active pane, or next to pane atId (side: right | left). A target already open in a pane is not opened twice: that pane becomes active.
+// The one place that refuses what a pane cannot hold and a split outside the chat tab.
 function paneSplit(t, kind, side, atId = "") {
+  if (!paneCanHold(kind, t) || !paneTabOk()) return "";
   if (paneCount() < 2) {
     const h = paneHere();
     PN.root = paneNew(h.kind, h.t); PN.active = PN.root.id;
@@ -74,7 +82,7 @@ function paneSplit(t, kind, side, atId = "") {
 }
 function paneReplace(id, t, kind) {
   const p = paneFind(id);
-  if (!p) return false;
+  if (!p || !paneCanHold(kind, t) || !paneTabOk()) return false;
   const dup = paneOpenIn(kind, t);
   if (dup && dup !== p) { paneFocus(dup.id); return false; }
   if (p.kind === kind && p.t === t) return true;
@@ -131,7 +139,7 @@ function paneClose(id) {
 // (a layout saved with three or four panes, or one above another, before 950d715f). null when nothing is left.
 function panePrune(d) {
   if (!d || !d.root) return null;
-  const ok = p => p && (p.kind === "chat" ? validTarget(p.t) : p.kind === "app" ? typeof p.t === "string" && !!p.t : p.kind === "project" && typeof p.t === "string" && (p.t.startsWith("builtin:") || !PRJ || PRJ.projects.some(x => x.key === p.t)));
+  const ok = p => p && typeof p.t === "string" && paneCanHold(p.kind, p.t);   // what the chat list can open; a project or 모니터링 screen of an older layout is dropped
   const seen = new Set();
   let left = PANE_MAX;
   const prune = n => {
@@ -159,4 +167,15 @@ function paneRestore() {
   PN = r;
   paneSync();
   panePersist();
+}
+// The chat tab pressed again after another tab: the panes come back as they were, the active one's content opened again.
+function paneReturn() {
+  if (paneCount() < 2 || narrowChat()) return false;
+  if (!paneTabOk()) paneEnter(paneFind(PN.active));
+  return true;
+}
+// go() asks before it leaves the chat tab: the reader's place in the active conversation is kept for the way back.
+function paneStash() {
+  const p = PNV.el && !PNV.el.hidden && current === "chat" && paneFind(PN.active);
+  if (p && p.kind === "chat") { p.at = chatAnchor(); p.stick = chatStick; }
 }
