@@ -34,11 +34,21 @@ function nscTag(n) {
   if (n.cls === "alert") return "경고";
   return ntPlain(n.app || "") || "새 소식";
 }
+// A decision's second line follows its state: waiting says so, an answer says what was chosen, the rest say how it ended (the words of monDecisionNode).
+function nscDecLine(n) {
+  const d = n.decision, ctx = ntDecCtx(n);
+  if (d.state === "open") return `${ctx} · 답을 기다리고 있어요`;
+  if (d.state === "ignored") return `${ctx} · 무시했어요`;
+  if (d.expired) return `${ctx} · 기한 지남`;
+  if (d.resolved) return `${ctx} · 답 없이 끝났어요`;
+  const m = /^\s*(\d+)\)/.exec(String(d.answer || "")), o = m && (d.options || []).find(x => x.n === Number(m[1]));
+  return `${ctx} · 답했어요${o ? ` · ${o.label}` : ""}`;
+}
 // The second line: a price change as the old value struck and the new one bold, else the first line of the text that is not the title, else the place.
 function nscSummary(n, text = n.text) {
   const chg = NW_CHANGE.exec(nwChangeLine(text));
   if (chg) return el("span", {}, el("s", { text: chg[2] }), " → ", chg[3]);
-  if (n.decision) return n.decision.draft ? ntPlain(n.decision.draft.body.split("\n").find(l => l.trim()) || "") : `${ntDecCtx(n)} · 답을 기다리고 있어요`;
+  if (n.decision) return n.decision.draft ? ntPlain(n.decision.draft.body.split("\n").find(l => l.trim()) || "") : nscDecLine(n);
   if (n.kind === "watch" && n.item) return (n.item.card && n.item.card.subject) || ntPlain(hcLine(n));   // a mail report says the mail
   const title = ntPlain(hcLine(n)), src = n.src || n.open;
   // the feed's own summary: the name is not said twice, nor the title when the summary opens with it
