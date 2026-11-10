@@ -315,7 +315,7 @@ export const approvals = createApprovalQueue({
 		broadcast({ ts: now(), kind: "approvals", source: "gateway", held: held.length });
 	},
 	log,
-	load: () => loadHeld(HELD),
+	load: () => loadHeld(HELD, log),
 });
 /**
  * Start-up reconcile for installs where the bot's own mail card (`mail:<mailId>`) took the item and the app's reply draft of that mail lost its card

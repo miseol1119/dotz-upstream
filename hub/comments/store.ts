@@ -1,8 +1,10 @@
 // Files of the comment feature, all under <dataDir>/custom/comments/ (per install, never in the repo): config.json (the owner's choices),
 // comments.json, drafts.json, replies.json (send records), cursors.json, reads.json, dismissed.json (comment id -> time of 답장 안 함), authors.json (Instagram
 // reply id -> who wrote it; an author never changes, so an entry is kept for good). Every write is atomic and private (0600).
-import { chmodSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { log } from "../config.ts";
+import { readState } from "../statefile.ts";
 import type { Comment, CommentsConfig, SourceConfig } from "./contract.ts";
 
 // "answered": the comment stopped waiting without this draft (the owner answered on the platform, it was deleted, 답장 안 함); see closedReason.
@@ -30,29 +32,31 @@ const EMPTY: CommentsConfig = { enabled: false, sources: {} };
 export const commentsDir = (dataDir: string): string => join(dataDir, "custom", "comments");
 
 function readJson<T>(file: string, fallback: T): T {
-	try {
-		return JSON.parse(readFileSync(file, "utf8")) as T;
-	} catch {
-		return fallback;
-	}
+	const read = readState(file, log);
+	return read.state === "ok" ? (read.value as T) : fallback;
 }
 
 // The drafts are asked for once per card of a request: the parse is kept while the file is the same (path, inode, mtime, size; every write is a
 // rename, so another process's write changes the inode). The list is shared: callers build new lists and records, they never edit one in place.
 const keptDrafts = new Map<string, { id: string; list: Draft[] }>();
 function readDrafts(file: string): Draft[] {
+	let st: ReturnType<typeof statSync>;
 	try {
-		const st = statSync(file);
-		const id = `${st.ino}|${st.mtimeMs}|${st.size}`;
-		const kept = keptDrafts.get(file);
-		if (kept?.id === id) return kept.list;
-		const list = JSON.parse(readFileSync(file, "utf8")) as Draft[];
-		keptDrafts.set(file, { id, list });
-		return list;
+		st = statSync(file);
 	} catch {
 		keptDrafts.delete(file);
 		return [];
 	}
+	const id = `${st.ino}|${st.mtimeMs}|${st.size}`;
+	const kept = keptDrafts.get(file);
+	if (kept?.id === id) return kept.list;
+	const read = readState(file, log);
+	if (read.state !== "ok") {
+		keptDrafts.delete(file);
+		return [];
+	}
+	keptDrafts.set(file, { id, list: read.value as Draft[] });
+	return read.value as Draft[];
 }
 
 function writeAtomic(file: string, value: unknown): void {

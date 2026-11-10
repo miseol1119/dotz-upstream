@@ -11,9 +11,9 @@
 // One item, one card (2026-11-02): a card is keyed by the item it is about (deps.itemOf: the bot's `mail:<id>` card and the app's reply draft of that
 // mail are one item). A newer card of an item that has an open or held card replaces it in place (one that waits behind another card is replaced on the
 // load/sweep path too), and a held card whose item was handled meanwhile (deps.handled) is dropped instead of being shown.
-import { existsSync, readFileSync } from "node:fs";
 import { DECISION_HEAD } from "./choices.ts";
 import { keepBrief, parseDraftApproval, withRecipientMark } from "./draft-approval.ts";
+import { readState } from "./statefile.ts";
 import { parseTone, stripHandoff } from "./tone.ts";
 
 export type Held = { ref: string; target: string; text: string; extra: Record<string, unknown> };
@@ -381,12 +381,8 @@ export function pendingCardsNote(cards: PendingCard[], held: number): string | u
 }
 
 /** The held cards a previous process wrote. */
-export function loadHeld(file: string): Held[] {
-	try {
-		if (!existsSync(file)) return [];
-		const list = JSON.parse(readFileSync(file, "utf8"));
-		return Array.isArray(list) ? list.filter(h => h && typeof h.ref === "string" && typeof h.target === "string" && typeof h.text === "string").map(h => ({ ...h, extra: h.extra ?? {} })) : [];
-	} catch {
-		return [];
-	}
+export function loadHeld(file: string, note: (line: string) => void): Held[] {
+	const read = readState(file, note);
+	const list = read.state === "ok" ? read.value : undefined;
+	return Array.isArray(list) ? list.filter(h => h && typeof h.ref === "string" && typeof h.target === "string" && typeof h.text === "string").map(h => ({ ...h, extra: h.extra ?? {} })) : [];
 }

@@ -5,9 +5,10 @@
 // dotz itself left in a room's input is recognized (kakao/input.json) and cleared; the owner's own draft is never touched.
 // There is no Kakao message API, HTTP or private-protocol path in this module.
 import { randomBytes } from "node:crypto";
-import { closeSync, existsSync, openSync, readFileSync, readSync, statSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, openSync, readFileSync, readSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { claimHolder, claimSend } from "../draft-claim.ts";
+import { readState } from "../statefile.ts";
 import { type DraftAction, draftApprovalBlock, draftVerdict } from "../draft-approval.ts";
 import { type Confirmer, dbConfirmer, dbPreview } from "./confirm.ts";
 import { writePrivate } from "./creds.ts";
@@ -52,13 +53,18 @@ const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
 const nowMs = (d: SendDeps) => (d.now ?? Date.now)();
 
-export function readDrafts(paths: KakaoPaths): Draft[] {
+// Not hub/config.ts's log: that module refuses to load outside a configured hub, and the send CLI (also a second sender in another process) must not need it.
+const noteDamage = (paths: KakaoPaths) => (line: string) => {
 	try {
-		const raw = JSON.parse(readFileSync(paths.drafts, "utf8"));
-		return Array.isArray(raw) ? raw.filter(d => d && typeof d.code === "string" && typeof d.chatId === "string") : [];
+		appendFileSync(join(paths.dataDir, "hub.log"), `${new Date().toISOString()} ${line}\n`);
 	} catch {
-		return [];
+		// a log that cannot be written must not fail the read
 	}
+};
+
+export function readDrafts(paths: KakaoPaths): Draft[] {
+	const read = readState(paths.drafts, noteDamage(paths));
+	return read.state === "ok" && Array.isArray(read.value) ? read.value.filter(d => d && typeof d.code === "string" && typeof d.chatId === "string") : [];
 }
 
 const writeDrafts = (paths: KakaoPaths, list: Draft[]) => writePrivate(paths.drafts, `${JSON.stringify(list.slice(-MAX_DRAFTS), null, 1)}\n`);
