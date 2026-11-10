@@ -352,12 +352,12 @@ describe("the owner's work stays out of public posts", () => {
 		}
 		expect(publicPostDeny(`${COMMENT} '본문의 \`… 녹음 ….mp3\`'`, dir, dir)).toContain("파일1.mp3");
 		expect(publicPostDeny(`${COMMENT} '(마감본)계약.pdf'`, dir, dir)).toContain("(마감본)계약.pdf");
-	});
+	}, 20_000); // every call walks and reads the whole repo tree (about 65 ms alone, several times that on a loaded machine) and the text paths must each run
 
 	test("emphasis, angle brackets, a glob, a scratch folder or an attachment URL does not hide a file name", () => {
 		const dir = install();
 		for (const text of ["**분기실적.pdf**", "<분기실적.pdf>", "**/분기실적.pdf", "/tmp/분기실적.pdf", "https://github.com/user-attachments/files/1/분기실적.pdf", "https://github.com/someone/private/blob/main/분기실적.pdf", "분기실적.xlsm", "__분기실적.pdf__", "~~분기실적.pdf~~", "$HOME/문서/분기실적.pdf", "--분기실적.pdf", "cat > 분기실적.pdf", "tee 분기실적.pdf"]) expect(publicPostDeny(`${COMMENT} '${text} 봐요'`, dir, dir)).toContain("분기실적");
-	});
+	}, 20_000); // 13 posts, each walking and reading the whole repo tree (about 65 ms alone, several times that on a loaded machine)
 
 	test("a body file over the secret size is still read, and one too big to read is refused", () => {
 		const dir = install();
