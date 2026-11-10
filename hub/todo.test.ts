@@ -1,6 +1,6 @@
 // The todo strip source (hub/todo.ts): the last `todo` tool result of a session jsonl, read from the file's end.
 import { expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { openMonitor, readTodo } from "./todo.ts";
 
@@ -34,6 +34,20 @@ test("a todo result far from the end of a large file is found by reading growing
 	expect(readTodo(file)).toEqual({ phases: phases(false), at: "2026-10-21T01:00:00.000Z" });
 	const newer = session("big-newer", [todoLine("2026-10-21T01:00:00.000Z", phases(false)), ...filler.slice(0, 2500), todoLine("2026-10-21T03:00:00.000Z", phases(true)), ...filler.slice(2500)]);
 	expect(readTodo(newer).at).toBe("2026-10-21T03:00:00.000Z");
+});
+
+// GET /api/state reads every session's list per call: an unchanged file must not be scanned again (same object back), a file that grew must.
+test("a session file that did not change is not read again; a file that grew is", () => {
+	const filler = Array.from({ length: 3000 }, (_, i) => other(`line ${i} ${"x".repeat(i % 200)}`));
+	const file = session("cached", [todoLine("2026-10-21T01:00:00.000Z", phases(false)), ...filler]);
+	const first = readTodo(file);
+	expect(first.phases).toEqual(phases(false));
+	for (let i = 0; i < 20; i++) expect(readTodo(file)).toBe(first);
+	appendFileSync(file, `${todoLine("2026-10-21T04:00:00.000Z", phases(true))}\n`);
+	const next = readTodo(file);
+	expect(next).not.toBe(first);
+	expect(next).toEqual({ phases: phases(true), at: "2026-10-21T04:00:00.000Z" });
+	expect(readTodo(file)).toBe(next);
 });
 
 // acme-loss-review on the Mac mini (2026-10-29): its turn ended to wait on its own "HTML 워커 종료" monitor (armed two turns before) and a

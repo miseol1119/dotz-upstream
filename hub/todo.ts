@@ -30,32 +30,51 @@ function todoOf(line: string): Todo | undefined {
 	return { phases, ...(at ? { at } : {}) };
 }
 
+// GET /api/state asks for every session's list on each call and the page calls it often, while most session files did not change between two calls:
+// the result is kept per file, valid while the size, the time and the last bytes are the same (as `lifecycle` below). Callers only read it.
+const todoCache = new Map<string, { stamp: string; todo: Todo }>();
+const TODO_CACHE_MAX = 64;
+
 export function readTodo(file: string | undefined): Todo {
 	if (!file || !existsSync(file)) return { phases: [] };
 	const fd = openSync(file, "r");
 	try {
-		let end = fstatSync(fd).size;
-		let chunk = FIRST_CHUNK;
-		// bytes of the line that straddles the boundary to the chunk read after this one
-		let carry = Buffer.alloc(0);
-		while (end > 0) {
-			const start = Math.max(0, end - chunk);
-			const buf = Buffer.alloc(end - start);
-			readSync(fd, buf, 0, buf.length, start);
-			const data = Buffer.concat([buf, carry]);
-			// the first line is cut unless the chunk starts the file
-			const cut = start === 0 ? -1 : data.indexOf(0x0a);
-			carry = cut < 0 ? Buffer.alloc(0) : data.subarray(0, cut);
-			const lines = data.subarray(cut + 1).toString("utf8").split("\n");
-			for (let i = lines.length - 1; i >= 0; i--) {
-				const found = todoOf(lines[i]!);
-				if (found) return found;
-			}
-			end = start;
-			chunk = Math.min(chunk * 2, MAX_CHUNK);
-		}
+		const st = fstatSync(fd);
+		const tail = Buffer.alloc(Math.min(64, st.size));
+		readSync(fd, tail, 0, tail.length, st.size - tail.length);
+		const stamp = `${st.size}:${st.mtimeMs}:${tail.toString("hex")}`;
+		const hit = todoCache.get(file);
+		if (hit?.stamp === stamp) return hit.todo;
+		const todo = scanTodo(fd, st.size);
+		todoCache.delete(file);
+		if (todoCache.size >= TODO_CACHE_MAX) todoCache.delete(todoCache.keys().next().value!);
+		todoCache.set(file, { stamp, todo });
+		return todo;
 	} finally {
 		closeSync(fd);
+	}
+}
+
+function scanTodo(fd: number, size: number): Todo {
+	let end = size;
+	let chunk = FIRST_CHUNK;
+	// bytes of the line that straddles the boundary to the chunk read after this one
+	let carry = Buffer.alloc(0);
+	while (end > 0) {
+		const start = Math.max(0, end - chunk);
+		const buf = Buffer.alloc(end - start);
+		readSync(fd, buf, 0, buf.length, start);
+		const data = Buffer.concat([buf, carry]);
+		// the first line is cut unless the chunk starts the file
+		const cut = start === 0 ? -1 : data.indexOf(0x0a);
+		carry = cut < 0 ? Buffer.alloc(0) : data.subarray(0, cut);
+		const lines = data.subarray(cut + 1).toString("utf8").split("\n");
+		for (let i = lines.length - 1; i >= 0; i--) {
+			const found = todoOf(lines[i]!);
+			if (found) return found;
+		}
+		end = start;
+		chunk = Math.min(chunk * 2, MAX_CHUNK);
 	}
 	return { phases: [] };
 }
