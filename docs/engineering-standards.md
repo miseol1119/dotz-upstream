@@ -12,6 +12,7 @@
 | 함수 크기 | 맨 바깥 함수 300줄 이하 | 11개 초과. 최대 `createOrchestrator` 967, `createPrompts` 692, `createKakaoWeb` 649 | 규칙 2 |
 | 순환 의존 | 새 순환 0 | 5묶음(레인 5개 모듈, 폴백 3개, 감시 3개, 계정 2개, 유튜브 2개) | 규칙 3 |
 | 층 경계 | 층을 넘는 import 증가 0. web은 hub를 import하지 않음 | hub→features 50, hub→onboard 6, hub→extension 2, extension→hub 12, onboard→hub 1, features→onboard 2, 기능끼리 18. web↔hub import 0 | 규칙 4 |
+| 테스트가 자식으로 띄우는 모듈 | 테스트가 `env` 없이 띄우는 hub 모듈(경로로, 또는 `bun -e` 스크립트가 import)은 `hub/config.ts`를 직접이든 거쳐서든 import하지 않음. `NODE_ENV=test`인 채로 진짜 데이터 폴더를 가리키면 그 파일이 로드를 거절하는데, `env`를 안 주면 자식은 bun이 처음 받은 환경을 물려받아 `bun test`가 세운 임시 데이터 폴더(`DOTZ_DIR`)를 못 받아요. `env`를 주는 테스트는 세지 않음 | 0 | 규칙 15. 엔트리는 테스트 파일의 spawn 호출에서 코드로 찾음 |
 | 첫 실행 층 | `firstrun/`은 hub와 onboard를 import할 수 있고, 이 층을 import하는 곳은 `hub/main.ts`, `hub/routes.ts`, `hub/routes-settings.ts`, `setup.ts`뿐. 삼킨 오류, 일반 쓰기, 제한 없는 호출은 0 | 0 | 규칙 4, 6, 7, 8 |
 | 웹 전역 이름 | 파일 사이 중복 0 | 0 (이름 약 2,500개) | 규칙 5 |
 | 삼킨 오류 | 이유 주석 없는 빈 catch와 `.catch(() => null)` 증가 0 | hub 193, web 78, features 27, extension 11, onboard 4, setup 1 | 규칙 6. catch 안에 왜 무시해도 되는지 주석을 쓰면 세지 않음 |

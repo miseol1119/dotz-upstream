@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, posix } from "node:path";
 import { listLines, PRIVACY_ALLOW } from "./public-scrub.ts";
 import {
-	boundaryEdges, cycles, deadExports, deadWebGlobals, duplicateGlobals, helperCopies, hubWebImports, importGraph, loadTree, longFunctions, metrics,
+	boundaryEdges, cycles, deadExports, deadWebGlobals, duplicateGlobals, helperCopies, hubWebImports, importGraph, isTest, loadTree, longFunctions, metrics,
 	nonAtomicWrites, oversizeFiles, pastedBlocks, prodOf, swallowedErrors, testTiming, unboundedCalls, unmappedModules, webJs, webStaticImports, type Src,
 } from "./engineering-rules.ts";
 
@@ -68,6 +68,63 @@ const HELPER_COPY_CEILINGS: Counts = { readJson: 13, json: 17, sameOrigin: 4, gi
 // A 12-line block pasted into two files gets fixed in one of them; blocks that exist today.
 const PASTED_BLOCKS = 0;
 
+// hub/config.ts throws when it is imported under NODE_ENV=test with a real data dir (hub/live-guard.ts testDataRefusal). The suite's bunfig preload sets a temp
+// DOTZ_DIR in process.env, but a child a test starts without an env option gets the environment bun started with: NODE_ENV=test from bun test, no temp data dir.
+// So a module a test file starts that way (by path, or imported by a "-e" script) must not reach hub/config.ts. A spawn with an env option is the test's own choice
+// of environment (process.env carries the temp dir) and is not counted. Entries are found in the test files' spawn calls, not listed by hand.
+const CONFIG_MODULE = "hub/config.ts";
+const SPAWN_CALL = /\b(?:Bun\.)?(?:spawnSync|spawn|execFileSync|execFile|execSync)\(/g;
+const isTestSide = (p: string) => isTest(p) || /\.fixtures?\.ts$/.test(p) || /(?:^|\/)(?:test|fixtures)\//.test(p);
+// End of the bracketed group opening at "from", or of the statement starting there (";" or a line end outside any bracket); quoted text is skipped.
+const endOf = (text: string, from: number, group: boolean): number => {
+	let depth = 0;
+	for (let i = from; i < text.length; i++) {
+		const c = text[i] ?? "";
+		if (c === '"' || c === "'" || c === "`") { for (i++; i < text.length && text[i] !== c; i++) if (text[i] === "\\") i++; continue; }
+		if ("([{".includes(c)) depth++;
+		else if (")]}".includes(c)) { depth--; if (group && depth === 0) return i + 1; }
+		else if (!group && (c === ";" || c === "\n") && depth <= 0) return i;
+	}
+	return text.length;
+};
+const entryModules = (files: readonly Src[]): string[] => {
+	const prod = new Set(prodOf(files).filter(f => f.path.endsWith(".ts")).map(f => f.path));
+	const found = new Set<string>();
+	for (const f of files) {
+		if (!isTestSide(f.path) || !f.path.endsWith(".ts")) continue;
+		const dir = posix.dirname(f.path);
+		for (const m of f.text.matchAll(SPAWN_CALL)) {
+			const call = f.text.slice(m.index, endOf(f.text, m.index + m[0].length - 1, true));
+			if (/\benv\b/.test(call)) continue;
+			// A path or a "-e" script held in a variable counts through the variable's own assignment.
+			let text = call;
+			for (const id of new Set(call.match(/\b[A-Za-z_]\w*\b/g))) {
+				const def = new RegExp(`(?:const|let)\\s+${id}\\s*(?::[^=]+)?=`).exec(f.text);
+				if (def) text += "\n" + f.text.slice(def.index + def[0].length, endOf(f.text, def.index + def[0].length, false));
+			}
+			for (const j of text.matchAll(/join\(\s*([\w.]+)\s*((?:,\s*"[^"]*")+)\s*\)/g)) {
+				found.add(posix.join(j[1] === "import.meta.dir" ? dir : "", ...[...(j[2] ?? "").matchAll(/"([^"]*)"/g)].map(s => s[1] ?? "")));
+			}
+			for (const s of text.matchAll(/["'`]((?:\.\/)?(?:[\w.-]+\/)*[\w.-]+\.ts)["'`]/g)) { found.add(posix.normalize(s[1] ?? "")); found.add(posix.join(dir, s[1] ?? "")); }
+		}
+	}
+	return [...found].filter(p => prod.has(p) && p !== CONFIG_MODULE).sort();
+};
+const reaches = (graph: Map<string, string[]>, from: string, to: string): boolean => {
+	const seen = new Set([from]), queue = [from];
+	for (let v = queue.shift(); v !== undefined; v = queue.shift()) {
+		if (v === to) return true;
+		for (const w of graph.get(v) ?? []) if (!seen.has(w)) { seen.add(w); queue.push(w); }
+	}
+	return false;
+};
+const configImporters = (files: readonly Src[]): string[] => {
+	const graph = importGraph(prodOf(files));
+	return entryModules(files).filter(e => reaches(graph, e, CONFIG_MODULE));
+};
+// Child entries that reach hub/config.ts today; fix one by giving the child an env (or dropping the import), then remove it. Never add one to get a change past this test.
+const CONFIG_IMPORTERS: string[] = [];
+
 const ratchet = (what: string, measured: Counts, ceilings: Counts) => {
 	for (const [k, ceil] of Object.entries(ceilings)) if ((measured[k] ?? 0) < ceil) console.info(`ratchet: ${what} ${k} is ${measured[k] ?? 0}, ceiling ${ceil}`);
 };
@@ -106,6 +163,9 @@ describe("engineering rules on the real tree", () => {
 	test("12 module map", () => expect(overCeilings("unmapped", { hub: M.unmappedModules.length }, { hub: UNMAPPED_MODULES })).toEqual([]));
 	test("13 same-name helpers", () => expect(overCeilings("copies", M.helperCopies, HELPER_COPY_CEILINGS)).toEqual([]));
 	test("14 pasted blocks", () => expect(overCeilings("blocks", { blocks: M.pastedBlocks.length }, { blocks: PASTED_BLOCKS })).toEqual([]));
+	test("15 a module a test starts as a child without an env does not reach hub/config.ts", () => {
+		expect(listErrors("child entry importing hub/config.ts", configImporters(loadTree(join(import.meta.dir, ".."))), CONFIG_IMPORTERS)).toEqual([]);
+	});
 });
 
 // Seeded violations: each detector must flag the violation and leave its neighbour alone.
@@ -195,6 +255,30 @@ describe("detectors can fail", () => {
 	test("13 a top-level helper copy counts, a nested one does not", () => {
 		expect(helperCopies(src("const readJson = () => 1;\nexport async function sleep() {}")).readJson).toBe(1);
 		expect(helperCopies(src("function f() {\n\tconst readJson = 1;\n}"))).toMatchObject({ readJson: 0, sleep: 0 });
+	});
+	test("15 a child started without an env that reaches hub/config.ts is flagged, also through another module; a child with an env, a clean child and a non-test spawner are not", () => {
+		const tree: Src[] = [
+			{ path: "hub/config.ts", text: "export const DATA_DIR = 1;" },
+			{ path: "hub/mid.ts", text: 'import { DATA_DIR } from "./config.ts";' },
+			{ path: "hub/by-path.ts", text: 'import "./mid.ts";' },
+			{ path: "hub/by-script.ts", text: 'import "./mid.ts";' },
+			{ path: "hub/with-env.ts", text: 'import "./mid.ts";' },
+			{ path: "hub/clean.ts", text: "export const x = 1;" },
+			{ path: "hub/prod-spawner.ts", text: 'Bun.spawn([process.execPath, join(import.meta.dir, "other.ts")]);' },
+			{ path: "hub/other.ts", text: 'import "./mid.ts";' },
+			{
+				path: "hub/child.test.ts",
+				text: [
+					'const a = Bun.spawn([process.execPath, join(import.meta.dir, "by-path.ts")], { stdout: "pipe" });',
+					"const script = `import { x } from ${JSON.stringify(join(import.meta.dir, 'by-script.ts'))};`;",
+					'const b = Bun.spawnSync([process.execPath, "-e", script]);',
+					'const c = Bun.spawn([process.execPath, join(import.meta.dir, "with-env.ts")], { env: { ...process.env, DOTZ_DIR: dir } });',
+					'const d = Bun.spawn([process.execPath, join(import.meta.dir, "clean.ts")]);',
+				].join("\n"),
+			},
+		];
+		expect(entryModules(tree)).toEqual(["hub/by-path.ts", "hub/by-script.ts", "hub/clean.ts"]);
+		expect(configImporters(tree)).toEqual(["hub/by-path.ts", "hub/by-script.ts"]);
 	});
 	test("14 a 12-line block in two files is one block, 11 lines or one file is none", () => {
 		const two = (a: string[], b: string[]) => pastedBlocks([{ path: "hub/a.ts", text: a.join("\n") }, { path: "hub/b.ts", text: b.join("\n") }]);
