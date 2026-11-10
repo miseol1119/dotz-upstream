@@ -83,10 +83,20 @@ async function runLaneHygiene(): Promise<string[]> {
 }
 
 // Masks secrets in idle OmO session files and deletes those past sessions.keep_days (hub/session-hygiene.ts), in a child process so
-// reading large session files never grows the gateway. The sessions the gateway holds open are passed as active and left alone.
+// reading large session files never grows the gateway. The sessions a live process holds open are passed as active and left alone.
 const SESSION_HYGIENE_TIMEOUT_MS = 30 * 60_000;
+// The session files a process has open right now: the orchestrator's, and those of the lanes and conversations whose process runs.
+// A stopped lane or a parked conversation keeps its entry and file name but no process, so its file is cleaned like any idle one
+// (2026-11-10: stopped lanes stayed in the registry and their files were skipped every night, secrets and 644 mode included).
+export function liveSessionFiles(): string[] {
+	return [
+		...(orchestratorPid() !== undefined ? [orch.sessionFile] : []),
+		...[...lanes.values()].filter(l => l.proc).map(l => l.sessionFile),
+		...convs.conversations().filter(c => c.o.orchestratorPid() !== undefined).map(c => c.o.orch.sessionFile),
+	].filter((f): f is string => !!f);
+}
 async function runSessionFileHygiene(): Promise<void> {
-	const active = [orch.sessionFile, ...[...lanes.values()].map(l => l.sessionFile), ...convs.conversations().map(c => c.o.orch.sessionFile)].filter((f): f is string => !!f);
+	const active = liveSessionFiles();
 	const proc = Bun.spawn([process.execPath, join(import.meta.dir, "session-hygiene.ts"), "--keep-days", String(sessionsKeepDays()), ...active.flatMap(f => ["--active", f])], {
 		env: { ...process.env, DOTZ_DIR: DATA_DIR }, stdout: "pipe", stderr: "pipe", timeout: SESSION_HYGIENE_TIMEOUT_MS,
 	});

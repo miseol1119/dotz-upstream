@@ -120,6 +120,22 @@ describe("session hygiene", () => {
 		expect([recent, leasedFile, activeFile].map(f => readFileSync(f, "utf8"))).toEqual(before);
 	});
 
+	test("a lease whose pid now belongs to another program does not protect the file", async () => {
+		const file = session("reused1", `키 ${FAKE_GH}`, "응", 2);
+		const other = Bun.spawn(["sleep", "30"]);
+		try {
+			mkdirSync(join(folder, "extensions", "terminal"), { recursive: true });
+			writeFileSync(join(folder, "extensions", "terminal", "reused1.lease"), JSON.stringify({ pid: other.pid, startedAtMs: Date.now() }));
+			const r = hygiene();
+			expect(r.skipped.leased).toBe(0);
+			expect(readFileSync(file, "utf8")).not.toContain(FAKE_GH);
+			expect(statSync(file).mode & 0o777).toBe(0o600);
+		} finally {
+			other.kill();
+			await other.exited;
+		}
+	});
+
 	test("a dry run counts and changes nothing", () => {
 		const file = session("dry1", `키 ${FAKE_GH}`, "응", 2);
 		const before = readFileSync(file, "utf8");

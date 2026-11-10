@@ -3,10 +3,10 @@
 // covers bash output only; hub/runtime/omo.ts turns it on). Once a night, in a child process so the gateway's memory does not grow:
 // - a session file past its retention (sessions.keep_days in config.json, default 90, 0 keeps them) is deleted with its -artifacts
 //   folder, but only after the recall index holds the whole file (recall-index retireFile): its masked pairs stay searchable;
-// - every other session file idle for IDLE_MS and not leased by a live OmO process has its secrets masked in place
+// - every other session file idle for IDLE_MS and not leased by a live OmO process (its pid alive and an agent's) has its secrets masked in place
 //   (maskSecrets, the same rules the recall index uses), atomically, keeping mode 600, its mtime and one valid JSON value per line;
 // - the sessions folder and its session folders are kept 700, session files 600.
-// A file written to within the day, leased, or named as active by the gateway (its own and its conversations' sessions) is never touched.
+// A file written to within the day, leased, or named as active by the gateway (the sessions its running processes hold) is never touched.
 // `bun hub/session-hygiene.ts [--dry-run] [--keep-days N] [--active <file>]...` prints one JSON summary of counts, never a value.
 import type { Database } from "bun:sqlite";
 import { chmodSync, closeSync, existsSync, openSync, readdirSync, readFileSync, readSync, renameSync, rmSync, statSync, utimesSync, writeSync } from "node:fs";
@@ -47,13 +47,27 @@ const alive = (pid: unknown): boolean => {
 		return (e as NodeJS.ErrnoException).code === "EPERM";
 	}
 };
+// What a live OmO process shows as its command: bun or node running its cli.js, or its own name (process.title) where ps reports that.
+const AGENT_COMMAND = /^(bun|node|senpi|omo|omp|pi)$/;
+// Whether a live pid is an agent process. A pid the system gave to another program since the lease was written (iconservicesagent on
+// the Mac mini, 2026-11-10) is not, so it no longer keeps a dead session's file uncleaned. Without ps nothing can tell: still an agent.
+function agentProcess(pid: number): boolean {
+	let r: ReturnType<typeof Bun.spawnSync>;
+	try {
+		r = Bun.spawnSync(["ps", "-p", String(pid), "-o", "comm="], { stdout: "pipe", stderr: "ignore", timeout: 5000 });
+	} catch {
+		return true;
+	}
+	return AGENT_COMMAND.test(basename(r.stdout.toString().trim()));
+}
 // <folder>/extensions/terminal/<session id>.lease holds {"pid": ...} while an OmO process has the session open.
 function leased(dir: string, file: string): boolean {
 	const id = /_([^_]+)\.jsonl$/.exec(basename(file))?.[1];
 	const lease = id && join(dir, "extensions", "terminal", `${id}.lease`);
 	if (!lease || !existsSync(lease)) return false;
 	try {
-		return alive((JSON.parse(readFileSync(lease, "utf8")) as { pid?: unknown }).pid);
+		const pid = (JSON.parse(readFileSync(lease, "utf8")) as { pid?: unknown }).pid;
+		return alive(pid) && agentProcess(pid as number);
 	} catch {
 		return true; // a lease being written right now
 	}
