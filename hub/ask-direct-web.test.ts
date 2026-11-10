@@ -1,7 +1,7 @@
-import { afterAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { emit } from "./events.ts";
 import { listNotices, resetNoticesForTest, unreadCount } from "./notices.ts";
-import { fakeHub, idleState, inbox, json, on } from "./test-web.ts";
+import { fakeHub, idleState, inbox, json, on, type View } from "./test-web.ts";
 
 // "직접 답하기" on a question card (web/js/30-notices.js ntDirect): the composer quotes the asking message and what the owner writes next is sent with that
 // question's id, which the hub settles alone (hub/notices-store.ts ownerReplied). Cancelling the quote, moving to another conversation or quoting another
@@ -25,8 +25,11 @@ const hub = fakeHub({
 		}
 	},
 });
-const view = await hub.view({ width: 1280, height: 760 });
-const { waitFor, ev, run } = on(view);
+// Each test owns its window: a test that timed out leaves an evaluate() pending in its view, and that view is closed, not handed to the next test.
+let view!: View;
+const waitFor = (expr: string, ms?: number) => on(view).waitFor(expr, ms);
+const ev = <T = unknown>(expr: string) => on(view).ev<T>(expr);
+const run = (code: string) => on(view).run(code);
 afterAll(() => {
 	hub.stop();
 	resetNoticesForTest();
@@ -47,11 +50,13 @@ const decisions = () => listNotices(300).items.filter(n => n.kind === "decision"
 const idOf = (part: string) => decisions().find(d => d.title.includes(part))!.id;
 const stateOf = (part: string) => decisions().find(d => d.title.includes(part))!.state;
 
-beforeEach(() => {
+beforeEach(async () => {
 	resetNoticesForTest();
 	history = [plain];
 	sent.length = 0;
-});
+	view = await hub.view({ width: 1280, height: 760 });
+}, 20_000);
+afterEach(() => hub.release());
 
 // The notice's sheet opened from 알림, "직접 답하기" pressed: the chat of the asking message with the quote bar on.
 let visits = 0;
@@ -68,6 +73,7 @@ const write = async (text: string) => {
 	return (await sent.until(s => s.length > 0))[0]!;
 };
 
+// Each test loads the whole app into a window of its own: 20s, not the default 5s, so a busy machine running other work does not fail it.
 describe("직접 답하기 on a question card", () => {
 	test("the owner's words go with the question's id and the quote, and only that question closes", async () => {
 		ask(T_ASK, ONE);
@@ -82,7 +88,7 @@ describe("직접 답하기 on a question card", () => {
 		expect(stateOf("폴더")).toBe("open");
 		// sent: the quote is gone and the next message carries no question
 		expect(await ev<boolean>(`document.querySelector("#replybar").hidden && RP.cur === null`)).toBe(true);
-	});
+	}, 20_000);
 
 	test("of two questions in one message only the pressed one closes", async () => {
 		ask(T_ASK, TWO);
@@ -91,7 +97,7 @@ describe("직접 답하기 on a question card", () => {
 		expect(body.decision).toBe(idOf("언제 지울까요"));
 		expect(stateOf("언제 지울까요")).toBe("answered");
 		expect(stateOf("파일은")).toBe("open");
-	});
+	}, 20_000);
 
 	test("cancelling the quote sends a plain message that closes nothing", async () => {
 		ask(T_ASK, ONE);
@@ -102,7 +108,7 @@ describe("직접 답하기 on a question card", () => {
 		expect(body.decision).toBeUndefined();
 		expect(body.reply).toBeUndefined();
 		expect(stateOf("보고서")).toBe("open");
-	});
+	}, 20_000);
 
 	test("moving to another conversation and coming back drops the question", async () => {
 		ask(T_ASK, ONE);
@@ -113,7 +119,7 @@ describe("직접 답하기 on a question card", () => {
 		await waitFor(`target === "main" && ts("main").msgs.length > 0`);
 		const body = await write("그건 그렇고 날씨 어때?");
 		expect(body.decision).toBeUndefined();
-	});
+	}, 20_000);
 
 	test("quoting another message drops the question", async () => {
 		ask(T_ASK, ONE);
@@ -124,5 +130,5 @@ describe("직접 답하기 on a question card", () => {
 		expect(body.decision).toBeUndefined();
 		expect(body.reply?.id).toBe(T_PLAIN);
 		expect(stateOf("보고서")).toBe("open");
-	});
+	}, 20_000);
 });

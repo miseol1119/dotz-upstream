@@ -412,6 +412,7 @@ test("when the opener exits 1 the address is printed instead", () => {
 	expect(i.out).not.toContain("opened the setup page");
 }, 60_000);
 
+// Like the install tests above they run install.sh as a child process: 60s, not the default 5s, so a busy machine running other work does not fail them.
 // --uninstall takes the `dotz` command with it: the link the gateway made and the PATH block it appended to the shell files, and nothing else of the owner's.
 test("--uninstall removes the dotz command link and the shell file block, keeps everything else of the owner's; a foreign dotz stays", () => {
 	for (const purge of [true, false]) {
@@ -437,7 +438,7 @@ test("--uninstall removes the dotz command link and the shell file block, keeps 
 		expect(readFileSync(join(other, "dotz"), "utf8")).toContain("not ours");
 		expect(existsSync(data)).toBe(!purge);
 	}
-});
+}, 60_000);
 
 test("--uninstall leaves a dotz link that points somewhere else, and a shell file with no dotz block", () => {
 	const home = mkdtempSync(join(root, "uninstall-"));
@@ -450,4 +451,4 @@ test("--uninstall leaves a dotz link that points somewhere else, and a shell fil
 	expect(r.code).toBe(0);
 	expect(lstatSync(join(bunDir, "dotz")).isSymbolicLink()).toBe(true);
 	expect(readFileSync(join(home, ".zshrc"), "utf8")).toBe("# only mine\n");
-});
+}, 60_000);

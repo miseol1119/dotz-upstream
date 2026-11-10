@@ -24,7 +24,8 @@ type Answer = { items: ConvRow[]; page?: { limit: number; more: boolean; next?: 
 const list = async (query = ""): Promise<Answer> => (await call(`/api/conversations${query}`)).json() as Promise<Answer>;
 const isMail = (r: ConvRow) => r.target.startsWith("mail:");
 
-const MAILS = 5000, T0 = Date.now() - MAILS * 1000;
+// Enough to be many pages (a page is 100 rows, at most 500) and to have owed mails older than the first page; every mail filed costs a write of the mailbox, so more only makes the seed slow.
+const MAILS = 1000, T0 = Date.now() - MAILS * 1000;
 let clock = T0, others = 0;
 const deps: MailDeps = { createThread: async () => ({ id: "143000000000000001" }), send: async () => undefined, mailChannel: async () => undefined, discordOn: false, emit: e => emit("inbox", e as never), wake: () => undefined, now: () => new Date(clock).toISOString() };
 const cards = spyOn(mailModule, "mailCard");
@@ -35,7 +36,7 @@ describe("대화 목록의 메일 카드는 나가는 행만 만들어요", () =
 		(cfg as unknown as { mail: { keep: number } }).mail = { keep: others + MAILS + 100 };
 		for (let i = 0; i < MAILS; i++) {
 			clock = T0 + i * 1000;
-			await postMail({ source: i % 3 === 0 ? "work" : "home", id: `cd${i}`, subject: `긴 목록 ${i}`, from: `Kim${i} <kim${i}@example.com>`, needsReply: i % 1000 === 0 }, deps);
+			await postMail({ source: i % 3 === 0 ? "work" : "home", id: `cd${i}`, subject: `긴 목록 ${i}`, from: `Kim${i} <kim${i}@example.com>`, needsReply: i % 200 === 0 }, deps);
 		}
 		cards.mockClear();
 		expect((await list("?all=1")).items.filter(isMail).length).toBe(others + MAILS);

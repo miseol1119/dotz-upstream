@@ -64,9 +64,11 @@ async function acquire(o: ViewOptions): Promise<View> {
 	}) as View["evaluate"];
 	return fresh;
 }
+// What a page keeps for its origin (localStorage, the snapshot in indexedDB, caches) outlives the navigation: the next test on this hub would start from it.
+const FORGET = `(async () => { try { localStorage.clear(); sessionStorage.clear(); for (const d of await indexedDB.databases()) indexedDB.deleteDatabase(d.name!); for (const k of await caches.keys()) await caches.delete(k); } catch {} })().then(() => 0)`;
 function release(v: View): void {
 	if (!pooled.has(v) || pending.get(v)) { v.close(); return; }
-	v.navigate("about:blank").then(() => { idle.push(v); }, () => { pooled.delete(v); v.close(); });
+	v.evaluate(FORGET).catch(() => undefined).then(() => v.navigate("about:blank")).then(() => { idle.push(v); }, () => { pooled.delete(v); v.close(); });
 }
 
 export function fakeHub(opts: HubOptions = {}) {
@@ -126,15 +128,20 @@ export function fakeHub(opts: HubOptions = {}) {
 		},
 		// Resolves on the next /api/events connection after this call (use before the navigation that opens it).
 		nextStream(ms = 10_000): Promise<void> { return hub.streamConnected(connects + 1, ms); },
-		// A tracked view, navigated to `path` on this hub when one is given; stop() closes it.
+		// A tracked view, navigated to `path` on this hub when one is given; release() or stop() gives it back.
 		async view(o: ViewOptions = {}, path?: string): Promise<View> {
 			const v = await acquire(o);
 			views.push(v);
 			if (path !== undefined) await v.navigate(`${origin}${path}`);
 			return v;
 		},
+		// Hands every view this hub gave out back to the pool (a view with an evaluate() still running is closed): a test file calls it after each test,
+		// so a test owns its views and one left behind by a timed-out test never reaches the next one.
+		release() {
+			for (const v of views.splice(0)) release(v);
+		},
 		stop() {
-			for (const v of views) release(v);
+			hub.release();
 			for (const c of streams) { try { c.close(); } catch { /* already closed */ } }
 			server.stop(true);
 		},

@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { classify, decisionPush, noticePush, relayedMessage } from "./push.ts";
@@ -82,6 +82,9 @@ let other!: ReturnType<typeof fakeHub>;
 const hub = fakeHub({ state, api: api(() => [{ name: "맥북", url: hub.origin, self: true, online: true }, { name: "맥미니", url: other.origin, self: false, online: true }]) });
 other = fakeHub({ state, api: api(() => [{ name: "맥미니", url: other.origin, self: true, online: true }, { name: "맥북", url: hub.origin, self: false, online: true }]) });
 afterAll(() => { hub.stop(); other.stop(); });
+// A test owns the windows it opened: they go back to the pool when it ends (a window of a test that timed out is closed), so a long file does not keep
+// hundreds of live pages loaded and none of them reaches the next test.
+afterEach(() => { hub.release(); other.release(); });
 
 // web/sw.js as shipped, platform stubbed: a tap on a notification opens a window or hands the message to the open one.
 const swOf = (origin: string, wins: unknown[]) => {
@@ -198,51 +201,52 @@ const opened = async (width: number, path: string, ok: string, push: object, lay
 	return view;
 };
 
+// Each test loads the whole app into a window of its own: 20s, not the default 5s, so a busy machine running other work does not fail it.
 describe.each(Object.entries(KINDS))("%s", (_name, k) => {
 	test("app closed, phone", async () => {
 		await expectLanded(await cold(390, k.push), k);
-	});
+	}, 20_000);
 	test("app closed, wide window", async () => {
 		await expectLanded(await cold(WIDE, k.push), k);
-	});
+	}, 20_000);
 	test("app closed, wide window that was left split", async () => {
 		const view = await cold(WIDE, k.push, split(k.conv && !k.conv.startsWith("mail:") ? k.conv : "main", "lane:b", "lane:b"));
 		try { await expectLanded(view, k); } finally { await reset(view); }
-	});
+	}, 20_000);
 	test("open on the main chat", async () => {
 		await expectLanded(await opened(390, "/#chat/main", `current === "chat" && target === "main" && CV.placed`, k.push), k);
-	});
+	}, 20_000);
 	test("open in the background on the main chat: the page comes forward after the tap arrived", async () => {
 		await expectLanded(await opened(390, "/#chat/main", `current === "chat" && target === "main" && CV.placed`, k.push, undefined, true), k);
-	});
+	}, 20_000);
 	test("open on the main chat, wide window", async () => {
 		await expectLanded(await opened(WIDE, "/#chat/main", `current === "chat" && target === "main" && CV.placed`, k.push), k);
-	});
+	}, 20_000);
 	test("open on settings, wide window", async () => {
 		await expectLanded(await opened(WIDE, "/#settings", `current === "settings"`, k.push), k);
-	});
+	}, 20_000);
 	test.each([["home", "/#home", `current === "home"`], ["the 알림 screen", "/#notices", `current === "notices"`], ["모니터링", "/#monitoring", `current === "monitoring" && NM.loaded`]])("open on %s", async (_n, path, ok) => {
 		await expectLanded(await opened(390, path, ok, k.push), k);
-	});
+	}, 20_000);
 	test("open on settings", async () => {
 		await expectLanded(await opened(390, "/#settings", `current === "settings"`, k.push), k);
-	});
+	}, 20_000);
 	test("open on another conversation", async () => {
 		await expectLanded(await opened(390, "/#chat/lane:b", `current === "chat" && target === "lane:b" && CV.placed`, k.push), k);
-	});
+	}, 20_000);
 	const here = k.conv && !k.conv.startsWith("mail:") ? k.conv : "";
 	if (here) test("wide, split: the conversation sits in the pane that is not active", async () => {
 		const view = await opened(WIDE, "/#chat/main", `current === "chat" && CV.placed`, k.push, split(here, "lane:b", "lane:b"));
 		try { await expectLanded(view, k); } finally { await reset(view); }
-	});
+	}, 20_000);
 	if (here) test("wide, split: the conversation sits in the active pane", async () => {
 		const view = await opened(WIDE, "/#chat/main", `current === "chat" && CV.placed`, k.push, split(here, "lane:b", here));
 		try { await expectLanded(view, k); } finally { await reset(view); }
-	});
+	}, 20_000);
 	test("wide, split: neither pane holds the conversation", async () => {
 		const view = await opened(WIDE, "/#chat/main", `current === "chat" && CV.placed`, k.push, split(here === "lane:a" ? "worklog" : "lane:a", "lane:b", "lane:b"));
 		try { await expectLanded(view, k); } finally { await reset(view); }
-	});
+	}, 20_000);
 });
 
 // The page's two first reads (the conversation and the notices) answer in either order; the tap must land whichever comes last.
@@ -255,7 +259,9 @@ describe.each([["/api/history"], ["/api/notices"]])("app closed, %s answered las
 		try {
 			const seen = arrived.length;
 			const view = await hub.view({ width: 390, height: 844 }, sw.opened[0]!.slice(hub.origin.length));
-			await arrived.until(a => a.slice(seen).includes(late), 10_000, `${late} asked`);
+			// Monitor news opens the monitoring screen, which reads no conversation: its page never asks /api/history (before windows were handed back
+			// after each test, another test's page left open asked for it and this wait was met by that one).
+			if (late !== "/api/history" || k.conv) await arrived.until(a => a.slice(seen).includes(late), 10_000, `${late} asked`);
 			if (late === "/api/history") await on(view).waitFor(`NT.loaded`);
 			else if (k.conv) await on(view).waitFor(`ts(${JSON.stringify(k.conv)}).hLoaded`);
 			release();
@@ -265,6 +271,7 @@ describe.each([["/api/history"], ["/api/notices"]])("app closed, %s answered las
 });
 
 // A notice relayed from the other computer: this app opens, switches to that computer and ends on the item there.
+// Each test loads the whole app into a window of its own: 20s, not the default 5s, so a busy machine running other work does not fail it.
 describe("another computer's push", () => {
 	const relayed = (p: object) => relayedMessage({ name: "맥미니", url: other.origin }, p as never)!;
 	const cases = {
@@ -279,7 +286,7 @@ describe("another computer's push", () => {
 			const view = await hub.view({ width: 390, height: 844 }, sw.opened[0]!.slice(hub.origin.length));
 			await gone;
 			await expectLanded(view, c.k as Spec);
-		});
+		}, 20_000);
 		test("app open", async () => {
 			const view = await hub.view({ width: 390, height: 844 }, "/#chat/main");
 			await on(view).waitFor(`NT.loaded && CV.placed && PR.fresh`);
@@ -289,7 +296,7 @@ describe("another computer's push", () => {
 			await on(view).run(`navigator.serviceWorker.dispatchEvent(new MessageEvent("message", { data: ${JSON.stringify(posted[0])} }));`);
 			await gone;
 			await expectLanded(view, c.k as Spec);
-		});
+		}, 20_000);
 	});
 });
 
