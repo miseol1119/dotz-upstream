@@ -19,7 +19,7 @@ const updCode = s => String(s || "").split("`").map((p, i) => i % 2 ? el("code",
 function updState(i) {
   const { running: run, disk } = i || {};
   const pending = !!(run && disk && run.commit && disk.commit && run.commit.sha !== disk.commit.sha);
-  const c = i && i.lastCheck && !(disk && disk.commit && i.lastCheck.version.commit && i.lastCheck.version.commit.sha !== disk.commit.sha) ? i.lastCheck : null;
+  const c = i && i.lastCheck && !(disk && disk.commit && i.lastCheck.version && i.lastCheck.version.commit && i.lastCheck.version.commit.sha !== disk.commit.sha) ? i.lastCheck : null;
   return { pending, c };
 }
 // A new version is waiting to be applied (from /api/update, not the toast).

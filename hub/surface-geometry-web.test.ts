@@ -140,3 +140,14 @@ test("390px: the same holds for the triage sheet's list toggle", async () => {
 	await shot(v, "4-sheet-triage-long");
 	headOk(await headGeo(v));
 });
+
+test("the update state tolerates a last check that carries no version, and no on-screen note shows a <placeholder>", async () => {
+	const v = await page(390, "light", `go("home")`, `typeof updState === "function" && typeof FC_NOTE === "object"`);
+	const r = await q<{ threw: string; kept: boolean; placeholders: string[] }>(v, `
+		let threw = "", kept = false;
+		try { kept = updState({ lastCheck: { remoteHead: "abc" }, disk: { commit: { sha: "a" } } }).c !== null; } catch (e) { threw = String(e.message); }
+		return { threw, kept, placeholders: Object.values(FC_NOTE).filter(t => /<[^>]+>/.test(t)) };`);
+	expect(r.threw).toBe("");
+	expect(r.kept).toBe(true);
+	expect(r.placeholders).toEqual([]);
+});
