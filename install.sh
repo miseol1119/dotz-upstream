@@ -89,6 +89,13 @@ esac
 WSL=
 if [ "$OS" = Linux ] && { [ -n "${WSL_DISTRO_NAME:-}" ] || grep -qi microsoft /proc/version 2>/dev/null; }; then WSL=1; fi
 
+# The closing guidance is Korean on a Korean computer: the first macOS language (bun's own locale says en-US there), else the locale variables.
+LANGS=
+if [ "$OS" = Darwin ] && have defaults; then LANGS=$(defaults read -g AppleLanguages 2>/dev/null | sed -n 's/^ *"\{0,1\}\([A-Za-z][A-Za-z_-]*\).*/\1/p' | head -n 1); fi
+[ -n "$LANGS" ] || LANGS=${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}
+# t ENGLISH KOREAN: the line for this computer's language.
+t() { case $LANGS in ko*) printf '%s' "$2" ;; *) printf '%s' "$1" ;; esac; }
+
 # The service belongs to this install only when its file runs this copy of the code; a gateway installed from another
 # checkout (same label) is never stopped or restarted by this script.
 ours() {
@@ -317,7 +324,7 @@ if [ "$SETUP" = auto ]; then
 fi
 if [ "$SETUP" = no ]; then
 	[ -n "$UPGRADE" ] && svc_restart
-	say "done. Wizard again: bun $APP/setup.ts"
+	say "$(t "done. Wizard again: bun $APP/setup.ts" "다 됐어요. 설정을 다시 하려면: bun $APP/setup.ts")"
 	exit 0
 fi
 if [ -n "$WEB" ]; then
@@ -351,17 +358,17 @@ if [ -n "$WEB" ]; then
 		if [ -n "$WSL" ]; then
 			if have wslview; then set -- wslview "$URL"; else set -- powershell.exe -NoProfile -Command "Start-Process '$URL'"; fi
 		elif [ "$OS" = Linux ]; then set -- xdg-open "$URL"; fi
-		if [ -z "$UP" ]; then say "the gateway is not answering yet"; MODE=print
-		elif have "$1" && "$@" >/dev/null 2>&1; then say "opened the setup page in your browser"
+		if [ -z "$UP" ]; then say "$(t "the gateway is not answering yet" "게이트웨이가 아직 응답하지 않아요")"; MODE=print
+		elif have "$1" && "$@" >/dev/null 2>&1; then say "$(t "opened the setup page in your browser" "브라우저에서 설정 화면을 열었어요")"
 		else MODE=print; fi
 	fi
 	if [ "$MODE" = print ]; then
-		say "open this address on this computer to finish setup (one use, valid 24 h):"
+		say "$(t "open this address on this computer to finish setup (one use, valid 24 h):" "이 컴퓨터에서 아래 주소를 열어 설정을 마치세요 (한 번만 쓸 수 있고 24시간 안에 열어야 해요):")"
 		printf '%s\n' "$URL"
-		if [ -n "${SSH_CONNECTION:-}" ]; then say "from your own computer: ssh -L $P:127.0.0.1:$P $(id -un)@$(hostname), then open the address there"; fi
-		say "or answer in the terminal instead: bun $APP/setup.ts"
+		if [ -n "${SSH_CONNECTION:-}" ]; then say "$(t "from your own computer: ssh -L $P:127.0.0.1:$P $(id -un)@$(hostname), then open the address there" "내 컴퓨터에서: ssh -L $P:127.0.0.1:$P $(id -un)@$(hostname) 으로 연결한 뒤 그 컴퓨터에서 주소를 여세요")"; fi
+		say "$(t "or answer in the terminal instead: bun $APP/setup.ts" "터미널에서 답하려면: bun $APP/setup.ts")"
 	fi
-	say "done. Code: $APP  Data: $DATA  Upgrade: run this installer again"
+	say "$(t "done. Code: $APP  Data: $DATA  Upgrade: run this installer again" "다 됐어요. 코드: $APP  데이터: $DATA  업그레이드: 이 설치 명령을 다시 실행하세요")"
 	exit 0
 fi
 LOAD=

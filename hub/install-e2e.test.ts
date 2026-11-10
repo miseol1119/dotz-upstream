@@ -223,13 +223,16 @@ function scene() {
 		writeFileSync(join(bin, name), `#!/bin/sh\necho "\$(basename "\$0") \$*" >> "\$STUB_LOG"\n[ "\$1" = print ] && exit 1\nexit 0\n`);
 		chmodSync(join(bin, name), 0o755);
 	}
+	// the macOS language list the installer reads: STUB_LANGS is its first entry (English unless a test says otherwise)
+	writeFileSync(join(bin, "defaults"), `#!/bin/sh\n[ "\$*" = "read -g AppleLanguages" ] || exit 1\nprintf '(\\n    "%s",\\n    "en-US"\\n)\\n' "\${STUB_LANGS:-en-US}"\n`);
+	chmodSync(join(bin, "defaults"), 0o755);
 	const probe = Bun.serve({ port: 0, fetch: () => new Response("") });
 	const port = probe.port;
 	void probe.stop(true);
 	if (!webTgz) tarball((webTgz = join(root, "web-release.tar.gz")));
 	const data = join(dir, "data");
 	const calls = join(dir, "stub.log");
-	const env = { HOME: join(dir, "home"), DOTZ_DIR: data, DOTZ_HOME: join(dir, "app"), DOTZ_TARBALL: `file://${webTgz}`, DOTZ_PORT: String(port), PATH: `${bin}:${process.env.PATH}`, STUB_LOG: calls, DOTZ_TAILSCALE_BIN: "", SSH_CONNECTION: "", DISPLAY: "", WAYLAND_DISPLAY: "" };
+	const env = { HOME: join(dir, "home"), DOTZ_DIR: data, DOTZ_HOME: join(dir, "app"), DOTZ_TARBALL: `file://${webTgz}`, DOTZ_PORT: String(port), PATH: `${bin}:${process.env.PATH}`, STUB_LOG: calls, DOTZ_TAILSCALE_BIN: "", SSH_CONNECTION: "", DISPLAY: "", WAYLAND_DISPLAY: "", LANG: "C", LC_ALL: "", LC_MESSAGES: "" };
 	mkdirSync(env.HOME);
 	// detached: no controlling terminal, so a terminal wizard can never read the developer's tty
 	const install = (extra: Record<string, string>, ...args: string[]) => {
@@ -255,6 +258,21 @@ test("a fresh install with --no-open writes the seed config and marker, prints a
 	expect(s.stubCalls()).not.toMatch(OPENERS);
 	expect(i.out).not.toContain("ssh -L");
 }, 60_000);
+
+const HANGUL = /[\uAC00-\uD7AF]/;
+
+test("on a Korean computer the closing guidance is Korean, with the address and commands unchanged; on an English one it is not", () => {
+	const ko = scene().install({ STUB_LANGS: "ko-KR" }, "--no-open");
+	if (ko.code !== 0) throw new Error(ko.out);
+	expect(ko.out).toMatch(HANGUL);
+	expect(ko.out).toMatch(ADDRESS);
+	expect(ko.out).toContain("setup.ts");
+	const en = scene().install({}, "--no-open");
+	if (en.code !== 0) throw new Error(en.out);
+	expect(en.out).not.toMatch(HANGUL);
+	const noSetup = scene().install({ STUB_LANGS: "ko-KR" }, "--no-setup");
+	expect(noSetup.out).toMatch(HANGUL);
+}, 120_000);
 
 test("over SSH the address comes with the ssh -L line and no browser is opened", () => {
 	const s = scene();
