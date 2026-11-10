@@ -108,7 +108,7 @@ function accountSection(p, g, conn) {
   rows.splice(1, 0, el("div", { class: "li" }, tx("한도에 걸렸을 때", onLimitSub),
     liEnd(rowToggle({ label: "한도에 걸렸을 때", opts: [["wait", "기다리기"], ["switch", "자동 전환"]], value: onLimit, onPick: (v, btn) => setOnLimit(btn, v) }))));
   if (!pinned) {
-    rows.push(el("div", { class: "li" }, tx("전환 규칙", lines.length ? "" : "규칙이 없어요. 계정이 막힐 때만 자동으로 바꿔요."), liEnd(el("button", { class: "btn tonal inrow", type: "button", onclick: () => rulesDialog() }, "편집"))));
+    rows.push(el("div", { class: "li" }, tx("전환 규칙", lines.length ? "" : "계정이 막힐 때만 자동으로 바꿔요."), liEnd(el("button", { class: "btn tonal inrow", type: "button", onclick: () => rulesDialog() }, "편집"))));
     for (const [i, r] of lines.entries()) rows.push(el("div", { class: "li" }, el("span", { class: "lead", text: String(i + 1) }), tx(r.text)));
   }
   const run = sc && [sc.timeout_ms ? `${Math.round(sc.timeout_ms / 1000)}초 안에 끝나요` : "", sc.every_minutes ? `${sc.every_minutes}분마다` : ""].filter(Boolean).join(" · ");
@@ -206,7 +206,7 @@ function rulesDialog() {
       const pref = Array.isArray(r.do.prefer) ? r.do.prefer : (r.do.prefer = []);
       for (const [v, t] of acctPairs()) { const at = pref.indexOf(v); doCtl.push(el("button", { type: "button", class: `chip${at >= 0 ? " on" : ""}`, "aria-pressed": String(at >= 0), text: at >= 0 ? `${at + 1} ${t}` : t, onclick: () => { at >= 0 ? pref.splice(at, 1) : pref.push(v); paint(); } })); }
     }
-    const many = Object.keys(w).filter(k => ACC_COND.some(([c]) => c === k)).length > 1;
+    const nCond = Object.keys(w).filter(k => ACC_COND.some(([c]) => c === k)).length;
     return el("div", { class: "list" }, el("div", { class: "li", style: "flex-direction:column;align-items:stretch;gap:var(--sp-3)" },
       el("div", { class: "row", style: "flex-wrap:wrap" }, nm,
         el("button", { type: "button", class: "btn text", disabled: i === 0, onclick: () => move(i, i - 1) }, "위로"),
@@ -214,14 +214,14 @@ function rulesDialog() {
         el("button", { type: "button", class: "btn danger", onclick: () => { list().splice(i, 1); paint(); } }, "삭제")),
       field("요일 (선택)", ...days),
       field("시간 (선택)", time("from", "시작"), el("span", { class: "sup", text: "~" }), time("to", "끝")),
-      field("조건", ...condCtl), many ? el("div", { class: "sup", text: "조건이 여러 개예요. 모두 바꾸려면 채팅에서 말해 주세요." }) : null,
+      field("조건", ...condCtl), nCond > 1 ? el("div", { class: "sup", text: `조건 ${nCond}개` }) : null,
       field("동작", ...doCtl)));
   }
   function paint() {
     clear(box);
     if (json) { box.append(ta); return; }
     const l = Array.isArray(R.rules) ? R.rules : [];
-    if (!l.length) box.append(el("div", { class: "sup", text: "규칙이 없어요. 계정이 막힐 때만 자동으로 바꿔요." }));
+    if (!l.length) box.append(el("div", { class: "sup", text: "계정이 막힐 때만 자동으로 바꿔요." }));
     l.forEach((r, i) => box.append(card(r, i, l.length)));
     box.append(el("div", {}, el("button", { type: "button", class: "btn tonal", onclick: () => { list().push({ do: { auto: true } }); paint(); } }, "규칙 추가")));
   }

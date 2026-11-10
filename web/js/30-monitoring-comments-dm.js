@@ -34,7 +34,7 @@ function dmPaintRooms() {
   const sig = JSON.stringify(["dm", DM.perm, DM.line, DM.error, DM.convs, DM.loaded, DM.busy, DM.open && DM.open.id, !!tabs]);
   if (sig === CM.roomsSig) return;
   CM.roomsSig = sig;
-  const bar = el("div", { class: "dm-bar" }, el("span", { class: "dm-note", text: "받은 DM을 읽기만 해요. 답장은 보내지 않아요" }),
+  const bar = el("div", { class: "dm-bar" }, el("span", { class: "dm-note", text: "읽기 전용" }),
     el("button", { class: "btn text", type: "button", id: "dm-refresh", disabled: DM.busy, text: DM.busy ? "불러오는 중…" : "새로고침", onclick: dmRefresh }));
   const list = el("section", { class: "kk-watch", "aria-label": "DM 대화" });
   list.append(el("div", { class: "cv-gh", role: "presentation", text: "대화" }));

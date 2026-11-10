@@ -39,7 +39,7 @@ function paneLayoutAsk() {
     close();
     toast(`'${name}' 배치를 저장했어요`);
   };
-  const d = dialog({ classic: true, title: "배치 저장", body: el("div", { class: "col" }, el("div", { class: "sup", text: "지금 열린 창들을 이름을 붙여 저장해요. 같은 이름이 있으면 덮어써요." }), inp), actions: [{ label: "저장", kind: "pri", onclick: c => save(c) }] });
+  const d = dialog({ classic: true, title: "배치 저장", body: el("div", { class: "col" }, el("div", { class: "sup", text: "같은 이름이 있으면 덮어써요." }), inp), actions: [{ label: "저장", kind: "pri", onclick: c => save(c) }] });
   inp.addEventListener("keydown", ev => { if (ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); d.node.querySelector(".dact .btn:last-child").click(); } });
   inp.focus();
 }

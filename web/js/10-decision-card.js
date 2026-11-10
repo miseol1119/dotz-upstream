@@ -289,7 +289,7 @@ function draftFilesNode(d, o = {}) {
     const mailDraft = d.toLabel === "받는이";
     // o.live (the mail of a combined card, read only): the list is read from the staged files, so a ✓ says they are on the mail.
     clear(box).append(...[fl.length ? el("div", { class: o.live && live ? "dr-fh ok" : "dr-fh", text: o.live && live ? `✓ 첨부 ${fl.length}개 붙어 있어요` : `첨부 ${fl.length}개` }) : null, ...rows,
-      named ? el("div", { class: "dr-note", text: "세션이 직접 붙여 보내는 파일이라 여기서는 열어 볼 수 없어요" }) : null,
+      named ? el("div", { class: "dr-note", text: "열람 불가" }) : null,
       !fl.length && (d.noAttachments || mailDraft) ? el("div", { class: "dr-none" }, icon("clip"), el("span", { text: "첨부: 없음" })) : null,
       add, menu, lib, ...(o.warn ? [] : warns), pickers].filter(Boolean));
     box.hidden = !box.querySelector(".dr-fh, .dr-none, .dr-warn, .dr-add");

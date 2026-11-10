@@ -88,8 +88,7 @@ function appsSettings(a) {
     kvRows({ 주소: a.web ? a.web.href : a.kind === "monitor" ? "모니터링에서 확인해요" : "", 상태: (APP_STATUS[a.off ? "off" : a.status] || APP_STATUS.unknown)[0] }),
     a.start ? el("div", { class: "apps-block" }, el("div", { class: "apps-kk", text: "앱 실행" }), el("p", { class: "apps-note", text: "이 앱은 스스로 실행되지 않아요. 아래 명령으로 띄워 주세요." }), el("pre", { class: "apps-pre", text: [a.start.cwd ? `cd ${a.start.cwd}` : "", `${a.start.env ? Object.entries(a.start.env).map(([k, v]) => `${k}=${v}`).join(" ") + " " : ""}${a.start.command}`].filter(Boolean).join("\n") })) : null,
     a.watches && a.watches.length ? el("div", { class: "apps-block" }, el("div", { class: "apps-kk", text: "감시" }), el("p", { class: "apps-note", text: a.watches.join(", ") })) : null,
-    a.settings && Object.keys(a.settings).length ? el("div", { class: "apps-block" }, el("div", { class: "apps-kk", text: "설정" }), kvRows(a.settings)) : null,
-    el("p", { class: "apps-note", text: "이 값들은 채팅에서 바꿔 달라고 하면 돼요." }));
+    a.settings && Object.keys(a.settings).length ? el("div", { class: "apps-block" }, el("div", { class: "apps-kk", text: "설정" }), kvRows(a.settings)) : null);
   dialog({ title: `${a.label} 설정`, body, actions: [{ label: "닫기", onclick: c => c() }] });
 }
 function appsMenu(anchor, a) {
@@ -122,7 +121,7 @@ function appsBody(a) {
       el("p", { class: "apps-note", text: a.kind === "monitor" ? "이 앱은 모니터링에서 소식을 모아 보여 줘요." : "이 앱은 자체 화면이 없어요." }),
       a.source === "registry" ? el("button", { class: "btn tonal sm", type: "button", text: "모니터링에서 열기", onclick: () => go("monitoring", `i:${a.id}`) }) : null);
   }
-  if (a.off) return el("div", { class: "apps-card" }, el("p", { class: "apps-note", text: "꺼 둔 앱이에요. 켜면 화면이 다시 열려요." }), el("button", { class: "btn tonal sm", type: "button", text: "켜기", onclick: () => appsToggle(a) }));
+  if (a.off) return el("div", { class: "apps-card" }, el("p", { class: "apps-note", text: "꺼짐" }), el("button", { class: "btn tonal sm", type: "button", text: "켜기", onclick: () => appsToggle(a) }));
   if (a.status === "unreachable") {
     return el("div", { class: "apps-card" },
       el("p", { class: "apps-note", text: `${a.label}이(가) 응답하지 않아요${a.reason ? ` (${a.reason})` : ""}.` }),
@@ -154,7 +153,7 @@ function appsRender() {
   if (pane.dataset.key === bodyKey && pane.firstChild) { /* same app, same state: keep the frame (a reload would lose the app's own state) */ }
   else {
     pane.dataset.key = bodyKey;
-    clear(pane).append(head, a ? appsBody(a) : el("div", { class: "apps-card" }, el("p", { class: "apps-note", text: "왼쪽에서 앱을 골라 주세요." })));
+    clear(pane).append(head, a ? appsBody(a) : el("div", { class: "apps-card" }, el("p", { class: "apps-note", text: "앱을 골라 주세요." })));
   }
 }
 

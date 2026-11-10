@@ -110,7 +110,7 @@ async function fbKeyDialog(e, done) {
   const custom = e.key_file && e.key_file !== cur.file ? e.key_file : "";
   const file = input({ value: custom, placeholder: cur.file });
   const status = el("p", { class: "sup", text: cur.present ? `저장된 키: ${cur.masked}${e.key_file === cur.file ? " (사용 중)" : ""}` : "저장된 키가 없어요" });
-  const adv = el("details", custom ? { open: "" } : {}, el("summary", { class: "sup", text: "고급: 키 파일 이름으로 지정" }), el("p", { class: "sup", text: "데이터 폴더 secrets 안의 파일 이름(이름에 api-key 포함). 키를 붙여 넣으면 이 칸은 쓰지 않아요." }), textField("파일 이름", file));
+  const adv = el("details", custom ? { open: "" } : {}, el("summary", { class: "sup", text: "고급: 키 파일 이름으로 지정" }), el("p", { class: "sup", text: "키를 붙여 넣으면 이 칸은 쓰지 않아요." }), textField("파일 이름", file));
   const saveWith = async (c, body) => { const r = await api("/api/apikeys", "PUT", body); key.value = ""; toast(`키를 확인하고 저장했어요 (${r.masked})`); done(r.file); c(); };
   const actions = [{ label: "취소", onclick: c => c() }];
   if (provider === "anthropic" && K.omo_anthropic) actions.push({ label: "OmO 키 쓰기", onclick: (c, b) => busy(b, () => saveWith(c, { from: "omo" })) });
@@ -122,7 +122,7 @@ async function fbKeyDialog(e, done) {
     if (cur.present) { done(cur.file); return c(); }
     toast("API 키를 붙여 넣어 주세요", true);
   }) });
-  dialog({ title: "API 키", body: el("div", { class: "col" }, el("p", { class: "sup", text: "구독 대신 API 키로 쓸 때 키를 붙여 넣어요. 저장하기 전에 한 번 확인하고, 키 값은 다시 보여주거나 기록에 남기지 않아요. 비워 두면 저장된 키를 써요." }), status, textField("API 키", key), adv), actions });
+  dialog({ title: "API 키", body: el("div", { class: "col" }, el("p", { class: "sup", text: "저장한 키는 다시 보여 주지 않아요." }), status, textField("API 키", key), adv), actions });
   setTimeout(() => key.focus(), 0);
 }
 // Drag a fallback step by its handle to another place in its chain (pointer events); the handle's arrow keys and the editor's arrow

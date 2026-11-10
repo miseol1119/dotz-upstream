@@ -32,7 +32,7 @@ function renderDevices() {
     el("div", { class: "sec", text: "이 웹앱을 쓸 수 있는 기기" }),
     el("div", { class: "list" }, ...(DEV.items.length ? DEV.items.map(row) : [el("div", { class: "li" }, el("span", { class: "tx" }, el("div", { class: "sup", text: "연결된 기기가 없어요" })))]), self ? null : addSelf,
       el("button", { type: "button", class: "li tap", "data-dev-new": "1", onclick: () => dvNew(false) },
-        el("span", { class: "lead" }, icon("add")), el("span", { class: "tx" }, el("div", { class: "hd", text: "새 기기 연결" }), el("div", { class: "sup", text: "코드를 만들어 다른 기기를 연결해요" })))));
+        el("span", { class: "lead" }, icon("add")), el("span", { class: "tx" }, el("div", { class: "hd", text: "새 기기 연결" })))));
 }
 
 /* ---------- one device: rename, unpair ---------- */
@@ -82,15 +82,13 @@ function dvNew(self) {
     const addr = input({ value: o.url, readonly: true, name: "dev-url", onfocus: ev => ev.target.select() });
     clear(res).append(
       !self && o.qr ? dvQr(o.qr) : null,
-      !self && o.qr ? el("div", { class: "sup", text: "새 기기의 카메라로 찍으면 코드가 들어간 연결 화면이 열려요." }) : null,
       el("div", { class: "dv-code", "data-dev-code": o.code, text: o.code }),
-      el("div", { class: "sup", text: `${o.minutes}분 동안 한 번만 쓸 수 있어요. 새 코드를 만들면 이 코드는 사라져요.` }),
       el("div", { class: "tf" }, el("label", { text: "연결 화면 주소", for: addr.id }), el("div", { class: "ms-copy" }, addr,
         self ? el("a", { class: "btn tonal", href: o.url, target: "_blank", rel: "noopener", text: "연결 화면 열기" })
           : el("button", { type: "button", class: "btn tonal", onclick: () => { try { navigator.clipboard.writeText(o.url); } catch {} toast("복사했어요"); }, text: "복사" }))));
   });
   const body = el("div", { class: "col" },
-    self ? null : el("div", { class: "sup", text: "휴대폰이라면 아래에서 코드를 만들고 카메라로 QR을 찍으면 돼요. 코드를 입력할 필요가 없어요." }),
+    self ? null : el("div", { class: "sup", text: "QR을 찍으면 연결돼요." }),
     el("ol", { class: "steps" }, ...steps.map(s => el("li", { text: s }))),
     el("div", { class: "sup", text: "코드는 10분 동안 한 번만 쓸 수 있고, 메신저와 이 화면을 합쳐 한 시간에 3번까지 만들 수 있어요." }),
     el("div", { class: "dcs-acts" }, el("button", { type: "button", class: "btn tonal", "data-dev-make": "1", onclick: ev => make(ev.currentTarget), text: "여기서 코드 만들기" })),

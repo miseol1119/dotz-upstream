@@ -134,8 +134,7 @@ function fcPaintList() {
   const off = (FC.off || []).filter(fcMatch);
   if (off.length) {
     const shut = fcCollapsed.has("__off");
-    const head = el("button", { type: "button", class: "fc-gh", "aria-expanded": String(!shut) }, icon("drop"), el("span", { text: "이 하네스에선 꺼짐" }), el("span", { class: "tag", text: `${off.length}개` }),
-      el("div", { class: "note", text: `다른 하네스 폴더에 설치돼 있지만 ${fcHarness()}는 불러오지 않는 확장이에요. 지금은 아무것도 강제하지 않아요.` }));
+    const head = el("button", { type: "button", class: "fc-gh", "aria-expanded": String(!shut) }, icon("drop"), el("span", { text: "이 하네스에선 꺼짐" }), el("span", { class: "tag", text: `${off.length}개` }));
     head.addEventListener("click", () => { if (fcCollapsed.has("__off")) fcCollapsed.delete("__off"); else fcCollapsed.add("__off"); fcPaintList(); });
     fcList.append(head);
     if (!shut) fcList.append(el("div", { class: "fc-grid" }, ...off.map(fcCard)));
@@ -157,7 +156,7 @@ function fcBuild(box) {
   fcCount = el("div", { class: "sup fc-count" });
   fcList = el("div");
   box.append(el("div", { class: "sec", text: "기능 목록" }),
-    el("div", { class: "sup", text: "내가 더한 기능을 구현 형식별로 모았어요. 회색으로 채운 카드(강제)는 코드가 막거나 실행하는 것, 테두리만 있는 카드(권고)는 모델에게 따르라고 부탁한 글이에요. 카드를 누르면 작동하는 자리와 파일이 열려요." }),
+    el("div", { class: "sup", text: "회색으로 채운 카드(강제)는 코드가 막거나 실행하는 것, 테두리만 있는 카드(권고)는 모델에게 따르라고 부탁한 글이에요." }),
     el("div", { class: "fc-bar" }, q, pick("form", "형식", () => FC.forms), pick("trigger", "트리거", () => FC.triggers), hOrigin() ? pick("origin", "출처", () => Object.values(FC_ORIGIN)) : null, seg), fcCount, fcList);
 }
 

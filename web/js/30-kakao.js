@@ -450,7 +450,7 @@ const kkForm = el("form", { class: "sendrow kk-send", id: "kk-form", onsubmit: e
 const kkFoot = el("div", { class: "composer kk-composer", id: "kk-foot" }, kkEditBar, kkForm, kkDrafts);
 // 자동 초안 of the open room: the one two-value switch of this screen (the watch toggles are eyes). Built once; kkPaintAuto only flips it.
 const kkAutoSw = el("button", { class: "kk-sw", type: "button", role: "switch", "aria-checked": "false", "aria-label": "자동 초안", "data-k": "auto", onclick: () => { const r = kkRoom(KK.open); if (r) kkSetRoom(r, { autoDraft: !r.autoDraft }); } }, el("span", { class: "kk-knob" }));
-const kkAuto = el("div", { class: "kk-auto", id: "kk-auto", hidden: true }, el("span", { class: "cv-b" }, el("span", { class: "cv-n", text: "자동 초안" }), el("span", { class: "cv-p", text: "답할 거리가 있으면 초안을 만들어요" })), kkAutoSw);
+const kkAuto = el("div", { class: "kk-auto", id: "kk-auto", hidden: true }, el("span", { class: "cv-b" }, el("span", { class: "cv-n", text: "자동 초안" })), kkAutoSw);
 function kkPaintAuto() {
   const r = KK.open ? kkRoom(KK.open) : null, show = !!r && !!r.watched;
   kkAuto.hidden = !show;
@@ -560,7 +560,7 @@ function kkAddOpen() {
   KK.q = ""; kkSearch.value = "";
   const d = el("dialog", { class: "kk-pd kk-add", id: "kk-add", "aria-label": "지켜볼 대화방" },
     el("div", { class: "kk-pd-in", tabindex: "-1", autofocus: true },
-      fsHead([el("h2", { class: "fs-t", text: "지켜볼 대화방" }), el("span", { class: "sup", text: "누르면 추가되고, 다시 누르면 빠져요" })], { close: () => d.close() }),
+      fsHead([el("h2", { class: "fs-t", text: "지켜볼 대화방" })], { close: () => d.close() }),
       el("div", { class: "kk-pd-b" }, el("label", { class: "pl-search kk-search" }, icon("search"), kkSearch), el("div", { class: "pl-list kk-pl", id: "kk-pl" }, ...kkPickRows()))));
   KK.adding = d;
   d.addEventListener("click", ev => { if (ev.target === d) d.close(); });

@@ -113,7 +113,7 @@ function renderModels() {
       inUseSection(),
       ...FB_LAYERS.map(L => targetCard(L.id, L.title(), "", L.cur(), L.confirm, fbParts(L))),
       repliesCard(),
-      lanes.length ? el("div", { class: "sec" }, "실행 중 세션", el("span", { class: "sup", text: "폴백은 세션 기본값 순서를 따라요" })) : null,
+      lanes.length ? el("div", { class: "sec" }, "실행 중 세션") : null,
       ...lanes.map(l => targetCard(`lane:${l.name}`, l.name, l.status, l, ""))));
   if (modelsFocus) {
     const n = box.querySelector(`[data-target="${CSS.escape(modelsFocus)}"]`);
@@ -165,7 +165,7 @@ function inUseSection() {
       open ? el("button", { class: "mt-use-act", type: "button", title: "바꾸기", "aria-label": `${r.label} 바꾸기`, onclick: open }, icon("pencil")) : null);
   };
   return el("section", { class: "mt-card mt-use", "data-target": "in-use", "aria-label": "실제로 쓰는 모델" },
-    el("div", { class: "mt-head" }, el("span", { class: "t", text: "실제로 쓰는 모델" }), el("span", { class: "sup", text: "지금 돌고 있는 모델이에요" })),
+    el("div", { class: "mt-head" }, el("span", { class: "t", text: "실제로 쓰는 모델" })),
     el("div", { class: "list mt-use-list" }, ...rows.map(row)));
 }
 // 답장 기본값: the reply model of every app that has none of its own (hub/reply-model-choices.ts setReplyDefault).
@@ -178,7 +178,7 @@ function repliesCard() {
     catch (e) { toast(e.message || "저장하지 못했어요", true); }
   }));
   return el("section", { class: "mt-card", "data-target": "replies", "aria-label": "답장 기본값" },
-    el("div", { class: "mt-head" }, el("span", { class: "t", text: "답장 기본값" }), el("span", { class: "sup", text: "앱마다 따로 고르지 않은 답장 초안" })),
+    el("div", { class: "mt-head" }, el("span", { class: "t", text: "답장 기본값" })),
     el("div", { class: "list mt-list" }, el("div", { class: "mt-pick" }, el("div", { class: "mt-model" }, pick))),
-    el("div", { class: "note", text: "앱 설정의 답장 모델이 있으면 그 모델이 먼저예요. 답장 초안은 API 키로 넘어가지 않아요." }));
+    el("div", { class: "note", text: "답장 초안은 API 키로 넘어가지 않아요." }));
 }

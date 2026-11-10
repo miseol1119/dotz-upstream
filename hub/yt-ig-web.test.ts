@@ -128,7 +128,7 @@ describe("인스타 DM on a phone (390x844)", async () => {
 		expect(refreshes).toBe(1);
 		const list = await q<{ peers: string[]; note: string }>(v, `return { peers: [...document.querySelectorAll("#cm .kk-row .cv-n")].map(n => n.textContent), note: document.querySelector("#cm .dm-note").textContent }`);
 		expect(list.peers).toEqual(["camp_lover", "ramen_fan"]);
-		expect(list.note).toContain("읽기만");
+		expect(list.note).toContain("읽기 전용");
 		await shot(v, "instagram-dm-list-390.png");
 
 		await run(v, `document.querySelector('#cm .kk-row[data-conv="c1"]').click()`);

@@ -37,7 +37,7 @@ function hProjCard(p) {
 function hProjBand() {
   const list = HGB.projects || [];
   const head = el("div", { class: "pj-hd" }, el("span", { class: "t", text: `프로젝트 · ${list.length}` }),
-    el("span", { class: "sup", text: list.length ? "작업 채널·홈 채널에 묶인 세션이에요. 나란히 놓고 비교해 보고, 카드를 누르면 그 프로젝트만의 지도가 열려요." : "작업 채널이나 홈 채널에 묶인 세션이 아직 없어요. 세션을 채널에 묶으면 여기서 프로젝트별로 비교해 볼 수 있어요." }),
+    el("span", { class: "sup", text: list.length ? "작업 채널·홈 채널에 묶인 세션이에요." : "작업 채널이나 홈 채널에 묶인 세션이 아직 없어요." }),
     list.length ? el("span", { class: "pj-lg" }, el("span", { class: "bd m", text: "바뀜" }), "전역과 다른 값", el("span", { class: "pj-g", text: "전역 기본" }), "전역 그대로") : null);
   return list.length ? [head, el("div", { class: "pj-row" }, ...list.map(hProjCard))] : [head];
 }
@@ -356,7 +356,7 @@ async function openHSheet(id, focus = {}) {
   if (hOrigin()) body.append(hOriginLine(n));
   if (n.facts.length) body.append(el("div", { class: "sec", text: "지금 상태" }), el("div", { class: "hs-facts" }, ...n.facts.map(f => el("div", { class: "hs-fact" }, el("span", { class: "k", text: f.label }), el("span", { class: "v", text: f.value })))));
   body.append(...(hPj() ? [] : fcSheetSection(n, focus.feature)));
-  if (n.settings.some(s => s.editable) || n.fileEditable) body.append(el("div", { class: "note", text: `이 화면에서는 직접 고치지 않아요. 수정 요청을 보내면 ${botName} 쪽에서 적용해요.` }));
+  if (n.settings.some(s => s.editable) || n.fileEditable) body.append(el("div", { class: "note", text: `수정 요청은 ${botName}에게 가요.` }));
   if (n.settings.length) body.append(el("div", { class: "sec", text: "설정" }), ...n.settings.map(s => hSetting(s, drafts)));
   if (n.file) body.append(el("div", { class: "sec", text: `파일 · ${n.file.split("/").pop()}` }), hFileEditor(n, drafts, focus.line));
   const near = [...HG.edges.filter(e => e.to === id).map(e => ({ id: e.from, t: `← ${hNode(e.from).label}`, l: e.label })), ...HG.edges.filter(e => e.from === id).map(e => ({ id: e.to, t: `${hNode(e.to).label} →`, l: e.label }))];

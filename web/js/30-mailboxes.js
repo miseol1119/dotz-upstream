@@ -145,7 +145,7 @@ const mxTitle = it => {
   if (mxGroup(MX.box)) return el("div", { class: "mx-bh" }, el("h2", { text: e.b.name }), el("span", { class: "meta", text: `계정 ${e.n}개를 합쳐서 보여요` }), set(e.b.id));
   return el("div", { class: "mx-bh" }, el("h2", { text: e.b.name }), mxAcctMark(it, e), el("span", { class: "tag", text: mxModeOf(e.b) }), set(e.b.id));
 };
-const mxNote = it => { const e = it.rows.find(x => x.id === MX.box); return e && e.b.base ? el("div", { class: "mx-note" }, el("div", { text: e.n ? "계정마다 어느 메일함에도 맞지 않는 메일이 여기로 와요. 빠지는 메일은 없어요." : "어느 메일함에도 맞지 않는 메일은 여기로 와요. 빠지는 메일은 없어요." })) : null; };
+const mxNote = it => { const e = it.rows.find(x => x.id === MX.box); return e && e.b.base ? el("div", { class: "mx-note" }, el("div", { text: e.n ? "계정마다 어느 메일함에도 맞지 않는 메일이 여기로 와요." : "어느 메일함에도 맞지 않는 메일은 여기로 와요." })) : null; };
 // An account whose login is gone says so above the list, with the app's own way to connect again (monRecheckApp). With one account the head's banner does it.
 const mxDown = it => it.accounts.length < 2 ? [] : it.accounts.filter(a => a.conn && (MX.acct === "all" || MX.acct === a.key)).map(a => {
   const names = a.owned.map(m => m.watch).filter(Boolean);

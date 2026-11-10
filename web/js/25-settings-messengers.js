@@ -38,7 +38,7 @@ function renderMessengers() {
       el("span", { class: "li-end" }, ...(tag ? [el("span", { class: `dot ${tone}`, "aria-hidden": "true", title: tag })] : []), icon("chev", "chev")));
     r.dataset.msRow = id;
     return r;
-  })), el("div", { class: "note", text: "메신저로도 같은 대화를 받을 수 있어요. 웹 앱은 항상 모두 받아요." }));
+  })));
 }
 function msPaint() {
   if (inSettings()) renderSettings();
@@ -200,8 +200,7 @@ function renderMessenger(id) {
       msSelfChatRow(id, s)),
     ...obSection(id, !!m && m.state === "ok")];
   if (s.notify) nodes.push(el("div", { class: "sec", text: "알림" }), el("div", { class: "list" },
-    ...notifyRows(k => s.notify[k] !== false, (k, on) => msNotifySet(id, k, on)),
-    el("div", { class: "li" }, el("span", { class: "tx" }, el("div", { class: "sup", text: "끄면 그 알림은 여기로 보내지 않고 앱에만 와요." })))));
+    ...notifyRows(k => s.notify[k] !== false, (k, on) => msNotifySet(id, k, on))));
   if (s.rooms) nodes.push(el("div", { class: "sec", text: s.rooms.label }), el("div", { class: "list" },
     ...s.rooms.items.map(r => el("div", { class: "li", "data-room": r.id },
       el("span", { class: "lead" }, el("span", { class: `dot ${r.last_error ? "err" : r.last_in || r.last_out ? "ok" : ""}`, "aria-hidden": "true" })),

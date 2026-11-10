@@ -19,7 +19,7 @@ function rtSection() {
     b.addEventListener("click", () => showMenu(b, others.filter(o => o.value !== r.id), { onPick: id => rtFlow(RT.runtimes.find(x => x.id === id)) }));
     return b;
   });
-  return [el("div", { class: "sec", text: "실행 하네스" }), el("div", { class: "list" }, ...rows), el("div", { class: "note", text: "바꾼 뒤에는 어시스턴트와 세션을 다시 시작해야 적용돼요. 바꾸기 전에 호환성을 검사해요." })];
+  return [el("div", { class: "sec", text: "실행 하네스" }), el("div", { class: "list" }, ...rows), el("div", { class: "note", text: "바꾼 뒤에는 어시스턴트와 세션을 다시 시작해야 적용돼요." })];
 }
 function rtBadge(it) {
   const [label, tone] = RT_RESULT[it.result] || [it.result, ""];

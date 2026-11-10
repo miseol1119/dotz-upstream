@@ -80,10 +80,9 @@ function dcSwitches() {
     // Which notice classes Discord gets (discord-post.json ask/alert/result/news/conv; 진행 follows the conversation switches below).
     el("div", { class: "sec", text: "알림" }),
     el("div", { class: "list" }, ...(on ? [...notifyRows(k => DP.v[k] !== false, dpSet, ["ask", "alert", "result", "news", "conv"]),
-      el("div", { class: "li" }, el("span", { class: "tx" }, el("div", { class: "sup", text: "끄면 그 알림은 디스코드로 가지 않고 앱에만 와요. 디스코드에서 직접 물은 것의 답은 디스코드에도 가요." })))] : [hint()])),
+      el("div", { class: "li" }, el("span", { class: "tx" }, el("div", { class: "sup", text: "디스코드에서 직접 물은 것의 답은 디스코드에도 가요." })))] : [hint()])),
     el("div", { class: "sec", text: "대화별로 디스코드에도 보내기" }),
-    el("div", { class: "list" }, ...(on ? [...DP_KINDS.map(([k, label, desc]) => li(label, desc, k, k === "web_lanes" ? DP.v[k] === true : DP.v[k] !== false)),
-      el("div", { class: "li" }, el("span", { class: "tx" }, el("div", { class: "sup", text: "끄면 웹에만 와요. 디스코드에서 직접 물은 것의 답은 디스코드에도 가요." })))] : [hint()])),
+    el("div", { class: "list" }, ...(on ? [...DP_KINDS.map(([k, label, desc]) => li(label, desc, k, k === "web_lanes" ? DP.v[k] === true : DP.v[k] !== false))] : [hint()])),
   ];
 }
 function dcChecked() {
@@ -92,7 +91,7 @@ function dcChecked() {
   if (!c.ok) return el("div", { class: "dcs-res err" }, el("div", { text: c.error || "확인하지 못했어요" }), c.intent_note ? el("div", { class: "sup", text: c.intent_note }) : null);
   return el("div", { class: "dcs-res" },
     el("div", { class: "dcs-ok", text: `봇 ${c.bot_name || "이름 없음"}` }),
-    c.admin === true ? el("div", { class: "dcs-ok", text: "관리자 권한 확인됨" }) : c.invite_url ? el("div", {}, el("div", { text: "관리자 권한이 없어요." }), el("a", { class: "btn tonal", href: c.invite_url, target: "_blank", rel: "noopener noreferrer", text: "봇 권한 다시 승인" })) : el("div", { class: "sup", text: "서버 ID를 저장하면 관리자 권한도 확인해요" }),
+    c.admin === true ? el("div", { class: "dcs-ok", text: "관리자 권한 확인됨" }) : c.invite_url ? el("div", {}, el("div", { text: "관리자 권한이 없어요." }), el("a", { class: "btn tonal", href: c.invite_url, target: "_blank", rel: "noopener noreferrer", text: "봇 권한 다시 승인" })) : null,
     c.intent_note ? el("div", { class: "sup", text: c.intent_note }) : null);
 }
 function dcConnect(btn) {
@@ -114,10 +113,10 @@ function renderDiscord() {
   if (!DCS.v) { clear(box).append(DCS.asked && DCS.fail ? emptyNode("디스코드 설정을 불러오지 못했어요") : emptyNode("불러오는 중")); return; }
   const v = DCS.v, m = msItem("discord"), [, , line] = dcStatus();
   const [tag, tone] = m ? msTag(m) : v.enabled ? (v.connected ? ["연결됨", "ok"] : v.error ? ["연결 안 됨", "err"] : ["연결됨", "ok"]) : ["설정 안 됨", "warn"];
-  const guide = v.enabled ? [] : [el("div", { class: "sec", text: "연결하는 방법" }), el("div", { class: "list" }, el("div", { class: "li", "data-dc-guide": "1" }, el("ol", { class: "steps" },
+  const guide = v.enabled ? [] : [el("div", { class: "list" }, el("div", { class: "li", "data-dc-guide": "1" }, el("details", {}, el("summary", { class: "sup", text: "연결하는 방법" }), el("ol", { class: "steps" },
     el("li", { text: "디스코드 개발자 포털(discord.com/developers)에서 새 앱을 만들고 Bot 탭에서 MESSAGE CONTENT를 켠 뒤 봇 토큰을 복사해요" }),
     el("li", { text: "초대 링크로 내 서버에 봇을 초대해요 (위에서 저장한 뒤 연결 확인을 누르면 초대 링크가 나와요)" }),
-    el("li", { text: "봇 토큰, 서버 ID, 내 사용자 ID를 ‘직접 입력’에 붙여 넣고 저장해요" }))))];
+    el("li", { text: "봇 토큰, 서버 ID, 내 사용자 ID를 ‘직접 입력’에 붙여 넣고 저장해요" })))))];
   // The toggle event arrives after a redraw can already have replaced the element, so read the live state.
   const prev = box.querySelector("details[data-ms-advanced]");
   if (prev) DCS.advOpen = prev.open;
