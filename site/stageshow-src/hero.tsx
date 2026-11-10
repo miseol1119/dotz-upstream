@@ -1,19 +1,20 @@
-import { Activity, ArrowUp, Bell, ChevronDown, ChevronLeft, Folder, House, MessageCircle, Plus, Search, SlidersHorizontal } from 'lucide-react'
+import { ArrowUp, Bell, ChevronLeft, Plus, Search } from 'lucide-react'
 import { Stage } from './kit/stage'
-import { Window } from './kit/window'
+import { Phone } from './kit/phone'
 import { Collapse } from './kit/motion/Collapse'
 import { Icon } from './kit/parts/Icon'
 import type { Act } from './kit/act'
-import { AppMark, DraftActions, P, useDark, type Send } from './shared'
+import { DraftActions, P, useDark, type Send } from './shared'
 import { strings } from './strings'
 import './hero.css'
 
-// The product's chat screen: sidebar, top bar, one white conversation card.
-// Beats: a new mail lands in the dotz chat, dotz posts a summary with the reply
-// draft, and a thin decision card docks above the composer. The cursor presses
-// 보내기, the card says 보냈어요 on itself and leaves, and the draft's tag turns
-// to 보냈어요 in place. The three added items leave together (newest first) and
-// the loop begins on the same finished chat it opened on.
+// The moment the page is about: away from the desk, phone in hand. The chat
+// screen of the web app as a phone shows it. Beats: a new mail lands in the
+// dotz chat, dotz posts a summary with the reply draft, and a thin decision
+// card docks above the composer. A finger presses 보내기, the card says 보냈어요
+// on itself and leaves, and the draft's tag turns to 보냈어요 in place. The
+// three added items leave together (newest first) and the loop begins on the
+// same finished chat it opened on.
 
 type S = { mail: boolean; summary: boolean; draft: boolean; dock: boolean; send: Send }
 
@@ -32,7 +33,6 @@ async function script(a: Act<S>) {
   a.put({ send: 'busy' })
   await a.wait(800)
   a.put({ send: 'done' })
-  await a.move({ wide: { x: 900, y: 470 }, compact: { x: 320, y: 470 } })
   await a.wait(900)
   a.put({ dock: false })
   await a.wait(2000)
@@ -45,38 +45,12 @@ async function script(a: Act<S>) {
   a.put({ send: 'idle' })
 }
 
-const ic = { size: 18, strokeWidth: 1.75, absoluteStrokeWidth: true, 'aria-hidden': true } as const
-const NAV = [
-  { icon: <House {...ic} /> },
-  { icon: <MessageCircle {...ic} />, on: true },
-  { icon: <Folder {...ic} /> },
-  { icon: <Activity {...ic} /> },
-  { icon: <SlidersHorizontal {...ic} /> },
-]
-
-function Sidebar() {
-  const t = strings().hero
-  return (
-    <div className="hz-side">
-      <div className="hz-brand">
-        <AppMark size={18} />
-        dotz
-        <ChevronDown className="hz-caret" size={14} aria-hidden />
-      </div>
-      <nav className="hz-nav">
-        {NAV.map((n, i) => (
-          <span key={i} className="hz-ni" data-on={n.on || undefined}>
-            {n.icon}
-            {t.nav[i]}
-          </span>
-        ))}
-      </nav>
-      <div className="hz-use">
-        {t.usage}<span className="hz-use__bar"><i /></span><span>{t.usageValue}</span>
-      </div>
-    </div>
-  )
-}
+// The stage is the phone plus room for its shadow. The phone's screen is drawn in iPhone points
+// and scaled down (kit/phone.tsx); hero.css zooms the chat back up so its type renders near its own size.
+const STAGE = { width: 340, height: 676 }
+const PHONE = 300
+// A phone is too narrow for a whole "kind · who · subject" line: the chip keeps kind and sender (the summary under it says the subject), the draft's header keeps the kind (the card under it names the person).
+const lead = (line: string, parts: number) => line.split(' · ').slice(0, parts).join(' · ')
 
 export default function HeroScene() {
   const dark = useDark()
@@ -84,84 +58,78 @@ export default function HeroScene() {
   return (
     <Stage
       className="dz hz"
-      width={1000}
-      height={600}
-      compact={{ below: 600, width: 358, height: 560 }}
+      width={STAGE.width}
+      height={STAGE.height}
       fill
       theme={dark ? 'dark' : 'light'}
       initial={initial}
       poster={poster}
       script={script}
       play="loop"
-      cursor={{ at: { wide: { x: 900, y: 470 }, compact: { x: 320, y: 470 } } }}
+      cursor={{ at: { x: 250, y: 560 }, style: 'touch' }}
     >
-      {(s, _rect, layout) => (
-        <Window title="dotz" className="hz-win">
+      {(s) => (
+        <Phone width={PHONE} frame="pro" time="9:41" dark={dark} wallpaper="var(--bg)" className="hz-phone">
           <div className="hz-app">
-            {layout === 'wide' && <Sidebar />}
-            <div className="hz-main">
-              <div className="hz-bar">
-                <ChevronLeft className="hz-back" size={layout === 'wide' ? 15 : 20} aria-hidden />
-                <h2>{layout === 'wide' ? t.title : 'dotz'}</h2>
-                <span className="hz-cmdk"><Search size={15} aria-hidden /><span>{t.command}</span><kbd>⌘K</kbd></span>
-                <span className="hz-bell"><Bell size={18} strokeWidth={1.75} aria-hidden /><span className="hz-bd">1</span></span>
-              </div>
-              <div className="hz-cv">
-                {layout === 'wide' && <div className="hz-cvh"><b>dotz</b><span>{t.idle}</span></div>}
-                <div className="hz-thread">
-                  <div className="hz-msg hz-me">
-                    <span className="hz-bub"><P>{t.ask}</P></span>
-                    <span className="hz-mm">{t.askAt}</span>
-                  </div>
-                  <div className="hz-msg">
-                    <span className="hz-mm"><b>dotz</b> · {t.ackAt}</span>
-                    <P className="hz-text">{t.ack}</P>
-                  </div>
-                  <Collapse open={s.mail} reveal="drop" from="below">
-                    <div className="hz-sys">
-                      <Icon name="mail" size={13} />
-                      <span>{t.mail}</span>
-                    </div>
-                  </Collapse>
-                  <Collapse open={s.summary} reveal="drop" from="below">
-                    <div className="hz-msg">
-                      <span className="hz-mm"><b>dotz</b> · {t.summaryAt}</span>
-                      <P className="hz-text">{t.summary}</P>
-                    </div>
-                  </Collapse>
-                  <Collapse open={s.draft} reveal="drop" from="below">
-                    <div className="hz-q">
-                      <div className="hz-q__hd">
-                        <span className="hz-mm">{t.draftFor}</span>
-                        <span className="dz-swap">
-                          <span className="dz-tag dz-tag--warn" data-off={s.send === 'done' || undefined}>{tags.review}</span>
-                          <span className="dz-tag dz-tag--ok" data-off={s.send !== 'done' || undefined}>{tags.sent}</span>
-                        </span>
-                      </div>
-                      <P className="hz-q__body">{t.draftBody}</P>
-                    </div>
-                  </Collapse>
+            <div className="hz-bar">
+              <ChevronLeft className="hz-back" size={20} aria-hidden />
+              <h2>dotz</h2>
+              <Search size={17} strokeWidth={1.75} aria-hidden />
+              <span className="hz-bell"><Bell size={18} strokeWidth={1.75} aria-hidden /><span className="hz-bd">1</span></span>
+            </div>
+            <div className="hz-cv">
+              <div className="hz-thread">
+                <div className="hz-msg hz-me">
+                  <span className="hz-bub"><P>{t.ask}</P></span>
                 </div>
-                <Collapse open={s.dock} reveal="drop" from="below">
-                  <div className="hz-dock">
-                    <div className="hz-dock__q">
-                      <span className="dz-tag dz-tag--warn">{tags.review}</span>
-                      <P className="hz-dock__t">{t.dock}</P>
-                    </div>
-                    <DraftActions send={s.send} at={t.sentAt} />
+                <div className="hz-msg">
+                  <span className="hz-mm"><b>dotz</b> · {t.ackAt}</span>
+                  <P className="hz-text">{t.ack}</P>
+                </div>
+                <Collapse open={s.mail} reveal="drop" from="below">
+                  <div className="hz-sys">
+                    <Icon name="mail" size={13} />
+                    <span>{lead(t.mail, 2)}</span>
                   </div>
                 </Collapse>
-                <div className="hz-cmp">
-                  <div className="hz-box">
-                    <Plus size={18} strokeWidth={1.75} aria-hidden />
-                    <span className="hz-ph">{t.composer}</span>
-                    <span className="hz-send"><ArrowUp size={16} strokeWidth={2} aria-hidden /></span>
+                <Collapse open={s.summary} reveal="drop" from="below">
+                  <div className="hz-msg">
+                    <span className="hz-mm"><b>dotz</b> · {t.summaryAt}</span>
+                    <P className="hz-text">{t.summary}</P>
                   </div>
+                </Collapse>
+                <Collapse open={s.draft} reveal="drop" from="below">
+                  <div className="hz-q">
+                    <div className="hz-q__hd">
+                      <span className="hz-mm">{lead(t.draftFor, 1)}</span>
+                      <span className="dz-swap">
+                        <span className="dz-tag dz-tag--warn" data-off={s.send === 'done' || undefined}>{tags.review}</span>
+                        <span className="dz-tag dz-tag--ok" data-off={s.send !== 'done' || undefined}>{tags.sent}</span>
+                      </span>
+                    </div>
+                    <P className="hz-q__body">{t.draftBody}</P>
+                  </div>
+                </Collapse>
+              </div>
+              <Collapse open={s.dock} reveal="drop" from="below">
+                <div className="hz-dock">
+                  <div className="hz-dock__q">
+                    <span className="dz-tag dz-tag--warn">{tags.review}</span>
+                    <P className="hz-dock__t">{t.dock}</P>
+                  </div>
+                  <DraftActions send={s.send} at={t.sentAt} />
+                </div>
+              </Collapse>
+              <div className="hz-cmp">
+                <div className="hz-box">
+                  <Plus size={18} strokeWidth={1.75} aria-hidden />
+                  <span className="hz-ph">{t.composer}</span>
+                  <span className="hz-send"><ArrowUp size={16} strokeWidth={2} aria-hidden /></span>
                 </div>
               </div>
             </div>
           </div>
-        </Window>
+        </Phone>
       )}
     </Stage>
   )

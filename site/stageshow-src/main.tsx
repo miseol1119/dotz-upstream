@@ -2,11 +2,10 @@ import type { ComponentType } from 'react'
 import { createRoot } from 'react-dom/client'
 import './look.css'
 import HeroScene from './hero'
-import { MailScene, PhoneScene, WatchScene } from './cards'
+import { PhoneScene, WatchScene } from './cards'
 
 const SCENES: Record<string, ComponentType> = {
   hero: HeroScene,
-  mail: MailScene,
   phone: PhoneScene,
   watch: WatchScene,
 }

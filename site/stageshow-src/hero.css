@@ -1,17 +1,16 @@
-.hz-win {
+.hz-phone {
   position: absolute;
   top: 8px;
-  left: 24px;
-  width: 952px;
-  height: 584px;
-  box-shadow: var(--ss-shadow-hero);
+  left: 20px;
 }
 
+/* The phone's screen is 402pt wide and drawn at 300 / 426 of that; the zoom brings the chat's own px back to about 1:1. */
 .hz-app {
-  display: grid;
-  grid-template-columns: 208px minmax(0, 1fr);
+  zoom: 1.36;
+  display: flex;
+  flex-direction: column;
   height: 100%;
-  background: var(--bg);
+  padding-bottom: 14px;
   color: var(--ink);
   font-size: 13px;
 }
@@ -19,86 +18,25 @@
 .dz-mark { flex: none; fill: var(--ink); }
 .dz-mark__dot { fill: var(--accent); }
 
-.hz-side {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-height: 0;
-  padding: 12px;
-}
-.hz-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 10px;
-  font-size: 15px;
-  font-weight: 600;
-}
-.hz-caret { margin-left: -4px; color: var(--muted); }
-.hz-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
-.hz-ni {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 40px;
-  padding: 0 10px;
-  border-radius: var(--r-ctl);
-  color: var(--body);
-  font-size: 14px;
-  font-weight: 500;
-}
-.hz-ni[data-on] { background: var(--surface); color: var(--ink); font-weight: 700; }
-.hz-use {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: auto;
-  padding: 0 10px 8px;
-  color: var(--body);
-  font-size: 12px;
-}
-.hz-use__bar { flex: 1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
-.hz-use__bar i { display: block; width: 18%; height: 100%; background: var(--warn); }
-
-.hz-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .hz-bar {
-  position: relative;
   flex: none;
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 52px;
-  padding: 0 16px 0 8px;
+  height: 44px;
+  padding: 0 8px 0 10px;
+  color: var(--body);
 }
-.hz-back { position: absolute; left: -14px; color: var(--muted); }
+.hz-back { flex: none; color: var(--muted); }
 .hz-bar h2 {
   flex: 1;
   min-width: 0;
   margin: 0;
   color: var(--ink);
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 700;
   line-height: 28px;
   letter-spacing: -0.02em;
-}
-.hz-cmdk {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 6px 0 10px;
-  border-radius: var(--r-ctl);
-  background: var(--surface);
-  color: var(--body);
-  font-size: 13px;
-}
-.hz-cmdk kbd {
-  padding: 0 5px;
-  border: 1px solid var(--line-strong);
-  border-radius: 4px;
-  background: var(--surface-2);
-  font: 500 12px/16px var(--font-sans);
 }
 .hz-bell {
   position: relative;
@@ -129,14 +67,11 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  margin: 0 16px 16px 8px;
+  margin: 0 8px;
   border-radius: var(--r-card);
   background: var(--surface);
   overflow: hidden;
 }
-.hz-cvh { flex: none; display: grid; gap: 2px; padding: 14px 20px 8px; }
-.hz-cvh b { font-size: 16px; font-weight: 600; }
-.hz-cvh span { color: var(--muted); font-size: 12px; }
 
 .hz-thread {
   flex: 1;
@@ -145,19 +80,20 @@
   justify-content: flex-end;
   gap: 14px;
   min-height: 0;
-  padding: 0 20px 12px;
+  padding: 0 14px 10px;
   overflow: hidden;
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 36px);
   mask-image: linear-gradient(to bottom, transparent, #000 36px);
 }
 .hz-thread > * { will-change: transform; flex: none; }
+.hz-thread .ss-collapse__inner { min-width: 0; }
 
 .hz-msg { display: flex; flex-direction: column; gap: 4px; }
 .hz-me { align-items: flex-end; }
 .hz-mm { color: var(--muted); font-size: 12px; line-height: 16px; }
 .hz-mm b { color: var(--ink); font-weight: 600; }
 .hz-bub {
-  max-width: 80%;
+  max-width: 86%;
   padding: 9px 14px;
   border-radius: 18px 18px 6px 18px;
   background: var(--surface-2);
@@ -165,12 +101,13 @@
   font-size: 13.5px;
   line-height: 1.45;
 }
-.hz-text { color: var(--ink); font-size: 14px; line-height: 1.55; }
+.hz-text { color: var(--ink); font-size: 13.5px; line-height: 1.55; }
 .hz-sys {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  max-width: 100%;
   width: fit-content;
   margin: 0 auto;
   padding: 4px 12px;
@@ -180,39 +117,41 @@
   font-size: 12px;
   line-height: 16px;
 }
-.hz-sys .ss-icon { color: var(--accent); }
+.hz-sys > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hz-sys .ss-icon { flex: none; color: var(--accent); }
 
 .hz-q {
   display: grid;
   gap: 6px;
-  max-width: 440px;
   padding: 10px 14px;
   border-radius: 14px;
   background: var(--surface-2);
 }
 .hz-q__hd { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.hz-q__hd .hz-mm b { font-weight: 500; }
+.hz-q__hd .hz-mm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hz-q__body { color: var(--body); font-size: 13px; line-height: 1.55; }
 
 .hz-dock {
   display: grid;
   gap: 10px;
-  margin: 0 12px 8px;
-  padding: 12px 14px;
+  margin: 0 8px 6px;
+  padding: 10px 12px;
   border-radius: 16px;
   background: var(--surface-2);
 }
 .hz-dock__q { display: flex; align-items: center; gap: 8px; }
 .hz-dock__t { color: var(--ink); font-size: 14px; font-weight: 600; line-height: 1.4; }
+.hz-dock .dz-btn { padding: 0 11px; }
+.hz-dock .dz-btn--text { padding: 0 6px; }
 .hz-dock .dz-btn:not(.dz-btn--send):not(.dz-btn--text) { background: var(--surface); }
 
-.hz-cmp { flex: none; padding: 4px 12px 12px; }
+.hz-cmp { flex: none; padding: 4px 8px 8px; }
 .hz-box {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  height: 46px;
+  height: 42px;
   padding: 0 6px 0 14px;
   border-radius: 18px;
   background: var(--surface-2);
@@ -226,29 +165,9 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--accent);
-  color: var(--on-accent);
-  opacity: 0.3;
+  background: var(--line-strong);
+  color: var(--surface);
 }
 
-
-.hz .ss-stage[data-layout='compact'] .hz-win {
-  left: 8px;
-  width: 342px;
-  height: 544px;
-}
-.hz .ss-stage[data-layout='compact'] .hz-app { display: flex; flex-direction: column; }
-.hz .ss-stage[data-layout='compact'] .hz-main { flex: 1; }
-.hz .ss-stage[data-layout='compact'] .hz-bar { height: 46px; padding: 0 4px 0 36px; }
-.hz .ss-stage[data-layout='compact'] .hz-back { left: 10px; }
-.hz .ss-stage[data-layout='compact'] .hz-cmdk { width: 32px; padding: 0; justify-content: center; background: transparent; }
-.hz .ss-stage[data-layout='compact'] .hz-cmdk span,
-.hz .ss-stage[data-layout='compact'] .hz-cmdk kbd { display: none; }
-.hz .ss-stage[data-layout='compact'] .hz-cv { margin: 0 8px 8px; }
-.hz .ss-stage[data-layout='compact'] .hz-thread { padding: 0 16px 10px; }
-.hz .ss-stage[data-layout='compact'] .hz-dock { margin: 0 8px 6px; padding: 10px 12px; }
-.hz .ss-stage[data-layout='compact'] .hz-cmp { padding: 4px 8px 8px; }
-.hz .ss-stage[data-layout='compact'] .hz-box { height: 42px; }
-.hz .ss-stage[data-layout='compact'] .hz-text { font-size: 13.5px; }
-.hz .ss-stage[data-layout='compact'] .dz-btn { padding: 0 11px; }
-.hz .ss-stage[data-layout='compact'] .dz-btn--text { padding: 0 6px; }
+/* The status bar takes the page's ink, so it follows the same scheme as everything drawn on the screen. */
+.hz-phone .ss-phone__screen { color: var(--ink); }

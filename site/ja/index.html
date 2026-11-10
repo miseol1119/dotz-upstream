@@ -30,10 +30,12 @@
 <meta property="og:image:alt" content="dotz の Web アプリのチャット画面。承認を待つ返信の下書きカードがある。">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/style.css?v=52fded705554">
-<script src="/app.js?v=52fded705554" defer></script>
+<link rel="stylesheet" href="/style.css?v=690de961e260">
+<!-- The demo embedded below links back to this page. Opened inside that frame, the page reloads the window around it instead of nesting itself. -->
+<script>try { if (top !== self) top.location.replace(top.location.pathname); } catch {}</script>
+<script src="/app.js?v=690de961e260" defer></script>
 <script>if ('noModule' in HTMLScriptElement.prototype) document.documentElement.classList.add('ss');</script>
-<script type="module" src="/js/stageshow.js?v=52fded705554" defer></script>
+<script type="module" src="/js/stageshow.js?v=690de961e260" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#main">本文へ移動</a>
@@ -76,127 +78,168 @@
 
 <main id="main">
   <section class="hero" id="top" aria-labelledby="hero-title">
-    <div class="wrap">
-      <h1 class="wordmark" id="hero-title">dotz</h1>
-      <p class="pitch"><span class="ph">自分のパソコンで</span><span class="ph">動き続ける</span><span class="ph">パーソナルアシスタント。</span></p>
-      <p class="hero-lede"><span class="ph">新着メールを読んで</span><span class="ph">返信の下書きを用意し、</span><span class="ph">スマホで送信を押すまで</span><span class="ph">待ちます。</span></p>
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <h1 id="hero-title"><span class="ln"><span class="ph">作業はパソコンが</span><span class="ph">進めておきます。</span></span><span class="ln"><span class="ph">あなたはスマホで</span><span class="ph">確認するだけ。</span></span></h1>
+        <p class="hero-lede">dotz は自分のパソコンで動き続けるパーソナルアシスタントです。新着メールを読んで返信の下書きを用意し、あなたが送信を押すまで待ちます。</p>
+      </div>
 
-      <div class="install">
-        <div class="install-bar">
-          <div class="os-pick" role="group" aria-label="OS">
-            <button class="os" type="button" data-os="mac" aria-pressed="true">macOS · Linux</button>
-            <button class="os" type="button" data-os="windows" aria-pressed="false">Windows</button>
+      <div class="hero-act">
+        <div class="cmd">
+          <pre><code>curl -fsSL https://raw.githubusercontent.com/<wbr>ddotz/dotz/main/install.sh | sh</code></pre>
+          <div class="cmd-foot">
+            <span class="cmd-os">macOS · Linux · Windows（WSL 2）</span>
+            <button class="copy" type="button" data-copy data-label="コピー" data-copied="コピーしました" data-fail="コピーできませんでした。コマンドを選択してコピーしてください。" data-done="インストールコマンドをコピーしました。">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <rect x="8.5" y="8.5" width="11" height="11" rx="2"></rect>
+                <path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"></path>
+              </svg>
+              <span class="copy-label">コピー</span>
+            </button>
           </div>
-          <button class="copy" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/ddotz/dotz/main/install.sh | sh" data-label="コピー" data-copied="コピーしました" data-fail="コピーできませんでした。コマンドを選択してコピーしてください。" data-done="インストールコマンドをコピーしました。">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <rect x="8.5" y="8.5" width="11" height="11" rx="2"></rect>
-              <path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"></path>
-            </svg>
-            <span class="copy-label">コピー</span>
-          </button>
         </div>
-        <pre><code>curl -fsSL https://raw.githubusercontent.com/ddotz/<wbr>dotz/main/install.sh | sh</code></pre>
-        <ol class="install-steps" id="install-windows" hidden>
-          <li>管理者として開いた PowerShell で <code>wsl --install</code> を実行します。</li>
-          <li>再起動後、Ubuntu のウィンドウに上のコマンドを貼り付けます。</li>
-          <li>dotz は WSL の中で動き、そこから Windows を操作します。<a href="https://github.com/ddotz/dotz/blob/main/docs/windows.md">手順（韓国語）</a></li>
-        </ol>
-      </div>
-      <p class="visually-hidden" id="copy-status" aria-live="polite"></p>
 
-      <div class="cta-row">
-        <a class="btn btn-primary" href="/demo/">
-          デモを試す
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M7.5 16.5 16.5 7.5"></path>
-            <path d="M9 7.5h7.5V15"></path>
-          </svg>
-        </a>
-        <a class="btn btn-secondary" href="https://github.com/ddotz/dotz">GitHub でスターする</a>
+        <p class="hero-more">
+          <a href="/demo/">まずデモで触ってみる<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.5 16.5 16.5 7.5"></path><path d="M9 7.5h7.5V15"></path></svg></a>
+        </p>
       </div>
-      <p class="cta-note">デモと Web アプリの画面は今のところ韓国語です。</p>
+
       <figure class="shot">
         <picture>
-          <source media="(max-width: 640px)" srcset="/img/web-phone.png" width="390" height="844">
-          <img src="/img/web-desktop.png" width="1440" height="900" fetchpriority="high" decoding="async" alt="dotz のチャット画面。新着メールが届くと dotz が要約と返信の下書きを出し、確認カードで送信を押すと下書きが「送信しました」に変わる。">
+          <img src="/img/web-phone.png" width="390" height="844" fetchpriority="high" decoding="async" alt="dotz のチャット画面。新着メールが届くと dotz が要約と返信の下書きを出し、確認カードで送信を押すと下書きが「送信しました」に変わる。">
         </picture>
         <div class="ss-slot" data-ss="hero" role="img" aria-label="dotz のチャット画面。新着メールが届くと dotz が要約と返信の下書きを出し、確認カードで送信を押すと下書きが「送信しました」に変わる。"></div>
       </figure>
     </div>
   </section>
 
-  <section class="section" id="usage" aria-labelledby="usage-title">
+  <section class="section band" id="more" aria-labelledby="more-title">
     <div class="wrap">
-      <div class="section-head">
-        <h2 id="usage-title">使い方</h2>
-      </div>
+      <h2 id="more-title">メールだけではありません。</h2>
 
       <ul class="cards">
-        <li class="card card-scene">
-          <div class="card-demo" data-ss="mail" role="img" aria-label="新着メールが届くと dotz が要約して返信の下書きを書く。下書きは送信ボタンの前で確認を待つ。"></div>
-          <h3>返信は確認して送るだけ</h3>
-          <p>新着メールを読み、あなたの口調で下書きまで用意します。よければ送信を押すだけです。</p>
-        </li>
-        <li class="card card-scene">
+        <li class="card">
           <div class="card-demo" data-ss="phone" role="img" aria-label="スマホで dotz に今日の予定を聞くと、少しして予定が二つ返ってくる。"></div>
-          <h3>スマホから話しかける</h3>
-          <p>席を外していても、いつものメッセンジャーで今日の予定やメールのことを聞けます。</p>
+          <div class="card-copy">
+            <h3>スマホから話しかける</h3>
+            <p>席を外していても、いつものメッセンジャーで今日の予定やメールのことを聞けます。</p>
+            <p class="card-meta">Web アプリ、Discord、Telegram、JANDI で会話でき、Slack では通知と返事を受け取れます。</p>
+          </div>
         </li>
-        <li class="card card-scene">
+        <li class="card">
           <div class="card-demo" data-ss="watch" role="img" aria-label="見ていたキャンプチェアが 8,900 円から 7,200 円に下がり、通知一覧のいちばん上に「価格が変わりました」が届く。"></div>
-          <h3>値下がりを逃さない</h3>
-          <p>見ておきたい商品を決めておけば、値段が下がったときにスマホへ知らせます。</p>
+          <div class="card-copy">
+            <h3>値下がりを逃さない</h3>
+            <p>見ておきたい商品を決めておけば、値段が下がったときにスマホへ知らせます。</p>
+            <p class="card-meta">メール、カレンダー、YouTube・Instagram、Web サイトのコメントも見ています。</p>
+          </div>
         </li>
       </ul>
+    </div>
+  </section>
+
+  <section class="section" id="app" aria-labelledby="app-title">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="app-title">席に戻れば、すべてがひとつのアプリに。</h2>
+        <p>会話、プロジェクト、見守っているものが、ひとつの Web アプリにまとまっています。プロジェクトごとにセッションが分かれていて、再起動や回線の切断で止まった作業は自動で再開します。</p>
+      </div>
+
+      <div class="app-shot">
+        <iframe src="/demo/" title="dotz の Web アプリのデモ" loading="lazy"></iframe>
+        <a class="app-open" href="/demo/" tabindex="-1" aria-hidden="true"></a>
+      </div>
+
+      <div class="app-foot">
+        <a class="btn btn-primary" href="/demo/">
+          デモを開く
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.5 16.5 16.5 7.5"></path><path d="M9 7.5h7.5V15"></path></svg>
+        </a>
+        <p class="note">実際のアプリが、サンプルデータを使ってブラウザの中で動いています。画面は今のところ韓国語です。</p>
+      </div>
     </div>
   </section>
 
   <section class="section" id="why" aria-labelledby="why-title">
     <div class="wrap">
-      <div class="section-head">
-        <h2 id="why-title">特徴</h2>
-      </div>
+      <h2 id="why-title">自分のパソコンの中で動き、送る前に確認します。</h2>
 
-      <ul class="why">
-        <li>
-          <h3>自分のパソコンで動く</h3>
-          <p>パソコンにあるログイン情報やファイルをそのまま使い、秘密情報は ~/.dotz/secrets に保存します。</p>
-        </li>
-        <li>
-          <h3>承認しないと外に出ない</h3>
-          <p>メール、返信、投稿はチャットで承認するまで送られません。</p>
-        </li>
-        <li>
-          <h3>プロジェクトごとにセッション</h3>
-          <p>再起動や回線の切断で止まった作業は自動で再開します。</p>
-        </li>
-        <li>
-          <h3>過去の会話を探せる</h3>
-          <p>「先週のあれ」のような聞き方で大丈夫です。インデックス作成と検索はこのパソコンの中だけで行います。</p>
-        </li>
-      </ul>
+      <div class="why-grid">
+        <dl class="facts">
+          <div>
+            <dt>承認しないと外に出ない</dt>
+            <dd>メール、返信、投稿はチャットで承認するまで送られません。</dd>
+          </div>
+          <div>
+            <dt>自分のパソコンで動く</dt>
+            <dd>パソコンにあるログイン情報やファイルをそのまま使い、秘密情報は ~/.dotz/secrets に保存します。</dd>
+          </div>
+          <div>
+            <dt>過去の会話を探せる</dt>
+            <dd>「先週のあれ」のような聞き方で大丈夫です。インデックス作成と検索はこのパソコンの中だけで行います。</dd>
+          </div>
+          <div>
+            <dt>オープンソース</dt>
+            <dd>MIT ライセンスです。コードはすべて <a href="https://github.com/ddotz/dotz">GitHub</a> にあります。</dd>
+          </div>
+        </dl>
+
+        <figure class="tree">
+          <ul>
+            <li class="tree-root"><code>~/.dotz</code></li>
+            <li><code>config.json</code><span>設定（秘密情報は入りません）</span></li>
+            <li><code>secrets/</code><span>トークン（自分だけが読めます）</span></li>
+            <li><code>identity/</code><span>名前と話し方</span></li>
+            <li><code>memory/</code><span>あなたについて覚えたこと</span></li>
+            <li><code>RULES.md</code><span>あなたが決めたルール</span></li>
+          </ul>
+          <figcaption>保存するものは、すべてこのフォルダーにあります。</figcaption>
+        </figure>
+      </div>
     </div>
   </section>
 
-  <section class="section" id="messengers" aria-labelledby="messengers-title">
+  <section class="section" id="install" aria-labelledby="install-title">
     <div class="wrap">
-      <div class="section-head">
-        <h2 id="messengers-title">つながるもの</h2>
-      </div>
+      <div class="start">
+        <h2 id="install-title">インストールはコマンド一行。</h2>
 
-      <ul class="links">
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 4 7.5 20"></path><path d="M16.5 4l-2 16"></path><path d="M4.5 9h16"></path><path d="M3.5 15h16"></path></svg>Discord</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="7" y="2.8" width="10" height="18.4" rx="2.2"></rect><path d="M11 18h2"></path></svg>Web アプリ（スマホ・PC）</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 3.5 10 14"></path><path d="M20.5 3.5 14 20.5l-4-6.5-6.5-4z"></path></svg>Telegram</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 1.5H5z"></path><path d="M10 20h4"></path></svg>Slack</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 6.5c0-1 .8-1.8 1.8-1.8h11.4c1 0 1.8.8 1.8 1.8v8c0 1-.8 1.8-1.8 1.8H10l-4.2 3.2v-3.2h0c-.7 0-1.3-.8-1.3-1.8z"></path></svg>JANDI</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5.5" width="17" height="13" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg>メール・カレンダー</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5.5" width="18" height="13" rx="3"></rect><path d="m10.5 9.5 4 2.5-4 2.5z"></path></svg>YouTube・Instagram</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.8 12S6.3 5.8 12 5.8 21.2 12 21.2 12 17.7 18.2 12 18.2 2.8 12 2.8 12Z"></path><circle cx="12" cy="12" r="3.2"></circle></svg>Web サイトのコメント</li>
-      </ul>
+        <div class="start-main">
+          <div class="cmd">
+            <pre><code>curl -fsSL https://raw.githubusercontent.com/<wbr>ddotz/dotz/main/install.sh | sh</code></pre>
+            <div class="cmd-foot">
+              <span class="cmd-os">macOS · Linux · Windows（WSL 2）</span>
+              <button class="copy" type="button" data-copy data-label="コピー" data-copied="コピーしました" data-fail="コピーできませんでした。コマンドを選択してコピーしてください。" data-done="インストールコマンドをコピーしました。">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <rect x="8.5" y="8.5" width="11" height="11" rx="2"></rect>
+                  <path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"></path>
+                </svg>
+                <span class="copy-label">コピー</span>
+              </button>
+            </div>
+          </div>
+
+          <details class="win">
+            <summary>Windows でインストールする</summary>
+            <ol>
+              <li>管理者として開いた PowerShell で <code>wsl --install</code> を実行します。</li>
+              <li>再起動後、Ubuntu のウィンドウに上のコマンドを貼り付けます。</li>
+              <li>dotz は WSL の中で動き、そこから Windows を操作します。<a href="https://github.com/ddotz/dotz/blob/main/docs/windows.md">手順（韓国語）</a></li>
+            </ol>
+          </details>
+          <p class="note">セットアップ画面は英語と韓国語で、アシスタントは設定した言語で返事をします。</p>
+        </div>
+
+        <ol class="steps">
+          <li>macOS か Linux のターミナルにコマンドを貼り付けます。</li>
+          <li>ブラウザが開くので、アシスタントの名前、話し方、つなぐサービスを選び、モデルのアカウントにログインします。</li>
+          <li>終わったら、ターミナルで dotz と打つと Web アプリが開きます。アップデートは自動で届きます。</li>
+        </ol>
+      </div>
     </div>
   </section>
 </main>
+<p class="visually-hidden" id="copy-status" aria-live="polite"></p>
 
 <footer class="site-footer">
   <div class="wrap footer-inner">

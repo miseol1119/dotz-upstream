@@ -89,35 +89,6 @@
 .dz-sent .ss-check__fill { fill: var(--ok); }
 .dz-sent .ss-check__tick { stroke: var(--surface); }
 
-/* The reply draft card, as the web app draws it (web/js/10-reply-card.js): a layer on the white card, the draft text on white */
-.dz-draft {
-  display: grid;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  background: var(--surface-2);
-}
-.dz-draft__hd {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.dz-draft__hd .dz-draft__title { color: var(--ink); font-size: 14px; font-weight: 600; }
-.dz-draft__hd .ss-icon { color: var(--muted); }
-.dz-draft__body {
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--body);
-  font-size: 13px;
-  line-height: 1.55;
-}
-.dz-draft__to { display: flex; gap: 10px; font-size: 12.5px; color: var(--muted); }
-.dz-draft__to b { color: var(--ink); font-weight: 500; }
-.dz-draft .dz-btn:not(.dz-btn--send):not(.dz-btn--text) { background: var(--surface); }
-
 /* Small status tags (the product's .tag): a tint of the status colour; two can share one cell and swap in place */
 .dz-tag {
   display: inline-flex;

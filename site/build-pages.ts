@@ -14,8 +14,9 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const stamp = ["style.css", "app.js", "js/stageshow.js"]
   .reduce((h, f) => h.update(readFileSync(join(SITE, f))), createHash("sha1")).digest("hex").slice(0, 12);
 
-// "|" in a hero line marks where it may wrap; each piece stays whole (.ph), so Japanese and Chinese never break mid-word.
+// In the headline "||" ends a line (.ln, one sentence a line) and "|" marks where a line may wrap; each piece stays whole (.ph), so Japanese and Chinese never break mid-word.
 const phrases = (s: string, sep: string) => s.split("|").map((p) => `<span class="ph">${esc(p)}</span>`).join(sep);
+const lines = (s: string, sep: string) => s.split("||").map((l) => `<span class="ln">${phrases(l, sep)}</span>`).join(sep);
 
 const render = (lang: string) => {
   const c = copy[lang];
@@ -23,8 +24,7 @@ const render = (lang: string) => {
   const others = langs.filter((l) => l !== lang);
   const vars: Record<string, string> = {
     ...c,
-    pitch: phrases(c.pitch, sep),
-    lede: phrases(c.lede, sep),
+    pitch: lines(c.pitch, sep),
     stamp,
     path: pathOf(lang),
     canonical: ORIGIN + pathOf(lang),
@@ -33,7 +33,7 @@ const render = (lang: string) => {
     langMenu: langs.map((l) => `            <li><a href="${pathOf(l)}" lang="${copy[l].htmlLang}" hreflang="${copy[l].htmlLang}"${l === lang ? ' aria-current="page"' : ""}>${esc(copy[l].langName)}</a></li>`).join("\n"),
     footerLangs: langs.map((l) => `      <a href="${pathOf(l)}" lang="${copy[l].htmlLang}" hreflang="${copy[l].htmlLang}"${l === lang ? ' aria-current="page"' : ""}>${esc(copy[l].langName)}</a>`).join("\n"),
   };
-  const raw = new Set(["pitch", "lede", "alternates", "ogAlternates", "langMenu", "footerLangs", "win1", "win2", "win3"]);
+  const raw = new Set(["pitch", "alternates", "ogAlternates", "langMenu", "footerLangs", "win1", "win2", "win3"]);
   return template
     .replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}\n?/g, (_, k, body) => (vars[k] ? body : ""))
     .replace(/\{\{\{(\w+)\}\}\}/g, (_, k) => get(vars, k))

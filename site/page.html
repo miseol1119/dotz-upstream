@@ -23,6 +23,8 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css?v={{stamp}}">
+<!-- The demo embedded below links back to this page. Opened inside that frame, the page reloads the window around it instead of nesting itself. -->
+<script>try { if (top !== self) top.location.replace(top.location.pathname); } catch {}</script>
 <script src="/app.js?v={{stamp}}" defer></script>
 <script>if ('noModule' in HTMLScriptElement.prototype) document.documentElement.classList.add('ss');</script>
 <script type="module" src="/js/stageshow.js?v={{stamp}}" defer></script>
@@ -64,128 +66,168 @@
 
 <main id="main">
   <section class="hero" id="top" aria-labelledby="hero-title">
-    <div class="wrap">
-      <h1 class="wordmark" id="hero-title">dotz</h1>
-      <p class="pitch">{{pitch}}</p>
-      <p class="hero-lede">{{lede}}</p>
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <h1 id="hero-title">{{pitch}}</h1>
+        <p class="hero-lede">{{lede}}</p>
+      </div>
 
-      <div class="install">
-        <div class="install-bar">
-          <div class="os-pick" role="group" aria-label="{{osGroup}}">
-            <button class="os" type="button" data-os="mac" aria-pressed="true">{{osMac}}</button>
-            <button class="os" type="button" data-os="windows" aria-pressed="false">{{osWin}}</button>
+      <div class="hero-act">
+        <div class="cmd">
+          <pre><code>curl -fsSL https://raw.githubusercontent.com/<wbr>ddotz/dotz/main/install.sh | sh</code></pre>
+          <div class="cmd-foot">
+            <span class="cmd-os">{{osLine}}</span>
+            <button class="copy" type="button" data-copy data-label="{{copy}}" data-copied="{{copied}}" data-fail="{{copyFail}}" data-done="{{copyDone}}">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <rect x="8.5" y="8.5" width="11" height="11" rx="2"></rect>
+                <path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"></path>
+              </svg>
+              <span class="copy-label">{{copy}}</span>
+            </button>
           </div>
-          <button class="copy" type="button" data-copy="curl -fsSL https://raw.githubusercontent.com/ddotz/dotz/main/install.sh | sh" data-label="{{copy}}" data-copied="{{copied}}" data-fail="{{copyFail}}" data-done="{{copyDone}}">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <rect x="8.5" y="8.5" width="11" height="11" rx="2"></rect>
-              <path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"></path>
-            </svg>
-            <span class="copy-label">{{copy}}</span>
-          </button>
         </div>
-        <pre><code>curl -fsSL https://raw.githubusercontent.com/ddotz/<wbr>dotz/main/install.sh | sh</code></pre>
-        <ol class="install-steps" id="install-windows" hidden>
-          <li>{{{win1}}}</li>
-          <li>{{{win2}}}</li>
-          <li>{{{win3}}}</li>
-        </ol>
-      </div>
-      <p class="visually-hidden" id="copy-status" aria-live="polite"></p>
 
-      <div class="cta-row">
-        <a class="btn btn-primary" href="/demo/">
-          {{ctaDemo}}
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M7.5 16.5 16.5 7.5"></path>
-            <path d="M9 7.5h7.5V15"></path>
-          </svg>
-        </a>
-        <a class="btn btn-secondary" href="https://github.com/ddotz/dotz">{{ctaGitHub}}</a>
+        <p class="hero-more">
+          <a href="/demo/">{{heroDemo}}<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.5 16.5 16.5 7.5"></path><path d="M9 7.5h7.5V15"></path></svg></a>
+        </p>
       </div>
-{{#demoNote}}      <p class="cta-note">{{demoNote}}</p>
-{{/demoNote}}
+
       <figure class="shot">
         <picture>
-          <source media="(max-width: 640px)" srcset="/img/web-phone.png" width="390" height="844">
-          <img src="/img/web-desktop.png" width="1440" height="900" fetchpriority="high" decoding="async" alt="{{heroAlt}}">
+          <img src="/img/web-phone.png" width="390" height="844" fetchpriority="high" decoding="async" alt="{{heroAlt}}">
         </picture>
         <div class="ss-slot" data-ss="hero" role="img" aria-label="{{heroAlt}}"></div>
       </figure>
     </div>
   </section>
 
-  <section class="section" id="usage" aria-labelledby="usage-title">
+  <section class="section band" id="more" aria-labelledby="more-title">
     <div class="wrap">
-      <div class="section-head">
-        <h2 id="usage-title">{{usageTitle}}</h2>
-      </div>
+      <h2 id="more-title">{{usageTitle}}</h2>
 
       <ul class="cards">
-        <li class="card card-scene">
-          <div class="card-demo" data-ss="mail" role="img" aria-label="{{c1Alt}}"></div>
-          <h3>{{c1Title}}</h3>
-          <p>{{c1Body}}</p>
-        </li>
-        <li class="card card-scene">
+        <li class="card">
           <div class="card-demo" data-ss="phone" role="img" aria-label="{{c2Alt}}"></div>
-          <h3>{{c2Title}}</h3>
-          <p>{{c2Body}}</p>
+          <div class="card-copy">
+            <h3>{{c2Title}}</h3>
+            <p>{{c2Body}}</p>
+            <p class="card-meta">{{c2Meta}}</p>
+          </div>
         </li>
-        <li class="card card-scene">
+        <li class="card">
           <div class="card-demo" data-ss="watch" role="img" aria-label="{{c3Alt}}"></div>
-          <h3>{{c3Title}}</h3>
-          <p>{{c3Body}}</p>
+          <div class="card-copy">
+            <h3>{{c3Title}}</h3>
+            <p>{{c3Body}}</p>
+            <p class="card-meta">{{c3Meta}}</p>
+          </div>
         </li>
       </ul>
+    </div>
+  </section>
+
+  <section class="section" id="app" aria-labelledby="app-title">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="app-title">{{appTitle}}</h2>
+        <p>{{appBody}}</p>
+      </div>
+
+      <div class="app-shot">
+        <iframe src="/demo/" title="{{appAlt}}" loading="lazy"></iframe>
+        <a class="app-open" href="/demo/" tabindex="-1" aria-hidden="true"></a>
+      </div>
+
+      <div class="app-foot">
+        <a class="btn btn-primary" href="/demo/">
+          {{appDemo}}
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7.5 16.5 16.5 7.5"></path><path d="M9 7.5h7.5V15"></path></svg>
+        </a>
+        <p class="note">{{appNote}}</p>
+      </div>
     </div>
   </section>
 
   <section class="section" id="why" aria-labelledby="why-title">
     <div class="wrap">
-      <div class="section-head">
-        <h2 id="why-title">{{whyTitle}}</h2>
-      </div>
+      <h2 id="why-title">{{whyTitle}}</h2>
 
-      <ul class="why">
-        <li>
-          <h3>{{w1Title}}</h3>
-          <p>{{w1Body}}</p>
-        </li>
-        <li>
-          <h3>{{w2Title}}</h3>
-          <p>{{w2Body}}</p>
-        </li>
-        <li>
-          <h3>{{w3Title}}</h3>
-          <p>{{w3Body}}</p>
-        </li>
-        <li>
-          <h3>{{w4Title}}</h3>
-          <p>{{w4Body}}</p>
-        </li>
-      </ul>
+      <div class="why-grid">
+        <dl class="facts">
+          <div>
+            <dt>{{w2Title}}</dt>
+            <dd>{{w2Body}}</dd>
+          </div>
+          <div>
+            <dt>{{w1Title}}</dt>
+            <dd>{{w1Body}}</dd>
+          </div>
+          <div>
+            <dt>{{w4Title}}</dt>
+            <dd>{{w4Body}}</dd>
+          </div>
+          <div>
+            <dt>{{w5Title}}</dt>
+            <dd>{{{w5Body}}}</dd>
+          </div>
+        </dl>
+
+        <figure class="tree">
+          <ul>
+            <li class="tree-root"><code>~/.dotz</code></li>
+            <li><code>config.json</code><span>{{t1}}</span></li>
+            <li><code>secrets/</code><span>{{t2}}</span></li>
+            <li><code>identity/</code><span>{{t3}}</span></li>
+            <li><code>memory/</code><span>{{t4}}</span></li>
+            <li><code>RULES.md</code><span>{{t5}}</span></li>
+          </ul>
+          <figcaption>{{treeCaption}}</figcaption>
+        </figure>
+      </div>
     </div>
   </section>
 
-  <section class="section" id="messengers" aria-labelledby="messengers-title">
+  <section class="section" id="install" aria-labelledby="install-title">
     <div class="wrap">
-      <div class="section-head">
-        <h2 id="messengers-title">{{connTitle}}</h2>
-      </div>
+      <div class="start">
+        <h2 id="install-title">{{installTitle}}</h2>
 
-      <ul class="links">
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9.5 4 7.5 20"></path><path d="M16.5 4l-2 16"></path><path d="M4.5 9h16"></path><path d="M3.5 15h16"></path></svg>Discord</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="7" y="2.8" width="10" height="18.4" rx="2.2"></rect><path d="M11 18h2"></path></svg>{{connWeb}}</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.5 3.5 10 14"></path><path d="M20.5 3.5 14 20.5l-4-6.5-6.5-4z"></path></svg>Telegram</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 1.5H5z"></path><path d="M10 20h4"></path></svg>Slack</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 6.5c0-1 .8-1.8 1.8-1.8h11.4c1 0 1.8.8 1.8 1.8v8c0 1-.8 1.8-1.8 1.8H10l-4.2 3.2v-3.2h0c-.7 0-1.3-.8-1.3-1.8z"></path></svg>{{connJandi}}</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="5.5" width="17" height="13" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg>{{connMail}}</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5.5" width="18" height="13" rx="3"></rect><path d="m10.5 9.5 4 2.5-4 2.5z"></path></svg>{{connYt}}</li>
-        <li><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.8 12S6.3 5.8 12 5.8 21.2 12 21.2 12 17.7 18.2 12 18.2 2.8 12 2.8 12Z"></path><circle cx="12" cy="12" r="3.2"></circle></svg>{{connComments}}</li>
-      </ul>
+        <div class="start-main">
+          <div class="cmd">
+            <pre><code>curl -fsSL https://raw.githubusercontent.com/<wbr>ddotz/dotz/main/install.sh | sh</code></pre>
+            <div class="cmd-foot">
+              <span class="cmd-os">{{osLine}}</span>
+              <button class="copy" type="button" data-copy data-label="{{copy}}" data-copied="{{copied}}" data-fail="{{copyFail}}" data-done="{{copyDone}}">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <rect x="8.5" y="8.5" width="11" height="11" rx="2"></rect>
+                  <path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"></path>
+                </svg>
+                <span class="copy-label">{{copy}}</span>
+              </button>
+            </div>
+          </div>
+
+          <details class="win">
+            <summary>{{winSummary}}</summary>
+            <ol>
+              <li>{{{win1}}}</li>
+              <li>{{{win2}}}</li>
+              <li>{{{win3}}}</li>
+            </ol>
+          </details>
+{{#setupNote}}          <p class="note">{{setupNote}}</p>
+{{/setupNote}}        </div>
+
+        <ol class="steps">
+          <li>{{s1}}</li>
+          <li>{{s2}}</li>
+          <li>{{s3}}</li>
+        </ol>
+      </div>
     </div>
   </section>
 </main>
+<p class="visually-hidden" id="copy-status" aria-live="polite"></p>
 
 <footer class="site-footer">
   <div class="wrap footer-inner">

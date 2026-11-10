@@ -7,14 +7,7 @@ export type Strings = {
   actions: { send: string; edit: string; skip: string; sent: string }
   tags: { review: string; sent: string }
   hero: {
-    nav: [home: string, chat: string, projects: string, monitoring: string, settings: string]
-    usage: string
-    usageValue: string
-    title: string
-    command: string
-    idle: string
     ask: string[]
-    askAt: string
     ack: string[]
     ackAt: string
     mail: string
@@ -26,7 +19,6 @@ export type Strings = {
     sentAt: string
     composer: string
   }
-  mail: { chip: string[]; summary: string[]; draftTitle: string; draftBody: string[]; at: string }
   phone: { time: string; ask: string; busy: string; reply: string; events: [string, string][] }
   watch: {
     item: string
@@ -47,14 +39,7 @@ const en: Strings = {
   actions: { send: 'Send', edit: 'Edit', skip: "Don't send", sent: 'Sent' },
   tags: { review: 'Needs review', sent: 'Sent' },
   hero: {
-    nav: ['Home', 'Chat', 'Projects', 'Monitoring', 'Settings'],
-    usage: 'Usage',
-    usageValue: '7d 18%',
-    title: 'Chat',
-    command: 'Command',
-    idle: 'Idle',
     ask: ['When a new mail arrives,', 'summarize it and draft a reply'],
-    askAt: '9:12 AM',
     ack: ['Got it.', "I'll always ask before sending."],
     ackAt: '9:12 AM',
     mail: "New mail · Emily Carter · Next week's shoot",
@@ -65,13 +50,6 @@ const en: Strings = {
     dock: ['Send this reply', 'to Emily Carter?'],
     sentAt: '9:42 AM',
     composer: 'Send a message',
-  },
-  mail: {
-    chip: ['New mail · Emily Carter', '· Shoot dates'],
-    summary: ['A mail asking whether', 'Tuesday afternoon works for the shoot.'],
-    draftTitle: 'Reply draft',
-    draftBody: ['Tuesday at 2 PM works.'],
-    at: 'Just now',
   },
   phone: {
     time: '8:30',
@@ -99,14 +77,7 @@ const ko: Strings = {
   actions: { send: '보내기', edit: '고치기', skip: '보내지 않기', sent: '보냈어요' },
   tags: { review: '확인 필요', sent: '보냈어요' },
   hero: {
-    nav: ['홈', '채팅', '프로젝트', '모니터링', '설정'],
-    usage: '사용량',
-    usageValue: '7일 18%',
-    title: '채팅',
-    command: '명령',
-    idle: '대기',
     ask: ['새 메일이 오면', '요약하고 답장 초안 써 줘'],
-    askAt: '오전 9:12',
     ack: ['알겠어요.', '보내기 전에 꼭 물어볼게요.'],
     ackAt: '오전 9:12',
     mail: '새 메일 · 한지우 · 다음 주 촬영 일정',
@@ -117,13 +88,6 @@ const ko: Strings = {
     dock: ['한지우 님께', '이 답장을 보낼까요?'],
     sentAt: '오전 9:42',
     composer: '메시지 보내기',
-  },
-  mail: {
-    chip: ['새 메일 · 한지우', '· 다음 주 촬영 일정'],
-    summary: ['화요일 오후에', '촬영이 되는지 묻는 메일이에요.'],
-    draftTitle: '답장 초안',
-    draftBody: ['화요일 오후 2시 좋아요.'],
-    at: '방금',
   },
   phone: {
     time: '8:30',
@@ -151,14 +115,7 @@ const ja: Strings = {
   actions: { send: '送信', edit: '編集', skip: '送信しない', sent: '送信しました' },
   tags: { review: '確認待ち', sent: '送信済み' },
   hero: {
-    nav: ['ホーム', 'チャット', 'プロジェクト', 'モニタリング', '設定'],
-    usage: '使用量',
-    usageValue: '7日 18%',
-    title: 'チャット',
-    command: 'コマンド',
-    idle: '待機中',
     ask: ['新しいメールが届いたら、', '要約して返信の下書きを書いて'],
-    askAt: '午前9:12',
     ack: ['わかりました。', '送る前に必ず確認しますね。'],
     ackAt: '午前9:12',
     mail: '新着メール · 佐藤 美咲 · 来週の撮影日程',
@@ -169,13 +126,6 @@ const ja: Strings = {
     dock: ['この返信を', '佐藤 美咲さんに送りますか？'],
     sentAt: '午前9:42',
     composer: 'メッセージを送信',
-  },
-  mail: {
-    chip: ['新着メール · 佐藤 美咲', '· 来週の撮影日程'],
-    summary: ['火曜の午後に', '撮影できるかを尋ねるメールです。'],
-    draftTitle: '返信の下書き',
-    draftBody: ['火曜の午後2時で大丈夫です。'],
-    at: 'たった今',
   },
   phone: {
     time: '8:30',
@@ -203,14 +153,7 @@ const zhCN: Strings = {
   actions: { send: '发送', edit: '修改', skip: '不发送', sent: '已发送' },
   tags: { review: '待确认', sent: '已发送' },
   hero: {
-    nav: ['首页', '聊天', '项目', '监控', '设置'],
-    usage: '用量',
-    usageValue: '7 天 18%',
-    title: '聊天',
-    command: '命令',
-    idle: '待命',
     ask: ['来新邮件时，', '帮我总结并起草回复'],
-    askAt: '上午9:12',
     ack: ['好的。', '发送之前我一定会先问你。'],
     ackAt: '上午9:12',
     mail: '新邮件 · 林悦 · 下周拍摄安排',
@@ -221,13 +164,6 @@ const zhCN: Strings = {
     dock: ['要把这封回复', '发给林悦吗？'],
     sentAt: '上午9:42',
     composer: '发送消息',
-  },
-  mail: {
-    chip: ['新邮件 · 林悦', '· 下周拍摄安排'],
-    summary: ['这封邮件问', '周二下午能不能拍摄。'],
-    draftTitle: '回复草稿',
-    draftBody: ['周二下午两点可以。'],
-    at: '刚刚',
   },
   phone: {
     time: '8:30',
@@ -255,14 +191,7 @@ const es: Strings = {
   actions: { send: 'Enviar', edit: 'Editar', skip: 'No enviar', sent: 'Enviado' },
   tags: { review: 'Por revisar', sent: 'Enviado' },
   hero: {
-    nav: ['Inicio', 'Chat', 'Proyectos', 'Supervisión', 'Ajustes'],
-    usage: 'Uso',
-    usageValue: '7 d 18 %',
-    title: 'Chat',
-    command: 'Comandos',
-    idle: 'En espera',
     ask: ['Cuando llegue un correo nuevo,', 'resúmelo y escribe un borrador de respuesta'],
-    askAt: '9:12',
     ack: ['Entendido.', 'Siempre te preguntaré antes de enviar.'],
     ackAt: '9:12',
     mail: 'Correo nuevo · Lucía Fernández · Rodaje de la próxima semana',
@@ -273,13 +202,6 @@ const es: Strings = {
     dock: ['¿Enviar esta respuesta', 'a Lucía Fernández?'],
     sentAt: '9:42',
     composer: 'Enviar un mensaje',
-  },
-  mail: {
-    chip: ['Correo nuevo · Lucía Fernández', '· Rodaje'],
-    summary: ['Un correo que pregunta', 'si el martes por la tarde va bien para el rodaje.'],
-    draftTitle: 'Borrador de respuesta',
-    draftBody: ['El martes a las 14:00 me va bien.'],
-    at: 'Ahora',
   },
   phone: {
     time: '8:30',

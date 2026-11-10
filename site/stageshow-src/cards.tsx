@@ -2,17 +2,14 @@ import type { ReactNode } from 'react'
 import { Stage } from './kit/stage'
 import { Phone } from './kit/phone'
 import { Collapse } from './kit/motion/Collapse'
-import { Icon } from './kit/parts/Icon'
 import { Spinner } from './kit/parts/Spinner'
 import type { Act } from './kit/act'
-import { AppMark, DraftActions, P, useDark } from './shared'
+import { AppMark, P, useDark } from './shared'
 import { strings } from './strings'
 import './cards.css'
 
-// Three looping examples for the 이렇게 써요 section, each one beat of the
-// product: a mail becomes a draft that waits for 보내기, a phone message comes
-// back with its answer, a watched price drops and a notice lands. No cursor:
-// the system acts on its own, and nothing here presses 보내기 for the owner.
+// Two looping examples for the page's second section, each one beat of the product: a phone message comes
+// back with its answer, a watched price drops and a notice lands. No cursor: the system acts on its own.
 // Every script closes what it opened (newest first), so a loop seams on initial.
 
 function CardStage<S extends object>({ name, initial, poster, script, bare, children }: {
@@ -39,63 +36,6 @@ function CardStage<S extends object>({ name, initial, poster, script, bare, chil
     >
       {(s) => <div className={`cz-panel${bare ? ' cz-panel--bare' : ''}`}>{children(s)}</div>}
     </Stage>
-  )
-}
-
-type Mail = { mail: boolean; summary: boolean; draft: boolean; wait: boolean }
-
-export function MailScene() {
-  const t = strings().mail
-  const { tags } = strings()
-  return (
-    <CardStage<Mail>
-      name="mail"
-      initial={{ mail: false, summary: false, draft: false, wait: false }}
-      poster={{ mail: true, summary: true, draft: true, wait: true }}
-      script={async (a) => {
-        await a.wait(500)
-        a.put({ mail: true })
-        await a.wait(900)
-        a.put({ summary: true })
-        await a.wait(1000)
-        a.put({ draft: true })
-        await a.wait(800)
-        a.put({ wait: true })
-        await a.wait(3200)
-        a.put({ wait: false, draft: false })
-        await a.wait(70)
-        a.put({ summary: false })
-        await a.wait(70)
-        a.put({ mail: false })
-        await a.wait(600)
-      }}
-    >
-      {(s) => (
-        <>
-          <Collapse open={s.mail} reveal="drop" from="below">
-            <div className="cz-chip"><Icon name="mail" size={13} /><span className="cz-chip__t">{t.chip.join(' ')}</span></div>
-          </Collapse>
-          <Collapse open={s.summary} reveal="drop" from="below">
-            <div className="cz-head">
-              <AppMark size={22} />
-              <P className="cz-text">{t.summary}</P>
-            </div>
-          </Collapse>
-          <Collapse open={s.draft} reveal="drop" from="below">
-            <div className="dz-draft cz-draft" data-wait={s.wait || undefined}>
-              <div className="dz-draft__hd">
-                <span className="dz-draft__title">{t.draftTitle}</span>
-                <span className="dz-tag dz-tag--warn">{tags.review}</span>
-              </div>
-              <div className="dz-draft__body">
-                <P>{t.draftBody}</P>
-              </div>
-              <DraftActions send="idle" at={t.at} />
-            </div>
-          </Collapse>
-        </>
-      )}
-    </CardStage>
   )
 }
 

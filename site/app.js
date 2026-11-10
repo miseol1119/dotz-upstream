@@ -1,38 +1,28 @@
-const copyButton = document.querySelector("[data-copy]");
-const copyLabel = copyButton ? copyButton.querySelector(".copy-label") : null;
 const copyStatus = document.getElementById("copy-status");
 
-if (copyButton && copyLabel && copyStatus) {
-  const { label, copied, fail, done } = copyButton.dataset;
+document.querySelectorAll("[data-copy]").forEach((button) => {
+  const copyLabel = button.querySelector(".copy-label");
+  const command = button.closest(".cmd").querySelector("code").textContent;
+  const { label, copied, fail, done } = button.dataset;
   let resetTimer;
 
-  copyButton.addEventListener("click", async () => {
+  button.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(copyButton.dataset.copy);
+      await navigator.clipboard.writeText(command);
     } catch {
       copyStatus.textContent = fail;
       return;
     }
 
     copyLabel.textContent = copied;
-    copyButton.dataset.state = "copied";
+    button.dataset.state = "copied";
     copyStatus.textContent = done;
 
     clearTimeout(resetTimer);
     resetTimer = setTimeout(() => {
       copyLabel.textContent = label;
-      delete copyButton.dataset.state;
+      delete button.dataset.state;
     }, 2400);
-  });
-}
-
-const osButtons = document.querySelectorAll("[data-os]");
-const windowsSteps = document.getElementById("install-windows");
-
-osButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    osButtons.forEach((other) => other.setAttribute("aria-pressed", String(other === button)));
-    windowsSteps.hidden = button.dataset.os !== "windows";
   });
 });
 
