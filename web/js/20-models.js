@@ -50,14 +50,14 @@ function modelItems(key, curModel, filter = providerFilter) {
   return items;
 }
 // PUT /api/models for one target (the 모델 view and the 홈 card menus share it); confirms first when `confirmText` is set and again when the cache would be rewritten.
-async function putModel(key, title, change, confirmText, label) {
+async function putModel(key, change, confirmText, label) {
   const body = { target: key, ...change };
-  if (confirmText && !await ask(title, `${confirmText}\n${label}`, "적용")) return false;
+  if (confirmText && !await ask("모델 설정을 적용할까요?", `${confirmText}\n${label}`, "적용")) return false;
   let r;
   try { r = await api("/api/models", "PUT", body); }
   catch (e) {
     if (!(e.data && e.data.requires_force)) throw e;
-    if (!await ask(title, `캐시가 다시 쓰여요 · 컨텍스트 ${num(e.data.context_tokens)} 토큰\n${label}`, "적용")) return false;
+    if (!await ask("모델 설정을 적용할까요?", `캐시가 다시 쓰여요 · 컨텍스트 ${num(e.data.context_tokens)} 토큰\n${label}`, "적용")) return false;
     r = await api("/api/models", "PUT", { ...body, force: true });
   }
   delete pending[key];
@@ -91,7 +91,7 @@ function targetEdit(key, title, cur, confirmText, extra = {}) {
     const change = {};
     if (p.model != null && p.model !== cur.model) change.model = p.model;
     if (p.thinking != null && p.thinking !== cur.thinking) change.thinking = p.thinking;
-    await putModel(key, title, change, confirmText, `${modelName(model)} · ${thinkKo(thinking)}`);
+    await putModel(key, change, confirmText, `${modelName(model)} · ${thinkKo(thinking)}`);
   }) }, "적용");
   const pick = el("div", { class: "mt-pick" }, el("div", { class: "mt-model" }, modelField), el("div", { class: "mt-eff" }, effField));
   const notes = [

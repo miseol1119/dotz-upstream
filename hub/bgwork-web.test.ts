@@ -118,7 +118,7 @@ test("홈: a session the run line calls 진행 중 (waiting on its own worker) i
 		expect(await v.evaluate(`document.querySelector('#v-home [data-t="lane:bgw"] .hs').textContent`)).toMatch(/째$|^방금 시작$/);
 		expect(await v.evaluate(`document.querySelector('#v-home [data-t="lane:bgw"]').getAttribute("aria-label")`)).toContain("진행 중");
 		expect(s.waiting).toBeUndefined();
-		expect(await v.evaluate(`document.querySelector('#v-home .card:has([data-k="running"]) .hc-n').textContent`)).toBe("1개 작업 중");
+		expect(await v.evaluate(`document.querySelector('#v-home .card:has([data-k="running"]) .hc-n').textContent`)).toBe("1개");
 	} finally {
 		LANES.pop();
 	}

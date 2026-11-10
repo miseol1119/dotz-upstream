@@ -100,7 +100,7 @@ function updateHints() {
   const list = el("div", { class: "sl-list", role: "listbox", id: "sl-list" }, ...items.map((it, i) => {
     const b = el("button", { type: "button", role: "option", class: "sl-i", id: `sl-${i}`, tabindex: "-1" },
       it.kind === "cmd"
-        ? [el("span", { class: "c", text: it.x.c }), (it.x.args || []).length ? el("span", { class: "ar", text: it.x.args.map(x => x.opt ? `[${x.n}]` : `<${x.n}>`).join(" ") }) : null, el("span", { class: "d", text: it.x.d })]
+        ? [el("span", { class: "c", text: it.x.c }), (it.x.args || []).length ? el("span", { class: "ar" }, ...it.x.args.map(x => el("span", { class: "sl-a", text: `${x.n}${x.opt ? "?" : ""}` }))) : null, el("span", { class: "d", text: it.x.d })]
         : it.kind === "mn" ? [el("span", { class: "c", text: `@${it.it.label}` }), el("span", { class: "d", text: it.it.sub })]
         : [el("span", { class: "c", text: it.val }), it.lab ? el("span", { class: "d", text: it.lab }) : null]);
     // Taps and clicks must not take focus from the textarea (the phone keyboard stays up).

@@ -255,7 +255,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 홈 지금 진행 중 (카드 `now:running`)
 - 목적: 지금 돌고 있는 것만 보여요: 세션 턴, 앱 대화의 작업, 백그라운드 작업, 한도 리셋을 기다리는 작업.
-- 구성: 카드 머리(`지금 진행 중`, 개수 `{n}개 작업 중`)와 `.hn[data-k=running]`. 세션은 `sessionsNow`가 정해요: 답을 기다리는 세션이 맨 위(`답을 기다림`), 나머지는 오래된 순서이고 행 이름은 `프로젝트 · 제목`이에요. 저장해 둔 상태(`S.seeded`)로는 아무것도 올리지 않아요. 행 종류는 (1) 세션/어시스턴트 행(`homeNowRow`), (2) 앱 대화 행(`homeConvRow`), (3) 백그라운드 작업 행(`workRow`), (4) 한도 대기 행(`homeLimitRow`).
+- 구성: 카드 머리(`지금 진행 중`, 개수 `{n}개`)와 `.hn[data-k=running]`. 세션은 `sessionsNow`가 정해요: 답을 기다리는 세션이 맨 위(`답을 기다림`), 나머지는 오래된 순서이고 행 이름은 `프로젝트 · 제목`이에요. 저장해 둔 상태(`S.seeded`)로는 아무것도 올리지 않아요. 행 종류는 (1) 세션/어시스턴트 행(`homeNowRow`), (2) 앱 대화 행(`homeConvRow`), (3) 백그라운드 작업 행(`workRow`), (4) 한도 대기 행(`homeLimitRow`).
 - 기능: 어시스턴트 행은 `openTarget(t, lastChatView())`로 대화 열기. 세션 행은 `sessionRow`(아래 세션 행 항목). 앱 대화 행은 `go("chat", target)`. 작업 행은 `workGo`(진행 중이면 대화로, 끝났으면 결과 메시지로). 새로 생기는 행은 위에서 올라오는 모션(`motionIn`).
 - 상태: 비어 있으면 `진행 중인 작업이 없어요`. 행 미리보기 우선순위: 답변 필요일 때 질문 문구, 런 상태 줄(`runText`), 최신 활동 줄(`nowLine`), 모델 칩, 상태 단어. 서브에이전트가 있으면 `서브에이전트 {끝남}/{전체}`(title `서브에이전트 끝난 수 / 전체`). 폴백 모델이면 세션 행에 모델과 폴백 태그. 앱 대화 행 상태 `작업 중` 또는 `진행 중`, aria-label `{이름} · {상태} · 대화 열기`. 한도 대기 행: 배지 `한도 리셋되면 재개 ({HH:MM})`, 시각을 못 읽으면 `한도 리셋되면 재개`. 방금 끝난 작업은 `HC_KEEP`=6초 동안 이 카드에 `완료`로 남았다가 모션(`motionSwap`)으로 최근 끝난 작업으로 가요.
 - 데이터: `S.orchestrator`, `S.lanes`, `S.runs`, `S.work`, `S.convs`, `S.deferred`, `SUBS`, `LAST`(세션별 마지막 활동 줄), `GET /api/activity?source=lane:{name}&limit=30`(처음 한 번), `S.work_skew`.
@@ -454,8 +454,8 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 대화 머리와 앱바 (대화 화면 상단)
 - 목적: 열린 대화의 이름, 상태, 그 대화의 동작(세션 메뉴, 프로젝트 메뉴, 설정 앱 더보기)을 보여 줘요.
-- 구성: 넓은 화면은 `#cv-head.cv-head`(`.cv-hd-b`의 `.cv-hd-t` 제목 + `.cv-hd-s` 상태, 오른쪽 `.cv-hd-a` 동작). 폰은 앱바 `#title`에 대화 이름, `#back` 뒤로, `#cvmenu`(세션 메뉴), `#pjmenu`(프로젝트 메뉴). 모니터링에서 연 대화(`monCtx`)는 아바타+이름+상태 줄 형태에 `← 목록으로`(`.cv-up`)가 앞에 붙어요.
-- 기능: `← 목록으로`(aria `목록으로`)는 `go("monitoring", MON.sel)`. 세션 메뉴 `button.cvmenu`(aria `세션 메뉴`)는 `homeMenu`를 열어요. 프로젝트 메뉴는 `pmMenuButton`. 설정 대화는 `asMoreBtn`. 알림 종은 `#bell`(title `알림 (⌘/)` 또는 `알림 (Ctrl+/)`)이 `nscGo`로 알림 화면을 열어요.
+- 구성: 넓은 화면은 `#cv-head.cv-head`(`.cv-hd-b`의 `.cv-hd-t` 제목 + `.cv-hd-s` 상태, 오른쪽 `.cv-hd-a` 동작). 폰은 앱바 `#title`에 대화 이름, `#back` 뒤로, `#cvmenu`(세션 메뉴), `#pjmenu`(프로젝트 메뉴). 모니터링에서 연 대화(`monCtx`)는 아바타+이름+상태 줄 형태예요. 넓은 화면의 뒤로 화살표는 앱바의 `‹ 모니터링`(`#back.mon-up`) 하나뿐이에요.
+- 기능: 앱바의 `‹ 모니터링`(`#back`, aria `모니터링 목록으로`)은 보던 목록(`MON.sel`)으로 돌아가요. 세션 메뉴 `button.cvmenu`(aria `세션 메뉴`)는 `homeMenu`를 열어요. 프로젝트 메뉴는 `pmMenuButton`. 설정 대화는 `asMoreBtn`. 알림 종은 `#bell`(title `알림 (⌘/)` 또는 `알림 (Ctrl+/)`)이 `nscGo`로 알림 화면을 열어요.
 - 상태: 상태 줄 문구는 `알림`=`경고와 결정 요청`, `작업 기록`=`야간 정리와 세션 진행 기록`(`FIXED_DESC`), 메일 대화는 보낸 사람 또는 `메일`, 설정 대화는 `말로 설정을 바꾸고 적용을 눌러요`, 살아 있는 세션은 `statusKo(status)`, 종료된 세션은 `종료됨`. 알림 대화(`target==="alert"`)는 `#v-chat.no-composer`로 입력창이 사라져요. 폰에서 대화 안(`convOnPhone`)일 때만 `#cvmenu`/`#pjmenu`가 보이고 앱바는 `back`/`cvconv` 클래스를 가져요. 넓은 화면의 모니터링 대화는 `#back`이 `‹ 모니터링 목록으로`(aria `모니터링 목록으로`) 모양(`mon-up`)이에요. 미디어쿼리 변화(`max-width:1099px`)에서 `convChrome`이 다시 그려요.
 - 데이터: 읽는 것은 `targetInfo`, `MAILS`, `S.lanes` 등 메모리 상태뿐이에요. 프로젝트 대화면 `prjLoad`(프로젝트 목록)를 한 번 불러와요.
 - 근거: web/js/31-conversations.js:366(convPaintHead), :383-390(메뉴 버튼), :418(convOnPhone), :419(convTitle), :429(convChrome), :447(미디어쿼리 리스너), :456-460(종).
@@ -517,7 +517,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 슬래시 명령 및 @멘션 메뉴
 - 목적: 입력창에서 `/`나 `@`를 치면 입력창 위에 명령/인자/진행 중 작업 후보를 보여 줘요(디스코드식).
-- 구성: `div#hints.hintrow` 안에 인자 칩 줄 `.sl-args`(`.sl-c`, `.sl-a`), 머리 `.sl-hd`, 목록 `.sl-list[role=listbox]`의 `button.sl-i`(`.c`, `.ar`, `.d`).
+- 구성: `div#hints.hintrow` 안에 인자 칩 줄 `.sl-args`(`.sl-c`, `.sl-a`), 머리 `.sl-hd`, 목록 `.sl-list[role=listbox]`의 `button.sl-i`(`.c`, `.ar`, `.d`). 목록 줄의 인자(`.ar`)는 인자마다 칩 `.sl-a` 하나이고, 없어도 되는 인자는 이름 끝에 `?`가 붙어요.
 - 기능: ↑↓ 이동, Tab/Enter 선택, Esc 닫기(`SL.hide`로 같은 글에서는 다시 안 열려요), 탭/클릭은 포커스를 안 뺏어요. 명령 단계(`/` 시작)는 접두 일치 먼저, 포함 일치 뒤. 명령 뒤 공백이면 그 인자 후보(`opts()`)를 라이브 상태에서 만들고 선택 시 `/cmd 값 `으로 채워요. `@` 후보는 `mnItems()`(백그라운드 작업, 진행 중 대화+그 작업, 살아 있는 세션)이고 선택하면 `@제목 `이 들어가고 전송 시 남아 있는 토큰만 `refs`로 가요(`mnRefs`).
 - 상태: 명령 목록(`CMDS`): `/status` 봇·세션·Discord 상태와 컨텍스트, `/context` 프로세스별 컨텍스트 사용량과 압축 상태, `/compact` 컨텍스트 압축 (작업 중이면 끝난 뒤), `/lanes` 세션마다 상태·모델·폴더, `/model` 모델 보기, 또는 대상의 모델 바꾸기, `/effort` 추론 강도 바꾸기, `/restart` 에이전트 재시작 · 게이트웨이는 전체 재시작, `/stop` 세션 멈추기 (나중에 다시 시작할 수 있어요), `/resume` 멈춘 세션 이어가기, 실행 중이면 메시지 보내기, `/abort` 지금 하는 일 취소 (비우면 봇), `/providers` 로그인·API 키·공급자별 모델, `/login` 공급자 로그인 (링크가 열려요), `/logout` 공급자 로그아웃, `/quota` 공급자·모델별 사용 한도, `/terminal` 이 컴퓨터 터미널에서 명령 실행, `/screen` 이 컴퓨터 화면 열기(`S.desk`가 있을 때만), `/help` 명령 전체 설명. 머리 문구: 명령 단계 `명령`(봇 이름+로고), 멘션 `지금 진행 중 · 골라서 지칭하기`, 인자 `${인자명}`(선택이면 ` · 비워도 돼요`). 선택 인자는 미리 선택되지 않아 Enter가 입력 그대로 전송해요. 모델 후보에서 Haiku, Fable, 날짜 붙은 스냅샷은 빼요. 폰(`max-width:639px`)은 항목 높이 44px, 인자 표기(`.ar`) 숨김. 후보가 없으면 메뉴가 닫혀요. 자유 입력 인자(`free`)는 후보 없이 닫혀요.
 - 데이터: 후보는 상태(`S.lanes`, `M.available`, `P.providers`, `S.convs`)에서 만들어요. 실행은 `POST /api/command {text}`(성공하면 `/model|effort|compact|restart|resume|stop|abort`일 때 `refreshState`, `loadModels`, `loadContext`).
@@ -770,7 +770,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 팝오버 메뉴 (showMenu)
 - 목적: 모든 드롭다운/선택 메뉴 하나의 컴포넌트예요.
-- 구성: `div.menu[role=listbox]`(폰 시트형은 `.msheet`), 항목 `button.mi`(체크 `.ck`, 점 `.dot`, 라벨 `.ml` + 보조 `small`, 플래그 `.sb.warn`, 배지 `.nb`), 머리 `.mh`, 접힘 행 `.mi.more`.
+- 구성: `div.menu[role=listbox]`(폰 시트형은 `.msheet`), 항목 `button.mi`(체크 `.ck`, 점 `.dot`, 라벨 `.ml` + 보조 `small`, 플래그 `.sb.warn`, 배지 `.nb`), 머리 `.mh`, 접힘 행 `.mi.more`. 폰 시트형은 누른 단추 위로 열리고, 단추가 화면 위쪽(앱바)에 있어 위에 자리가 없으면 그 단추 아래로 열려요.
 - 기능: 같은 앵커를 다시 누르면 닫기. ↑↓/Home/End 이동, Esc, Tab 닫기, 글자 입력으로 라벨 접두 이동(700ms), 바깥 포인터다운/앵커를 움직이는 스크롤/리사이즈로 닫기. 열릴 때 선택된 항목에 포커스+스크롤. `fold` 항목은 누르면 그 자리에서 펼쳐져요. 선택은 메뉴를 닫은 뒤 `onPick(value)`. 보조 컨트롤 `selectField`(라벨+선택 버튼), `textField`, `input`.
 - 상태: 선택된 항목은 체크(`sel-on`, `aria-selected`), 들여쓰기 `ind`. 터치(`pointer:coarse`)는 항목 높이 40px.
 - 데이터: 없음.
@@ -1427,7 +1427,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 열린 메일 상단 도구줄 (mtop)
 - 목적: 메일 대화 화면 맨 위에서 열린 메일의 동작을 전부 한 줄 아이콘으로 해요. 동작마다 한 번씩이고 ⋯ 메뉴는 없어요.
-- 구성: `.mtop`(role=toolbar, aria-label `메일 처리`) 안에 아이콘 버튼 `.ib.mtop-b`: 보관(또는 받은편지함으로), 삭제, 읽음/안 읽음, 답장, 전체답장, 전달(`.mbox-mode`), 초안 작성(`mailDraftButton`, 받은 메일만), 답장 안 함/답장 필요로 표시(`mailFyiBtn`, 받은 메일만), 원문 보기/접기(`mailRawBtn`). 호출처 web/js/11-todo-strip.js:241(카드 앞에 prepend). 돌아가기는 머리의 `#back`과 `.cv-up`이 맡아요. 폰에서는 아홉 개가 `.ib` 터치 크기 36px로 들어가요.
+- 구성: `.mtop`(role=toolbar, aria-label `메일 처리`) 안에 아이콘 버튼 `.ib.mtop-b`: 보관(또는 받은편지함으로), 삭제, 읽음/안 읽음, 답장, 전체답장, 전달(`.mbox-mode`), 초안 작성(`mailDraftButton`, 받은 메일만), 답장 안 함/답장 필요로 표시(`mailFyiBtn`, 받은 메일만), 원문 보기/접기(`mailRawBtn`). 호출처 web/js/11-todo-strip.js:241(카드 앞에 prepend). 돌아가기는 앱바의 `#back`이 맡아요. 폰에서는 아홉 개가 `.ib` 터치 크기 36px로 들어가요.
 - 기능:
   - 보관/받은편지함으로: 보관된 메일이면 `받은편지함으로`(unarchive), 아니면 `보관`(archive). `mbRun`.
   - `삭제`: `mbTrash([t])`.
@@ -1963,7 +1963,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 전환 규칙 대화창 (`rulesDialog`)
 - 목적: 계정 자동 전환 규칙(요일, 시간, 조건, 동작)을 폼 또는 JSON으로 고쳐요.
-- 구성: 넓은 대화창 `전환 규칙`: 규칙 카드마다 이름 입력(placeholder `규칙 {n} 이름 (선택)`), `위로` `아래로` `삭제`, `요일 (선택)` 칩(월~일), `시간 (선택)` 시작 ~ 끝, `조건` 드롭다운(`없음` `5시간 남은 % 밑` `주간 남은 % 밑` `한도 걸림` `로그인 풀림` `특정 계정 못 씀`)과 값, `동작` 드롭다운(`계정 고정` `순서대로 우선` `자동`)과 계정 선택/칩, 하단 `규칙 추가`. 버튼 `취소` / `JSON으로 편집`(또는 `폼으로 보기`) / `저장`.
+- 구성: 넓은 대화창 `전환 규칙`: 규칙 카드마다 이름 입력(placeholder `규칙 {n} 이름 (선택)`), `위로` `아래로` `삭제`(한 묶음 `.rl-ord`), `요일 (선택)` 칩(월~일, `.rl-days`. 폰에서는 일곱 개가 같은 폭으로 한 줄), `시간 (선택)` 시작 ~ 끝, `조건` 드롭다운(`없음` `5시간 남은 % 밑` `주간 남은 % 밑` `한도 걸림` `로그인 풀림` `특정 계정 못 씀`)과 값, `동작` 드롭다운(`계정 고정` `순서대로 우선` `자동`)과 계정 선택/칩, 하단 `규칙 추가`. 버튼 `취소` / `JSON으로 편집`(또는 `폼으로 보기`) / `저장`.
 - 기능: 저장 `PUT /api/accounts/rules` `{rules}`.
 - 상태: 규칙이 없으면 `규칙이 없어요. 계정이 막힐 때만 자동으로 바꿔요.` 조건이 여러 개인 규칙은 `조건이 여러 개예요. 모두 바꾸려면 채팅에서 말해 주세요.` JSON 모드에서 잘못된 입력은 토스트 `JSON 모양이 맞지 않아요`. 성공 토스트 `규칙을 저장했어요`.
 - 데이터: `PUT /api/accounts/rules`.
@@ -2210,7 +2210,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 컴퓨터 전환 시트 (내 컴퓨터)
 - 목적: 한 사람의 게이트웨이들(맥북, 맥미니 등)을 오가요. 컴퓨터가 2대 이상일 때만 켜져요(`prTrig`).
-- 구성: `.ds-bd`(+넓은 화면 `.anch`) 안 `.ds-sheet.pr-sheet[role=dialog]`: 머리 `.pr-hd#pr-t` `내 컴퓨터`, `.pr-list`에 컴퓨터마다 `button.pr-row`(상태 점 `.dot`, 이름 `.pr-t`, 한 줄 `.pr-sub`, 오른쪽 체크 `.pr-ck` 또는 대기 수 `.pr-n`), 이어서 `화면 공유 열기`(`S.desk`일 때, `.pr-screen`), `컴퓨터 관리`(`.pr-manage`, 설정으로).
+- 구성: `.ds-bd`(+넓은 화면 `.anch`) 안 `.ds-sheet.pr-sheet[role=dialog]`: 머리 `.pr-hd#pr-t` `내 컴퓨터`, `.pr-list`에 컴퓨터마다 `button.pr-row`(상태 점 `.dot`, 이름 `.pr-t`, 한 줄 `.pr-sub`, 오른쪽 체크 `.pr-ck` 또는 대기 수 `.pr-n`. 연결이 안 되는 컴퓨터는 한 줄 대신 오른쪽에 `.tag.off` `연결 안 됨` 또는 `확인 못 함`), 이어서 `화면 공유 열기`(`S.desk`일 때, `.pr-screen`), `컴퓨터 관리`(`.pr-manage`, 설정으로).
 - 기능: 열기는 사이드바 브랜드 클릭, 폰 제목 탭, 홈 탭 재탭(`homeTabTap`), 닫기는 같은 탭 재탭 또는 바깥, Esc. 행 선택 `prPick`. 단축키 Ctrl+` 로 시트 없이 순환 `prNext`. 설정의 `이 컴퓨터 이름` 행 `mnRow`가 이름 변경 대화창 `mnDialog`(`maxlength 24`, 저장 `PUT /api/machine`, 버튼 `저장`, `기본 이름으로`, 토스트 `이름을 저장했어요`, `기본 이름으로 돌렸어요`).
 - 상태: 목록은 주소 순으로 정렬해 모든 컴퓨터에서 같은 순서. 행 한 줄: 이 컴퓨터는 `이 컴퓨터`(게이트웨이가 안 닿으면 `연결 안 됨`), 다른 컴퓨터는 `연결됨` 또는 `연결 안 됨`, 안 닿는 동안에는 `확인 못 함`(그래도 선택 가능), 안 본 것이 있으면 `답변 필요 n · 새 알림 n`. 꺼진 컴퓨터는 회색(`.off`, `aria-disabled`)이고 선택하면 토스트 `<이름>에 연결할 수 없어요`. 컴퓨터를 고르면 토스트 `<이름>(으)로 넘어가요`(자동 전환은 조용히). 점: 브랜드 쉐브론 또는 폰 제목 오른쪽 아래의 작은 점이 다른 컴퓨터에 안 본 것이 있음(`pdot`, accent), 질문 대기면 `p-need`(warn). 브랜드 `aria-label` `컴퓨터 바꾸기, 지금은 <이름>`(+`, 다른 컴퓨터에 새 알림`). 컴퓨터 1대면 `홈으로`. 넓은 화면은 브랜드 줄 아래 240px 팝오버(스크림 없음), 폰은 하단 시트이고 탭바를 가리지 않게 `bottom`을 띄워요(탭바 위 공간이 있으면). JANDI로만 닿는 컴퓨터(`via:"jandi"`)는 이 앱 안 주소(`/jandi-peer/<keyword>`)로 이동해요. 다른 컴퓨터 프레임 안에서는 상위 앱에 `postMessage({dotz:"peer-pick"})`.
 - 데이터: `GET /api/peers`(60초 주기, 보일 때, 실패하면 2초, 5초, 15초 뒤 재시도, 마지막 목록은 `localStorage dotz-peers`에 캐시), SSE `peer_counts`, `peer_notice`, `peer_notice_done`(`prLive`), `GET/PUT /api/machine`, `GET /api/peers`가 주는 `{name,url,self,online,unread,need,via}`.

@@ -295,7 +295,7 @@ function mbList(vis) {
 
 /* ---------- the open mail: one slim bar of icons at its top, like Gmail ---------- */
 // 보관, 삭제, 읽음 / 안 읽음, 답장, 전체답장, 전달, 초안 작성, 답장 안 함 / 답장 필요로 표시, 원문 보기 / 접기: every action of the open mail once, no ⋯ (owner 11-05). The way
-// back is the head's (#back, .cv-up); the row's ⋯ keeps 삭제 from dotz only. Icons only: the name is the aria-label and the title. The bar sticks while
+// back is the bar's (#back); the row's ⋯ keeps 삭제 from dotz only. Icons only: the name is the aria-label and the title. The bar sticks while
 // the mail scrolls. A mailbox that will not follow an action says so in the action's toast, not in a standing line.
 const mbIco = (label, ic, onclick, k) => el("button", { class: "ib mtop-b", type: "button", "data-k": k, title: label, "aria-label": label, onclick }, icon(ic));
 // The mark a tap sets now names the button, and mailSetFyi turns it to the other one.

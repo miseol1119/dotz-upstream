@@ -113,7 +113,7 @@ details.think .md { padding: var(--sp-1) var(--sp-2) var(--sp-2) var(--box-ind);
 .sheet { position: fixed; z-index: 900; top: 0; right: 0; bottom: 0; display: flex; flex-direction: column; width: min(var(--sheet-w), 100vw); border-left: 1px solid var(--line-2); background: var(--bg); box-shadow: -8px 0 24px rgb(0 0 0 / .12); }
 .sh-head { flex: none; display: flex; align-items: center; gap: var(--sp-2); height: calc(48px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) var(--sp-2) 0 var(--sp-4); border-bottom: 1px solid var(--line); }
 .sh-t { flex: 1; min-width: 0; }
-.sh-name { font: 600 13px/20px var(--font); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-name { font: 600 var(--fs-card)/var(--lh-card) var(--font); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sh-t .sup { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sh-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: var(--sp-4); }
 .sh-body:not(.term) > * + * { margin-top: var(--sp-1); }

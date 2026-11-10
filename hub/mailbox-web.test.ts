@@ -206,6 +206,23 @@ describe("moving", () => {
 	}, 30_000);
 });
 
+describe("on a phone", () => {
+	test("the account chip's menu opens below the app bar, inside the screen, and the title keeps its room", async () => {
+		const v = await hub.view({ width: 390, height: 844 });
+		await v.navigate(`${hub.origin}/`);
+		await waitFor(v, `NT.loaded && INTG.items.length === 2 && CONV.has("mail:p-1")`);
+		await run(v, `MON.mailFilter = "all"; MON.land = "i:mail"; go("monitoring", "i:mail")`);
+		await waitFor(v, `document.querySelector("#appbar .mx-acc") && document.querySelector("#mon-tl > .mr")`);
+		const bar = await ev<{ title: number; chip: number; bar: number }>(v, `({ title: $("#title").getBoundingClientRect().width, chip: document.querySelector("#appbar .mx-acc").getBoundingClientRect().width, bar: $("#appbar").getBoundingClientRect().width })`);
+		expect(bar.title).toBeGreaterThanOrEqual(88);
+		await run(v, `document.querySelector("#appbar .mx-acc").click()`);
+		await waitFor(v, `document.querySelector(".menu.msheet .mi")`);
+		const r = await ev<{ top: number; bottom: number; chipBottom: number; h: number }>(v, `(() => { const m = document.querySelector(".menu.msheet").getBoundingClientRect(); return { top: m.top, bottom: m.bottom, chipBottom: document.querySelector("#appbar .mx-acc").getBoundingClientRect().bottom, h: innerHeight }; })()`);
+		expect(r.top).toBeGreaterThanOrEqual(r.chipBottom);
+		expect(r.bottom).toBeLessThanOrEqual(r.h);
+	}, 30_000);
+});
+
 describe("a live update", () => {
 	test("keeps the row nodes and adds only the new row", async () => {
 		const v = await open();

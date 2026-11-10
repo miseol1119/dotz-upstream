@@ -47,9 +47,12 @@ function showMenu(anchor, items, { value, onPick, sheet }) {
     if (sheet) {
       node.style.left = "8px"; node.style.width = `${vw - 16}px`;
       // an anchor with no box (the tab bar hides while typing) puts the sheet at the screen's bottom edge
-      const top = r.height ? r.top : vh;
-      node.style.bottom = `${vh - top + 8}px`;
-      node.style.maxHeight = `${Math.max(160, Math.min(vh * 0.6, top - 16))}px`;
+      const top = r.height ? r.top : vh, above = top - 16, below = vh - r.bottom - 16;
+      // an anchor high on the screen (the app bar) leaves no room above for its menu: the sheet opens below it instead
+      const under = !!r.height && above < Math.min(node.scrollHeight, vh * 0.6) && below > above;
+      node.style.top = under ? `${r.bottom + 8}px` : "auto";
+      node.style.bottom = under ? "auto" : `${vh - top + 8}px`;
+      node.style.maxHeight = `${Math.max(160, Math.min(vh * 0.6, under ? below : above))}px`;
       return;
     }
     node.style.minWidth = `${Math.max(112, r.width)}px`;

@@ -93,7 +93,7 @@ test("the counts elsewhere leave out what has not started: the greeting's sessio
 	const lanes = [{ name: "q", title: "대기 세션", status: "starting", live: true, waiting: "한도" }, { name: "w", title: "도는 세션", status: "working", live: true }];
 	await paint({ lanes, runs: { "lane:w": { kind: "working" } } });
 	expect(await view.evaluate(`document.querySelector("#home-now .hgreet .meta").textContent`)).toContain("세션 1개");
-	expect(await view.evaluate(`document.querySelector("#home-cards .bi[data-id='now:running'] .ch").textContent`)).toContain("1개 작업 중");
+	expect(await view.evaluate(`document.querySelector("#home-cards .bi[data-id='now:running'] .ch").textContent`)).toContain("1개");
 	expect(await view.evaluate(`prjState({ lanes: [{ name: "q", status: "starting", live: true }] }).k`)).toBe("run");
 	expect(await view.evaluate(`prjState({ lanes: [{ name: "q", status: "starting", live: true }] }).tone`)).toBe("");
 	await paint({ lanes: [{ ...lanes[0]! }] });

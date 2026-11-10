@@ -50,6 +50,13 @@
 .mx-acc { display: none; flex: none; align-items: center; gap: var(--sp-1); height: 28px; margin-right: var(--sp-1); padding: 0 var(--sp-2); border: 0; border-radius: var(--r-ctl); background: var(--card); color: var(--fg-2); font-size: var(--fs-meta); font-weight: 500; white-space: nowrap; }
 @media (hover: hover) { .mx-acc:hover { background: var(--card-hover); } }
 .mx-acc .ic { width: 14px; height: 14px; }
+/* on a phone the bar also holds back, title, the app buttons, search, bell and usage: the chip gives way (its name ends in …) before the title is squeezed */
+@media (max-width: 639px) {
+  .mx-acc { flex: 0 1 auto; min-width: 0; }
+  .mx-acc > :not(.mx-ac-t) { flex: none; }
+  .mx-ac-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .main:has(#v-monitoring.mx-on:not(.mx-scr):not([hidden])) #title { min-width: calc(var(--btn-hit) * 2); }
+}
 .main:has(#v-monitoring.mx-on:not(.mx-scr):not([hidden])) .mx-acc { display: inline-flex; }
 
 .mr-mv { flex: none; }

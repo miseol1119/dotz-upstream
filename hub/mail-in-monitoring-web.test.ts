@@ -109,8 +109,8 @@ for (const width of [1440, 390]) {
 			// the browser's back from a mail lands on the mail list in 모니터링, not on 홈: the entry below the mail is that list
 			// (a scripted history.back() is skipped by the browser for entries pushed without a user gesture, so the chain itself is checked)
 			expect(await ev(v, `history.state.c`)).toEqual(["home", "monitoring", "monitoring/i%3Amail", "monitoring/c:mail%3Afx-1"]);
-			// and the ← in the mail's head goes back to that list inside the page
-			await v.evaluate(`document.querySelector('#chat-head [data-k="cv-up"], [data-k="cv-up"]').click()`);
+			// and the bar's ‹ 모니터링 (the only back arrow on a wide screen) goes back to that list inside the page
+			await v.evaluate(`document.querySelector("#back.mon-up").click()`);
 			await v.evaluate(until(`current === "monitoring" && MON.sel === "i:mail" && location.hash === "#monitoring/i%3Amail" && document.querySelectorAll("#mon-tl .mr").length === 2`, "the head's back did not return to the mail list"));
 			await v.evaluate(`document.querySelector('#nav .ni[data-view="chat"]').click()`);
 			await v.evaluate(until(`current === "chat" && !monCtx && target === MAIN`, "the 채팅 tab did not open the chat"));

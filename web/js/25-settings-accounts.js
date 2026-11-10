@@ -199,6 +199,8 @@ function rulesDialog() {
   const acctPairs = cur => { const p = accts.map(a => [a.name, accName(a.label || a.alias || a.name)]); if (cur && !p.some(([v]) => v === cur)) p.push([cur, accLabel(cur)]); return p; };
   const select = (pairs, cur, label, onPick) => selectButton({ label, items: pairs.map(([value, text]) => ({ value, label: text })), value: cur, onPick });
   const field = (label, ...ctrl) => el("div", {}, el("div", { class: "lbl", style: "margin:0 0 var(--sp-15)", text: label }), el("div", { class: "row", style: "flex-wrap:wrap" }, ...ctrl));
+  // the seven weekdays are one row of seven equal chips (a phone cannot leave one on a second line)
+  const dayField = (...ctrl) => el("div", {}, el("div", { class: "lbl", style: "margin:0 0 var(--sp-15)", text: "요일 (선택)" }), el("div", { class: "row rl-days" }, ...ctrl));
   const ta = el("textarea", { class: "fi hs-ta hs-mono", rows: 14, spellcheck: "false", "aria-label": "규칙 JSON" });
   const box = el("div", { class: "col" });
   const move = (i, to) => { const l = list(); [l[i], l[to]] = [l[to], l[i]]; paint(); };
@@ -232,10 +234,11 @@ function rulesDialog() {
     const nCond = Object.keys(w).filter(k => ACC_COND.some(([c]) => c === k)).length;
     return el("div", { class: "list" }, el("div", { class: "li", style: "flex-direction:column;align-items:stretch;gap:var(--sp-3)" },
       el("div", { class: "row", style: "flex-wrap:wrap" }, nm,
-        el("button", { type: "button", class: "btn text", disabled: i === 0, onclick: () => move(i, i - 1) }, "위로"),
-        el("button", { type: "button", class: "btn text", disabled: i === n - 1, onclick: () => move(i, i + 1) }, "아래로"),
-        el("button", { type: "button", class: "btn danger", onclick: () => { list().splice(i, 1); paint(); } }, "삭제")),
-      field("요일 (선택)", ...days),
+        el("div", { class: "row rl-ord" },
+          el("button", { type: "button", class: "btn text", disabled: i === 0, onclick: () => move(i, i - 1) }, "위로"),
+          el("button", { type: "button", class: "btn text", disabled: i === n - 1, onclick: () => move(i, i + 1) }, "아래로"),
+          el("button", { type: "button", class: "btn danger", onclick: () => { list().splice(i, 1); paint(); } }, "삭제"))),
+      dayField(...days),
       field("시간 (선택)", time("from", "시작"), el("span", { class: "sup", text: "~" }), time("to", "끝")),
       field("조건", ...condCtl), nCond > 1 ? el("div", { class: "sup", text: `조건 ${nCond}개` }) : null,
       field("동작", ...doCtl)));

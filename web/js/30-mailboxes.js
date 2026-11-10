@@ -164,7 +164,7 @@ function mxChip(it) {
   if (!multi) return;
   const a = it.accounts.find(x => x.key === MX.acct), hid = it.accounts.filter(x => x.conn || (a && x !== a)), tone = hid.some(x => x.conn) ? "warn" : hid.map(mxTone).includes("warn") ? "warn" : hid.map(mxTone).includes("pri") ? "pri" : "";
   $("#appbar").insertBefore(el("button", { class: "mx-acc", type: "button", "aria-haspopup": "menu", "aria-label": "메일 계정 바꾸기", onclick: ev => mxAcctPop(ev.currentTarget) },
-    a ? mxMark(a) : null, el("span", { text: a ? a.label : "모든 계정" }), tone ? el("span", { class: `dot ${tone}` }) : null, icon("drop")), $("#cmdk"));
+    a ? mxMark(a) : null, el("span", { class: "mx-ac-t", text: a ? a.label : "모든 계정" }), tone ? el("span", { class: `dot ${tone}` }) : null, icon("drop")), $("#cmdk"));
 }
 function mxAcctPop(btn) {
   const it = MX.it;

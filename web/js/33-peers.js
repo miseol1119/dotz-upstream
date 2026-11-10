@@ -186,12 +186,14 @@ function prSheet() {
     const off = !p.self && !p.online && !selfDown, alert = !p.self && (p.unread > 0 || p.need > 0);
     const st = p.self ? (selfDown ? "연결 안 됨" : "") : selfDown ? "확인 못 함" : p.online ? "연결됨" : "연결 안 됨";
     // the prototype's switcher row: a status dot, the name over one quiet line, and at the right the check (this one) or the count of what waits there
-    const sub = p.self ? (st || "이 컴퓨터") : isRelayRow(p) ? [p.note, p.online ? "" : st].filter(Boolean).join(" · ") : alert ? prText(p) : st;
+    // a computer that cannot be reached says so at the right as a dot and one word (row anatomy: the status is last), not as the quiet line
+    const bad = !alert && !isRelayRow(p) && (st === "연결 안 됨" || st === "확인 못 함");
+    const sub = p.self ? (bad ? "이 컴퓨터" : st || "이 컴퓨터") : isRelayRow(p) ? [p.note, p.online ? "" : st].filter(Boolean).join(" · ") : alert ? prText(p) : bad ? "" : st;
     const row = el("button", { type: "button", class: `pr-row${here ? " on" : ""}${off ? " off" : ""}`, "aria-current": here ? "true" : null, "aria-disabled": off ? "true" : null,
       "aria-label": [p.name, here ? "지금 보고 있어요" : "", st, alert ? prText(p) : ""].filter(Boolean).join(", "), onclick: () => prPick(p) },
       el("span", { class: `dot${(p.self ? !selfDown : p.online && !selfDown) ? " ok" : ""}` }),
       el("span", { class: "pr-tx" }, el("span", { class: "pr-t", text: p.name }), sub ? el("span", { class: "pr-sub", text: sub }) : null),
-      alert ? el("span", { class: `pr-n${p.need > 0 ? " need" : ""}`, text: String((p.need || 0) + (p.unread || 0)) }) : here ? icon("check", "pr-ck") : null);
+      bad ? el("span", { class: "tag off", text: st }) : alert ? el("span", { class: `pr-n${p.need > 0 ? " need" : ""}`, text: String((p.need || 0) + (p.unread || 0)) }) : here ? icon("check", "pr-ck") : null);
     const screen = dskRowBtn(p) || prForgetBtn(p, off);
     return screen ? el("div", { class: "pr-line" }, row, screen) : row;
   });

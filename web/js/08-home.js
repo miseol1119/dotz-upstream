@@ -43,8 +43,8 @@ function homeMenu(anchor, id, inChat) {
     const key = id === MAIN ? "orchestrator" : id, name = targetName(id), restartNote = id === MAIN ? "어시스턴트가 다시 시작돼요." : "";
     const cur = M && (id === MAIN ? M.orchestrator : (M.lanes || []).find(l => `lane:${l.name}` === id));
     if (cur) {
-      add("모델 변경…", () => showMenu(anchor, modelItems(key, cur.model, ""), { value: cur.model, onPick: v => busy(null, () => putModel(key, name, { model: v }, restartNote, `${modelName(v)} · ${cur.thinking}`)) }));
-      add("추론 강도…", () => showMenu(anchor, effortItems(cur.model, cur.thinking), { value: cur.thinking, onPick: v => busy(null, () => putModel(key, name, { thinking: v }, restartNote, `${modelName(cur.model)} · ${thinkKo(v)}`)) }));
+      add("모델 변경…", () => showMenu(anchor, modelItems(key, cur.model, ""), { value: cur.model, onPick: v => busy(null, () => putModel(key, { model: v }, restartNote, `${modelName(v)} · ${cur.thinking}`)) }));
+      add("추론 강도…", () => showMenu(anchor, effortItems(cur.model, cur.thinking), { value: cur.thinking, onPick: v => busy(null, () => putModel(key, { thinking: v }, restartNote, `${modelName(cur.model)} · ${thinkKo(v)}`)) }));
       add("모델 설정", () => openModels(key));
     }
     if (id === MAIN) {
@@ -499,7 +499,7 @@ function renderHomeNow() {
   }
   const alertCard = homeAlertCard(taken);
   if (alertCard) add("notices:alert", alertCard);
-  add("now:running", el("div", { class: "card" }, hcHead("지금 진행 중", { n: working ? `${working}개 작업 중` : null }), running));
+  add("now:running", el("div", { class: "card" }, hcHead("지금 진행 중", { n: working ? `${working}개` : null }), running));
   if (heldT.length || heldW.length) add("now:waiting", el("div", { class: "card" }, hcHead("대기 중"), el("div", { class: "hn", "data-k": "waiting", "data-cap": "waiting" }, ...heldT.map(restRow), ...heldW.map(workRow))));
   if (ended.length || doneT.length) add("now:ended", el("div", { class: "card" }, hcHead("최근 끝난 작업"), el("div", { class: "hn", "data-k": "ended-work", "data-cap": "ended-work" }, ...doneT.map(doneRow), ...ended.map(workRow))));
   add("notices:watch", homeMonitorCard());
