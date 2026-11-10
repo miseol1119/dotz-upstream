@@ -62,7 +62,7 @@ test("the project menu opens a confirm sheet that lists exactly what goes, and �
 	expect(lines.join("|")).toContain("로그인 유지 2개도 남겨요: login-studio-youtube-com, login-google-com");
 	expect(lines.join("|")).not.toContain("지워요: 유튜브 감시");
 	expect(lines.join("|")).toContain("알림 3개를 치워요");
-	expect(await q(v, `return document.querySelector('.pmd [data-k="drop-archive"]').checked`)).toBe(false);
+	expect(await q(v, `return document.querySelector('.pmd [data-k="drop-archive"]').getAttribute("aria-checked")`)).toBe("false");
 	expect(await q(v, `return document.documentElement.scrollWidth <= innerWidth`)).toBe(true);
 	await shot(v, "01-confirm-sheet-390.png");
 	await run(v, `document.querySelector('.pmd [data-k="drop-archive"]').click()`);

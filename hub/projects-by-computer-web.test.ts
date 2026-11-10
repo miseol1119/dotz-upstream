@@ -79,12 +79,12 @@ async function boot(width: number, height: number, ready: string): Promise<View>
 }
 
 for (const [w, h] of [[390, 844], [1280, 800]] as const) {
-	test(`at ${w}px one computer keeps the list as it was: 고정, 전체 and 내 설정, no computer headers`, async () => {
+	test(`at ${w}px one computer keeps the list as it was: 고정, 프로젝트 and 내 설정, no computer headers`, async () => {
 		computers = SINGLE;
 		listed = projects.slice(0, 2);
 		const v = await boot(w, h, `document.querySelector(".pl-row") && typeof PRJ_PC !== "undefined" && PRJ_PC`);
 		await shot(v, `single-${w}.png`);
-		expect(await q(v, `return ${heads}`)).toEqual(["고정", "전체", "내 설정"]);
+		expect(await q(v, `return ${heads}`)).toEqual(["고정", "프로젝트", "내 설정"]);
 		expect(await q(v, `return document.querySelectorAll(".pl-pc").length`)).toBe(0);
 	});
 

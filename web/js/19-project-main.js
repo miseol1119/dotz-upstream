@@ -69,10 +69,13 @@ function pmPaint() {
   const q = { ...p, record: (D && D.record) || p.record }, rows = pmSessionRows(p, D);
   // A phone shows one screen at a time, so its app bar carries the project's name (the prototype's detail); wide keeps the list beside it under "프로젝트".
   $("#title").textContent = ppWide() ? "프로젝트" : prjTitle(q);
-  const sig = JSON.stringify([q, D, rows, botName]);
+  const sig = JSON.stringify([q, D, rows, botName, PM.fail]);
   if (root.dataset.sig === sig) return;
   root.dataset.sig = sig;
-  clear(root).append(pmHead(q), pmOverview(q, D, rows));
+  // Not read yet is not empty: what is already known (확인 필요, the sessions) shows, and under it a pending load says so, a failed one offers 다시 시도.
+  const o = pmOverview(q, D, rows);
+  if (!D) o.append(emptyNode(PM.fail ? "나머지를 불러오지 못했어요" : "불러오는 중…", PM.fail ? () => { PM.fail = false; pmPaint(); pmLoad(); } : null));
+  clear(root).append(pmHead(q), o);
   pmSheetsPaint();
 }
 // An open drill-in page follows the detail: a save or a 20 s refresh repaints it from the re-fetched data, never under a field being typed in.
@@ -107,15 +110,16 @@ function pmOverview(q, D, rows) {
   const work = (D && D.work) || [], results = (D && D.results) || [], items = pmRoutineItems(D);
   const works = [...work.filter(w => w.status === "running"), ...work.filter(w => w.status !== "running")];
   const info = (D && D.info) || {}, files = info.files || [];
+  // A section with nothing in it is left out, title and all.
   return el("div", { class: "pm-o" },
     pmPrimary(rows),
     pmSection({ kind: "info", label: "지금 상황", count: "", action: D && D.info ? "전체" : "", head: info.summary ? el("div", { class: "pm-goal sup", text: info.summary }) : null,
-      nodes: pmInfoRows(info), empty: info.summary ? "" : "대화하면서 정한 내용이 여기에 모여요" }),
-    pmSection({ kind: "sessions", label: "세션", count: rows.length, action: rows.length ? "전체" : "", nodes: rows.slice(0, 5).map(pmLaneRow), empty: "아직 세션이 없어요" }),
-    pmSection({ kind: "sessions", label: "작업", count: work.length, nodes: works.slice(0, 4).map(pmWorkRow), empty: "진행 중인 작업이 없어요" }),
-    pmSection({ kind: "results", label: "결과", count: results.length, action: results.length ? "전체" : "", nodes: results.slice(0, 4).map(pmResultRow), empty: "아직 결과가 없어요" }),
+      nodes: pmInfoRows(info) }),
+    pmSection({ kind: "sessions", label: "세션", count: rows.length, action: rows.length ? "전체" : "", nodes: rows.slice(0, 5).map(pmLaneRow) }),
+    pmSection({ kind: "sessions", label: "작업", count: work.length, nodes: works.slice(0, 4).map(pmWorkRow) }),
+    pmSection({ kind: "results", label: "결과", count: results.length, action: results.length ? "전체" : "", nodes: results.slice(0, 4).map(pmResultRow) }),
     files.length ? pmSection({ kind: "info", label: "파일", count: files.length, action: files.length > 3 ? "전체" : "", nodes: files.slice(-3).toReversed().map(pmFileRow) }) : null,
-    pmSection({ kind: "routines", label: "감시", count: items.length, action: items.length ? "전체" : "", nodes: items.slice(0, 4).map(pmWatchRow), empty: "연결된 감시가 없어요" }));
+    pmSection({ kind: "routines", label: "감시", count: items.length, action: items.length ? "전체" : "", nodes: items.slice(0, 4).map(pmWatchRow) }));
 }
 // A line of what the project's turns kept (hub/projectinfo.ts), with what kind of line it is.
 const pmInfoRow = (text, tag, tone = "") => el("div", { class: "li" }, el("span", { class: "tx" }, el("div", { class: "hd pmv-clamp pmv-wrap", text })), tag ? el("span", { class: "li-end" }, el("span", { class: `tag ${tone}`, text: tag })) : null);
@@ -134,12 +138,13 @@ function pmInfoBody(D) {
   return nodes.length ? el("div", {}, ...nodes) : emptyNode("대화하면서 정한 내용이 여기에 모여요");
 }
 // The prototype's section header + list (s-work.js project detail: 지금 상황 · 세션 · 작업 · 결과 · 감시); the header button opens the section's full page.
-function pmSection({ kind, label, count, action, head, nodes, empty }) {
+function pmSection({ kind, label, count, action, head, nodes }) {
+  if (!nodes.length && !head) return null;
   return el("div", { class: "pm-block" },
     el("div", { class: "sec sec-act pm-sec" }, el("span", { text: `${label}${count !== "" ? ` ${count}` : ""}` }),
       action ? el("button", { class: "btn text sm", type: "button", "data-k": kind, onclick: () => pmSheet(kind), text: action }) : null),
     head,
-    nodes.length ? el("div", { class: "list pm-sec-list" }, ...nodes) : empty ? el("div", { class: "empty", text: empty }) : null);
+    nodes.length ? el("div", { class: "list pm-sec-list" }, ...nodes) : null);
 }
 // Level 3: one section page over the overview. It is an overlay, so 32-history-nav gives it its own history entry: the back arrow
 // (or the browser's back) returns to the overview. Every function of the old one-page layout lives here, unchanged.
@@ -247,7 +252,9 @@ async function pmDeleteAsk(q) {
   try { p = await pmDeleteCall(q, "delete-plan"); } catch (e) { return toast(e.message || "지울 내용을 읽지 못했어요", true); }
   const st = { drop: false, busy: false }, err = el("div", { class: "note err" });
   const h = fsOpen({ labelledby: "pmd-t" });
-  const cb = el("input", { type: "checkbox", "data-k": "drop-archive", onchange: () => { st.drop = cb.checked; } });
+  // The app's own switch row (as 설정), not a browser checkbox: the whole row is the tap target.
+  const sw = el("button", { type: "button", class: "hs-sw", role: "switch", "aria-checked": "false", "aria-label": "보관 파일도 같이 지우기", "data-k": "drop-archive" });
+  const drop = el("div", { class: "li tap", onclick: () => { st.drop = !st.drop; sw.setAttribute("aria-checked", String(st.drop)); } }, el("span", { class: "tx" }, el("div", { class: "hd", text: "보관 파일도 같이 지워요" })), liEnd(sw));
   const go1 = el("button", { class: "btn danger fill", type: "button", "data-k": "delete", disabled: p.running.length > 0, onclick: async () => {
     if (st.busy) return;
     st.busy = true; go1.disabled = true; err.textContent = "";
@@ -265,10 +272,8 @@ async function pmDeleteAsk(q) {
     el("div", { class: "fs-body pmd" },
       p.running.length ? el("div", { class: "note err", text: `실행 중인 세션이 있어서 지울 수 없어요: ${p.running.join(", ")}` }) : null,
       el("ul", { class: "as-rml" }, ...pmDeleteLines(p).map(t => el("li", { text: t }))),
-      el("label", { class: "as-del" }, cb, el("span", { text: "보관 파일도 같이 지우기. 체크하지 않으면 남겨요" })),
-      el("div", { class: "as-h", text: `보관 파일: ${p.archive}` }),
-      err),
-    el("div", { class: "fs-ft row" }, el("button", { class: "btn text", type: "button", onclick: () => h.close() }, "취소"), go1));
+      el("div", { class: "list" }, drop), err),
+    el("div", { class: "fs-ft row pmd-ft" }, el("button", { class: "btn text", type: "button", onclick: () => h.close() }, "취소"), go1));
 }
 
 // 세션 기록 page: what runs now, then the ended sessions and finished background work, newest first.
@@ -376,21 +381,23 @@ function pmRoutine(x) {
 const pmSessionRow = (r, open) => sessionRow({ name: r.name, title: r.title, status: r.status, live: r.live, pendingAsk: r.waiting }, { project: r.project, line: r.line, ...(typeof open === "function" ? { open } : {}) });
 // The prototype's session row (s-work.js project 세션): a state dot, the title, the lane name, and the state tag at the right.
 function pmLaneRow(r) {
-  const [word, tone] = pmLaneState(r);
+  const [word, tone] = pmLaneState(r), sub = (r.waiting && r.ask) || r.line;   // what it does now, not its internal name
   return el("button", { class: "li tap", type: "button", onclick: () => openTarget(`lane:${r.name}`, lastChatView()), "aria-label": `${r.title} · ${word} · 대화 열기` },
     el("span", { class: "lead" }, el("span", { class: `dot ${tone}` })),
-    el("span", { class: "tx" }, el("div", { class: "hd", text: r.title }), el("div", { class: "sup", text: r.name })),
+    el("span", { class: "tx" }, el("div", { class: "hd", text: r.title }), sub ? el("div", { class: "sup", text: sub }) : null),
     el("span", { class: "li-end" }, el("span", { class: `tag ${tone}`, text: word })));
 }
 // A background job of the main assistant that belongs to the project (asked in its chat, or briefed for its folder): tap lands on its result, or on the asking message while it runs.
 const pmWorkRow = w => {
   const run = w.status === "running" && !w.queued, stall = w.status === "stalled", rec = workRecovering(w);
   const word = w.queued ? "순서 대기" : run ? "진행 중" : stall ? "멈춤" : w.status === "done" ? "완료" : w.cancelled ? "중단됨" : rec ? "이어서" : "실패";
-  const tag = workTone(w);
-  return withResults(el("button", { class: "li tap", type: "button", onclick: () => workGo(w) },
+  const tag = workTone(w), ok = run || w.status === "done";
+  // Same as home's workRow: the dot says the state, the quiet line what or why, the right end a time; a stopped or failed one keeps its word.
+  const sub = w.queued ? "순서를 기다려요" : ok ? w.model || "" : stall ? `${w.reason || "활동이 없어요"} · ${workAgo(w)}` : `${workFailText(w)} · ${workAgo(w)}`;
+  return withResults(el("button", { class: "li tap", type: "button", onclick: () => workGo(w), "aria-label": `${friendlyLine(w.description)} · ${word}` },
     el("span", { class: "lead" }, el("span", { class: `dot ${tag}` })),
-    el("span", { class: "tx" }, el("div", { class: "hd", text: friendlyLine(w.description) }), el("div", { class: "sup", text: w.queued ? "순서를 기다려요" : run ? `작업 중 · ${workElapsed(w)}` : `${stall ? `멈춤 · ${w.reason || "활동이 없어요"}` : w.status === "done" ? "끝남" : w.cancelled ? "중단됨" : rec ? "이어서 처리 중" : "실패 · 이어서 처리함"} · ${workAgo(w)}` })),
-    el("span", { class: "li-end" }, el("span", { class: `tag ${tag}`, text: word }))), w.status === "done" ? resultChips(w) : null);
+    el("span", { class: "tx" }, el("div", { class: "hd", text: friendlyLine(w.description) }), sub ? el("div", { class: "sup", text: sub }) : null),
+    el("span", { class: "li-end" }, ok && !w.queued ? el("span", { class: "sup", text: run ? workElapsed(w) : workAgo(w) }) : el("span", { class: `tag ${tag}`, text: word }))), w.status === "done" ? resultChips(w) : null);
 };
 // 진행 중: sessions that are alive and background jobs that are running. 최근 세션: the ended ones, newest first.
 function pmDoing(live, running) {

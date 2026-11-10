@@ -27,6 +27,7 @@ const projects = Array.from({ length: 30 }, (_, i) => {
 });
 const builtin = { key: "builtin:custom", name: "커스텀", note: "내 취향대로 바꾼 것", pinned: true, builtin: true, lanes: [] };
 const writes: { path: string; body: any }[] = [];
+let detailDown = false;
 
 const detailOf = (key: string) => {
 	const p = projects.find(x => x.key === key), rec = records[key];
@@ -71,6 +72,7 @@ const server = Bun.serve({
 		if (p === "/api/custom") return json({ dir: "~/.dotz/custom", cards: [], projects: [builtin, ...projects], routines: [], links: [] });
 		if (p === "/api/custom/project") {
 			if (url.searchParams.get("key") === "builtin:custom") return json({ groups: [{ id: "rules", label: "내 규칙", empty: "없어요", items: ["하나", "둘", "셋", "넷", "다섯", "여섯", "일곱"].map(n => ({ title: `규칙 ${n}`, full: `[11-01] 규칙 ${n}의 원문` })) }] });
+			if (detailDown) return json({ error: "down" }, 500);
 			const d = detailOf(url.searchParams.get("key") || "");
 			return d ? json(d[0]) : json({ error: "not found" }, 404);
 		}
@@ -188,8 +190,8 @@ test("커스텀 내 규칙: five rows and 더 보기 as the card's last line, a 
 test("a row opens the overview; every section opens its own page and 뒤로 or the browser back returns", async () => {
 	const v = await boot(390, 844);
 	await run(v, `document.querySelectorAll("#pl-list .pl-row")[0].click()`);
-	await waitFor(v, `document.querySelectorAll(".pm-sec").length === 5`);
-	expect(await q<string[]>(v, `return [...document.querySelectorAll(".pm-sec > span")].map(n => n.textContent)`)).toEqual(["지금 상황", "세션 1", "작업 1", "결과 3", "감시 3"]);
+	await waitFor(v, `document.querySelectorAll(".pm-sec").length === 4`);
+	expect(await q<string[]>(v, `return [...document.querySelectorAll(".pm-sec > span")].map(n => n.textContent)`)).toEqual(["세션 1", "작업 1", "결과 3", "감시 3"]);
 	// 확인 필요 is the primary action, and it is a single tap into the waiting session's chat
 	expect(await q(v, `return document.querySelector(".pm-need-t").textContent`)).toBe("질문 세션 1");
 	expect(await q(v, `return document.querySelector('.pm-need [data-k="answer"]').textContent`)).toBe("대화에서 답하기");
@@ -211,16 +213,31 @@ test("a row opens the overview; every section opens its own page and 뒤로 or t
 	await waitFor(v, `!!document.querySelector(".pdv")`);
 	await run(v, `history.back()`);
 	await waitFor(v, `!document.querySelector(".pdv")`);
-	expect(await q(v, `return !document.querySelector("#v-project").hidden && document.querySelectorAll(".pm-sec").length`)).toBe(5);
+	expect(await q(v, `return !document.querySelector("#v-project").hidden && document.querySelectorAll(".pm-sec").length`)).toBe(4);
 	// a write goes through the project's record key
 	await v.evaluate(`pmWrite({ title: "프로젝트 1" }).then(() => 0)`);
 	expect(writes.at(-1)!.body.key).toBe("ch:8000");
 });
 
+test("a detail that fails to load keeps 확인 필요 and the sessions, says so with 다시 시도, and pressing it loads the rest", async () => {
+	const v = await boot(390, 844);
+	detailDown = true;
+	try {
+		await run(v, `document.querySelectorAll("#pl-list .pl-row")[0].click()`);
+		await waitFor(v, `!!document.querySelector('#v-project .empty [data-k="retry"]')`);
+		expect(await q<string[]>(v, `return [...document.querySelectorAll(".pm-sec > span")].map(n => n.textContent)`)).toEqual(["세션 1"]);
+		expect(await q(v, `return !!document.querySelector('.pm-need [data-k="answer"]')`)).toBe(true);
+	} finally {
+		detailDown = false;
+	}
+	await run(v, `document.querySelector('#v-project .empty [data-k="retry"]').click()`);
+	await waitFor(v, `document.querySelectorAll(".pm-sec").length === 4 && !document.querySelector("#v-project .empty")`);
+});
+
 test("from 1100px the list sits beside the overview, and a section page opens over both", async () => {
 	const v = await boot(1280, 900);
 	await run(v, `document.querySelectorAll("#pl-list .pl-row")[0].click()`);
-	await waitFor(v, `document.querySelectorAll(".pl-row").length > 0 && document.querySelectorAll(".pm-sec").length === 5`);
+	await waitFor(v, `document.querySelectorAll(".pl-row").length > 0 && document.querySelectorAll(".pm-sec").length === 4`);
 	expect(await q(v, `return !document.querySelector("#v-projects").hidden && document.querySelector(".views").classList.contains("pp")`)).toBe(true);
 	// the open project is the selected row, and the chips stay on one line
 	expect(await q(v, `return document.querySelector("#pl-list .pl-row.on .pl-n").textContent`)).toBe("프로젝트 1");
@@ -239,6 +256,19 @@ test("from 1100px the list sits beside the overview, and a section page opens ov
 	await shot(v, "07-list-1280-dark.png");
 });
 
+test("opening 프로젝트 from 1100px lands on the top project, not on 커스텀", async () => {
+	const v = await boot(1280, 900);
+	await waitFor(v, `current === "project" && !!document.querySelector("#pl-list .pl-row.on") && !!document.querySelector("#v-project .pm-sec")`);
+	expect(await q(v, `return [document.querySelector("#pl-list .pl-row.on").dataset.key, ppCur]`)).toEqual(["ch:8000", "ch:8000"]);
+	// the list had not arrived when the tab opened (커스텀 held the pane first): the project the app moved to is still not one the owner chose,
+	// so the first project pressed takes its entry instead of stacking on it
+	await run(v, `PRJ = null; ppCur = ""; go("home")`);
+	await waitFor(v, `current === "home"`);
+	await run(v, `document.querySelector('#nav .ni[data-view="projects"]').click()`);
+	await waitFor(v, `current === "project" && !!PRJ && ppCur === "ch:8000" && location.hash === "#project/ch%3A8000"`);
+	expect(await q(v, `return [history.state.a, history.state.w]`)).toEqual([1, ["home", "project/ch%3A8000"]]);
+});
+
 test("from 1100px, back after pressing another project returns to the one pressed before and the app never calls history.go", async () => {
 	const v = await boot(1280, 900);
 	await run(v, `go("home")`);
@@ -252,14 +282,14 @@ test("from 1100px, back after pressing another project returns to the one presse
 	const back = (go: "back" | "forward") => run(v, `window.__popped = new Promise(res => addEventListener("popstate", () => res(true), { once: true })); history.${go}()`);
 	await run(v, `document.querySelector('#nav .ni[data-view="projects"]').click()`);
 	await waitFor(v, `current === "project" && document.querySelector("#pl-list .pl-row.on")`);
-	await press(0, "프로젝트 1");
-	const first = await sel();
 	await press(1, "프로젝트 2");
+	const first = await sel();
+	await press(2, "프로젝트 3");
 	const second = await sel();
 	await back("back");
-	await waitFor(v, `document.querySelector("#pl-list .pl-row.on .pl-n")?.textContent === "프로젝트 1" && location.hash === ${JSON.stringify(first[1])}`);
+	await waitFor(v, `document.querySelector("#pl-list .pl-row.on .pl-n")?.textContent === "프로젝트 2" && location.hash === ${JSON.stringify(first[1])}`);
 	await back("forward");
-	await waitFor(v, `document.querySelector("#pl-list .pl-row.on .pl-n")?.textContent === "프로젝트 2" && location.hash === ${JSON.stringify(second[1])}`);
+	await waitFor(v, `document.querySelector("#pl-list .pl-row.on .pl-n")?.textContent === "프로젝트 3" && location.hash === ${JSON.stringify(second[1])}`);
 	await back("back");
 	await waitFor(v, `location.hash === ${JSON.stringify(first[1])}`);
 	await back("back");

@@ -109,7 +109,8 @@ function histSync() {
   }
   H.tries = 0;
   // the pane a list opened by itself was never chosen: pressing another item of that list takes its place, so back from the first item pressed lands before the list
-  if (S.a && W[p].startsWith("project/") && p === w.length - 1 && p === W.length - 1) { history.replaceState(hstate([...C.slice(0, -1), W[p]], 0, W), "", hurl(W)); return; }
+  if (S.a && W[p].startsWith("project/") && p === w.length - 1 && p === W.length - 1) { const s = hstate([...C.slice(0, -1), W[p]], 0, W); if (H.auto) s.a = 1;   // the app itself moved its first pane (the list came late): still not chosen
+    history.replaceState(s, "", hurl(W)); return; }
   scrollKeep(S);
   pushChain(W, p, C);   // going deeper, or sideways (another tab, another item): stack on top of the view that was showing
 }

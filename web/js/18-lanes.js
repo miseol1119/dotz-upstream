@@ -174,6 +174,8 @@ function sessionRow(l, o = {}) {
     el("span", { class: `hs ${tone}`, text: word }));
 }
 
+// The project a wide screen opens first: the first pinned one (the list shows 고정 on top), else the top of the list.
+const prjFirst = () => { const r = projRows((PRJ && PRJ.projects) || []); return ((r.find(x => x.p.pinned) || r[0] || {}).p || {}).key || ""; };
 /* ---------- 프로젝트 level 1: a compact list (name, one status line, last activity), filtered and paged ----------
    Rows sort by what needs the owner, then what runs, then the most recent. A row opens the project's overview (level 2); the overview's
    sections open one drill-in page each (level 3). The built-in 커스텀 project is a settings page, so it sits at the end, outside the filters. */
@@ -238,8 +240,8 @@ function prjRow(r) {
     el("span", { class: "li-end" }, unread ? el("span", { class: "pl-nb", "aria-label": `읽지 않은 메시지 ${unread}개`, text: unread > 99 ? "99+" : String(unread) }) : null,
       el("span", { class: `tag ${tone}`, text: st.word })));
 }
-// The prototype's section headers: 고정 first, then 전체, the same rows sorted by what needs the owner (projRows).
-const prjGroups = rows => [["고정", rows.filter(r => r.p.pinned)], ["전체", rows.filter(r => !r.p.pinned)]].filter(g => g[1].length);
+// The prototype's section headers: 고정 first, then 프로젝트 (not 전체: that is the filter chip's word), the same rows sorted by what needs the owner (projRows).
+const prjGroups = rows => [["고정", rows.filter(r => r.p.pinned)], ["프로젝트", rows.filter(r => !r.p.pinned)]].filter(g => g[1].length);
 // With two or more computers: one folding header per computer (이 컴퓨터 first), its rows pinned first. Another computer's project opens
 // that computer's own web app at the project page; an offline computer keeps its header, marked 연결 안 됨, like the computer switcher.
 const PJ_FOLD = new Set((() => { try { const l = JSON.parse(localStorage.getItem("dotz-pj-fold") || "[]"); return Array.isArray(l) ? l : []; } catch { return []; } })());
