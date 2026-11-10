@@ -431,12 +431,8 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 		if (appFile) return new Response(req.method === "HEAD" ? null : committedText(appFile[0]) ?? Bun.file(join(import.meta.dir, "..", "web", appFile[0])), { headers: { "Content-Type": appFile[1], "Cache-Control": url.pathname === "/sw.js" || url.pathname.endsWith(".webmanifest") ? "no-cache" : "public, max-age=86400" } });
 		// The other gateways read this computer's chosen name here (hub/peers.ts); it is a display name, no secret, so it is public like the manifest.
 		if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/api/peer-info") return json({ name: resolveName(cfg.web?.machine_name, machineHost()) });
-		// Pairing gates itself: only a request from this node's own tailscale login gets a token (hub/peer-pair.ts), so it needs no owner check first.
-		if (req.method === "POST" && url.pathname === PAIR_PATH) {
-			if (!tailnet) return refuse("pairing outside the tailnet", req);
-			// The write check every other route has (a page of another site, a body that is not JSON), before the pairing reads the body.
-			return ambientWrite(req, url.pathname) ?? handlePair(req, { ownLogin });
-		}
+		// Pairing gates itself (only this node's own tailscale login gets a token, hub/peer-pair.ts) but still passes the write check first (another site's page, a non-JSON body).
+		if (req.method === "POST" && url.pathname === PAIR_PATH) return tailnet ? (ambientWrite(req, url.pathname) ?? handlePair(req, { ownLogin })) : refuse("pairing outside the tailnet", req);
 		// A request with the peer header gets only the peer paths (hub/peer-auth.ts); a good one skips the owner check, a bad one never reaches it.
 		const devices = webAccess.devices();
 		const cfAccess = webAccess.cfAccess();
