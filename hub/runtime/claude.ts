@@ -26,6 +26,7 @@ import { classifyProviderError } from "../providers.ts";
 import { stripSteerMark } from "../steer-mark.ts";
 import { type Probes, makeProbes } from "./claude-probes.ts";
 import { detectBinary } from "./detect.ts";
+import { touchedPath, withTouchedFiles } from "./handover-files.ts";
 import type { ActivityRow, AgentEvent, AgentProcess, RuntimeAdapter, SendMode, SpawnOpts, SubagentUpdate } from "./types.ts";
 
 const CLAUDE = process.env.DOTZ_CLAUDE ?? "claude";
@@ -51,6 +52,9 @@ const textOfBlocks = (content: unknown): string =>
 		: Array.isArray(content)
 			? content.filter(b => b?.type === "text" || typeof b === "string").map(b => (typeof b === "string" ? b : b.text ?? "")).join("")
 			: "";
+
+// The file an edit or write tool call of the CLI targets (a structured argument; other tools, shell included, have none).
+const editedPath = (b: Frame): unknown => (b.name === "Edit" || b.name === "Write" || b.name === "MultiEdit" ? b.input?.file_path : b.name === "NotebookEdit" ? b.input?.notebook_path : undefined);
 
 // Prompts the CLI echoes that are not the owner's message: local-command output, its own bookkeeping tags.
 const INTERNAL_USER = /^<(local-command|command-name|command-message|system-reminder|task-notification)/;
@@ -423,10 +427,11 @@ function sessionFile(ref: string): string | undefined {
 }
 
 // The most recent user messages and final answers of a saved session (oldest first, ~9000 chars), the body of a handover
-// into a fresh session; only `end_turn`/`max_tokens` assistant messages are answers (a tool-use step is mid-turn
+// into a fresh session, then the paths its edit and write calls touched; only `end_turn`/`max_tokens` assistant messages are answers (a tool-use step is mid-turn
 // monologue). undefined when the session cannot be read.
 export function recentExchanges(ref: string): string | undefined {
 	const turns: string[] = [];
+	const files: string[] = [];
 	try {
 		const file = sessionFile(ref);
 		if (!file) return undefined;
@@ -435,6 +440,11 @@ export function recentExchanges(ref: string): string | undefined {
 			const entry: Frame = JSON.parse(line);
 			const m = entry.message;
 			if (!m || entry.isSidechain || entry.isMeta || entry.isCompactSummary) continue;
+			if (m.role === "assistant" && Array.isArray(m.content))
+				for (const b of m.content) {
+					const p = b?.type === "tool_use" ? touchedPath(editedPath(b)) : undefined;
+					if (p) files.push(p);
+				}
 			if (m.role === "assistant" && m.stop_reason !== "end_turn" && m.stop_reason !== "max_tokens") continue;
 			const t = stripSteerMark(textOfBlocks(m.content)).trim();
 			if (!t || INTERNAL_USER.test(t) || t.startsWith("This session is being continued") || t.startsWith("[keepalive]") || t === "ok" || isNote(t, "youAre") || t.includes("\n[dotz lane ")) continue;
@@ -445,7 +455,7 @@ export function recentExchanges(ref: string): string | undefined {
 	}
 	const tail: string[] = [];
 	for (let i = turns.length - 1, size = 0; i >= 0 && size + turns[i].length < 9000; size += turns[i].length, i--) tail.unshift(turns[i]);
-	return tail.join("\n\n");
+	return withTouchedFiles(tail.join("\n\n"), files);
 }
 
 function args(o: SpawnOpts, settings: string, autocompact: number | undefined): string[] {

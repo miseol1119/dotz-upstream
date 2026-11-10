@@ -234,3 +234,14 @@ test("detect: a missing binary says why, a present one gives path and version", 
 	expect(present.version).toMatch(/^\d+\.\d+\.\d+/);
 	expect(present.path).toBe(process.execPath);
 });
+
+test("recentExchanges lists the paths Claude's edit tools touched, most recent first, and never reads shell commands", () => {
+	const dir = mkdtempSync(join(tmpdir(), "dotz-claude-files-"));
+	const file = join(dir, "session.jsonl");
+	const call = (name: string, input: Record<string, unknown>) => JSON.stringify({ type: "assistant", message: { role: "assistant", stop_reason: "tool_use", content: [{ type: "tool_use", name, input }] } });
+	const text = (role: string, t: string) => JSON.stringify({ type: role, message: { role, stop_reason: "end_turn", content: [{ type: "text", text: t }] } });
+	writeFileSync(file, [text("user", "fix it"), call("Edit", { file_path: "/work/a.ts", old_string: "x", new_string: "y" }), call("Bash", { command: "echo ghp_SECRETTOKEN > /work/leak.txt" }), call("Write", { file_path: "/work/b.ts", content: "body" }), call("NotebookEdit", { notebook_path: "/work/n.ipynb", new_source: "" }), call("Edit", { file_path: "/work/a.ts" }), text("assistant", "done")].join("\n"));
+	const out = recentExchanges(file)!;
+	expect(out).toBe("IN: fix it\n\nYOU: done\n\nFiles touched:\n- /work/a.ts\n- /work/n.ipynb\n- /work/b.ts");
+	expect(out).not.toContain("SECRETTOKEN");
+});

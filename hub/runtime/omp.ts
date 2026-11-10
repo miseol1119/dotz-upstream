@@ -12,6 +12,7 @@ import { classifyProviderError } from "../providers.ts";
 import { stripSteerMark } from "../steer-mark.ts";
 import { isLater, isSilent } from "../tone.ts";
 import { detectBinary } from "./detect.ts";
+import { touchedPath, withTouchedFiles } from "./handover-files.ts";
 import type { ActivityRow, AgentEvent, AgentProcess, RuntimeAdapter, SendMode, SpawnOpts, SubagentUpdate } from "./types.ts";
 
 // The slice of an omp RPC frame this adapter reads (OmO speaks the same pi RPC protocol; omo.ts reuses this reader).
@@ -333,17 +334,24 @@ function writeOverlay(o: SpawnOpts, lane: NonNullable<SpawnOpts["lane"]>): strin
 }
 
 // The most recent user messages and assistant final answers of a saved omp session (oldest first, ~9000 chars), the
-// body of a handover into a fresh session. Assistant text from a tool-use step is mid-turn monologue, not an answer, so
-// only `stop`/`length` assistant messages count. undefined when the session file cannot be read.
-type SessionMessage = { role?: string; stopReason?: string; content?: string | Array<{ type?: string; text?: string }> };
+// body of a handover into a fresh session, then the paths its edit and write calls touched. Assistant text from a
+// tool-use step is mid-turn monologue, not an answer, so only `stop`/`length` assistant messages count. undefined when
+// the session file cannot be read.
+type SessionMessage = { role?: string; stopReason?: string; content?: string | Array<{ type?: string; text?: string; name?: string; arguments?: { path?: unknown } }> };
 export function recentExchanges(sessionFile: string): string | undefined {
 	const turns: string[] = [];
+	const files: string[] = [];
 	try {
 		for (const line of readFileSync(sessionFile, "utf8").split("\n")) {
 			if (!line.includes('"role":"user"') && !line.includes('"role":"assistant"')) continue;
 			const parsed: { message?: SessionMessage } = JSON.parse(line);
 			const m = parsed.message;
 			if (!m) continue;
+			if (m.role === "assistant" && Array.isArray(m.content))
+				for (const b of m.content) {
+					const p = b?.type === "toolCall" && (b.name === "edit" || b.name === "write") ? touchedPath(b.arguments?.path) : undefined;
+					if (p) files.push(p);
+				}
 			if (m.role === "assistant" && m.stopReason !== "stop" && m.stopReason !== "length") continue;
 			const t = stripSteerMark(Array.isArray(m.content) ? m.content.filter(b => b?.type === "text").map(b => b.text).join("") : (m.content ?? "")).trim();
 			if (!t || t.startsWith("[keepalive]") || t === "ok" || (m.role === "assistant" && (isLater(t) || isSilent(t))) || isNote(t, "youAre") || t.includes("\n[dotz lane ")) continue;
@@ -354,7 +362,7 @@ export function recentExchanges(sessionFile: string): string | undefined {
 	}
 	const tail: string[] = [];
 	for (let i = turns.length - 1, size = 0; i >= 0 && size + turns[i].length < 9000; size += turns[i].length, i--) tail.unshift(turns[i]);
-	return tail.join("\n\n");
+	return withTouchedFiles(tail.join("\n\n"), files);
 }
 
 export const omp: RuntimeAdapter = {
