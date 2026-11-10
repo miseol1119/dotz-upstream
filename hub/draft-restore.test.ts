@@ -6,6 +6,7 @@ import { setupEnv } from "../features/reply-drafts/test/helpers.ts";
 import { draftApprovalBlock } from "./draft-approval.ts";
 import { emit } from "./events.ts";
 import { answerDecision, listNotices, NOTICE_CAP, reopenNotices, resetNoticesForTest, setDraftHandled } from "./notices.ts";
+import { appendSealed } from "./approval-seal.ts";
 
 // 보내지 않기 on a mail reply draft drops it in the real reply-drafts store (temp DOTZ_DIR); 되돌리기 (the reopen route's two steps) puts it back
 // to pending, and the 보내기 answered after that is the one the send gate accepts.
@@ -20,7 +21,7 @@ let clock = Date.now();
 // The web send of a decision answer as it lands in inbox.jsonl (hub/notices.ts answerDecision -> sendWeb), each a little later than the last.
 const webSend = async (a: { text: string; picks?: unknown }) => {
 	clock += 1000;
-	appendFileSync(join(env.dir, "inbox.jsonl"), `${JSON.stringify({ ts: new Date(clock).toISOString(), kind: "message", source: "web", text: a.text, picks: a.picks })}\n`);
+	appendSealed(join(env.dir, "inbox.jsonl"), { ts: new Date(clock).toISOString(), kind: "message", source: "web", text: a.text, picks: a.picks });
 };
 const post = (ref: string) => emit("outbox", { ts: new Date().toISOString(), kind: "out", source: "orchestrator", target: "mail:acme-1", text: `[ask] 답장 초안을 만들었어요\n${draftApprovalBlock({ to: "kim@example.com", toLabel: "받는이", subject: "Re: 견적", body: "확인해 보고 말씀드릴게요.", ref, question: "이 답장 보낼까요?" })}` });
 const cardOf = (ref: string) => listNotices(NOTICE_CAP).items.find(i => i.decision?.draft?.ref === ref)!;

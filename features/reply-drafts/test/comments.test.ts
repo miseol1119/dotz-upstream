@@ -14,6 +14,7 @@ import { runOnboard, type SnsAccess } from "../bin/onboard.ts";
 import { draftComments } from "../lib/comments.ts";
 import { appOn, loadSettings } from "../lib/settings.ts";
 import { fakeModel, j } from "./helpers.ts";
+import { appendSealed } from "../../../hub/approval-seal.ts";
 
 let env: TestEnv;
 beforeEach(() => {
@@ -37,7 +38,7 @@ const tone = (app: string) => join(env.dir, "custom", "reply-drafts", "tone", `$
 function pick(id: string, n: 1 | 2 | 3, note?: string) {
 	const label = ["보내기", "고치기", "보내지 않기"][n - 1]!;
 	const text = `${n}) ${label}${note ? ` - ${note}` : ""}`;
-	appendFileSync(join(env.dir, "inbox.jsonl"), `${JSON.stringify({ ts: "2030-06-15T12:01:00.000Z", kind: "message", source: "web", text, picks: [{ q: `이 답글 올릴까요? (${id})`, n, label }] })}\n`);
+	appendSealed(join(env.dir, "inbox.jsonl"), { ts: "2030-06-15T12:01:00.000Z", kind: "message", source: "web", text, picks: [{ q: `이 답글 올릴까요? (${id})`, n, label }] });
 }
 
 async function oneAsk(): Promise<{ id: string; text: string }> {

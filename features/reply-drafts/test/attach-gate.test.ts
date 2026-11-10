@@ -12,6 +12,7 @@ import { paths } from "../lib/settings.ts";
 import { addStagedFile, stagedFiles } from "../lib/staged.ts";
 import { addDraft, type DraftRec, getDraft } from "../lib/store.ts";
 import { enable, setupEnv } from "./helpers.ts";
+import { appendSealed } from "../../../hub/approval-seal.ts";
 
 const env = setupEnv();
 const lib = mkdtempSync(join(tmpdir(), "rd-gate-lib-"));
@@ -34,7 +35,7 @@ function draft(body: string, extra: Partial<DraftRec> = {}): DraftRec {
 	return rec;
 }
 const choose = (id: string, k: number, label: string) =>
-	appendFileSync(join(env.dir, "inbox.jsonl"), `${JSON.stringify({ ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: `${k}) ${label}`, picks: [{ q: `이 답장 보낼까요? (${id})`, n: k, label }] })}\n`);
+	appendSealed(join(env.dir, "inbox.jsonl"), { ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: `${k}) ${label}`, picks: [{ q: `이 답장 보낼까요? (${id})`, n: k, label }] });
 function fakeSend() {
 	const sent: string[] = [];
 	return { sent, send: async (r: DraftRec) => (sent.push(r.id), { ok: true, message: "보냈어요" }) };
@@ -43,7 +44,7 @@ const PROMISE = "alpha-song 문서 보내드립니다.";
 
 describe("sendDraft with a card posted in a work channel", () => {
 	const at = "ch:700000000000000009";
-	const log = (file: string, e: Record<string, unknown>, ms: number) => appendFileSync(join(env.dir, file), `${JSON.stringify({ ts: new Date(Date.now() + ms).toISOString(), ...e })}\n`);
+	const log = (file: string, e: Record<string, unknown>, ms: number) => (file === "inbox.jsonl" ? appendSealed : (f: string, o: Record<string, unknown>) => appendFileSync(f, `${JSON.stringify(o)}\n`))(join(env.dir, file), { ts: new Date(Date.now() + ms).toISOString(), ...e });
 	const posted = (rec: DraftRec) => log("outbox.jsonl", { kind: "out", source: "orchestrator", target: at, text: askText(rec, []) }, 1000);
 	test("the card alone sends nothing; his typed answer under it sends once", async () => {
 		const rec = draft("확인했습니다.");
@@ -89,7 +90,7 @@ describe("sendDraft with a mail whose files disagree with its words", () => {
 	});
 
 	test("a typed 이대로 보내 in the draft's conversation sends it as it is, where a typed 보내 is refused like the pick", async () => {
-		const typed = (id: string, text: string) => appendFileSync(join(env.dir, "inbox.jsonl"), `${JSON.stringify({ ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", channel: `mail:ref-${id}`, text })}\n`);
+		const typed = (id: string, text: string) => appendSealed(join(env.dir, "inbox.jsonl"), { ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", channel: `mail:ref-${id}`, text });
 		const rec = draft(PROMISE);
 		typed(rec.id, "보내");
 		const s = fakeSend();

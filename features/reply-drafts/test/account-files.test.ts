@@ -16,6 +16,7 @@ import { addStagedFile, stagedFiles, stagedName } from "../lib/staged.ts";
 import { addDraft, answerDrafts, getDraft, listDrafts, type DraftRec } from "../lib/store.ts";
 import type { Runner } from "../lib/tone.ts";
 import { enable, fakeModel, goodReply, j, mailFixture, setupEnv } from "./helpers.ts";
+import { sealLine } from "../../../hub/approval-seal.ts";
 
 const env = setupEnv();
 const lib = mkdtempSync(join(tmpdir(), "rd-acct-lib-"));
@@ -40,7 +41,7 @@ const fake = () => {
 	const run: Runner = async argv => (calls.push(argv), { code: 0, stdout: "ok", stderr: "" });
 	return { calls, run };
 };
-const emitApproval = (id: string) => writeFileSync(paths.inbox(), `${JSON.stringify({ ts: new Date(Date.now() + 1000).toISOString(), kind: "message", source: "web", channel: "mail:x", text: "1) 보내기", picks: [{ q: `이 답장 보낼까요? (${id})`, n: 1, label: "보내기" }] })}\n`);
+const emitApproval = (id: string) => writeFileSync(paths.inbox(), `${sealLine(paths.inbox(), { ts: new Date(Date.now() + 1000).toISOString(), kind: "message", source: "web", channel: "mail:x", text: "1) 보내기", picks: [{ q: `이 답장 보낼까요? (${id})`, n: 1, label: "보내기" }] })}\n`);
 const sink = () => {
 	const sent: string[] = [];
 	return { sent, send: (_: string, text: string) => void sent.push(text) };

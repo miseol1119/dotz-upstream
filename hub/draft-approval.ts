@@ -24,6 +24,7 @@
 // Discord modal ask for the change first, and the answer is "2) 고치기 - <change>".
 // The answer comes back as the owner's own inbox message with picks [{q: "<question> (<ref>)", n, label}] (hub/notices.ts answerDecision),
 // which is what the per-feature approval checks read (hub/kakao/send.ts verdict, orchestrator turn "결정 답: ... → 1) 보내기").
+import { isSealed, readSealKey } from "./approval-seal.ts";
 import { withFileWords } from "./auto-attach.ts";
 import { mailLineText, type DraftBrief } from "./mail-lines.ts";
 import { closeSync, existsSync, openSync, readSync, statSync } from "node:fs";
@@ -651,9 +652,11 @@ export function draftVerdict(inboxPath: string, ref: string, sinceMs: number, op
 	const tag = `(${ref})`;
 	type Entry = { ts?: unknown; kind?: unknown; source?: unknown; text?: unknown; picks?: unknown; conv?: unknown; channel?: unknown };
 	const owned: Entry[] = [];
+	// Only a line the gateway sealed (hub/approval-seal.ts) is the owner's word: a line appended to the file by another process is not.
+	const key = readSealKey(inboxPath);
 	for (const line of lines) {
 		const e = parsedLine<Entry>(line);
-		if (!e || e.kind !== "message" || typeof e.source !== "string" || !OWNER_SOURCES.has(e.source) || typeof e.ts !== "string" || !(Date.parse(e.ts) > sinceMs)) continue;
+		if (!e || e.kind !== "message" || typeof e.source !== "string" || !OWNER_SOURCES.has(e.source) || typeof e.ts !== "string" || !(Date.parse(e.ts) > sinceMs) || !isSealed(key, e)) continue;
 		owned.push(e);
 	}
 	const picksOf = (e: Entry) => (Array.isArray(e.picks) ? (e.picks as { q?: unknown; label?: unknown }[]) : []).filter(p => typeof p?.q === "string" && p.q.includes(tag) && typeof p.label === "string" && !!draftActionOf(p.label));

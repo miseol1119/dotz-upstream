@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { appendSealed } from "../approval-seal.ts";
 import { parseDecisions } from "../choices.ts";
 import { approval, createDraft, draftBlock, forgetWarm, listDrafts, sendDraft, sendText, type Draft } from "./send.ts";
 import { KAKAO_BUNDLE, kakaoPaths, type Runner } from "./types.ts";
@@ -20,7 +21,7 @@ beforeEach(() => {
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
 const add = (file: string, e: Record<string, unknown>) => appendFileSync(file, `${JSON.stringify(e)}\n`);
-const owner = (sec: number, e: Record<string, unknown> = {}) => add(paths.inbox, { ts: at(sec), kind: "message", source: "web", channel: "web", author: "me", text: "", ...e });
+const owner = (sec: number, e: Record<string, unknown> = {}) => appendSealed(paths.inbox, { ts: at(sec), kind: "message", source: "web", channel: "web", author: "me", text: "", ...e });
 const ask = (sec: number, d: Draft, target = "web") => add(paths.outbox, { ts: at(sec), kind: "out", source: "orchestrator", target, text: draftBlock(d), reply_to: null });
 const pick = (d: Draft, label: string, n = 1) => ({ picks: [{ q: `카톡 답장 보낼까요? (${d.code})`, n, label }] });
 

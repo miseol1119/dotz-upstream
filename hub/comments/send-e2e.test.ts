@@ -18,6 +18,7 @@ import { createEngine } from "./engine.ts";
 import { realMailLink } from "./mail-link.ts";
 import { commentsDir } from "./store.ts";
 import { createCommentsWeb } from "./web.ts";
+import { appendSealed } from "../approval-seal.ts";
 
 const NOW = Date.parse("2026-10-26T00:00:00.000Z");
 const source: SourceConfig = { key: "youtube", kind: "youtube", label: "유튜브 댓글", watch: ["*"], autoDraft: false };
@@ -54,7 +55,7 @@ function world(o: { replyFails?: string; zeleFails?: boolean } = {}) {
 	const inbox = join(dir, "inbox.jsonl");
 	const pick = (code: string, n: 1 | 3 = 1) => {
 		const label = n === 1 ? "보내기" : "보내지 않기";
-		appendFileSync(inbox, `${JSON.stringify({ ts: new Date(NOW + 5000).toISOString(), kind: "message", source: "web", text: `${n}) ${label}`, picks: [{ q: `이 답글을 올리고 메일도 보낼까요? (${code})`, n, label }] })}\n`);
+		appendSealed(inbox, { ts: new Date(NOW + 5000).toISOString(), kind: "message", source: "web", text: `${n}) ${label}`, picks: [{ q: `이 답글을 올리고 메일도 보낼까요? (${code})`, n, label }] });
 	};
 	const recover = () => {
 		replyFails = undefined;
@@ -95,7 +96,7 @@ describe("comment reply + mail: 1) 보내기 -> reply posted -> mail sent with t
 	test("the mail of the card cannot be sent on its own, before or instead of the reply", async () => {
 		const w = world();
 		const { mailId } = await card(w);
-		appendFileSync(w.inbox, `${JSON.stringify({ ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: "1) 보내기", picks: [{ q: `이 메일 보낼까요? (${mailId})`, n: 1, label: "보내기" }] })}\n`);
+		appendSealed(w.inbox, { ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: "1) 보내기", picks: [{ q: `이 메일 보낼까요? (${mailId})`, n: 1, label: "보내기" }] });
 		const alone = await runMailCli(["send", "--draft", mailId], "", { run: async () => ({ code: 0, stdout: "", stderr: "" }), hub: { post: async () => ({ status: 200 }) } });
 		expect(alone.code).toBe(1);
 		expect(alone.lines[0]).toContain("한 장으로 승인해요");
@@ -131,7 +132,7 @@ describe("comment reply + mail: 1) 보내기 -> reply posted -> mail sent with t
 		const hub = { post: async () => ({ status: 200 }) };
 		const ask = await runMailCli(["ask", "--draft", mailId], "", { hub });
 		expect(parseDraftApproval(ask.lines[0]!)).toMatchObject({ ref: mailId, attachments: [{ name: "캐논.pdf" }] });
-		appendFileSync(w.inbox, `${JSON.stringify({ ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: "1) 보내기", picks: [{ q: `이 메일 보낼까요? (${mailId})`, n: 1, label: "보내기" }] })}\n`);
+		appendSealed(w.inbox, { ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: "1) 보내기", picks: [{ q: `이 메일 보낼까요? (${mailId})`, n: 1, label: "보내기" }] });
 		const run: Runner = async argv => (w.zele.push(argv), { code: 0, stdout: "", stderr: "" });
 		expect((await runMailCli(["send", "--draft", mailId], "", { run, hub })).code).toBe(0);
 		expect(w.posted).toHaveLength(1);

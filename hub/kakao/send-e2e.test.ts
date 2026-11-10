@@ -11,6 +11,7 @@ import { atomicWrite } from "./onboard.ts";
 import { createDraft, draftBlock, forgetWarm, listDrafts, sendDraft } from "./send.ts";
 import { kakaoPaths, type Msg, type Room, type Runner } from "./types.ts";
 import { type FakeRow, fakeScreen } from "./ui.fixture.ts";
+import { appendSealed } from "../approval-seal.ts";
 
 const ROOM: Room = { chatId: "101", name: "스터디방", type: 0, kind: "direct", unread: 1, lastAt: 0 };
 const IN: Msg = { logId: "9007199254740901", chatId: "101", authorId: "2001", sender: "Alex", text: "내일 7시 괜찮아?", type: 1, sentAt: 1_700_000_060, fromMe: false };
@@ -58,7 +59,7 @@ function cli(screen: ReturnType<typeof fakeScreen>, stdin = "") {
 }
 
 const pick = (code: string, label = "보내기") =>
-	appendFileSync(paths.inbox, `${JSON.stringify({ ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: `1) ${label}`, picks: [{ q: `카톡 답장 보낼까요? (${code})`, n: 1, label }] })}\n`);
+	appendSealed(paths.inbox, { ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: `1) ${label}`, picks: [{ q: `카톡 답장 보낼까요? (${code})`, n: 1, label }] });
 
 async function drafted(): Promise<string> {
 	const c = cli(fakeScreen(rows), "응 7시에 봐");

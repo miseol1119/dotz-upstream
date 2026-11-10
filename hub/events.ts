@@ -1,5 +1,6 @@
 import { appendFileSync, closeSync, existsSync, openSync, readFileSync, readSync, statSync } from "node:fs";
 import { DATA_DIR, NAME, paths } from "./config.ts";
+import { sealLine } from "./approval-seal.ts";
 import { fileLinePaths, snapshotSent } from "./files.ts";
 import { liveEmitRefusal } from "./live-guard.ts";
 import { stripSteerMark } from "./steer-mark.ts";
@@ -53,7 +54,7 @@ export function emit(box: "inbox" | "outbox", event: HubEvent): void {
 		const spec = deriveSpec(dropClaim(text), NAME, tone);
 		if (spec) event.spec = spec;
 	}
-	appendFileSync(box === "inbox" ? paths.inbox : paths.outbox, `${JSON.stringify(event)}\n`);
+	appendFileSync(box === "inbox" ? paths.inbox : paths.outbox, `${box === "inbox" ? sealLine(paths.inbox, event) : JSON.stringify(event)}\n`);
 	if (typeof event.text === "string" && event.text.includes("[file]")) snapshotSent(event.text);
 	recent.push(event);
 	if (recent.length > 300) recent.shift();

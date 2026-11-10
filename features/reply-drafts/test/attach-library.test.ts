@@ -14,6 +14,7 @@ import { paths } from "../lib/settings.ts";
 import { getDraft, listDrafts, setStatus } from "../lib/store.ts";
 import type { Runner } from "../lib/tone.ts";
 import { enable, fakeModel, j, mailFixture, setupEnv } from "./helpers.ts";
+import { sealLine } from "../../../hub/approval-seal.ts";
 
 const env = setupEnv();
 const lib = mkdtempSync(join(tmpdir(), "rd-lib-"));
@@ -259,7 +260,7 @@ export default { name: "work", reply: () => { writeFileSync(${JSON.stringify(got
 		}, 30_000);
 		test("send refuses a draft that promises a file it does not carry, as the gateway's check does", async () => {
 			const { rec, got } = await pluginDraft("c-3");
-			writeFileSync(paths.inbox(), `${JSON.stringify({ ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: "1) 보내기", picks: [{ q: `이 답장 보낼까요? (${rec.id})`, n: 1, label: "보내기" }] })}\n`);
+			writeFileSync(paths.inbox(), `${sealLine(paths.inbox(), { ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: "1) 보내기", picks: [{ q: `이 답장 보낼까요? (${rec.id})`, n: 1, label: "보내기" }] })}\n`);
 			const out = await cli("send", rec.id);
 			expect(out.stderr).toContain(ATTACH_REFUSED);
 			expect(out.code).toBe(1);

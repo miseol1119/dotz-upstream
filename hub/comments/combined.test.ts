@@ -11,6 +11,7 @@ import { commentAsk } from "./ask.ts";
 import { type Comment, type CommentAdapter, commentId, type RawComment, type SourceConfig } from "./contract.ts";
 import { createEngine, type MailLink, type MailView } from "./engine.ts";
 import { createCommentsWeb } from "./web.ts";
+import { appendSealed } from "../approval-seal.ts";
 
 const NOW = Date.parse("2026-10-23T00:00:00.000Z");
 const raw = (native: string): RawComment => ({ native, thread: "p1", author: "팬", text: "문서 받을 수 있나요? fan@example.com", postTitle: "Post one", at: NOW - 1000 });
@@ -92,7 +93,7 @@ async function withMail(t: T) {
 }
 const pick = (t: T, code: string, n: 1 | 2 | 3, ts = NOW + 5000, source = "web") => {
 	const label = ["보내기", "고치기", "보내지 않기"][n - 1]!;
-	appendFileSync(t.inbox, `${JSON.stringify({ ts: new Date(ts).toISOString(), kind: "message", source, text: `${n}) ${label}`, picks: [{ q: `이 답글을 올리고 메일도 보낼까요? (${code})`, n, label }] })}\n`);
+	appendSealed(t.inbox, { ts: new Date(ts).toISOString(), kind: "message", source, text: `${n}) ${label}`, picks: [{ q: `이 답글을 올리고 메일도 보낼까요? (${code})`, n, label }] });
 };
 
 describe("the combined card", () => {
@@ -189,7 +190,7 @@ describe("the combined card", () => {
 		expect((await runComments(["send", d.code, "--as-is"], t.engine, t.inbox)).code).toBe(1);
 		expect(t.log).toEqual(["compose M1"]);
 
-		appendFileSync(t.inbox, `${JSON.stringify({ ts: new Date(NOW + 6000).toISOString(), kind: "message", source: "web", text: "4) 이대로 보내기", picks: [{ q: `이 답글을 올리고 메일도 보낼까요? (${d.code})`, n: 4, label: "이대로 보내기" }] })}\n`);
+		appendSealed(t.inbox, { ts: new Date(NOW + 6000).toISOString(), kind: "message", source: "web", text: "4) 이대로 보내기", picks: [{ q: `이 답글을 올리고 메일도 보낼까요? (${d.code})`, n: 4, label: "이대로 보내기" }] });
 		const out = await runComments(["send", d.code, "--as-is"], t.engine, t.inbox);
 		expect(out.code).toBe(0);
 		expect(t.log).toEqual(["compose M1", "reply", "send M1 as-is"]);
@@ -204,7 +205,7 @@ describe("the combined card", () => {
 		expect(refused.lines[0]).toStartWith(LINT_REFUSED);
 		expect(t.log).toEqual(["compose M1"]);   // no "reply": a posted reply beside an unsent mail
 		expect(t.engine.store.drafts()[0]!.status).toBe("pending");
-		appendFileSync(t.inbox, `${JSON.stringify({ ts: new Date(NOW + 6000).toISOString(), kind: "message", source: "web", text: "4) 이대로 보내기", picks: [{ q: `이 답글을 올리고 메일도 보낼까요? (${d.code})`, n: 4, label: "이대로 보내기" }] })}\n`);
+		appendSealed(t.inbox, { ts: new Date(NOW + 6000).toISOString(), kind: "message", source: "web", text: "4) 이대로 보내기", picks: [{ q: `이 답글을 올리고 메일도 보낼까요? (${d.code})`, n: 4, label: "이대로 보내기" }] });
 		expect((await runComments(["send", d.code, "--as-is"], t.engine, t.inbox)).code).toBe(1);
 		expect(t.log).toEqual(["compose M1"]);
 		const only = await runComments(["send", d.code, "--only", "reply"], t.engine, t.inbox);
@@ -424,7 +425,7 @@ describe("sending one part of the card (send --only)", () => {
 		const o: { failSend?: string } = { failSend: "SMTP 거부" };
 		const t = setup({ ...o, issues: ["본문에 파일을 보낸다고 썼지만 첨부파일이 없어요"] });
 		const d = await withMail(t);
-		appendFileSync(t.inbox, `${JSON.stringify({ ts: new Date(NOW + 6000).toISOString(), kind: "message", source: "web", text: "4) 이대로 보내기", picks: [{ q: `이 답글을 올리고 메일도 보낼까요? (${d.code})`, n: 4, label: "이대로 보내기" }] })}\n`);
+		appendSealed(t.inbox, { ts: new Date(NOW + 6000).toISOString(), kind: "message", source: "web", text: "4) 이대로 보내기", picks: [{ q: `이 답글을 올리고 메일도 보낼까요? (${d.code})`, n: 4, label: "이대로 보내기" }] });
 		expect((await runComments(["send", d.code, "--as-is"], t.engine, t.inbox)).code).toBe(1);
 		const r = await runComments(["send", d.code, "--only", "mail", "--retry"], t.engine, t.inbox);
 		expect(r.code).toBe(1);

@@ -15,6 +15,7 @@ import { type KakaoConfig, kakaoPaths } from "./types.ts";
 import { fakeScreen } from "./ui.fixture.ts";
 import { runWatch } from "./watch.ts";
 import { createKakaoWeb } from "./web.ts";
+import { appendSealed } from "../approval-seal.ts";
 
 const OPEN = 106;
 const OPEN_NAME = "보컬 스터디 오픈채팅";
@@ -150,7 +151,7 @@ describe("open chat rooms", () => {
 		expect(await run(["draft", "--chat", String(OPEN)], ctx)).toBe(0);
 		const card = parseDraftApproval(out[0]!)!;
 		expect(card).toMatchObject({ toLabel: "대화방", to: OPEN_NAME, body: "7시에 해요" });
-		appendFileSync(paths.inbox, `${JSON.stringify({ ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: "1) 보내기", picks: [{ q: `카톡 답장 보낼까요? (${card.ref})`, n: 1, label: "보내기" }] })}\n`);
+		appendSealed(paths.inbox, { ts: new Date(Date.now() + 5000).toISOString(), kind: "message", source: "web", text: "1) 보내기", picks: [{ q: `카톡 답장 보낼까요? (${card.ref})`, n: 1, label: "보내기" }] });
 		expect(await run(["send", "--draft", card.ref!], ctx)).toBe(0);
 		expect(screen.sends).toEqual([["ax-send", OPEN_NAME, "7시에 해요"]]);
 		db.close();

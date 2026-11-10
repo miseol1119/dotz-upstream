@@ -8,6 +8,7 @@ import { createEngine, type DraftModel } from "./engine.ts";
 import { instagramAdapter } from "./adapters/google-meta.ts";
 import { bunExec, parseRss, websiteAdapter } from "./adapters/website.ts";
 import { createCommentsWeb } from "./web.ts";
+import { appendSealed } from "../approval-seal.ts";
 
 const NOW = Date.parse("2026-10-23T00:00:00.000Z");
 const reply = (body: string, extra: object = {}) => `\`\`\`json\n${JSON.stringify({ action: "draft", reason: "asks", to: "", body, questions: [], ...extra })}\n\`\`\``;
@@ -258,7 +259,7 @@ describe("the send gate", () => {
 		const refused = await runComments(["send", t.code], t.engine, inbox);
 		expect(refused.code).toBe(1);
 		expect(t.state.posted).toHaveLength(0);
-		const pick = (id: string, label: string, source = "web") => appendFileSync(inbox, `${JSON.stringify({ ts: new Date(NOW + 5000).toISOString(), kind: "message", source, text: `1) ${label}`, picks: [{ q: `이 답글 올릴까요? (${id})`, n: 1, label }] })}\n`);
+		const pick = (id: string, label: string, source = "web") => appendSealed(inbox, { ts: new Date(NOW + 5000).toISOString(), kind: "message", source, text: `1) ${label}`, picks: [{ q: `이 답글 올릴까요? (${id})`, n: 1, label }] });
 		pick("Dother00", "보내기");
 		expect((await runComments(["send", t.code], t.engine, inbox)).code).toBe(1);
 		pick(t.code, "보내기", "lane_message");
