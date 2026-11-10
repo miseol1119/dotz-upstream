@@ -33,7 +33,8 @@ test("build-demo exits non-zero on a planted word and names the file", async () 
   cpSync(join(repo, "site"), join(root, "site"), { recursive: true, filter: skip });
   cpSync(join(repo, "web"), join(root, "web"), { recursive: true, filter: skip });
   writeFileSync(join(root, "site", "planted.txt"), LONG);
-  const run = Bun.spawn(["bun", join(root, "site", "build-demo.ts")], { cwd: root, stdout: "pipe", stderr: "pipe" });
+  // The copy is no git checkout, so build-demo's `git show` per web file fails anyway (about 140 spawns, over 1 s): with git out of reach it reads the files at once.
+  const run = Bun.spawn([process.execPath, join(root, "site", "build-demo.ts")], { cwd: root, env: { ...process.env, PATH: "/nonexistent" }, stdout: "pipe", stderr: "pipe" });
   const [err, code] = await Promise.all([new Response(run.stderr).text(), run.exited]);
   expect(code).not.toBe(0);
   expect(err).toContain("planted.txt:1");
