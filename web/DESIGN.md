@@ -86,7 +86,7 @@ instant change. The product has no motion on/off setting: the system setting is 
 
 ## Per-form spec
 
-Heights, padding, gaps, type steps and don'ts for each display form (list row, card, settings row, sheet, button, badge, empty, toast, chips, field, progress) live in `docs/ui-spec.md`. Height tokens: `--row-h` 44 (rows), `--menu-h` 30 / `--menu-h-sheet` 44 (menu items), `--sheet-h` 44 (sheet items), `--btn-h` 36 (`.btn`), `--btn-h-sm` 32 (`.btn.sm`), `--btn-h-row` 28 (`.btn.inrow`, 40px touch target via padding); settings row = `.li` + `.li-end`; row-level add action = `.sec.sec-act` > `.btn.tonal.sm`. Screens use these; no one-off heights.
+Heights, padding, gaps, type steps and don'ts for each display form (list row, card, settings row, sheet, button, badge, empty, toast, chips, field, progress) live in `docs/ui-spec.md`. Height tokens: `--row-h` 44 (rows), `--menu-h` 30 / `--menu-h-sheet` 44 (menu items), `--sheet-h` 44 (sheet items), `--btn-h` 36 (`.btn`), `--btn-h-sm` 32 (`.btn.sm`), `--btn-h-row` 28 (`.btn.inrow`, 44px touch target via `::after`); settings row = `.li` + `.li-end`; row-level add action = `.sec.sec-act` > `.btn.tonal.sm`. Screens use these; no one-off heights. Touch: on a phone a control drawn under `--btn-hit` (44) keeps its drawn size and extends only its hit area (`::after`, or padding with the same negative margin in a row that clips); the areas of neighbours never overlap.
 
 ## 목록 줄 구성 (row anatomy)
 

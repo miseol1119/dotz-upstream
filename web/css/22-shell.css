@@ -179,6 +179,7 @@ body { display: flow-root; }
   .appbar :is(.ib, .ustrip, .conn) { position: relative; }
   .appbar :is(.ib, .ustrip, .conn)::after { content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, var(--btn-hit)); height: max(100%, var(--btn-hit)); transform: translate(-50%, -50%); }
   .appbar #back::after { left: 0; transform: translateY(-50%); }
+  .appbar h1.pdot { padding-block: var(--sp-3); margin-block: calc(var(--sp-3) * -1); }   /* the title clips its overflow (ellipsis), so its area is padding with the same margin back */
 }
 
 /* phone / touch: a control in the page body keeps its drawn size and answers a tap over --btn-hit through ::after, like the app bar above (a list row only needs 40). A row that scrolls sideways clips what hangs out above and below it (overflow-x: auto clips y too), so it carries the area as padding and gives the same back as negative margin: nothing moves. Where two areas would share a strip, the line gap or the end of the stack gives way, not the drawn size. */
@@ -199,11 +200,21 @@ body { display: flow-root; }
   .ct-body { padding-block: var(--sp-3); margin-block: calc(var(--sp-3) * -1); }
   .ct-file { z-index: 1; }
   #c-attach::after { top: calc(var(--sp-2) * -1); height: var(--btn-hit); transform: translateX(-50%); }
-  #cbar { padding-block: var(--sp-15); margin-block: calc(var(--sp-15) * -1); }
+  #cbar { padding-block: var(--sp-15) calc(var(--sp-4) + var(--sp-05)); margin-block: calc(var(--sp-15) * -1) calc((var(--sp-4) + var(--sp-05)) * -1); }
+  .cbar .cchip::after { top: calc(var(--sp-15) * -1); height: var(--btn-hit); transform: translateX(-50%); }   /* the text box ends 6px above the chips: the area grows down, over the composer's bottom padding */
   .hm-chips { row-gap: var(--sp-2); padding-bottom: var(--sp-05); }
   .pmv-edit::after { left: 0; width: 100%; height: var(--btn-hit); transform: none; }
   .mtop .mtop-b::after { left: 0; width: 100%; transform: translateY(-50%); }   /* nine buttons in the bar leave under 37px each: an area wider than the button would take a strip of its neighbour */
   .pmv-title::after { top: calc(var(--sp-3) * -1); }
   .pmv-purpose::after { top: calc(var(--sp-1) * -1); }
   .pmv-hrow { padding-top: var(--sp-15); }
+  /* the controls the list above missed (ui F7) */
+  :where(.td-bar, .rq-og, .nsc-x, .nsc-fold, .dr-rc-x, .dr-seg button) { position: relative; }
+  :where(.td-bar, .rq-og, .nsc-x, .nsc-fold, .dr-rc-x, .dr-seg button)::after { content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, var(--btn-hit)); height: max(100%, var(--btn-hit)); transform: translate(-50%, -50%); }
+  .dr-seg button { overflow: visible; }
+  .dr-seg button::after { left: 0; width: 100%; transform: translateY(-50%); }   /* the two segments share an edge: tall, not wider */
+  .rp-btn::before { content: ""; position: absolute; left: 50%; top: 50%; width: var(--btn-hit); height: var(--btn-hit); transform: translate(-50%, -50%); }
+  .dr-rc { overflow: visible; }
+  .ch > .btn.inrow::after { top: calc(var(--sp-15) * -1); bottom: calc((var(--sp-2) + var(--sp-05)) * -1); }   /* a card head sits 6px under the card's top edge, which clips */
+  .dr-rc-x::after { left: calc(var(--sp-05) * -1); width: var(--btn-hit); transform: translateY(-50%); }   /* grows into the gap after it, not over the name */
 }
