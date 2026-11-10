@@ -59,7 +59,8 @@ export async function memberIdOf(get: Get, team: number, fallback: number): Prom
  * the room list), else from the room and bot lists (a connector is never the JANDI bot). The room list is `{ chats: [...] }` (a bare list is also read). */
 export async function findRoom(get: Get, team: number, member: number): Promise<FoundRoom> {
 	const base = `start-api/v4/teams/${team}`;
-	const bot = list(obj(await get(base, 4)).members).map(obj).find(m => m.type === "bot" && int(m.id));
+	const bots0 = list(obj(await get(base, 4)).members).map(obj).filter(m => m.type === "bot" && int(m.id));
+	const bot = bots0.find(m => int(m.entityId)) ?? bots0[0];
 	if (bot && int(bot.entityId)) return { member_id: member, bot_id: int(bot.id), room_id: int(bot.entityId) };
 	const listed = list(await get(`${base}/bots`, 4)).map(obj);
 	const bots = new Set(listed.filter(b => b.botType !== "connect_bot").map(b => int(b.id)).filter(Boolean));

@@ -36,6 +36,11 @@ describe("reading the owner's session", () => {
 		expect(await findRoom(get, 9, 2)).toEqual({ member_id: 2, bot_id: 7, room_id: 70 });
 	});
 
+	test("a bot member with an entityId is taken before one without", async () => {
+		const get = getOf({ "start-api/v4/teams/9": { members: [{ id: 6, type: "bot" }, { id: 7, type: "bot", entityId: 70 }] } });
+		expect(await findRoom(get, 9, 2)).toEqual({ member_id: 2, bot_id: 7, room_id: 70 });
+	});
+
 	test("the team's bot member gives the bot id and the room id", async () => {
 		const get = getOf({ "start-api/v4/teams/9": { members: [{ id: 2, type: "user" }, { id: 7, type: "bot", entityId: 70 }] } });
 		expect(await findRoom(get, 9, 2)).toEqual({ member_id: 2, bot_id: 7, room_id: 70 });
