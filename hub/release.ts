@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeAtomic } from "../firstrun/atomic.ts"; // not hub/config.ts: it needs a data dir at load, and CI has none
 import { ownerAddress, releaseTerms, scrub, type Term } from "./public-scrub.ts";
-import { clearGate, gateStatus, realGateEnv, runGate, runSuiteIn, startGate, type GateEnv } from "./release-gate.ts";
+import { clearGate, gateStatus, realGateEnv, runGate, runSuiteIn, saveRedEvidence, startGate, type GateEnv } from "./release-gate.ts";
 import { buildReleaseNote, NOTE_LOG_FORMAT, parseNoteCommits } from "./release-note.ts";
 import { keyMissing, pushAuthArgs, RELEASE_IDENTITY, signingKeyPath, signMode, signTag, verifyOwnTag, type SignMode } from "./release-sign.ts";
 
@@ -553,8 +553,9 @@ export async function dispatchSlot(opts: DispatchOptions): Promise<number> {
 	}
 	const message =
 		gate.kind === "red"
-			? `전체 시험이 빨개서 이 시간대의 릴리스를 건너뛰었어요 (${gate.sha.slice(0, 8)}): ${failedList(gate.failed) || "실패한 파일을 읽지 못했어요"} · 다음 시간대에 새 main으로 다시 시험해요.`
+			? `전체 시험이 빨개서 이 시간대의 릴리스를 건너뛰었어요 (${gate.sha.slice(0, 8)}): ${failedList(gate.failures.length ? gate.failures.map(f => f.name) : gate.failed) || "실패한 시험을 읽지 못했어요"} · 다음 시간대에 새 main으로 다시 시험해요.`
 			: `시험은 초록이지만 릴리스를 내지 못했어요 (${gate.sha.slice(0, 8)}, 코드 ${gate.release?.code ?? "없음"}): ${(gate.release?.out ?? "릴리스 결과가 없어요").split("\n").slice(-3).join(" / ")} · 다음 시간대에 다시 시도해요.`;
+	if (gate.kind === "red") saveRedEvidence(opts.stateDir, slot, gate.sha, gate, now); // clearGate below removes the result: this is what stays
 	writeAtomic(stateFile, `${slot}\n`);
 	writeAtomic(join(opts.stateDir, "release-run.json"), `${JSON.stringify({ slot, startedAt: now.toISOString(), state: "failed", message } satisfies RunState)}\n`);
 	clearGate(opts.stateDir);

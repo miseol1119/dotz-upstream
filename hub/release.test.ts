@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Attempt, failedFiles, RETRY_MAX_FAILED_SHARE, runGate, runWithRetry, type GateEnv, type SuiteFn, type SuiteResult, testFileCount } from "./release-gate.ts";
+import { type Attempt, failedFiles, failedTests, RETRY_MAX_FAILED_SHARE, runGate, runWithRetry, type GateEnv, type SuiteFn, type SuiteResult, testFileCount } from "./release-gate.ts";
 import {
 	compareVersions,
 	cutInSlot,
@@ -452,6 +452,20 @@ describe("release slots", () => {
 		expect(failedFiles(xml)).toEqual(["hub/a.test.ts"]);
 	});
 
+	test("the failed tests come from the junit file with the first line of their error", () => {
+		const xml = [
+			'<testsuite name="hub/a.test.ts" file="hub/a.test.ts" tests="3" failures="2">',
+			'<testcase name="times out" classname="a" time="5.2" file="hub/a.test.ts" line="4" assertions="0"><failure type="TimeoutError" message="test timed out" /></testcase>',
+			'<testcase name="it&apos;s fine" classname="a" time="0.1" file="hub/a.test.ts" line="9" assertions="1" />',
+			'<testcase name="wrong value" classname="a" time="0.1" file="hub/a.test.ts" line="12" assertions="1"><failure type="Error" message="expected 1&#10;received 2">Error: expected 1&#10;  at x</failure></testcase>',
+			"</testsuite>",
+		].join("\n");
+		expect(failedTests(xml)).toEqual([
+			{ file: "hub/a.test.ts", name: "times out", error: "test timed out" },
+			{ file: "hub/a.test.ts", name: "wrong value", error: "expected 1" },
+		]);
+	});
+
 	describe("dispatch", () => {
 		const stateDir = () => {
 			const dir = mkdtempSync(join(tmpdir(), "dotz-release-state-"));
@@ -805,6 +819,22 @@ describe("release slots", () => {
 			expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T18:00:10")).toBe(0);
 			expect(kit.state.suites).toBe(2);
 			expect(kit.state.released).toEqual([kit.state.head]);
+		});
+
+		test("a red run leaves its failed tests, their first error line and the output tail in the state dir, and names the tests in the skip message", async () => {
+			const dir = stateDir();
+			const failures = [
+				{ file: "hub/a.test.ts", name: "seeds a long mailbox", error: "test timed out" },
+				{ file: "hub/b.test.ts", name: "closes only that question", error: "expected 1" },
+			];
+			const kit = gateKit({ green: false, failed: ["hub/a.test.ts", "hub/b.test.ts"], failures, detail: "the tail of the output" });
+			const lines: string[] = [];
+			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print: l => lines.push(l) }, "2026-11-05T12:00:10")).toBe(1);
+			expect(existsSync(join(dir, "gate-result.json"))).toBe(false); // cleared, as before
+			const kept = JSON.parse(readFileSync(join(dir, "release-red.json"), "utf8")) as { failures: unknown; failed: unknown; detail: string; sha: string };
+			expect(kept).toMatchObject({ failures, failed: ["hub/a.test.ts", "hub/b.test.ts"], detail: "the tail of the output", sha: kit.state.head });
+			expect(lines.at(-1)).toContain("seeds a long mailbox");
+			expect(lines.at(-1)).toContain("closes only that question");
 		});
 
 		test("a runner that died without a result fails the tick without using the slot, and the next tick starts it again", async () => {

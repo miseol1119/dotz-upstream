@@ -8,7 +8,9 @@ import { writeAtomic } from "../firstrun/atomic.ts"; // not hub/config.ts: it ne
 
 type Output = { code: number; out: string };
 export type GitFn = (args: readonly string[], cwd: string) => Promise<Output>;
-export type SuiteResult = { green: boolean; failed: string[]; detail: string; flaky?: string[] }; // flaky: files that failed the full run and passed the one retry
+// failures: the failed tests (name and first error line), from the junit file; detail: the tail of the run's output
+export type FailedTest = { file: string; name: string; error: string };
+export type SuiteResult = { green: boolean; failed: string[]; detail: string; flaky?: string[]; failures?: FailedTest[] }; // flaky: files that failed the full run and passed the one retry
 export type SuiteFn = (dir: string) => Promise<SuiteResult>;
 
 // What the tick needs from the machine: start a detached runner (its pid), ask if a pid lives, kill a runner with its children.
@@ -24,12 +26,12 @@ export type GateOutcome =
 	| { kind: "running" }
 	| { kind: "nothing"; sha: string } // nothing on main since the newest release tag: the suite was not run
 	| { kind: "green"; sha: string; flaky: string[]; release?: ReleaseResult } // release: what releasing that commit did (a runner from before the release moved here has none)
-	| { kind: "red"; sha: string; failed: string[]; detail: string }
+	| { kind: "red"; sha: string; failed: string[]; failures: FailedTest[]; detail: string }
 	| { kind: "unrunnable"; reason: string };
 
 export type ReleaseResult = { code: number; out: string };
 type RunFile = { slot: string; pid: number; startedAt: string };
-type ResultFile = { slot: string; sha?: string; nothing?: boolean; green?: boolean; failed?: string[]; flaky?: string[]; detail?: string; release?: ReleaseResult; error?: string };
+type ResultFile = { slot: string; sha?: string; nothing?: boolean; green?: boolean; failed?: string[]; failures?: FailedTest[]; flaky?: string[]; detail?: string; release?: ReleaseResult; error?: string };
 const RELEASE_OUT_CHARS = 1500;
 
 const RUN_FILE = "gate-run.json";
@@ -37,6 +39,8 @@ const RESULT_FILE = "gate-result.json";
 const LOG_FILE = "gate.log";
 const MAX_RUN_MS = 45 * 60_000; // the suite's own limit is 40 minutes; past this the run is taken for lost
 const SUITE_TIMEOUT_MS = 40 * 60_000;
+const RED_FILE = "release-red.json"; // the evidence of the last red run; clearGate leaves it, the next red run replaces it
+const DETAIL_CHARS = 2000;
 const LAST_RESULT = ".dotz-last-test.xml"; // written by every run: bunfig.toml, [test.reporter]
 
 function readState<T>(file: string): T | null {
@@ -51,6 +55,12 @@ function readState<T>(file: string): T | null {
 export function clearGate(stateDir: string): void {
 	rmSync(join(stateDir, RUN_FILE), { force: true });
 	rmSync(join(stateDir, RESULT_FILE), { force: true });
+}
+
+// Keeps what a red run showed (failed tests with their first error line, the output tail) in the state dir: the gate's own files are cleared at
+// the end of the slot, and without this a skipped slot leaves nothing to read.
+export function saveRedEvidence(stateDir: string, slot: string, sha: string, red: { failed: readonly string[]; failures: readonly FailedTest[]; detail: string }, now: Date): void {
+	writeAtomic(join(stateDir, RED_FILE), `${JSON.stringify({ slot, sha, at: now.toISOString(), failed: red.failed, failures: red.failures, detail: red.detail })}\n`);
 }
 
 function stopRun(c: GateCtx, run: RunFile): void {
@@ -77,7 +87,7 @@ export function gateStatus(c: GateCtx): GateOutcome {
 		}
 		if (result.nothing) return { kind: "nothing", sha: result.sha };
 		if (result.green) return { kind: "green", sha: result.sha, flaky: result.flaky ?? [], release: result.release };
-		return { kind: "red", sha: result.sha, failed: result.failed ?? [], detail: result.detail ?? "" };
+		return { kind: "red", sha: result.sha, failed: result.failed ?? [], failures: result.failures ?? [], detail: result.detail ?? "" };
 	}
 	if (c.now.getTime() - Date.parse(run.startedAt) > MAX_RUN_MS) {
 		stopRun(c, run);
@@ -202,13 +212,26 @@ export function failedFiles(xml: string): string[] {
 	return [...new Set([...xml.matchAll(/<testsuite name="[^"]*" file="([^"]*)"[^>]* failures="[1-9]/g)].map(m => m[1]!))];
 }
 
+const unescapeXml = (s: string): string => s.replace(/&#10;/g, "\n").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+
+// The tests that failed, from the junit file the run leaves in `dir`: name, file and the first line of the error.
+export function failedTests(xml: string): FailedTest[] {
+	const found: FailedTest[] = [];
+	for (const m of xml.matchAll(/<testcase name="([^"]*)"[^>]*? file="([^"]*)"[^>]*[^/]>\s*<failure([^>]*?)(\/?)>([^<]*)/g)) {
+		const attr = /message="([^"]*)"/.exec(m[3]!)?.[1];
+		const error = unescapeXml(attr || m[5] || "").split("\n")[0]!.trim();
+		found.push({ file: m[2]!, name: unescapeXml(m[1]!), error });
+	}
+	return found;
+}
+
 // All test files of the run in the junit file (a describe block is a suite of its own, so files are counted once).
 export function testFileCount(xml: string): number {
 	return new Set([...xml.matchAll(/<testsuite name="[^"]*" file="([^"]*)"/g)].map(m => m[1])).size;
 }
 
 // One run of the suite in `dir`: all of it, or only `files`. `total` is the number of test files in that run's report.
-export type Attempt = { green: boolean; failed: string[]; total: number; detail: string };
+export type Attempt = { green: boolean; failed: string[]; total: number; detail: string; failures?: FailedTest[] };
 export type AttemptFn = (dir: string, files?: readonly string[]) => Promise<Attempt>;
 
 export const RETRY_MAX_FAILED_SHARE = 0.15; // the share of all test files that may fail and still be retried; more is a real breakage and stays red
@@ -218,11 +241,11 @@ export const RETRY_MAX_FAILED_SHARE = 0.15; // the share of all test files that 
 export async function runWithRetry(dir: string, attempt: AttemptFn): Promise<SuiteResult> {
 	const first = await attempt(dir);
 	if (first.green) return { green: true, failed: [], detail: "" };
-	const red: SuiteResult = { green: false, failed: first.failed, detail: first.detail };
+	const red: SuiteResult = { green: false, failed: first.failed, failures: first.failures ?? [], detail: first.detail };
 	if (first.failed.length === 0 || first.total <= 0 || first.failed.length / first.total > RETRY_MAX_FAILED_SHARE) return red;
 	const second = await attempt(dir, first.failed);
 	if (second.green) return { green: true, failed: [], detail: "", flaky: first.failed };
-	return { green: false, failed: second.failed.length ? second.failed : first.failed, detail: second.detail };
+	return { green: false, failed: second.failed.length ? second.failed : first.failed, failures: (second.failed.length ? second.failures : first.failures) ?? [], detail: second.detail };
 }
 
 function suiteAttempt(): AttemptFn {
@@ -233,7 +256,7 @@ function suiteAttempt(): AttemptFn {
 		const tested = await spawn(files ? ["bun", "test", ...files.map(f => `./${f}`)] : ["bun", "run", "test"], dir);
 		const green = tested.code === 0 && /^\s*0 fail/m.test(tested.out);
 		const xml = existsSync(report) ? readFileSync(report, "utf8") : "";
-		return { green, failed: failedFiles(xml), total: testFileCount(xml), detail: tested.out.trim().slice(-300) };
+		return { green, failed: failedFiles(xml), failures: failedTests(xml), total: testFileCount(xml), detail: tested.out.trim().slice(-DETAIL_CHARS) };
 	};
 }
 
