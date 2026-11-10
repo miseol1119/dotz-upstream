@@ -26,8 +26,8 @@
 .mon-pc { margin-left: var(--sp-2); white-space: nowrap; color: var(--fg-3); font: 400 11px/16px var(--font); }
 .cv-id { margin-left: var(--sp-2); color: var(--fg-3); font: 400 12px/16px var(--font); }
 .cv-row.unread .cv-n { font-weight: 600; }
-/* the unread count: 11px, one step up from the tab bar's 10.5 (docs/ui-spec.md 배지·점) */
-.cv-row .nb { min-width: 18px; height: 18px; border-radius: 9px; font-size: 11px; line-height: 18px; }
+/* the unread count and the 미답장 count: 11px, one step up from the tab bar's 10.5 (docs/ui-spec.md 배지·점); the same size on a list row, a home row and the head of a card or app */
+.cv-row .nb, .hr .nb, .hn-h .nb, #mon-head .nb { min-width: 18px; height: 18px; border-radius: 9px; font-size: 11px; line-height: 18px; }
 /* a session under its project: indented, smaller avatar; the group label for sessions started from chat */
 .cv-row.sub { min-height: 40px; padding-left: var(--sp-8); }
 .cv-row.sub .cv-av { width: 28px; height: 28px; }

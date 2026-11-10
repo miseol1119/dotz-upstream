@@ -124,6 +124,8 @@ float shadow (`--float`, `--shadow-menu`, `--shadow-dialog`, `--shadow-sheet`). 
 
 Count badges (`.nb`, unread circles) and dots stay as they are; the palette does not change with these shapes.
 
+A COUNT is a badge, a STATE is a dot + word. The unread count `.nb` is a filled capsule on every row that shows it (app and project rows, home cards, mail and comment rows): `--accent` fill with `--on-accent` text in light, `--unreplied` orange in dark (owner 2026-11-05). "미답장 N" (a number) is the tinted orange count badge `.nb.unreplied`; one item that is owed, with no number, is `.tag.unreplied`, a dot and a word. The same count has the same size and fill on every row; do not set a bare number or coloured text for it.
+
 **Keep a capsule only where it is the natural shape**: a standalone object you pick up or remove, a count, a switch, or a round action
 next to other buttons. Kept: count badges (`.nb`, `.pr-n`, `.pl-nb`, `.mth-n`, `.mlist-b`, `.pk-n`, `.tr-n`, `.fb-n`); switches (`.hs-sw`, `.kk-sw`);
 recipient and token chips (`.dr-chip`, `.pj-tg` channel/file, `.sl-c`/`.sl-a` slash-command arguments, `.fatt` attachments); round icon

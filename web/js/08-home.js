@@ -278,7 +278,7 @@ function homeConvRow(c) {
 function homeOwedRow(it) {
   return el("button", { class: "hr", type: "button", onclick: () => go("monitoring", it.key), "aria-label": `${it.name} · 미답장 ${it.unreplied}건` },
     el("span", { class: "dot unreplied" }), el("span", { class: "hb" }, el("span", { class: "hn1" }, el("span", { class: "nm", text: it.name })), el("span", { class: "ha", text: "답장을 기다리는 것이 있어요" })),
-    el("span", { class: "hs unreplied", text: `미답장 ${it.unreplied}` }));
+    unrepCount(it.unreplied));
 }
 // 답장 대기: what waits on the owner in the apps (a draft to send or a failed send, of every computer), one row that opens the screen (30-replies.js).
 function homeRepliesRow(n) {
@@ -453,7 +453,7 @@ function renderHomeNow() {
   const running = el("div", { class: "hn", "data-k": "running", "data-cap": "running" }, ...waitT.map(t => homeNowRow(t, SESSION_WORD.wait[0], "att", true)), ...runT.map(t => homeNowRow(t, targetState(t)[0], "", true)), ...convWork.map(x => x.conv ? workRow(x) : homeConvRow(x)), ...bg.map(workRow),
     ...(working || waitT.length || bg.length ? [] : [hcNone(S && S.seeded ? "불러오는 중…" : "진행 중인 작업이 없어요")]));
   const owedBlock = owed.length || drafts ? [
-    el("div", { class: "hn-h hsub" }, el("h2", { text: "답장" }), owedN ? unrepPill(`미답장 ${owedN}`) : null),
+    el("div", { class: "hn-h hsub" }, el("h2", { text: "답장" }), owedN ? unrepCount(owedN) : null),
     el("div", { class: "hn", "data-k": "replies", "data-cap": "replies" }, ...(drafts ? [homeRepliesRow(drafts)] : []), ...owed.map(homeOwedRow))] : [];
   clear(now).append(homeGreeting(h), ...[homeStrip()].filter(Boolean),
     el("div", { class: "hneeds" },

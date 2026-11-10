@@ -85,9 +85,8 @@ for (const [width, height] of [[390, 844], [1280, 800]] as const) {
 			expect(rows["i:kakao"]).toEqual({ nb: [], unreplied: ["미답장 1"] });
 			expect(rows["peer:i:mail"]!.unreplied).toEqual(["미답장 2"]);
 			expect(await fg(v, '#mon-side .nb.unreplied')).toBe("rgb(194, 65, 12)");
-			// light: the unread count is a grey number with no fill, blue is only for what you press
-			expect(await bg(v, '#mon-side .cv-row[data-k="i:youtube"] .nb:not(.unreplied)')).toBe("rgba(0, 0, 0, 0)");
-			expect(await fg(v, '#mon-side .cv-row[data-k="i:youtube"] .nb:not(.unreplied)')).toBe("rgb(78, 89, 104)");
+			// light: the unread count is a blue count badge (owner 2026-11-05), not a bare grey number
+			expect(await bg(v, '#mon-side .cv-row[data-k="i:youtube"] .nb:not(.unreplied)')).toBe("rgb(49, 130, 246)");
 			expect(await bg(v, "#nav-upd")).toBe("rgb(49, 130, 246)");
 			expect(await q<boolean>(v, `return document.documentElement.scrollWidth <= ${width}`)).toBe(true);
 			await shot(v, `app-list-${width}-light.png`);
@@ -110,7 +109,7 @@ for (const [width, height] of [[390, 844], [1280, 800]] as const) {
 			await waitFor(v, `!$("#cm").hidden && CM.loaded && document.querySelector("#cm .kk-row")`);
 			const row = await q<{ nb: string; unreplied: string }>(v, `const r = document.querySelector("#cm .kk-row"); return { nb: r.querySelector(".nb:not(.unreplied)").textContent, unreplied: r.querySelector(".nb.unreplied").textContent }`);
 			expect(row).toEqual({ nb: "2", unreplied: "미답장 2" });
-			expect(await q<string>(v, `return document.querySelector("#mon-head .tag.unreplied").textContent`)).toBe("미답장 2");
+			expect(await q<string>(v, `return document.querySelector("#mon-head .nb.unreplied").textContent`)).toBe("미답장 2");
 			await shot(v, `comments-list-${width}-light.png`);
 
 			await run(v, `document.querySelector("#cm .kk-row").click()`);
@@ -128,14 +127,13 @@ for (const [width, height] of [[390, 844], [1280, 800]] as const) {
 			const read = `(() => { document.body.insertAdjacentHTML("beforeend", '<span class="hr"><i class="dot un"></i></span><div class="fr un"><span class="rc-src">x</span></div>'); return JSON.stringify([getComputedStyle(document.querySelector(".hr .dot.un")).backgroundColor, getComputedStyle(document.querySelector(".fr.un .rc-src"), "::before").backgroundColor]); })()`;
 			expect(JSON.parse((await v.evaluate(read)) as string)).toEqual(["rgb(255, 154, 77)", "rgb(255, 154, 77)"]);
 		});
-		test.each([["light", "rgb(49, 130, 246)"], ["dark", "rgb(255, 154, 77)"]] as const)("the plain unread number in %s: blue in light, orange in dark; a draft count stays blue", async (theme, unread) => {
+		test.each([["light", "rgb(49, 130, 246)"], ["dark", "rgb(255, 154, 77)"]] as const)("the unread count badge in %s: blue in light, orange in dark; a draft count stays blue", async (theme, unread) => {
 			await boot(v, theme, `go("monitoring", "i:youtube")`);
 			await waitFor(v, `!$("#cm").hidden && CM.loaded && document.querySelector("#cm .kk-row")`);
 			const sel = "#cm .kk-row .nb:not(.unreplied)";
-			expect(await fg(v, sel)).toBe(unread);
-			expect(await bg(v, sel)).toBe("rgba(0, 0, 0, 0)");
+			expect(await bg(v, sel)).toBe(unread);
 			await run(v, `document.querySelector(${JSON.stringify(sel)}).classList.add("drafted")`);
-			expect(await fg(v, sel)).toBe(theme === "dark" ? "rgb(108, 167, 255)" : unread);
+			expect(await bg(v, sel)).toBe(theme === "dark" ? "rgb(108, 167, 255)" : "rgb(49, 130, 246)");
 		});
 	});
 }
@@ -144,17 +142,38 @@ describe("home and the peer's mail", async () => {
 	const v = await open(390, 844);
 	test("the home 답변 필요 list counts this computer's 미답장 apart from unread (the other computer's stay in 모니터링)", async () => {
 		await boot(v, "light", `go("home")`);
-		await waitFor(v, `current === "home" && PQ.loaded && document.querySelectorAll("#home-now .hr .hs.unreplied").length === 3`);
-		const t = await q<{ head: string; rows: string[] }>(v, `return { head: document.querySelector("#home-now .hn-h .tag.unreplied").textContent, rows: [...document.querySelectorAll("#home-now .hr .hs.unreplied")].map(n => n.textContent) }`);
+		await waitFor(v, `current === "home" && PQ.loaded && document.querySelectorAll("#home-now .hr .nb.unreplied").length === 3`);
+		const t = await q<{ head: string; rows: string[] }>(v, `return { head: document.querySelector("#home-now .hn-h .nb.unreplied").textContent, rows: [...document.querySelectorAll("#home-now .hr .nb.unreplied")].map(n => n.textContent) }`);
 		expect(t.head).toBe("미답장 4");
 		expect(t.rows).toEqual(["미답장 2", "미답장 1", "미답장 1"]);
 		await shot(v, "home-390-light.png");
+	});
+	// A count is a badge, a state is a dot and a word (web/DESIGN.md): the unread count and the 미답장 count read the same on an app row, a home row and a comments row.
+	test.each(["light", "dark"] as const)("the unread count and the 미답장 count are one badge shape on app rows, home rows and comment rows (%s)", async theme => {
+		const look = (sel: string) => q<{ bg: string; radius: string; h: number; weight: string }>(v, `const n = document.querySelector(${JSON.stringify(sel)}); const s = getComputedStyle(n); return { bg: s.backgroundColor, radius: s.borderRadius, h: Math.round(n.getBoundingClientRect().height), weight: s.fontWeight }`);
+		await boot(v, theme, `go("monitoring")`);
+		await waitFor(v, `current === "monitoring" && document.querySelector('#mon-side .cv-row[data-k="i:youtube"] .nb:not(.unreplied)')`);
+		const appUnread = await look('#mon-side .cv-row[data-k="i:youtube"] .nb:not(.unreplied)'), appOwed = await look('#mon-side .cv-row[data-k="i:youtube"] .nb.unreplied');
+		expect(appUnread.bg).not.toBe("rgba(0, 0, 0, 0)");
+		expect(appUnread.bg).not.toBe(appOwed.bg);
+		await run(v, `go("home")`);
+		await waitFor(v, `current === "home" && PQ.loaded && document.querySelector("#home-now .hr .nb.unreplied")`);
+		expect(await look("#home-now .hr .nb.unreplied")).toEqual(appOwed);
+		expect(await look("#home-now .hn-h .nb.unreplied")).toEqual(appOwed);
+		await run(v, `go("monitoring", "i:youtube")`);
+		await waitFor(v, `!$("#cm").hidden && CM.loaded && document.querySelector("#cm .kk-row .nb.unreplied")`);
+		expect(await look("#cm .kk-row .nb:not(.unreplied)")).toEqual(appUnread);
+		expect(await look("#cm .kk-row .nb.unreplied")).toEqual(appOwed);
+		// the app header is not laid out beside the comments list on a phone, so its look is compared without a height
+		expect({ ...(await look("#mon-head .nb.unreplied")), h: 0 }).toEqual({ ...appOwed, h: 0 });
 	});
 	test("a peer's mail card carries the pill, and 답장 안 함 goes to that computer", async () => {
 		await boot(v, "light", `go("monitoring")`);
 		await waitFor(v, `document.querySelector('#mon-side .cv-row[data-k^="p:"][data-k$="i:mail"]')`);
 		await run(v, `document.querySelector('#mon-side .cv-row[data-k^="p:"][data-k$="i:mail"]').click()`);
 		await waitFor(v, `document.querySelector("#mon-tl .mr .tag.unreplied")`);
+		// one mail still owed is a state: a dot and a word with no fill, not a count badge
+		expect(await q(v, `const t = document.querySelector("#mon-tl .mr .tag.unreplied"); return [getComputedStyle(t).backgroundColor, getComputedStyle(t, "::before").content !== "none", t.classList.contains("nb")]`)).toEqual(["rgba(0, 0, 0, 0)", true, false]);
 		// 초안 작성 is the pencil on the row: it asks first what the reply should say, then the computer that holds the mail makes the draft with it
 		await run(v, `document.querySelector("#mon-tl .mr .mr-draft").click()`);
 		await waitFor(v, `document.querySelector('dialog[open] [data-k="draft-instruction"]')`);

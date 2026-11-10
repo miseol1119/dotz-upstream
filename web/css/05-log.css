@@ -165,7 +165,6 @@ details.think .md { padding: var(--sp-1) var(--sp-2) var(--sp-2) var(--box-ind);
 .hr .ha { min-width: 0; color: var(--fg-2); font-size: var(--fs-meta); line-height: var(--lh-meta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hr .ha:empty { display: none; }
 .hr .hp { flex: none; color: var(--fg-3); font-size: var(--fs-meta); line-height: var(--lh-meta); font-variant-numeric: tabular-nums; }
-.hr .hs.unreplied { color: var(--unreplied); font-weight: 600; }
 .hr .hs { flex: none; min-width: 44px; text-align: right; color: var(--fg-2); font-size: var(--fs-meta); line-height: var(--lh-meta); font-weight: 500; }
 .hr .hs.pri { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-15); color: var(--accent); }
 .hr .hs.pri::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }   /* the word keeps its color; the dot is the tag pattern */
