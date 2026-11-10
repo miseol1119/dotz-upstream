@@ -167,10 +167,10 @@ describe("a room that is not watched opens read-only", () => {
 		t.close();
 	});
 
-	test("168 rooms x 5,000 messages: each open reads the messages through an index and the room list is read once", async () => {
+	test("168 rooms x 60 messages: each open reads the messages through an index and the room list is read once", async () => {
 		const p = kakaoPaths(dir, dir);
 		const dbPath = join(dir, "big.sqlite");
-		const ROOMS = 168, PER = 5000;
+		const ROOMS = 168, PER = 60; // a query plan does not depend on row count: 60 per room is enough for a full page of 50
 		const w = makeFixtureDb(dbPath, { rooms: Array.from({ length: ROOMS }, (_, i) => ({ chatId: 5000 + i, type: i % 3 === 0 ? 0 : 1, chatName: i % 3 === 0 ? null : `Room ${i}`, members: 6, peer: i % 3 === 0 ? PEER : null, lastUpdatedAt: at(i), ...(i % 5 === 0 ? { linkId: LINK } : {}) })), users: [{ userId: PEER, friendNickName: "Alex" }, { userId: MEMBER, linkId: LINK, nickName: "Washer" }], openLinks: [{ linkId: LINK, linkName: "Open Room" }], messages: [] });
 		w.exec("CREATE INDEX IF NOT EXISTS msg_chat ON NTChatMessage (chatId, logId)");
 		const ins = w.query("INSERT INTO NTChatMessage VALUES (?, ?, ?, ?, 1, ?, NULL, NULL)");
@@ -192,7 +192,7 @@ describe("a room that is not watched opens read-only", () => {
 			expect(((await res!.json()) as any).messages).toHaveLength(50);
 		};
 		for (const chatId of [5000, 5001, 5005, 5100, 5167, 5003]) await open(chatId);
-		// An open stays fast because every query that reads the messages walks an index and never the whole 840,000-row table.
+		// An open stays fast because every query that reads the messages walks an index and never the whole table.
 		const plans: string[] = [];
 		for (const [sql, params] of asked) if (/\bNTChatMessage\b/.test(sql)) for (const row of await db.query(`EXPLAIN QUERY PLAN ${sql}`, params)) plans.push(String(row.detail));
 		expect(plans.length).toBeGreaterThan(0);
