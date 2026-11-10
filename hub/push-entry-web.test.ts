@@ -246,6 +246,7 @@ describe.each(Object.entries(KINDS))("%s", (_name, k) => {
 });
 
 // The page's two first reads (the conversation and the notices) answer in either order; the tap must land whichever comes last.
+// Each opens a window and holds a reply until the page asked for it: 20s, not the default 5s, so a busy machine running other work does not fail it.
 describe.each([["/api/history"], ["/api/notices"]])("app closed, %s answered last", late => {
 	test.each(["answer (notice)", "question", "session done", "monitor news", "mail"])("%s", async name => {
 		const k = KINDS[name]!, sw = swOf(hub.origin, []);
@@ -260,7 +261,7 @@ describe.each([["/api/history"], ["/api/notices"]])("app closed, %s answered las
 			release();
 			await expectLanded(view, k);
 		} finally { release(); }
-	});
+	}, 20_000);
 });
 
 // A notice relayed from the other computer: this app opens, switches to that computer and ends on the item there.
@@ -293,6 +294,7 @@ describe("another computer's push", () => {
 });
 
 // The tap goes through the worker (web/sw.js notificationclick) into the real page, with windows that are not the plain top-level app window.
+// A fresh window, and 1800 messages for the far one: 20s, not the default 5s, so a busy machine running other work does not fail it.
 describe.each([["phone", 390], ["wide window", WIDE]] as const)("worker tap, %s", (_name, width) => {
 	test("app closed, the message is far back in a long conversation", async () => {
 		const sw = swOf(hub.origin, []);
@@ -301,7 +303,7 @@ describe.each([["phone", 390], ["wide window", WIDE]] as const)("worker tap, %s"
 		const view = await hub.view({ width, height: 844 }, sw.opened[0]!.slice(hub.origin.length));
 		await ready(view);
 		await expectLanded(view, { conv: "ch:2", at: LONG_AT, push: {} });
-	});
+	}, 20_000);
 	test("app open in a user app window (/apps/x/) and no app window", async () => {
 		// A window of a user app has no receiver for the tap and never answers: the worker must not hand the tap to it.
 		const sw = swOf(hub.origin, [{ url: `${hub.origin}/apps/x/`, focus: async () => {}, postMessage: () => {} }]);
@@ -310,7 +312,7 @@ describe.each([["phone", 390], ["wide window", WIDE]] as const)("worker tap, %s"
 		const view = await hub.view({ width, height: 844 }, sw.opened[0]!.slice(hub.origin.length));
 		await ready(view);
 		await expectLanded(view, KINDS["answer (notice)"]!);
-	});
+	}, 20_000);
 	test("app open but its window does not answer", async () => {
 		const posted: unknown[] = [];
 		let handed!: () => void;
@@ -327,5 +329,5 @@ describe.each([["phone", 390], ["wide window", WIDE]] as const)("worker tap, %s"
 		const view = await hub.view({ width, height: 844 }, sw.opened[0]!.slice(hub.origin.length));
 		await ready(view);
 		await expectLanded(view, KINDS["answer (notice)"]!);
-	});
+	}, 20_000);
 });

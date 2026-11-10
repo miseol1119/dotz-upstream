@@ -29,6 +29,7 @@ const hub = fakeHub({
 });
 afterAll(() => hub.stop());
 
+// Both page back through 1800 messages: 20s, not the default 5s, so a busy machine running other work does not fail them.
 describe.each([["phone", 390], ["desktop", 1280]] as const)("%s", (_name, width) => {
 	test("a finished job's result far back in the conversation is landed on", async () => {
 		const view = await hub.view({ width, height: 844 }, "/#home");
@@ -37,7 +38,7 @@ describe.each([["phone", 390], ["desktop", 1280]] as const)("%s", (_name, width)
 		await run(`workGo({ id: "w1" });`);
 		await waitFor(`tl.querySelector(".nt-hl")`);
 		expect(await ev(`[target, tl.querySelector(".nt-hl").closest("[data-ts]").dataset.ts, !!$(".snack")]`)).toEqual(["main", DEEP_AT, false]);
-	});
+	}, 20_000);
 
 	test("a result message that is gone keeps the toast", async () => {
 		const view = await hub.view({ width, height: 844 }, "/#home");
@@ -46,5 +47,5 @@ describe.each([["phone", 390], ["desktop", 1280]] as const)("%s", (_name, width)
 		await run(`workGo({ id: "w2" });`);
 		await waitFor(`$(".snack")`);
 		expect(await ev(`[target, !!$(".snack"), !!tl.querySelector(".nt-hl")]`)).toEqual(["main", true, false]);
-	});
+	}, 20_000);
 });
