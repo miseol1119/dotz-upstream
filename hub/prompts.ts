@@ -191,6 +191,8 @@ export function createPrompts(deps: PromptDeps) {
 		deps.log(`held an early send to ${target} until the turn's answer (${text.trim().length} chars)`);
 		return true;
 	}
+	/** A turn ended without a final answer to carry its held early sends: they go out now, once, as one note that settles nothing (with `extra`, what the turn wrote around [later]). */
+	const flushHeld = (p: Prompt, extra = "") => { const text = [...(p.held ?? []), extra].filter(Boolean).join("\n\n"); p.held = undefined; if (p.target && text) deps.interim?.(p.target, text); };
 
 	// What was steered into a cancelled request may still wait in the runtime's queue, and the runtime starts a turn with it after the
 	// abort (2026-10-28 live check: the turn came back 1 s after 중단 and answered). onPrompt tells the caller to abort that turn too.
@@ -306,6 +308,7 @@ export function createPrompts(deps: PromptDeps) {
 			p.retry = true;
 			deferred.push(p);
 			deps.log(`turn for ${p.target} stopped on an error before answering; its request stays open for the retry`);
+			flushHeld(p);
 			closeTurn();
 			current = undefined;
 			woke.length = 0;
@@ -316,9 +319,10 @@ export function createPrompts(deps: PromptDeps) {
 		// also right after a restart) is a new one and must not be taken for a continuation of this prompt (2026-10-20 12:51Z).
 		if (!p.done && p.target && !p.deferred) {
 			deps.log(`turn ended without an answer to ${p.target}; ${p.last ? "sending its last text" : "it wrote no text"}`);
-			if (p.last) onAnswer(p.last);
+			if (p.last || p.held?.length) onAnswer(p.last ?? "");
 			else p.done = true;
 		}
+		flushHeld(p);
 		closeTurn();
 		current = undefined;
 		askBack(p.target);
@@ -605,7 +609,7 @@ export function createPrompts(deps: PromptDeps) {
 		if (p.done) return onContinued(p, text);
 		const { later, text: t } = laterParts(text);
 		if (later && p.target && !p.deferred) {
-			if (t) deps.interim?.(p.target, t);
+			flushHeld(p, t);
 			// The answer itself waits for the worker, but the conversation must not look silent (owner 2026-10-27: "메일 내 대화에서
 			// 다른 일 시키니까 일 안하네"): one short note names who took it. It is a gateway note, so it settles no prompt.
 			// A turn the gateway woke for a request already waiting: that one entry keeps waiting.
@@ -642,7 +646,7 @@ export function createPrompts(deps: PromptDeps) {
 			save();
 			return;
 		}
-		if (later) return void (p.target && t && deps.interim?.(p.target, t));
+		if (later) return flushHeld(p, t);
 		p.done = true;
 		const silent = isSilent(t);
 		if (silent && t !== "-") deps.log(`a no-op answer for ${p.target ?? "-"} was not posted: ${t.slice(0, 160)}`);
@@ -654,12 +658,12 @@ export function createPrompts(deps: PromptDeps) {
 		const target = p.target;
 		// Parts sent early with dotz_send do not replace the answer; skip it only when it repeats something already sent.
 		const sentHere = p.sent.some(s => s.target === target);
-		const held = p.held ?? [];
+		const held = p.held ?? []; p.held = undefined;
 		// Also a repeat: the same first NEAR_CHARS normalized characters as something this turn already posted to that conversation
 		// (a schedule text said "tell web" while its final answer goes to "chat", both the main web conversation).
 		const key = head(t);
 		const prior = [...p.sent.filter(s => sameConv(s.target, target)).map(s => s.text), ...held];
-		const repeat = silent || prior.some(h => h.includes(t) || (key.length >= NEAR_MIN && head(h) === key));
+		const repeat = silent || !t || prior.some(h => h.includes(t) || (key.length >= NEAR_MIN && head(h) === key));
 		if (repeat && !held.length) {
 			if (sentHere) deps.clearProgress(target);
 			return burst.close(target, ids);
