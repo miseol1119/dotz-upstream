@@ -154,6 +154,22 @@ test("the token in the counts read reaches the computer over the real fetch, and
 	}
 });
 
+test("a computer that refuses the token (403) is asked again without it, any other failure reads as not connected", async () => {
+	const url = "http://100.100.0.9:8445";
+	const seen: Array<string | undefined> = [];
+	const refuses = async (_u: string, h?: Record<string, string>): Promise<unknown> => {
+		seen.push(h?.["x-dotz-peer"]);
+		if (h) throw new Error("HTTP 403");
+		return { unread: 3, items: [] };
+	};
+	expect(await refreshCounts(url, refuses, () => "stale-token")).toEqual({ unread: 3, need: 0 });
+	expect(seen).toEqual(["stale-token", undefined]);
+	seen.length = 0;
+	const down = async (_u: string, h?: Record<string, string>): Promise<unknown> => (seen.push(h?.["x-dotz-peer"]), Promise.reject(new Error("timeout")));
+	expect(await refreshCounts(url, down, () => "stale-token")).toBeUndefined();
+	expect(seen).toEqual(["stale-token"]);
+});
+
 test("the public probes never carry a peer header", async () => {
 	const headers: unknown[] = [];
 	const get = async (_u: string, h?: Record<string, string>): Promise<unknown> => (headers.push(h), { name: "dotz" });

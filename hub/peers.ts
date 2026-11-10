@@ -139,8 +139,10 @@ export async function peerName(url: string, get: Fetcher = getJson): Promise<str
 // Only tailnet computers get here: listPeers answers a public row by its manifest, and hub/peer-stream.ts follows knownComputers.
 async function counts(url: string, get: Fetcher = getJson, token: (url: string) => string | undefined = peerTokenFor): Promise<{ unread: number; need: number } | undefined> {
 	try {
-		const t = token(url);
-		return countsFrom(await get(`${url}/api/notices?limit=100`, t ? { [PEER_HEADER]: t } : undefined));
+		const t = token(url), path = `${url}/api/notices?limit=100`;
+		if (!t) return countsFrom(await get(path));
+		// A peer refuses a token it does not accept even where the tailnet identity alone would pass (stale pairing): ask once more without it, so that row stays connected as before.
+		return countsFrom(await get(path, { [PEER_HEADER]: t }).catch(e => ((e as Error)?.message === "HTTP 403" ? get(path) : Promise.reject(e))));
 	} catch {
 		return undefined;
 	}
