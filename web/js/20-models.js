@@ -70,11 +70,12 @@ async function logoutProvider(p) {
   await loadProviders(); loadModels(true);
   if (current === "home") renderHome();
 }
-// 모델 · 폴백: one card per target - its model and effort on one row, which is step 1 of the fallback chain that target's harness walks
-// where it has one (orchestrator, lane default, workers). The composer chips, the home card menu, 구성 and 설정 all open this screen.
-let modelsFocus = "";
-const openModels = key => { modelsFocus = key || ""; if (current === "models") renderModels(); else go("models"); };
-function targetCard(key, title, status, cur, confirmText, extra = {}) {
+// 모델 · 폴백 (owner 2026-11-11): one list of every place a model runs (hub/models-in-use.ts); pressing a row opens that target's editor right
+// under it, one at a time: its model and effort on one row, which is step 1 of the fallback chain that target's harness walks where it has one
+// (orchestrator, lane default, workers). The composer chips, the home card menu, 구성 and 설정 all open this screen on a row.
+let modelsFocus = "", modelsOpen = "", modelsRefocus = "";
+const openModels = key => { modelsFocus = key || ""; if (key) modelsOpen = key; if (current === "models") renderModels(); else go("models"); };
+function targetEdit(key, title, cur, confirmText, extra = {}) {
   const p = pending[key] || {};
   const model = p.model ?? cur.model, thinking = p.thinking ?? cur.thinking;
   const dirty = (p.model != null && p.model !== cur.model) || (p.thinking != null && p.thinking !== cur.thinking);
@@ -89,15 +90,12 @@ function targetCard(key, title, status, cur, confirmText, extra = {}) {
     if (p.thinking != null && p.thinking !== cur.thinking) change.thinking = p.thinking;
     await putModel(key, title, change, confirmText, `${modelName(model)} · ${thinkKo(thinking)}`);
   }) }, "적용");
-  const run = status ? runStatus(key, status, targetInfo(key).ask) : null, sub = [run && run[0], extra.sub].filter(Boolean).join(" · ");
   const pick = el("div", { class: "mt-pick" }, el("div", { class: "mt-model" }, modelField), el("div", { class: "mt-eff" }, effField));
   const notes = [
     info && !info.reasoning && thinking && thinking !== "off" ? el("div", { class: "sup mt-note", text: "이 모델은 추론 강도를 쓰지 않아요" }) : null,
     dirty ? el("div", { class: "btns mt-apply" }, el("button", { class: "btn text", type: "button", onclick: () => { delete pending[key]; renderModels(); } }, "되돌리기"), apply) : null,
   ].filter(Boolean);
-  return el("section", { class: "mt-card", "data-target": key, "aria-label": title },
-    el("div", { class: "mt-head" }, run ? el("span", { class: `dot ${run[1]}` }) : null, el("span", { class: "t", text: title }), sub ? el("span", { class: "sup", text: sub }) : null, el("span", { class: "sp" })),
-    el("div", { class: "list mt-list" }, ...(extra.chain ? [extra.chain(pick, notes)] : [pick, ...notes])));
+  return el("div", { class: "mt-list mt-edit", role: "group", "data-target": key, "aria-label": title }, ...(extra.chain ? [extra.chain(pick, notes)] : [pick, ...notes]));
 }
 function renderModels() {
   const box = $("#models");
@@ -106,19 +104,19 @@ function renderModels() {
   if (!M) { clear(box).append(emptyNode("불러오는 중…")); return; }
   const provs = [...new Set((M.available || []).map(a => a.provider))].sort((a, b) => providerName(a).localeCompare(providerName(b)));
   const filter = selectField("공급자", providerFilter ? providerName(providerFilter) : "공급자 전체", [{ value: "", label: "전체" }, ...provs.map(p => ({ value: p, label: providerName(p) }))], providerFilter, v => { providerFilter = v; renderModels(); });
-  const lanes = (M.lanes || []).filter(laneAlive);
   clear(box).append(
     el("div", { class: "col mt" },
       el("div", { class: "mt-top" }, el("p", { class: "mt-intro", text: "막히면 번호 순서대로 넘어가요." }), el("div", { class: "mt-filter" }, filter)),
-      inUseSection(),
-      ...FB_LAYERS.map(L => targetCard(L.id, L.title(), "", L.cur(), L.confirm, fbParts(L))),
-      repliesCard(),
-      lanes.length ? el("div", { class: "sec" }, "실행 중 세션") : null,
-      ...lanes.map(l => targetCard(`lane:${l.name}`, l.name, l.status, l, ""))));
+      ...modelGroups()));
+  if (modelsRefocus) {
+    const r = box.querySelector(`[data-use="${CSS.escape(modelsRefocus)}"]`);
+    modelsRefocus = "";
+    if (r) r.focus();
+  }
   if (modelsFocus) {
     const n = box.querySelector(`[data-target="${CSS.escape(modelsFocus)}"]`);
     modelsFocus = "";
-    if (n) requestAnimationFrame(() => n.scrollIntoView({ block: "start" }));
+    if (n) requestAnimationFrame(() => n.previousElementSibling.scrollIntoView({ block: "start" }));
   }
 }
 
@@ -150,27 +148,55 @@ function liveModel(t) {
 const fbTagText = f => ["대체 모델 사용 중", f.reason, f.until ? `${kstStamp(Date.parse(f.until))}에 복귀` : ""].filter(Boolean).join(" · ");
 const selText = sel => { const [b, lv] = String(sel || "").split(":"); return b ? `${modelChipText(b)}${lv ? ` · ${thinkKo(lv)}` : ""}` : "–"; };
 const fbTag = (f, conf) => el("span", { class: "tag warn", title: [fbTagText(f), conf ? `기본 모델 ${selText(conf)} 대신 쓰는 중` : ""].filter(Boolean).join(" · "), text: fbTagText(f) });
-// 실제로 쓰는 모델 (owner 2026-10-27): every place a model runs and the model it runs on now (hub/models-in-use.ts), each row opening
-// where it is changed: a card on this screen, or that app's settings screen.
-function inUseSection() {
-  const rows = M.in_use || [];
-  if (!rows.length) return null;
-  const row = r => {
-    const ch = r.change || {};
-    const open = ch.models ? () => { modelsFocus = ch.models; renderModels(); } : ch.app ? () => asScreen(ch.app) : null;
-    const why = r.fallback ? (r.key === "main" ? fbWhy("orchestrator") : r.key.startsWith("lane:") ? fbWhy("lanes") : { reason: "", until: "" }) : null;
-    const model = selText(r.model);
-    return el("div", { class: "mt-use-row", "data-use": r.key },
-      el("div", { class: "mt-use-tx" }, el("span", { class: "nm", title: r.label, text: r.label }), r.sub || ch.none ? el("span", { class: "sup", text: [r.sub, ch.none].filter(Boolean).join(" · ") }) : null),
-      el("div", { class: "mt-use-rest" }, el("span", { class: "mt-use-m", title: model, text: model }), why ? fbTag(why, r.configured) : null),
-      open ? el("button", { class: "mt-use-act", type: "button", title: "바꾸기", "aria-label": `${r.label} 바꾸기`, onclick: open }, icon("pencil")) : null);
-  };
-  return el("section", { class: "mt-card mt-use", "data-target": "in-use", "aria-label": "실제로 쓰는 모델" },
-    el("div", { class: "mt-head" }, el("span", { class: "t", text: "실제로 쓰는 모델" })),
-    el("div", { class: "list mt-use-list" }, ...rows.map(row)));
+// 실제로 쓰는 모델 (owner 2026-10-27): every place a model runs and the model it runs on now (hub/models-in-use.ts), in three groups. A row
+// that is changed on this screen opens its editor in place, one at a time; one that is changed in an app's settings opens that screen.
+const MT_GROUPS = ["어시스턴트", "세션", "답장과 요약"];
+const mtGroupOf = key => key === "main" || key === "background" || key === "lookups" ? 0 : key === "lanes" || key.startsWith("lane:") || key === "workers" || key.startsWith("workers:") ? 1 : 2;
+// A session that is alive but has no row from the hub still gets its own row.
+function mtRows() {
+  const rows = (M.in_use || []).slice(), have = new Set(rows.map(r => r.key));
+  const extra = (M.lanes || []).filter(l => laneAlive(l) && !have.has(`lane:${l.name}`)).map(l => {
+    const conf = withLevel(l.model, l.thinking), act = l.active_model;
+    return { key: `lane:${l.name}`, label: `세션 · ${l.title || l.name}`, model: act || conf, ...(act && runBaseOf(act) !== runBaseOf(conf) ? { configured: conf, fallback: true } : {}), change: { models: `lane:${l.name}` } };
+  });
+  rows.splice(rows.findLastIndex(r => r.key === "lanes" || r.key.startsWith("lane:")) + 1, 0, ...extra);
+  return rows;
+}
+function mtEditor(target, title) {
+  const L = FB_LAYERS.find(x => x.id === target), lm = (M.lanes || []).find(x => `lane:${x.name}` === target);
+  return L ? targetEdit(L.id, title, L.cur(), L.confirm, fbParts(L)) : target === "replies" ? repliesEdit(title) : lm ? targetEdit(target, title, lm, "") : null;
+}
+// `primary`: the first row that points at a target owns its editor; a later row on the same target (the background work, a session's subagents) only reads.
+function mtRow(r, primary) {
+  const ch = r.change || {}, target = primary ? ch.models : "", isOpen = Boolean(target) && modelsOpen === target;
+  const lm = r.key.startsWith("lane:") ? (M.lanes || []).find(x => `lane:${x.name}` === r.key) : null;
+  const run = lm ? runStatus(r.key, lm.status, targetInfo(r.key).ask) : null, sub = [run && run[0], r.sub].filter(Boolean).join(" · ");
+  const why = r.fallback ? (r.key === "main" ? fbWhy("orchestrator") : r.key.startsWith("lane:") ? fbWhy("lanes") : { reason: "", until: "" }) : null;
+  const chain = FB_LAYERS.some(L => L.id === target) ? ((M.fallbacks || {})[target] || {}).chain || [] : [];
+  const model = selText(r.model);
+  const act = target ? () => { modelsOpen = isOpen ? "" : target; modelsRefocus = r.key; renderModels(); } : ch.app ? () => asScreen(ch.app) : null;
+  const attrs = { class: "mt-use-row", "data-use": r.key };
+  if (act) Object.assign(attrs, { role: "button", tabindex: "0", onclick: act, onkeydown: ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); act(); } } });
+  if (target) attrs["aria-expanded"] = String(isOpen);
+  const end = ch.none ? el("span", { class: "mt-use-end sup", title: ch.none, text: "고정" }) : el("span", { class: "mt-use-end" }, target ? icon("drop") : ch.app ? icon("chev") : null);
+  const row = el("div", attrs,
+    el("div", { class: "mt-use-tx" }, el("span", { class: "nm", title: r.label }, run ? el("span", { class: `dot ${run[1]}` }) : null, r.label), sub ? el("span", { class: "sup", text: sub }) : null),
+    el("div", { class: "mt-use-rest" }, el("span", { class: "mt-use-m", title: model, text: model }), chain.length ? el("span", { class: "sup mt-use-fb", text: `대체 ${chain.length}` }) : null, why ? fbTag(why, r.configured) : null),
+    end);
+  const editor = isOpen ? mtEditor(target, r.label) : null;
+  return editor ? [row, editor] : [row];
+}
+function modelGroups() {
+  const groups = MT_GROUPS.map(() => []), seen = new Set();
+  for (const r of mtRows()) {
+    const t = (r.change || {}).models;
+    groups[mtGroupOf(r.key)].push(...mtRow(r, Boolean(t) && !seen.has(t)));
+    if (t) seen.add(t);
+  }
+  return groups.map((nodes, i) => nodes.length ? el("section", { class: "mt-card", "aria-label": MT_GROUPS[i] }, el("div", { class: "mt-head" }, el("span", { class: "t", text: MT_GROUPS[i] })), el("div", { class: "list mt-use-list" }, ...nodes)) : null);
 }
 // 답장 기본값: the reply model of every app that has none of its own (hub/reply-model-choices.ts setReplyDefault).
-function repliesCard() {
+function repliesEdit(title) {
   const R = M.replies;
   if (!R) return null;
   const items = R.options.map(v => ({ value: v, label: v ? R.labels[v] || v : R.default_label }));
@@ -178,8 +204,7 @@ function repliesCard() {
     try { await api("/api/models", "PUT", { target: "replies", model: v }); toast("적용했어요"); await loadModels(true); }
     catch (e) { toast(e.message || "저장하지 못했어요", true); }
   }));
-  return el("section", { class: "mt-card", "data-target": "replies", "aria-label": "답장 기본값" },
-    el("div", { class: "mt-head" }, el("span", { class: "t", text: "답장 기본값" })),
-    el("div", { class: "list mt-list" }, el("div", { class: "mt-pick" }, el("div", { class: "mt-model" }, pick))),
-    el("div", { class: "note", text: "답장 초안은 API 키로 넘어가지 않아요." }));
+  return el("div", { class: "mt-list mt-edit", role: "group", "data-target": "replies", "aria-label": title },
+    el("div", { class: "mt-pick" }, el("div", { class: "mt-model" }, pick)),
+    el("div", { class: "sup mt-note", text: "답장 초안은 API 키로 넘어가지 않아요." }));
 }

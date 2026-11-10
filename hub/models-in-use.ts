@@ -41,7 +41,7 @@ export function modelsInUse(s: InUseSnapshot): InUseRow[] {
 		...s.lanes.filter(l => l.activeWorker && runBase(l.activeWorker) !== runBase(l.worker)).map(l => ({ key: `workers:${l.name}`, label: `세션 서브에이전트 · ${l.title || l.name}`, model: l.activeWorker!, configured: l.worker, fallback: true as const, change: { models: "workers" } })),
 		{ key: "replies", label: "답장 기본값", sub: "앱마다 따로 고르지 않은 답장", model: s.replyDefault, change: { models: "replies" } },
 		...s.replies.map(r => ({ key: `reply:${r.key}`, label: `${r.label} 답장`, model: r.model, change: { app: r.key } })),
-		{ key: "outlang", label: "출력 언어 · 요약", sub: "답을 사용자 언어로 고치고 카드를 요약해요", model: s.outlang, change: { none: "설정 파일의 output_language에서 바꿔요" } },
+		{ key: "outlang", label: "출력 언어 · 요약", sub: "답을 사용자 언어로 고치고 카드를 요약해요", model: s.outlang, change: { none: "설정 파일에서만 바꿀 수 있어요" } },
 	];
 }
 

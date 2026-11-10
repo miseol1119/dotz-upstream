@@ -1807,12 +1807,12 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 - css: 02-cards-lists-tags.css(`.rt-row`). `.rt-rep` `.rt-roles` 규칙은 web/css에서 못 찾음(인라인 style로 배치).
 
 ### 모델 · 폴백 (`#v-models`, `renderModels`)
-- 목적: 대상(어시스턴트, 새 세션 기본, 서브에이전트, 실행 중 세션)마다 모델, 추론 강도, 막혔을 때 넘어갈 폴백 순서를 정해요.
-- 구성: `#models > .col.mt`: 맨 위 `.mt-top`(설명 `대상마다 모델과 추론 강도, 막혔을 때 넘어갈 순서를 정해요. 어시스턴트·세션 폴백은 저장하면 바로 적용돼요.` + 공급자 필터 `공급자` 드롭다운 `.mt-filter`), `실제로 쓰는 모델` 카드(`inUseSection`), 대상 카드 3개(`{봇 이름}` 부제 `메인 어시스턴트`, `세션 기본값` 부제 `새로 시작하는 세션`, `서브에이전트` 부제 `세션이 맡기는 구현·테스트`), `답장 기본값` 카드, 세션이 있으면 `.sec` `실행 중 세션` + 세션별 카드. 각 카드: `.mt-head`(상태 점, 제목, 부제, 하네스 태그) + `.mt-list`(`모델` 드롭다운 + `추론 강도` 드롭다운, `적용`/`되돌리기`, 폴백 영역).
-- 기능: 모델/추론 강도 선택은 `pending[key]`에 담고 `적용`(`putModel` -> `PUT /api/models` `{target, model, thinking}`)을 눌러야 저장. 폴백은 `fbParts` 안에서 바로 저장(`PUT /api/fallbacks`). 공급자 필터 `전체` + 공급자들. 다른 화면에서 들어올 때 `openModels(key)`가 해당 카드로 스크롤(`modelsFocus`).
-- 상태: 처음 `M` 없으면 `불러오는 중…`. 로드 실패(조용 모드가 아닐 때) `모델 정보를 불러오지 못했어요`. `적용`은 바뀐 것이 있을 때만 enabled, `되돌리기` 같이 보임. 어시스턴트 카드 적용 시 확인창(제목 카드명, 본문 `어시스턴트가 다시 시작돼요.` + `{모델} · {추론}`, 버튼 `적용`), 캐시가 다시 쓰이면 `캐시가 다시 쓰여요 · 컨텍스트 {n} 토큰`으로 한 번 더 물어요(`requires_force`). 토스트 `적용했어요` / `적용했어요 · 재시작됨` / `다음 시작부터 적용돼요`. 추론 강도를 안 쓰는 모델은 `이 모델은 추론 강도를 쓰지 않아요`. 세션 카드 하단 `폴백은 세션 기본값 순서를 따라요`. 세션 카드 상태 점/문구는 `runStatus`(41-runstate.js:20). 드래그 중(`fbDragging`)에는 다시 그리지 않아요. 폰 vs 데스크톱: 639px 이하에서 폴백 줄이 격자로 재배치되고 전환 스위치가 태그 줄 앞으로 와요(15-settings-phone.css:3-17), 드롭다운 폭 `min(58%, 200px)`(15-settings-pages.css:42), 터치/639px 이하에서 필드 높이 확대(15-settings-pages.css:43, 15-settings-phone.css:19-23), 640px 이하에서 `.mt-model` `.mt-eff` 폭 제한 해제(03-base.css:42). 이 화면은 60초마다와 탭 복귀 시 `loadModels(true)`로 조용히 다시 읽어요.
+- 목적: 모델이 도는 모든 자리(어시스턴트, 세션, 답장과 요약)를 한 목록으로 보고, 행을 눌러 그 자리의 모델, 추론 강도, 막혔을 때 넘어갈 폴백 순서를 그 자리에서 고쳐요.
+- 구성: `#models > .col.mt`: 맨 위 `.mt-top`(설명 `막히면 번호 순서대로 넘어가요.` + 공급자 필터 `공급자` 드롭다운 `.mt-filter`), 그 아래 `section.mt-card` 세 묶음 `어시스턴트`(메인 어시스턴트, 대화 백그라운드 작업, 조회 작업) / `세션`(새로 시작하는 세션, 실행 중 세션마다 한 줄, 세션 서브에이전트) / `답장과 요약`(답장 기본값, 앱별 답장, 출력 언어 · 요약). 묶음마다 `.mt-head` 제목 + `.list.mt-use-list` 안에 `.mt-use-row`(`modelGroups`, `mtRow`). 행: 이름과 부제(세션은 상태 점과 실행 상태 문구), 오른쪽에 모델 · 추론 강도, 폴백 체인이 있으면 `대체 {n}`, 폴백 중이면 경고 태그, 맨 끝 표시. 눌러서 열린 행 바로 아래에 그 자리의 편집기(`.mt-list.mt-edit[data-target]`: `모델` 드롭다운 + `추론 강도` 드롭다운, `적용`/`되돌리기`, 폴백 순서 `.mt-fb`)가 붙어요. 한 번에 하나만 열려요.
+- 기능: 모델/추론 강도 선택은 `pending[key]`에 담고 `적용`(`putModel` -> `PUT /api/models` `{target, model, thinking}`)을 눌러야 저장. 폴백은 `fbParts` 안에서 바로 저장(`PUT /api/fallbacks`). 공급자 필터 `전체` + 공급자들. 다른 화면에서 들어올 때 `openModels(key)`가 해당 행을 펼치고 그 행으로 스크롤(`modelsOpen`, `modelsFocus`). 이 화면을 눌러 고치는 행(`change.models`)은 행 전체가 버튼(`role="button"`, Enter/Space, `aria-expanded`)이고 맨 끝에 아래 화살표(열리면 위로 뒤집힘). 앱 설정에서 바꾸는 행(`change.app`)은 오른쪽 화살표이고 눌러 그 앱의 설정 화면(`asScreen`)을 열어요. 고정된 행(`change.none`)은 `고정` 글자만 있고 눌리지 않아요. 같은 자리를 가리키는 두 번째 행(대화 백그라운드 작업, 세션 서브에이전트)은 읽기 전용이에요.
+- 상태: 처음 `M` 없으면 `불러오는 중…`. 로드 실패(조용 모드가 아닐 때) `모델 정보를 불러오지 못했어요`. `적용`은 바뀐 것이 있을 때만 enabled, `되돌리기` 같이 보임. 어시스턴트 카드 적용 시 확인창(제목 카드명, 본문 `어시스턴트가 다시 시작돼요.` + `{모델} · {추론}`, 버튼 `적용`), 캐시가 다시 쓰이면 `캐시가 다시 쓰여요 · 컨텍스트 {n} 토큰`으로 한 번 더 물어요(`requires_force`). 토스트 `적용했어요` / `적용했어요 · 재시작됨` / `다음 시작부터 적용돼요`. 추론 강도를 안 쓰는 모델은 `이 모델은 추론 강도를 쓰지 않아요`. 세션 카드 상태 점/문구는 `runStatus`(41-runstate.js:20). 드래그 중(`fbDragging`)에는 다시 그리지 않아요. 폰 vs 데스크톱: 639px 이하에서 폴백 줄이 격자로 재배치되고 전환 스위치가 태그 줄 앞으로 와요(15-settings-phone.css:3-17), 드롭다운 폭 `min(58%, 200px)`(15-settings-pages.css:42), 터치/639px 이하에서 필드 높이 확대(15-settings-pages.css:43, 15-settings-phone.css:19-23), 640px 이하에서 `.mt-model` `.mt-eff` 폭 제한 해제(03-base.css:42). 이 화면은 60초마다와 탭 복귀 시 `loadModels(true)`로 조용히 다시 읽어요. 바꾼 값이 있는 편집기(`pending`)는 다시 그려도 열린 채로 있고, 폴백 행을 끄는 중(`fbDragging`)에는 다시 그리지 않아요. 실행 중이지만 `M.in_use`에 행이 없는 세션도 `M.lanes`로 한 줄을 만들어요.
 - 데이터: `GET /api/models`(`M`), `PUT /api/models`, `GET /api/providers`(공급자 이름, 구독/API 구분), `PUT /api/fallbacks`, `GET /api/apikeys`. SSE는 없고 폴링만 있어요(99-boot.js:95).
-- 근거: web/js/20-models.js:103 `renderModels`, :77 `targetCard`, :50 `putModel`, :5 `loadModels`, :76 `openModels`, :15 `modelSource`, :24 `modelPickItems`, :39 `modelItems`; web/js/05-command-palette.js:166; web/js/22-settings.js:2 `FB_LAYERS`.
+- 근거: web/js/20-models.js `renderModels`, `modelGroups`, `mtRow`, `mtRows`, `mtEditor`, `targetEdit`, `repliesEdit`, `putModel`, `loadModels`, `openModels`, `modelSource`, `modelPickItems`, `modelItems`; web/js/05-command-palette.js:166; web/js/22-settings.js `FB_LAYERS`.
 - css: 03-base.css(`.mt-*` `.fb-*` `.fbe*`), 15-settings-pages.css(`#models`), 15-settings-phone.css.
 
 ### 모델 선택 메뉴 (`modelItems`, `modelPickItems`)
@@ -1851,22 +1851,22 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 - 근거: web/js/22-settings.js:101 `fbKeyDialog`.
 - css: 14-overlay.css(대화창, 규칙 이름은 코드에서 확인 못 함), 06-harness.css.
 
-### 실제로 쓰는 모델 카드 (`inUseSection`)
-- 목적: 지금 모델이 실제로 도는 모든 자리와 그 모델을 한눈에 보여 줘요.
-- 구성: `section.mt-card.mt-use`: 머리 `실제로 쓰는 모델` / `지금 돌고 있는 모델이에요`, 행마다 이름, 부제, 모델 텍스트, 폴백 태그, `바꾸기` 연필 버튼.
-- 기능: 연필 버튼은 같은 화면의 카드로 스크롤하거나(`change.models`), 그 앱의 설정 화면을 열어요(`change.app` -> `asScreen`).
-- 상태: `M.in_use`가 비면 카드 자체를 안 그려요. 폴백 중이면 경고 태그 `폴백 중 · {이유} · {시각}에 복귀`(툴팁에 `기본 모델 {...} 대신 쓰는 중`). `change.none` 문구는 부제에 붙어요. 이유는 `한도 소진` `상한 도달` `오류`.
-- 데이터: `M.in_use`, `M.fallbacks[...].primary_down`.
-- 근거: web/js/20-models.js:148 `inUseSection`, :131 `fbWhy`, :143-145 `fbTagText` `selText` `fbTag`.
+### 모델 목록의 행 (`mtRow`)
+- 목적: 지금 모델이 실제로 도는 모든 자리와 그 모델을 한눈에 보고, 그 자리에서 바로 고쳐요.
+- 구성: `.mt-use-row[data-use]`: `.mt-use-tx`(`.nm` 이름, `.sup` 부제), `.mt-use-rest`(`.mt-use-m` 모델 · 추론 강도, `대체 {n}`, 폴백 태그), `.mt-use-end`(아래 화살표 / 오른쪽 화살표 / `고정`). 높이는 44px 이상.
+- 기능: `change.models` 행은 눌러 편집기를 펼치고 접어요(한 번에 하나). `change.app` 행은 그 앱의 설정 화면(`asScreen`)을 열어요.
+- 상태: 폴백 중이면 경고 태그 `대체 모델 사용 중 · {이유} · {시각}에 복귀`(툴팁에 `기본 모델 {...} 대신 쓰는 중`). 이유는 `한도 소진` `상한 도달` `오류`. 출력 언어 행은 설정 파일에서만 바꾸고 이 앱에는 고치는 자리가 없어서 `고정`으로 보여요.
+- 데이터: `M.in_use`, `M.lanes`, `M.fallbacks[...]`(`chain`, `primary_down`).
+- 근거: web/js/20-models.js `mtRow`, `modelGroups`, `fbWhy`, `fbTagText`, `selText`, `fbTag`.
 - css: 03-base.css(`.mt-use*`), 15-settings-pages.css.
 
-### 답장 기본값 카드 (`repliesCard`)
+### 답장 기본값 편집기 (`repliesEdit`)
 - 목적: 앱마다 따로 고르지 않은 답장 초안의 기본 모델을 정해요.
-- 구성: `section.mt-card`: 머리 `답장 기본값` / `앱마다 따로 고르지 않은 답장 초안`, `답장 모델` 드롭다운, 설명 `앱 설정의 답장 모델이 있으면 그 모델이 먼저예요. 답장 초안은 API 키로 넘어가지 않아요.`
+- 구성: `답장 기본값` 행을 열면 나오는 `.mt-list.mt-edit[data-target="replies"]`: `답장 모델` 드롭다운, 설명 `답장 초안은 API 키로 넘어가지 않아요.`
 - 기능: 선택 즉시 `PUT /api/models` `{target:"replies", model}`.
-- 상태: `M.replies`가 없으면 카드를 안 그려요. 토스트 `적용했어요` / 서버 메시지 또는 `저장하지 못했어요`. 기본 항목 라벨은 `R.default_label`.
+- 상태: `M.replies`가 없으면 편집기를 안 그려요. 토스트 `적용했어요` / 서버 메시지 또는 `저장하지 못했어요`. 기본 항목 라벨은 `R.default_label`.
 - 데이터: `M.replies`, `PUT /api/models`.
-- 근거: web/js/20-models.js:166 `repliesCard`.
+- 근거: web/js/20-models.js `repliesEdit`.
 - css: 03-base.css, 15-settings-pages.css.
 
 ### 공급자 목록 (`#v-providers`, `renderProviders`)

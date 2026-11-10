@@ -235,7 +235,9 @@ test("390px: the reply card's avatar letter and 초안 tag use a listed size and
 	await typeOk(v, ".rq-who .dr-st");
 });
 test("390px: the models add button reads at a listed size and line", async () => {
-	const v = await page(390, "light", `go("models")`, `current === "models" && !!document.querySelector("#models .fb-add")`);
+	const v = await page(390, "light", `go("models")`, `current === "models" && !!document.querySelector("#models .mt-use-row")`);
+	await v.evaluate(`void (M.in_use[0].change = { models: "orchestrator" }, openModels("orchestrator"))`);
+	await waitFor(v, `!!document.querySelector("#models .fb-add")`);
 	await typeOk(v, "#models .fb-add");
 });
 test("390px: the update bar's x reads at a listed size and line", async () => {

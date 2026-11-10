@@ -6,15 +6,20 @@
 .mt-filter { flex: 0 0 148px; }
 .mt-card { display: flex; flex-direction: column; gap: var(--sp-4); scroll-margin-top: 12px; }
 .mt-use-list { display: flex; flex-direction: column; }
-.mt-use-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-05) var(--sp-2); padding: var(--sp-15) 0; border-top: 1px solid var(--line); }
+.mt-use-row { display: flex; flex-wrap: wrap; align-items: center; min-height: var(--btn-hit); gap: var(--sp-05) var(--sp-2); padding: var(--sp-15) 0; border-top: 1px solid var(--line); }
 .mt-use-row:first-child { border-top: 0; }
 .mt-use-tx { flex: 1 1 100%; display: flex; flex-direction: column; min-width: 0; }
 .mt-use-rest { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: var(--sp-05) var(--sp-2); }
 .mt-use-m { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .mt-use-row .tag { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mt-use-act { flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--fg-2); }
-@media (hover: hover) { .mt-use-act:hover { background: var(--hover); color: var(--fg); } }
-.mt-use-act .ic { width: 16px; height: 16px; }
+.mt-use-row[role="button"] { cursor: pointer; }
+.mt-use-row:focus-visible { outline-offset: -2px; }   /* the card clips a ring drawn outside the row */
+@media (hover: hover) { .mt-use-row[role="button"]:hover { background: var(--hover); } }
+.mt-use-end { flex: none; display: inline-grid; place-items: center; min-width: 16px; color: var(--fg-3); }
+.mt-use-end .ic { width: 16px; height: 16px; transition: transform var(--m-fast) var(--m-ease); }
+.mt-use-row[aria-expanded="true"] .mt-use-end .ic { transform: rotate(180deg); }
+.mt-use-fb { flex: none; }
+.mt-use-tx .nm .dot { display: inline-block; margin-right: var(--sp-2); vertical-align: middle; }
 /* From 900px every row is one line: the label column takes the room, the model and tag shorten, the icon sits at the far right. */
 @media (min-width: 900px) {
   .mt-use-row { flex-wrap: nowrap; gap: 0 var(--sp-3); }
@@ -22,7 +27,7 @@
   .mt-use-rest { flex: 0 1 auto; }
   .mt-use-m { max-width: 300px; }
   .mt-use-row .tag { max-width: 260px; }
-  .mt-use-act { margin-left: auto; }
+  .mt-use-end { margin-left: auto; }
 }
 .mt-head { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .mt-head .t { min-width: 0; font: 700 17px/24px var(--font); overflow-wrap: anywhere; }

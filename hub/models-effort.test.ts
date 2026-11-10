@@ -99,7 +99,9 @@ const openModels = async (v: View) => {
 	// go("models") paints from the M it has and reads /api/models again: wait for that read to replace M, or a test's edit of M is
 	// thrown away when the read lands under load
 	await run(v, `window.__mOld = M; go("models")`);
-	await waitFor(v, `M !== window.__mOld && document.querySelector('[data-target="in-use"]')`);
+	await waitFor(v, `M !== window.__mOld && document.querySelector('.mt-use-row')`);
+	await run(v, `openModels("orchestrator")`);
+	await waitFor(v, `document.querySelector('[data-target="orchestrator"] .fb-item')`);
 };
 
 const menuLabels = async (v: View) => q<string[]>(v, `return [...document.querySelectorAll(".menu .mi .ml")].map(n => n.textContent)`);
@@ -188,45 +190,42 @@ describe("effort levels follow the model", () => {
 	}, 30_000);
 });
 
-describe("the in-use card is compact", () => {
-	const rowGeometry = async (v: View, key = "main") => q<{ row: number[]; tx: number[]; m: number[]; tag: number[]; btn: number[]; text: string; label: string; title: string; aria: string }>(v, `
-		const r = document.querySelector('.mt-use-row[data-use="${key}"]').getBoundingClientRect();
-		const tx = document.querySelector('.mt-use-row[data-use="${key}"] .mt-use-tx').getBoundingClientRect();
-		const mn = document.querySelector('.mt-use-row[data-use="${key}"] .mt-use-m').getBoundingClientRect();
-		const tag = document.querySelector('.mt-use-row[data-use="${key}"] .tag').getBoundingClientRect();
-		const b = document.querySelector('.mt-use-row[data-use="${key}"] .mt-use-act');
-		const br = b.getBoundingClientRect();
-		return { row: [r.top, r.height], tx: [tx.left, tx.top, tx.width], m: [mn.left, mn.top, mn.width, mn.height], tag: [tag.left, tag.top, tag.width], btn: [br.left, br.top, br.width, br.height], text: b.textContent, label: b.getAttribute("aria-label"), title: b.title + " · " + document.querySelector('.mt-use-row[data-use="${key}"] .mt-use-m').title, tagTitle: document.querySelector('.mt-use-row[data-use="${key}"] .tag').title };`);
-	test("at 1280 a row is one line with the pencil at the far right, and no 바꾸기 text remains", async () => {
+describe("the models list rows are compact", () => {
+	const rowGeometry = async (v: View, key = "main") => q<{ row: number[]; tx: number[]; m: number[]; tag: number[]; end: number[]; text: string; title: string; tagTitle: string }>(v, `
+		const row = document.querySelector('.mt-use-row[data-use="${key}"]');
+		const r = row.getBoundingClientRect();
+		const tx = row.querySelector(".mt-use-tx").getBoundingClientRect();
+		const mn = row.querySelector(".mt-use-m").getBoundingClientRect();
+		const tag = row.querySelector(".tag").getBoundingClientRect();
+		const e = row.querySelector(".mt-use-end");
+		const er = e.getBoundingClientRect();
+		return { row: [r.top, r.height], tx: [tx.left, tx.top, tx.width], m: [mn.left, mn.top, mn.width, mn.height], tag: [tag.left, tag.top, tag.width], end: [er.left, er.top, er.width, er.height], text: e.textContent, title: row.querySelector(".mt-use-m").title, tagTitle: row.querySelector(".tag").title };`);
+	test("at 1280 a row is one line with the chevron at the far right, at least 44px high", async () => {
 		const v = await boot();
 		await openModels(v);
-		await run(v, `document.querySelector('[data-target="in-use"]').scrollIntoView({ block: "start" })`);
+		await run(v, `document.querySelector('.mt-use-row[data-use="main"]').scrollIntoView({ block: "start" })`);
 		const g = await rowGeometry(v);
-		expect(g.row[1]).toBeLessThan(45);
-		expect(Math.abs(g.m[1] + g.m[3]! / 2 - (g.btn[1] + g.btn[3]! / 2))).toBeLessThan(4);
-		expect(g.btn[2]).toBeGreaterThanOrEqual(28);
-		expect(g.btn[2]).toBeLessThanOrEqual(32);
-		expect(g.btn[3]).toBeGreaterThanOrEqual(28);
-		expect(g.btn[3]).toBeLessThanOrEqual(32);
-		expect(g.btn[0]).toBeGreaterThan(g.tag[0]);
+		expect(g.row[1]).toBeGreaterThanOrEqual(44);
+		expect(g.row[1]).toBeLessThan(56);
+		expect(Math.abs(g.m[1] + g.m[3]! / 2 - (g.end[1] + g.end[3]! / 2))).toBeLessThan(4);
+		expect(g.end[0]).toBeGreaterThan(g.tag[0]);
 		expect(g.text).toBe("");
-		expect(g.label).toBe("메인 어시스턴트 바꾸기");
 		expect(g.title).toContain("V4.1 flash ultrafast · 보통");
 		expect(g.tagTitle).toContain("대체 모델 사용 중 · 한도 소진");
 		expect(g.tagTitle).toContain("기본 모델 Opus 5.5 · 높음 대신 쓰는 중");
 		await shot(v, "after-1280.png");
-		const noAct = await q<boolean>(v, `return !document.querySelector('.mt-use-row[data-use="lookups"] .mt-use-act') && !document.querySelector('.mt-use-row[data-use="outlang"] .mt-use-act')`);
-		expect(noAct).toBe(true);
+		const fixed = await q<string[]>(v, `return ["lookups", "outlang"].map(k => document.querySelector('.mt-use-row[data-use="' + k + '"] .mt-use-end').textContent)`);
+		expect(fixed).toEqual(["고정", "고정"]);
 	}, 30_000);
-	test("at 390 the row takes two tight lines and the icon stays on the model's line", async () => {
+	test("at 390 the row takes two tight lines and the chevron stays on the model's line", async () => {
 		const v = await boot(390, 1000);
 		await openModels(v);
-		await run(v, `document.querySelector('[data-target="in-use"]').scrollIntoView({ block: "start" })`);
+		await run(v, `document.querySelector('.mt-use-row[data-use="main"]').scrollIntoView({ block: "start" })`);
 		const g = await rowGeometry(v);
-		await shot(v, "after-390.png");
 		expect(g.row[1]).toBeLessThan(88);
 		expect(g.m[1]).toBeGreaterThan(g.tx[1] + 8);
-		expect(Math.abs(g.m[1] + g.m[3]! / 2 - (g.btn[1] + g.btn[3]! / 2))).toBeLessThan(4);
+		expect(Math.abs(g.m[1] + g.m[3]! / 2 - (g.end[1] + g.end[3]! / 2))).toBeLessThan(4);
+		expect(await q<boolean>(v, `return document.documentElement.scrollWidth <= innerWidth`)).toBe(true);
 		await shot(v, "after-390.png");
 	}, 30_000);
 });

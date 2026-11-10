@@ -48,6 +48,8 @@ const STATE = { name: "dotz", orchestrator: { status: "idle", activeModel: `${SO
 
 const json = (v: unknown, status = 200) => Response.json(v, { status });
 const projectChange = Promise.withResolvers<unknown>();
+const modelsPut = Promise.withResolvers<{ target: string; model: string }>();
+let modelsPuts = 0;
 const server = Bun.serve({
 	port: 0,
 	hostname: "127.0.0.1",
@@ -59,6 +61,14 @@ const server = Bun.serve({
 		if (asset) return asset;
 		if (p === "/api/events") return sseResponse(req.headers.get("last-event-id") ?? url.searchParams.get("last"));
 		if (p === "/api/state") return json(STATE);
+		if (p === "/api/models" && req.method === "PUT") {
+			const body = (await req.json()) as { target: string; model: string };
+			modelsPuts++;
+			modelsPut.resolve(body);
+			const row = MODELS.in_use.find(r => r.key === "lanes")!;
+			row.model = `${body.model}:high`;
+			return json({ applied: "live" });
+		}
 		if (p === "/api/models") return json(MODELS);
 		if (p === "/api/peers") return json([]);
 		if (p === "/api/target" && req.method === "PUT") { projectChange.resolve(await req.json()); return json({ applied: "next-turn" }); }
@@ -134,48 +144,89 @@ describe("REQ1: home cards and the composer chip show the model in use", () => {
 	});
 });
 
-describe("REQ2/REQ3/REQ5 on 모델·폴백", () => {
+describe("REQ2/REQ3/REQ5 on 모델·폴백: one list, a row opens its editor in place", () => {
 	const openModels = async () => {
 		const v = await boot();
-		await run(v, `go("models")`);
-		await waitFor(v, `document.querySelector('[data-target="in-use"]')`);
+		await run(v, `modelsOpen = ""; go("models"); renderModels()`);
+		await waitFor(v, `document.querySelector('.mt-use-row')`);
 		return v;
 	};
-	test("실제로 쓰는 모델 lists every place with the model in use, the fallback marked, each row linking to where it changes", async () => {
+	const press = (v: View, key: string) => run(v, `document.querySelector('[data-use="${key}"]').click()`);
+	const state = (v: View) => q<{ open: string[]; editors: string[] }>(v, `return { open: [...document.querySelectorAll('.mt-use-row[aria-expanded="true"]')].map(r => r.dataset.use), editors: [...document.querySelectorAll('#models [data-target]')].map(n => n.dataset.target) }`);
+	test("every place is one row in three groups with the model in use and the fallback marked; nothing is expanded at first", async () => {
 		const v = await openModels();
-		const rows = await q<{ key: string; label: string; model: string; tag: string; btn: boolean }[]>(v, `return [...document.querySelectorAll(".mt-use-row")].map(r => ({ key: r.dataset.use, label: r.querySelector(".nm").textContent, model: r.querySelector(".mt-use-m").textContent, tag: (r.querySelector(".tag.warn") || {}).textContent || "", btn: !!r.querySelector("button") }))`);
-		expect(rows.map(r => r.key)).toEqual(["main", "background", "lookups", "lanes", "lane:pay", "workers", "replies", "reply:mail", "outlang"]);
+		const groups = await q<string[][]>(v, `return [...document.querySelectorAll("#models .mt-card")].map(c => [...c.querySelectorAll(".mt-use-row")].map(r => r.dataset.use))`);
+		expect(groups).toEqual([["main", "background", "lookups"], ["lanes", "lane:pay", "workers"], ["replies", "reply:mail", "outlang"]]);
+		const rows = await q<{ key: string; model: string; tag: string; role: string | null; expanded: string | null; fb: string }[]>(v, `return [...document.querySelectorAll(".mt-use-row")].map(r => ({ key: r.dataset.use, model: r.querySelector(".mt-use-m").textContent, tag: (r.querySelector(".tag.warn") || {}).textContent || "", role: r.getAttribute("role"), expanded: r.getAttribute("aria-expanded"), fb: (r.querySelector(".mt-use-fb") || {}).textContent || "" }))`);
 		const by = Object.fromEntries(rows.map(r => [r.key, r]));
 		expect(by.main!.model).toBe("Sonnet 5.5 · 높음");
 		expect(by.main!.tag).toStartWith("대체 모델 사용 중 · 한도 소진");
-		expect(by.background!.model).toBe("Sonnet 5.5 · 높음");
+		expect(by.main!.fb).toBe("대체 2");
 		expect(by.lookups!.model).toBe("Sonnet 5.5 · 보통");
 		expect(by["lane:pay"]!.tag).toStartWith("대체 모델 사용 중");
 		expect(by["reply:mail"]!.model).toBe("Opus 5.5 · 낮음");
 		expect(by.replies!.model).toBe("Sonnet 5.5 · 높음");
-		for (const k of ["main", "background", "lanes", "lane:pay", "workers", "replies", "reply:mail"]) expect(by[k]!.btn).toBe(true);
-		expect(by.lookups!.btn).toBe(false);
+		for (const k of ["main", "lanes", "lane:pay", "workers", "replies"]) expect([by[k]!.role, by[k]!.expanded]).toEqual(["button", "false"]);
+		expect([by["reply:mail"]!.role, by["reply:mail"]!.expanded]).toEqual(["button", null]);
+		for (const k of ["lookups", "outlang"]) expect([by[k]!.role, by[k]!.expanded]).toEqual([null, null]);
+		expect(await state(v)).toEqual({ open: [], editors: [] });
 		await shot(v, "models.png");
 	});
-	test("바꾸기 on a row opens that place: the card on this screen, or the app's settings screen", async () => {
+	test("pressing a row opens its editor right under it; pressing another closes the first; pressing it again closes it", async () => {
 		const v = await openModels();
-		await run(v, `window.__scrolled = ""; Element.prototype.scrollIntoView = function () { window.__scrolled = this.dataset.target || ""; }; document.querySelector('[data-use="replies"] button').click()`);
-		await waitFor(v, `window.__scrolled === "replies"`);
-		await run(v, `window.__app = ""; asScreen = a => { window.__app = a; }; document.querySelector('[data-use="reply:mail"] button').click()`);
-		expect(await q<string>(v, `return window.__app`)).toBe("mail");
+		await press(v, "main");
+		expect(await state(v)).toEqual({ open: ["main"], editors: ["orchestrator"] });
+		expect(await q<boolean>(v, `const r = document.querySelector('[data-use="main"]'); return r.nextElementSibling === document.querySelector('[data-target="orchestrator"]')`)).toBe(true);
+		await press(v, "lanes");
+		expect(await state(v)).toEqual({ open: ["lanes"], editors: ["lanes"] });
+		await press(v, "lanes");
+		expect(await state(v)).toEqual({ open: [], editors: [] });
 	});
-	test("답장 기본값 is its own card naming Sonnet 5.5 높음 as the default, the same model the rows say drafts use", async () => {
+	test("Enter on a focused row opens it too", async () => {
 		const v = await openModels();
-		const r = await q<{ field: string; note: string }>(v, `const c = document.querySelector('[data-target="replies"]'); return { field: c.querySelector(".mt-model").textContent, note: c.querySelector(".note").textContent }`);
+		await run(v, `document.querySelector('[data-use="workers"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))`);
+		expect(await state(v)).toEqual({ open: ["workers"], editors: ["workers"] });
+	});
+	test("a row on a target already listed above is read-only; a row that changes in an app opens that app's settings screen", async () => {
+		const v = await openModels();
+		await press(v, "background");
+		expect(await state(v)).toEqual({ open: [], editors: [] });
+		await run(v, `window.__app = ""; asScreen = a => { window.__app = a; }; document.querySelector('[data-use="reply:mail"]').click()`);
+		expect(await q<string>(v, `return window.__app`)).toBe("mail");
+		expect(await state(v)).toEqual({ open: [], editors: [] });
+	});
+	test("openModels(key) opens that row and scrolls to it", async () => {
+		const v = await openModels();
+		await run(v, `window.__scrolled = ""; Element.prototype.scrollIntoView = function () { window.__scrolled = this.dataset.use || ""; }; openModels("lanes")`);
+		await waitFor(v, `window.__scrolled === "lanes"`);
+		expect(await state(v)).toEqual({ open: ["lanes"], editors: ["lanes"] });
+	});
+	test("답장 기본값 opens its picker naming Sonnet 5.5 높음 as the default, the same model the rows say drafts use", async () => {
+		const v = await openModels();
+		await press(v, "replies");
+		const r = await q<{ field: string; note: string }>(v, `const c = document.querySelector('[data-target="replies"]'); return { field: c.querySelector(".mt-model").textContent, note: c.querySelector(".mt-note").textContent }`);
 		expect(r.field).toContain("기본값 · Sonnet 5.5 · 높음");
 		expect(r.note).toContain("API 키로 넘어가지 않아요");
 	});
 	test("effort is said in Korean and the last step number is the number of drawn steps", async () => {
 		const v = await openModels();
+		await press(v, "main");
 		const r = await q<{ eff: string; count: string; steps: number }>(v, `const c = document.querySelector('[data-target="orchestrator"]'); return { eff: c.querySelector(".mt-eff").textContent, count: [...c.querySelectorAll(".fb-n")].at(-1).textContent, steps: c.querySelectorAll(".fb-list > .fb-item").length }`);
 		expect(r.eff).toContain("높음");
 		expect(r.eff).not.toContain("high");
 		expect(r.steps).toBe(3);
 		expect(r.count).toBe(String(r.steps));
+	});
+	test("changing the model and pressing 적용 sends one PUT for that target and the row shows the new model", async () => {
+		const v = await openModels();
+		await press(v, "lanes");
+		await run(v, `document.querySelector('[data-target="lanes"] .mt-model .sel').click()`);
+		await waitFor(v, `document.querySelector(".menu .mi")`);
+		await run(v, `[...document.querySelectorAll(".menu .mi")].find(n => n.querySelector(".ml").textContent.includes("Sonnet")).click()`);
+		await waitFor(v, `document.querySelector('[data-target="lanes"] .mt-apply .btn:not(.text)')`);
+		await run(v, `document.querySelector('[data-target="lanes"] .mt-apply .btn:not(.text)').click()`);
+		expect(await modelsPut.promise).toEqual({ target: "lanes", model: SONNET });
+		await waitFor(v, `document.querySelector('[data-use="lanes"] .mt-use-m').textContent === "Sonnet 5.5 · 높음"`);
+		expect(modelsPuts).toBe(1);
 	});
 });
