@@ -181,7 +181,7 @@ describe("entry points use the shared handler", () => {
 		expect(between(notices, "function pushOpen", "/* ---- one handler")).toContain("noticeOpen(");
 		expect(between(notices, "function ntHomeRow", "/* ---- detail sheet")).toContain("noticeOpen(n)");
 		expect(notices).toContain("noticeOpenId(d.notice, false,");
-		expect(notices).toContain("setTimeout(() => noticeOpenId(want, true,");
+		expect(notices).toContain("setTimeout(() => pushTapCold(noticeOpenId(want, true,");   // the cold start reports where the same handler landed
 		expect(between(notices, "function noticeLive", "async function ntMarkRead")).toContain("noticeOpenId(e.item.id)");
 		expect(sw).toContain("pushOpen(h, d.ts, d.nid)");
 		expect(home).toContain("noticeOpen(n)");
