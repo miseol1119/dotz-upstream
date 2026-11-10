@@ -186,6 +186,7 @@ export function createPrompts(deps: PromptDeps) {
 		const p = current;
 		if (!p || p.done || p.target !== target || !text.trim()) return false;
 		if (burst.find(target, replyTo)) return false;
+		if (replyTo && openDeferred().some(d => d.target === target && d.replyTo === replyTo)) return false;   // that request's own answer: held, it would stay open (nagged, replayed after a restart)
 		(p.held ??= []).push(stripLater(text).trim());
 		deps.log(`held an early send to ${target} until the turn's answer (${text.trim().length} chars)`);
 		return true;
