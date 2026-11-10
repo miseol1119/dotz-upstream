@@ -37,6 +37,18 @@ function threadDraft(conv: string, before: string): string | undefined {
 
 // The decisions an event asks of the owner: an [ask] from the assistant or a session, or any message holding a choice block
 // (2+ options), split by its decision blocks.
+// The `[file]` lines of a message, wherever it put them (parseTone drops them from the body): every question of the message carries all of them,
+// so the question sheet can show the pictures whichever question it opens.
+function messageFiles(raw: string): string {
+	let fence = false;
+	const out: string[] = [];
+	for (const l of raw.split("\n")) {
+		if (/^\s*```/.test(l)) fence = !fence;
+		else if (!fence && /^\s*\[file\]\s+\S/.test(l)) out.push(l.trim());
+	}
+	return out.slice(0, 10).map(l => `\n${l}`).join("");
+}
+
 export function decisionsOf(e: HubEvent): Draft[] {
 	if (e.kind === "out") {
 		const src = String(e.source ?? "");
@@ -60,7 +72,9 @@ export function decisionsOf(e: HubEvent): Draft[] {
 	const askDraft = !pc.blocks.length ? askedDraft(detail) : undefined;
 	const sendDraft = pc.blocks.length === 1 ? parseDraftApproval(body) : askDraft;
 	const by = authorOf(e), ref = refOf(e);
-	const draft = (title: string, given: DecisionOpt[], group: number, idx: number): Draft => ({ title, detail, options: askDraft ? DRAFT_OPTIONS.map(o => ({ ...o })) : given, to, replyTo: e.ts, group, ...(by ? { by } : {}), ...(ref ? { ref } : {}), key: `dec:${to}:${hashOf(`${idx}|${title}|${(askDraft ? DRAFT_OPTIONS : given).map(o => o.label).join("/")}${sendDraft ? `|${sendDraft.to}|${sendDraft.subject ?? ""}|${sendDraft.body}` : ""}`)}`, ...(sendDraft ? { draft: sendDraft } : {}) });
+	const files = sendDraft || askDraft ? "" : messageFiles(stripHandoff(String(e.text ?? "")));
+	const withFiles = (s: string): string => s.slice(0, Math.max(0, TEXT_MAX - files.length)) + files;
+	const draft = (title: string, given: DecisionOpt[], group: number, idx: number): Draft => ({ title, detail: withFiles(detail), options: askDraft ? DRAFT_OPTIONS.map(o => ({ ...o })) : given, to, replyTo: e.ts, group, ...(by ? { by } : {}), ...(ref ? { ref } : {}), key: `dec:${to}:${hashOf(`${idx}|${title}|${(askDraft ? DRAFT_OPTIONS : given).map(o => o.label).join("/")}${sendDraft ? `|${sendDraft.to}|${sendDraft.subject ?? ""}|${sendDraft.body}` : ""}`)}`, ...(sendDraft ? { draft: sendDraft } : {}) });
 	// No choice block (a plain question, often in a mail or work thread): the budget question's buttons, else yes / no or send defaults (ask-options.ts).
 	if (!pc.blocks.length) {
 		if (to.startsWith("lane:") && /\/budget-ok/.test(body)) return [draft(line || "답변이 필요해요", BUDGET_OPTIONS, 1, 0)];
@@ -74,7 +88,7 @@ export function decisionsOf(e: HubEvent): Draft[] {
 	return pc.blocks.map((b, i) => {
 		const title = b.title || (many ? `결정 ${i + 1}` : pc.question || line);
 		const d = draft(title, b.options.map(o => ({ ...o })), pc.blocks.length, i);
-		return own ? { ...d, detail: (decisionText(body, i) || title).slice(0, TEXT_MAX) } : d;
+		return own ? { ...d, detail: withFiles(decisionText(body, i) || title) } : d;
 	});
 }
 

@@ -365,7 +365,7 @@ details.work[open] { padding: var(--sp-15) var(--sp-2) var(--sp-2); border-radiu
 .composer.dropping .sendrow { background: color-mix(in srgb, var(--accent) 7%, var(--card)) !important; }
 .mfiles { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-15); max-width: 100%; }
 .bm .mfiles { justify-content: flex-start; margin-top: var(--sp-2); }
-.lg-x .mfiles, .a-text .mfiles { justify-content: flex-start; margin-top: var(--sp-2); }
+.lg-x .mfiles, .a-text .mfiles, .fs-body > .mfiles { justify-content: flex-start; margin-top: var(--sp-2); }   /* a sheet's body: the files start where its text starts */
 .mfiles .thumb { display: block; padding: 0; border: 0; border-radius: 14px; overflow: hidden; background: var(--layer); cursor: zoom-in; }
 .mfiles .thumb img { display: block; max-width: min(240px, 60vw); max-height: 200px; object-fit: cover; }
 .mfiles .fatt { cursor: pointer; padding-right: var(--sp-3); text-decoration: none; }

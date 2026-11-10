@@ -568,7 +568,7 @@ function ntHomeRow(n, label = "답변 필요") {
 }
 
 /* ---- detail sheet ---- */
-const NS = { id: "", det: null, h: null, node: null, busy: false, edit: null, pn: null };   // pn: a peer's notice (it is not in NT; drawn from the snapshot, 34-peer-monitoring.js)   // edit: { id, opt, text, fresh } while the owner writes the detail an option asks for   // det: a notice shown read-only (a failure alert), not looked up by id
+const NS = { id: "", det: null, h: null, node: null, busy: false, edit: null, pn: null, stash: new Map() };   // pn: a peer's notice (it is not in NT; drawn from the snapshot, 34-peer-monitoring.js)   // edit: { id, opt, text, fresh } while the owner writes the detail an option asks for   // det: a notice shown read-only (a failure alert), not looked up by id
 function ntSheetClose(restore = true) { if (NS.h) NS.h.close(restore); }
 // "직접 답하기": to the asking message in its chat (a login request: its own form), where the composer quotes that message as the answer to this question:
 // what the owner writes next carries the question's id and settles it (hub/notices-store.ts ownerReplied). A send approval stays a plain jump.
@@ -586,9 +586,42 @@ async function ntAnswer(n, opt, note) {
   if (opt.action === "form") { ntDirect(n); return; }
   if (!note && ntNeedsNote(n, opt)) { NS.edit = { id: String(n.id), opt, text: "", fresh: true }; ntSheetPaint(); return; }
   NS.busy = true; ntSheetPaint();
-  try { await ntPost(n, opt.n, note, undefined, opt.label); NS.edit = null; }
+  let sent = false;
+  try { await ntPost(n, opt.n, note, undefined, opt.label); NS.edit = null; sent = true; }
   catch (err) { toast(err.message, true); }
-  NS.busy = false; ntSheetPaint();
+  NS.busy = false;
+  if (sent && NS.id === String(n.id) && ntAfterAnswer(n)) return;
+  ntSheetPaint();
+}
+// The questions one message asked (same conversation, same asking message), in the order they were made; a lone question has none to move between.
+function ntSibs(n) {
+  const d = n.decision;
+  if (n.pc || d.draft || !(d.group > 1) || !d.reply_to) return [];
+  const all = NT.items.filter(x => ntIsDec(x) && !x.decision.draft && x.decision.to === d.to && x.decision.reply_to === d.reply_to && x.decision.group === d.group);
+  return all.length > 1 ? all : [];
+}
+// The question that waits next after `n` (then the ones before it), or null.
+function ntNextOpen(n) {
+  const all = ntSibs(n), at = all.findIndex(x => x.id === n.id);
+  return [...all.slice(at + 1), ...all.slice(0, Math.max(at, 0))].find(x => x.id !== n.id && ntOpenDec(x)) || null;
+}
+// Shows another question of the same message in the open sheet; what was typed or picked in the one left stays for when it is back.
+function ntSheetGo(id) {
+  if (NS.edit) NS.stash.set(NS.edit.id, NS.edit);
+  NS.id = String(id); NS.edit = NS.stash.get(NS.id) || null; NS.stash.delete(NS.id); NS.pn = null;
+  NS.h.box.dataset.sig = "";
+  ntSheetPaint();
+  const b = $(".fs-body", NS.h.box); if (b) b.scrollTop = 0;
+  const first = NS.edit ? null : NS.node.querySelector(".ds-opt, .ds-direct");
+  if (first) first.focus({ preventScroll: true });
+}
+// After an answer: a question of a several-question message moves the sheet to the next one that waits, the last one closes it. False for a lone question (its sheet shows the answer).
+function ntAfterAnswer(n) {
+  if (!ntSibs(n).length) return false;
+  const nx = ntNextOpen(n);
+  if (nx) { toast("답을 보냈어요 · 다음 질문이에요"); ntSheetGo(nx.id); }
+  else { ntSheetClose(); toast("답을 보냈어요"); }
+  return true;
 }
 function ntEditNode(n, ed) {
   const drf = !!n.decision.draft, dt = draftNoteText(ed.opt);
@@ -646,9 +679,9 @@ function ntSheetPaint() {
   if (NS.det) { ntDetailPaint(NS.det); return; }
   const n = NS.pn ? pqNoticeNow(NS.pn) : ntById(NS.id);
   if (!n || !ntIsDec(n)) { ntSheetClose(false); return; }
-  const d = n.decision, open = d.state === "open", ignd = d.state === "ignored", parts = ntParts(n), keep = NS.node.contains(document.activeElement) ? document.activeElement.dataset.k : "";
+  const d = n.decision, open = d.state === "open", ignd = d.state === "ignored", parts = ntParts(n), sibs = ntSibs(n), keep = NS.node.contains(document.activeElement) ? document.activeElement.dataset.k : "";
   const kids = [
-    fsHead([el("span", { class: `fs-ey ${open ? "warn" : ignd ? "ign" : "done"}`, text: `${ntDecCtx(n)} · ${open ? "답변 필요" : ignd ? "무시함" : d.expired ? "기한 지남" : d.resolved ? "해결됨" : "답변함"}` })],
+    fsHead([el("span", { class: `fs-ey ${open ? "warn" : ignd ? "ign" : "done"}`, text: `${ntDecCtx(n)} · ${open ? "답변 필요" : ignd ? "무시함" : d.expired ? "기한 지남" : d.resolved ? "해결됨" : "답변함"}` }, sibs.length ? el("span", { class: "fs-left", "data-k": "count", text: ` · ${sibs.findIndex(x => x.id === n.id) + 1}/${d.group}` }) : null)],
       { ignore: open ? () => ntIgnore(n) : null, ignoreOff: NS.busy, close: () => ntSheetClose() }),
     el("div", { class: "fs-body" },
       el("h2", { class: "ds-t", id: "ds-t", text: parts.title || "답변이 필요해요" }),
@@ -658,7 +691,7 @@ function ntSheetPaint() {
   const foot = el("div", { class: "fs-ft" }), ed = open && NS.edit && NS.edit.id === String(n.id) ? NS.edit : null;
   // Every notice event repaints the open sheet; one that changes nothing it shows leaves it alone, so the reason field being typed in is not
   // replaced (a new field takes the focus and a phone closes and reopens its keyboard).
-  const sig = JSON.stringify([n.title, n.text, d, ntWhen(n), NS.busy, ed ? ed.opt.n : 0]);
+  const sig = JSON.stringify([n.title, n.text, d, ntWhen(n), NS.busy, ed ? ed.opt.n : 0, sibs.map(x => [x.id, x.decision.state])]);
   if (NS.h.box.dataset.sig === sig) return;
   NS.h.box.dataset.sig = sig;
   const hadNote = !!NS.node.querySelector(".dc-note:focus");
@@ -668,6 +701,8 @@ function ntSheetPaint() {
       el("span", { class: "ds-lb" }, o.label),
       o.desc ? el("span", { class: "ds-ds", text: o.desc }) : null));
     foot.append(el("button", { type: "button", class: "ds-direct", "data-k": "direct", disabled: NS.busy, onclick: () => ntDirect(n), text: d.to.startsWith("auth:") ? "입력 창으로 가기" : "직접 답하기" }));
+    const nx = ntNextOpen(n);
+    if (nx) foot.append(el("button", { type: "button", class: "ds-direct", "data-k": "next", disabled: NS.busy, onclick: () => ntSheetGo(nx.id), text: "다음 질문 보기" }));
     if (NS.busy) foot.append(el("div", { class: "ds-st", role: "status", text: "보내는 중…" }));
   } else if (ignd) {
     foot.append(el("div", { class: "ds-res", role: "status" }, el("span", { class: "ds-rl ign", text: "무시했어요" }), el("span", { class: "ds-ra", text: "답하지 않고 넘겼어요" })));
@@ -701,7 +736,7 @@ async function noticeSheetOpen(id) {
 }
 function ntSheetShow(id, det, pn = null) {
   NS.id = id; NS.det = det; NS.pn = pn; NS.busy = false;
-  const h = fsOpen({ labelledby: "ds-t", onClose: () => { if (NS.h === h) { NS.h = NS.node = null; NS.id = ""; NS.det = null; NS.edit = null; NS.pn = null; } } });
+  const h = fsOpen({ labelledby: "ds-t", onClose: () => { if (NS.h === h) { NS.h = NS.node = null; NS.id = ""; NS.det = null; NS.edit = null; NS.pn = null; NS.stash.clear(); } } });
   NS.h = h; NS.node = h.node;
   ntSheetPaint();
   const first = NS.edit ? null : NS.node.querySelector(".ds-opt, .ds-direct");
