@@ -1571,3 +1571,24 @@ test("the count is what the 알림 screen lists: conversation and log items do n
 	expect(unreadCount()).toBe(0);
 	expect(stored().find(n => n.id === conv.id)!.read).toBe(false);   // nothing stored changes: the conversation item stays unread
 });
+
+// dotz_send `resolves` from one session closes only its own conversations' questions (a pick in one conversation answered another's question before).
+const askIn = (target: string) => emit("outbox", { ts: rts(), kind: "out", source: "orchestrator", target, text: `[ask] 배포할까요?\n결정: 배포 ${target}\n**1) 네**\n**2) 아니오**` });
+const openIn = (conv: string) => stored().some(n => n.decision?.state === "open" && n.open === conv);
+const within = (session: string) => (conv: string | undefined) => (conv?.startsWith("ch:") || conv?.startsWith("mail:") ? conv : "main") === session;
+
+test("a session's `resolves` closes only the questions of its own conversations; ids still name any, and no filter keeps the old reach", () => {
+	for (const target of ["web", "ch:111", "mail:k1"]) askIn(target);
+	expect(resolveNotices({ match: "배포" }, within("ch:111")).resolved).toBe(1);
+	expect(openIn("ch:111")).toBe(false);
+	// a web conversation's question is stored under main
+	expect(openIn("main") && openIn("mail:k1")).toBe(true);
+	expect(resolveNotices({ match: "배포" }, within("main")).resolved).toBe(1);
+	expect(openIn("main")).toBe(false);
+	expect(openIn("mail:k1")).toBe(true);
+	const mail = stored().find(n => n.open === "mail:k1")!;
+	expect(resolveNotices({ ids: [mail.id] }, within("ch:111")).resolved).toBe(1);
+	expect(openIn("mail:k1")).toBe(false);
+	for (const target of ["web", "ch:111"]) emit("outbox", { ts: rts(), kind: "out", source: "orchestrator", target, text: `[ask] 출시할까요?\n결정: 출시 ${target}\n**1) 네**\n**2) 아니오**` });
+	expect(resolveNotices({ match: "출시" }).resolved).toBe(2);
+});

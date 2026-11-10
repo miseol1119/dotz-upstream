@@ -11,6 +11,7 @@ export const enLeads = {
 	youAre: "[dotz gateway] You are",
 	replayLead: "[dotz gateway] The gateway restarted before you answered this",
 	newMessageLead: "[dotz gateway] A new message arrived while you are working",
+	handbackLead: "[dotz gateway] The session you handed work to answered:",
 	laneReportLead: "[dotz gateway] A session report arrived while you are working",
 	joinLead: "[dotz gateway] A background worker is already running for this conversation",
 	otherConvLead: "[dotz gateway] A background worker of another conversation may report during this turn",

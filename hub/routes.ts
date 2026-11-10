@@ -961,17 +961,17 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 				if (!sender) return json({ error: `unknown session ${from}` }, 400);
 				// One round only: a turn a session was handed another session's work for must not hand it back or onward.
 				const cur = sender.queue.current();
-				if (cur && !cur.done && cur.text.startsWith(MAIN === from ? "[conversation " : "[main session] ")) return json({ error: "handed work: answer it here, do not pass it on" }, 409);
+				if (cur && !cur.done && (cur.from || cur.handback)) return json({ error: "handed work: answer it here, do not pass it on" }, 409);
 				const toMain = from !== MAIN;
 				if (!toMain && !convs.get(key)) return json({ error: `no conversation session ${key}` }, 404);
 				// Into main: its answer goes to the conversation that asked, where its own window shows it.
 				if (toMain) {
-					queue.deliver(`[conversation ${from}] ${text}`, { target: sender.primary, replyTo: cur?.replyTo });
+					queue.deliver(`[conversation ${from}] ${text}`, { target: sender.primary, replyTo: cur?.replyTo, from });
 					return json({ ok: true, to: MAIN, answers_in: sender.primary });
 				}
 				const c = convs.get(key)!;
 				// Main's request goes in as that conversation's next turn with no reply_to: its answer is posted into the conversation.
-				convs.deliverTo(key, `[main session] ${text}`, undefined);
+				convs.deliverTo(key, `[main session] ${text}`, { target: c.primary, from: MAIN });
 				return json({ ok: true, to: key, answers_in: c.primary });
 			}
 		}
@@ -985,22 +985,22 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 			const refused = session === MAIN && !b.update_key && repostRefusal(target, String(b.text ?? ""));
 			if (refused) return json({ delivered: false, reason: refused });
 			// `resolves` (text in the title / text of the open questions it settles, or "*" for all): this post says their matter is over.
-			if (typeof b.resolves === "string" && b.resolves.trim()) resolveNotices(b.resolves.trim() === "*" ? { all: true } : { match: b.resolves });
+			if (typeof b.resolves === "string" && b.resolves.trim()) resolveNotices(b.resolves.trim() === "*" ? { all: true } : { match: b.resolves }, conv => convs.keyOf(conv ?? "") === session);
 			if (b.update_key) {
 				try {
-					return json(await progress(target, String(b.update_key), String(b.text ?? ""), b.reply_to));
+					return json(await progress(target, String(b.update_key), String(b.text ?? ""), b.reply_to, session, "dotz_send"));
 				} catch (error) {
 					return json({ delivered: false, reason: (error as Error).message }, 502);
 				}
 			}
 			// Answer only when it is ready: an early text to the asking channel waits for the turn's final answer. Meanwhile the owner sees it at once on that conversation's progress line (owner 2026-10-28: 중간 말을 바로 보여 주기), which the answer replaces.
 			if (sender.holdEarly(target, String(b.text ?? ""), b.reply_to ? String(b.reply_to) : undefined)) {
-				void progress(target, "progress", String(b.text ?? ""), b.reply_to).catch(e => log(`early text not shown on the progress line: ${(e as Error).message}`));
+				void progress(target, "progress", String(b.text ?? ""), b.reply_to, session, "dotz_send").catch(e => log(`early text not shown on the progress line: ${(e as Error).message}`));
 				return json({ delivered: true, held: true, note: "held: it is shown on the progress line now and goes out together with your final answer for this request; do not send it again" });
 			}
 			const answers = sender.sent(target, String(b.text ?? ""), b.reply_to ? String(b.reply_to) : undefined);
 			try {
-				return json(await out(target, String(b.text ?? ""), b.reply_to ?? answers));
+				return json(await out(target, String(b.text ?? ""), b.reply_to ?? answers, { session, cross: "dotz_send" }));
 			} catch (error) {
 				return json({ delivered: false, reason: (error as Error).message }, 502);
 			}

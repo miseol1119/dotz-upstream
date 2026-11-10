@@ -225,7 +225,7 @@ test("a user frame that matches nothing delivered leaves the running turn's prom
 
 // The OmO session of 2026-10-20 12:49Z: the gateway restarted mid-delegation, the resumed session was woken by the dead task
 // worker's completion, and its report (a run no delivered prompt started) was dropped.
-test("an answer to a run no prompt started reaches the conversation of the owner's newest message of the last 30 minutes", async () => {
+test("an answer to a run no prompt started goes home, however recent the owner's messages", async () => {
 	const now = Date.now();
 	// A new process: the prompts are gone, the inbox log tail names the owner's messages.
 	const { q, state } = setup([], [{ target: "web", at: now - 3 * 60_000 }]);
@@ -244,7 +244,7 @@ test("an answer to a run no prompt started reaches the conversation of the owner
 	expect(live.state.posts.map(p => p.text)).toEqual(["a worker is on it", "The README is done and pushed."]);
 });
 
-test("an answer without a prompt prefers an unanswered owner message's conversation and names no message", async () => {
+test("an answer without a prompt goes home, not to an unanswered owner message's conversation, and names no message", async () => {
 	const now = Date.now();
 	const { q, state } = setup(["b"], [
 		{ target: "ch:1", replyTo: "a", at: now - 10 * 60_000 },
@@ -252,10 +252,10 @@ test("an answer without a prompt prefers an unanswered owner message's conversat
 	]);
 	q.onAnswer("for the unanswered one");
 	await Promise.resolve();
-	expect(state.posts).toEqual([{ target: "ch:1", text: "for the unanswered one", replyTo: undefined }]);
+	expect(state.posts).toEqual([{ target: "web", text: "for the unanswered one", replyTo: undefined }]);
 });
 
-test("a real answer no message can take is never dropped: the newest owner message's conversation of any age, else the main chat", async () => {
+test("a real answer no label explains is never dropped: it goes home whatever owner messages exist", async () => {
 	const now = Date.now();
 	const old = setup([], [
 		{ target: "web", replyTo: "a", at: now - 90 * 60_000 },
@@ -263,7 +263,7 @@ test("a real answer no message can take is never dropped: the newest owner messa
 	]);
 	old.q.onAnswer("a late report");
 	await Promise.resolve();
-	expect(old.state.posts).toEqual([{ target: "ch:1", text: "a late report", replyTo: undefined }]);
+	expect(old.state.posts).toEqual([{ target: "web", text: "a late report", replyTo: undefined }]);
 
 	const none = setup();
 	none.q.onAnswer("a report with no message at all");
@@ -694,9 +694,9 @@ test("a worker spawned in a turn a note started serves the owner message steered
 	expect(open().filter(p => p.replyTo)).toEqual([]);
 });
 
-test("the newest-message path (no deferred prompt) names no message and answers none", async () => {
+test("an answer no label explains goes to the session's home, names no message and answers none", async () => {
 	const SETTINGS = "settings:w:login-boutique-com";
-	const { q, state, open } = setup([], [{ target: SETTINGS, replyTo: "m7", at: Date.now() - 60_000 }]);
+	const { q, state, open } = setup([], [{ target: SETTINGS, replyTo: "m7", at: Date.now() - 60_000 }], { home: SETTINGS });
 	q.onAnswer("다시 로그인했어요. 다음 확인 때 정상으로 바뀌는지 볼게요.");
 	await Bun.sleep(0);
 	expect(state.posts.map(p => [p.target, p.replyTo])).toEqual([[SETTINGS, undefined]]);
@@ -808,8 +808,8 @@ test("the owner's 중단 closes the request: nothing steered into it is delivere
 	expect(state.delivered).toEqual(["analyse the files"]);
 	expect(state.posts).toEqual([]);
 	expect(open().map(p => p.text)).toEqual([]);
-	q.onAnswer("here is the analysis you asked for");   // a worker's result waking a run with no prompt of ours
-	expect(state.posts).toEqual([]);
+	q.onAnswer("here is the analysis you asked for");   // a run with no prompt of ours and no link: no label names the cancelled request, so it goes home
+	expect(state.posts).toEqual([{ target: "web", text: "here is the analysis you asked for", replyTo: undefined }]);
 	expect(q.cancel()).toBeUndefined();
 });
 
@@ -954,7 +954,7 @@ test("a worker of another conversation finishing during a turn asks that convers
 
 // 2026-10-31 06:36: a worker's result woke a run with no prompt of ours while two deferred requests were open; the answer went to the
 // oldest one (channel A) though the worker of channel B was the one that just finished.
-test("an answer with no prompt goes to the conversation whose worker finished last", async () => {
+test("an answer with no prompt and no wake goes home, not to the conversation whose worker finished last", async () => {
 	const now = Date.now();
 	const works = [
 		{ id: "wA", description: "A", status: "done", target: "ch:A", replyTo: "a1", startedAt: now - 100_000, endedAt: now - 50_000 },
@@ -973,9 +973,9 @@ test("an answer with no prompt goes to the conversation whose worker finished la
 
 	q.onAnswer("작업 결과예요");
 	await Promise.resolve();
-	expect(state.posts.map(p => [p.target, p.replyTo])).toEqual([["ch:B", "b1"]]);
+	expect(state.posts.map(p => [p.target, p.replyTo])).toEqual([["web", undefined]]);
 
-	// With no finished worker to name, the oldest open request's conversation gets it, on no message.
+	// With no finished worker either, the oldest open request's conversation is not picked: it goes home, on no message.
 	const plain = setup();
 	plain.startTurn("A 요청", { target: "ch:A", replyTo: "a1" });
 	plain.q.onAnswer("[later]");
@@ -987,7 +987,7 @@ test("an answer with no prompt goes to the conversation whose worker finished la
 	plain.q.settleTurn();
 	plain.q.onAnswer("작업 결과예요");
 	await Promise.resolve();
-	expect(plain.state.posts.map(p => [p.target, p.replyTo])).toEqual([["ch:A", undefined]]);
+	expect(plain.state.posts.map(p => [p.target, p.replyTo])).toEqual([["web", undefined]]);
 });
 
 const defer = (t: ReturnType<typeof setup>, id: string, target = "web") => {

@@ -21,6 +21,7 @@ const koLeads: Leads = {
 	youAre: "[dotz gateway] 당신은",
 	replayLead: "[dotz gateway] 게이트웨이가 다시 시작돼서 이 요청에 아직 답하지 못했어요",
 	newMessageLead: "[dotz gateway] 작업 중에 새 메시지가 도착했어요",
+	handbackLead: "[dotz gateway] 일을 넘긴 세션이 답했어요:",
 	laneReportLead: "[dotz gateway] 작업 중에 세션 보고가 도착했어요",
 	joinLead: "[dotz gateway] 이 대화에서 백그라운드 작업이 이미 돌고 있어요",
 	otherConvLead: "[dotz gateway] 다른 대화의 백그라운드 작업 결과가 이 턴에 들어올 수 있어요",

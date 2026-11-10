@@ -22,12 +22,13 @@ import { allowedRoots } from "./files.ts";
 import { claimPrefix, LaneRuntimeMismatch, lanes, type LaneDelivery, turnHeader } from "./lanes.ts";
 import { main, type Orchestrator, steer as steerOrchestrator } from "./orchestrator.ts";
 import { type Conv, convs, setWiring } from "./convsessions.ts";
-import { MAIN } from "./session-key.ts";
+import { MAIN, primaryTarget } from "./session-key.ts";
+import { guardLine, guardTarget } from "./conv-guard.ts";
 import { errorAsk } from "./orch-error.ts";
 import { createBgWork, omoWorkById, sessionProjects } from "./bgwork.ts";
 import { createWorkRows } from "./workrows.ts";
 import { digest } from "./convdigest.ts";
-import { createPrompts, type Reply, type WorkLink } from "./prompts.ts";
+import { createPrompts, type Pending, type Reply, type WorkLink } from "./prompts.ts";
 import { createSendLedger } from "./sendlog.ts";
 import { createInflight } from "./inflight.ts";
 import { inOrder, localize } from "./outlang.ts";
@@ -47,7 +48,7 @@ import { repeatAlert } from "./alert-gate.ts";
 // Prompt queue: see prompts.ts. Unanswered prompts are kept on disk, so a restart mid-turn replays them on boot.
 const PENDING = join(DATA_DIR, "pending.json");
 // Read before anything in this process delivers (and rewrites the file); replayed once the orchestrator starts.
-let unanswered: { text: string; at?: number; target?: string; replyTo?: string }[] = [];
+let unanswered: Pending[] = [];
 try {
 	if (existsSync(PENDING)) unanswered = JSON.parse(readFileSync(PENDING, "utf8"));
 } catch {}
@@ -98,6 +99,9 @@ function makeQueue(key: string, o: Orchestrator, pendingFile: string, bg: () => 
 		isNote: text => isNote(text, "newMessageLead") || isNote(text, "waitedLead") || isNote(text, "laneReportLead"),
 		regenerated: isOpenNudge,
 		post: (target, text, replyTo) => out(target, text, replyTo, { auto: true, session: key }),
+		// An answer no label explains lands in the session's own conversation; work another session handed over goes back to it, as that session's next prompt.
+		home: primaryTarget(key),
+		handBack: (from, text, replyTo) => void convs.deliverTo(from, `${msg().handbackLead} ${text}`, { target: convs.get(from)?.primary ?? primaryTarget(from), replyTo, handback: true }),
 		// The deferral acknowledgement is the gateway speaking, not the answer: it must leave the deferred prompt open.
 		announce: (target, text, worker) => void systemNote(target, text, "deferred", worker).catch(e => log(`deferral note to ${target} failed: ${e}`)),
 		interim: (target, text) => void out(target, text, undefined, { auto: true, session: key, keepsOpen: true }).catch(e => log(`note to ${target} failed: ${e}`)),
@@ -303,7 +307,7 @@ export const approvals = createApprovalQueue({
 	// The bot's `mail:<id>` card and the app's reply draft of that mail are one item.
 	itemOf: (conv, ref) => mailItemKey(ref, conv, draftHeads),
 	handled: (ref, conv) => refHandled(ref, conv),
-	post: (target, text, extra) => void out(target, text, undefined, { ...extra, queued: true }).catch(e => log(`held approval card to ${target} failed: ${e}`)),
+	post: (target, text, extra) => void out(target, text, undefined, { ...extra, queued: true, ...(extra.session ? { cross: "approval" } : {}) }).catch(e => log(`held approval card to ${target} failed: ${e}`)),
 	rewrite: (conv, card, next) => {
 		// A card that replaces the open one keeps what only that one showed (hub/draft-approval.ts keepBrief).
 		const text = keepBrief(openDraftText(conv, card.ref) ?? "", next);
@@ -381,7 +385,17 @@ const cardsNoteFor = (target: string): string | undefined => {
 // A gateway status line (a deferral receipt): `system` on its event makes the web draw a compact system line (opening `worker` with its
 // live state) and Discord a small `-# ` line; it is never unread and never pushed (push.ts classify only pushes orchestrator answers).
 export const systemNote = (target: string, text: string, system: string, worker?: string) => out(target, text, undefined, { source: "gateway", system, ...(worker ? { worker } : {}) });
+// A session's post stays in its own conversation unless it names a reason (hub/conv-guard.ts); a post with no session (the gateway's) is not checked.
+function guarded(session: unknown, target: string, cross?: unknown): string {
+	if (typeof session !== "string") return target;
+	const g = guardTarget(session, target, t => convs.keyOf(t), typeof cross === "string" ? cross : undefined);
+	const line = guardLine(session, target, g);
+	if (line) log(line);
+	return g.target;
+}
 export async function out(target: string, text: string, replyTo?: string, extra: Record<string, unknown> = {}): Promise<{ delivered: boolean; reason?: string }> {
+	const inHome = guarded(extra.session, target, extra.cross);
+	if (inHome !== target) [target, replyTo] = [inHome, undefined];
 	// Gateway notices (rate-limit hold, command and limits replies) reply to a message without answering its request.
 	const answersOwner = (extra.source === undefined || extra.source === "orchestrator") && !extra.keepsOpen;
 	const said = stripSteerMark(text);
@@ -493,7 +507,9 @@ export function rateLimitNotice(target: string, replyTo?: string): void {
 	void out(target, text, replyTo, { source: "gateway" }).catch(() => undefined);
 }
 
-export async function progress(target: string, key: string, text: string, replyTo?: string): Promise<{ delivered: boolean; reason?: string; edited?: boolean }> {
+export async function progress(target: string, key: string, text: string, replyTo?: string, session?: string, cross?: string): Promise<{ delivered: boolean; reason?: string; edited?: boolean }> {
+	const inHome = guarded(session, target, cross);
+	if (inHome !== target) [target, replyTo] = [inHome, undefined];
 	const sent = await inOrder(target, async () => {
 		let t = await localize(stripHandoff(text), target, "orchestrator");
 		// The label goes in after the status marker ([done] becomes the leading emoji) and after localize (a rewrite must not touch it).
@@ -571,7 +587,11 @@ function wireAnswers(c: Conv): void {
 		// Its next owner prompt carries what happened in the conversations main does not answer itself (hub/convdigest.ts).
 		c.o.setTurnHeader(() => [turnHeader(), digest.take(MAIN)].filter(Boolean).join("\n"));
 		c.o.setAlertHandler(alert);
-	} else c.o.setAlertHandler(text => alert(`[${c.meta.name || c.primary}] ${text}`));
+	} else {
+		// What main posted in this conversation reaches the session's next owner prompt (the header is added to owner prompts only: a handed-over prompt carries none, and its answer goes back to the sender anyway).
+		c.o.setTurnHeader(() => digest.takeInto(c.key));
+		c.o.setAlertHandler(text => alert(`[${c.meta.name || c.primary}] ${text}`));
+	}
 }
 
 // A conversation session is wired when the registry creates it: its own queue (pending.json in its folder) and background-work view,
