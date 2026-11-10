@@ -235,7 +235,11 @@ function resolveLive(input: string, roots: string[], listed: ReadonlySet<string>
 // Copies the files named in the [file] lines of a message just sent into the data dir's files/ (filesnap.ts), in the background.
 const kept = () => [UPLOADS, FILES].map(d => real(d) ?? d);
 export function snapshotSent(text: string): void {
-	const paths = fileLinePaths(text).map(expand).filter(p => p.startsWith("/"));
+	snapshotResults(fileLinePaths(text));
+}
+// The same copy for the files a result chip names, so they open after the original is deleted.
+export function snapshotResults(files: string[]): void {
+	const paths = files.map(expand).filter(p => p.startsWith("/"));
 	if (!paths.length) return;
 	const store = kept();
 	queueSnapshots(paths, p => {

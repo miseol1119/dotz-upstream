@@ -4,6 +4,8 @@ import { expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { emit, sentFiles } from "./events.ts";
+import { listedFileRoute } from "./listed-files.ts";
+import { upsert } from "./notices-store.ts";
 import { HUB_TOKEN } from "./config.ts";
 import { allowedRoots, fileLinePaths, fileRoute } from "./files.ts";
 import { noticeKo, plainTable } from "./notice-ko.ts";
@@ -80,6 +82,42 @@ test("a listed work-channel result under projects/ is served; an unlisted neighb
 	const ok = await get("projects/boutique/shot.png");
 	expect([ok.status, ok.headers.get("content-type"), await ok.text()]).toEqual([200, "image/png", "PROJPNG"]);
 	expect((await get(join(dir, "unlisted.png"))).status).toBe(403);
+});
+
+// A result chip is the gateway's own claim that a file is the job's result, so its path opens (a stored notice's files, a done work row's files);
+// a neighbour no chip names, and anything DENY or the private folders refuse, stay refused.
+const chipGet = (path: string, rows: { files?: { path: string }[] }[] = []) => {
+	const url = new URL(`http://x/api/file?path=${encodeURIComponent(path)}`);
+	return listedFileRoute(new Request(url), url, allowedRoots([]), () => rows);
+};
+const chipFile = (path: string) => ({ path, name: path.split("/").pop()!, size: 1 });
+const findings = join(DATA, "projects", "p", "findings");
+mkdirSync(findings, { recursive: true });
+for (const f of ["a.md", "b.md", "c.md", "d.md"]) writeFileSync(join(findings, f), `body ${f}`);
+
+test("a file on a stored notice's chip is served; an unnamed neighbour is refused", async () => {
+	expect((await chipGet(join(findings, "a.md"))).status).toBe(403);
+	upsert({ kind: "result", tone: "", title: "결과", text: "끝났어요", open: "lane:p", key: "lane:p", files: [chipFile(join(findings, "a.md"))] });
+	const ok = await chipGet(join(findings, "a.md"));
+	expect([ok.status, await ok.text()]).toEqual([200, "body a.md"]);
+	expect((await chipGet(join(findings, "b.md"))).status).toBe(403);
+});
+
+test("a file on a done work row's chip is served; an unnamed neighbour is refused", async () => {
+	const rows = [{ files: [chipFile(join(findings, "c.md"))] }];
+	expect((await chipGet(join(findings, "c.md"))).status).toBe(403);
+	const ok = await chipGet(join(findings, "c.md"), rows);
+	expect([ok.status, await ok.text()]).toEqual([200, "body c.md"]);
+	expect((await chipGet(join(findings, "d.md"), rows)).status).toBe(403);
+});
+
+test("a chip naming a secret or a DENY path is still refused", async () => {
+	const secret = join(DATA, "secrets", "key.txt"), env = join(findings, ".env");
+	writeFileSync(env, "K=v");
+	upsert({ kind: "result", tone: "", title: "비밀", text: "끝났어요", open: "lane:q", key: "lane:q", files: [chipFile(secret), chipFile(env)] });
+	const rows = [{ files: [chipFile(secret), chipFile(env)] }];
+	expect((await chipGet(secret, rows)).status).toBe(403);
+	expect((await chipGet(env, rows)).status).toBe(403);
 });
 
 // A computer in the app's switcher (맥미니) is a gateway of its own: the page opens on its origin and asks that gateway's /api/file, with the same

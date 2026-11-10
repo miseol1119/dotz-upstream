@@ -46,7 +46,7 @@ import { askText } from "../features/reply-drafts/lib/flow.ts";
 import { pluginMailAction, pluginMailActions } from "./plugins.ts";
 import { webmailSite } from "../features/reply-drafts/lib/senders.ts";
 import { getDraft, holdDrafts, holdDraftsOf, listDrafts, restoreDrafts, restoreDraftsOf } from "../features/reply-drafts/lib/store.ts";
-import { attachmentLines, canvasRoute, fileRoute, FileError, messageFiles, ownerFiles, serveFile, UPLOAD_MAX_BYTES, uploadsFrom } from "./files.ts";
+import { attachmentLines, canvasRoute, FileError, messageFiles, ownerFiles, serveFile, UPLOAD_MAX_BYTES, uploadsFrom } from "./files.ts";
 import { ownerElements, pickedLines } from "./picked.ts";
 import { ownerRefs, refLines } from "./mentions.ts";
 import { laneCapacity, laneClosed, lanes, liveLanes, laneSummary } from "./lanes.ts";
@@ -83,7 +83,7 @@ import { authHeld, parseReply, replyLine, sendWeb } from "./intake.ts";
 import { json, body, terminals, BodyError } from "./routes-util.ts";
 import { ptyRoute } from "./pty.ts";
 import { desk } from "./remote-desktop.ts";
-import { projectFiles } from "./projectinfo.ts";
+import { listedFileRoute } from "./listed-files.ts";
 import { routeApps } from "./routes-apps.ts";
 import { routeLanes } from "./routes-lanes.ts";
 import { routeNotices } from "./routes-notices.ts";
@@ -823,7 +823,7 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 			}
 		}
 		if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/api/file") {
-			return fileRoute(req, url, fileRoots(), new Set([...sentFiles(), ...projectFiles()]));
+			return listedFileRoute(req, url, fileRoots(), () => bgWork.list());
 		}
 		if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/api/canvas") {
 			return canvasRoute(req, url, fileRoots(), sentFiles());
@@ -832,7 +832,7 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 		// or a result file the bot posted or wrote ([file] lines, paths), under the same rules as this computer's own /api/file.
 		if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/api/peer/file") {
 			const [f] = messageFiles([{ path: url.searchParams.get("path") ?? "" }]);
-			if (!f) return fileRoute(req, url, fileRoots(), sentFiles());
+			if (!f) return listedFileRoute(req, url, fileRoots(), () => bgWork.list());
 			const res = serveFile(f.path, req, url.searchParams.get("download") === "1");
 			return req.method === "HEAD" ? new Response(null, { status: res.status, headers: res.headers }) : res;
 		}

@@ -15,6 +15,7 @@ import type { Decision, DecisionOpt, Notice, NoticeKind, NoticeTone } from "./no
 import { appBlocked, appOf, closedHooks, decisionHooks, orchestratorUp, stampApp, summarizeWatch, unreadHooks, watchLabelOf } from "./notices-wiring.ts";
 import { BACKFILL_DAYS, DAY_MS, FOLD_MS, LOUD, MESSAGE_PREVIEW, NOTICE_CAP, REASK_MS, REPEATS_MAX, REPEAT_TEXT, RESTART_PREFIX, answersOption, authorOf, clean, closedInfo, coveredByRead, hasChoice, hasExpired, isAsking, isOpenDecision, keepWatchNewest, laneTone, needsAnswer, originOf, refOf, systemTitle, twinOf, waitKind, waitsOf } from "./notices-rules.ts";
 import { GENERIC_TITLES, channelLanes, channelTitle, laneExists, laneOfNotice, laneTitle, launchTitles, noteLaunch, readChannelMap, recordedCwd, stoppedSince } from "./notices-lanes.ts";
+import { snapshotResults } from "./files.ts";
 import { type ResultFile, type ResultLink, resultFiles, resultLinks } from "./result-refs.ts";
 import { broadcast, summary } from "./notices-read.ts";
 import { QUIET_MS, awaitingReply, isViewing, quietReplies, viewers } from "./notices-viewing.ts";
@@ -44,6 +45,8 @@ export let items: Notice[] = load();
 // True while backfillNotices replays old events: upsert then neither writes the file nor broadcasts per item.
 let replaying = false;
 
+// The file paths on the chips of the stored notices (hub/listed-files.ts).
+export const noticeFilePaths = (): string[] => items.flatMap(n => n.files?.map(f => f.path) ?? []);
 export const save = () => writeAtomic(paths.notices, `${JSON.stringify(items, null, 1)}\n`);
 
 // The 알림 screen does not list these (web/js/31-notices-screen.js nscListed), so the count must not hold what the owner cannot read there.
@@ -168,6 +171,7 @@ function resultsOf(raw: unknown, lane?: string): { files?: ResultFile[]; links?:
 	const text = String(raw ?? "");
 	if (replaying || !/\[file\]|`[~/]|근거\s*:|https?:\/\//.test(text)) return {};
 	const files = resultFiles(text), links = resultLinks(text, [lane ? (recordedCwd(lane) ?? "") : "", CODE_ROOT]);
+	snapshotResults(files.map(f => f.path));
 	return { ...(files.length ? { files } : {}), ...(links.length ? { links } : {}) };
 }
 
