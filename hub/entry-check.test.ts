@@ -85,6 +85,27 @@ describe("입구 검사", () => {
 		expect(await status("/api/notices", { headers: peer })).toBe(200);
 	});
 
+	test("pairing is answered after the write check and only for a JSON body", async () => {
+		const reachedPairing = async (r: Response) => ((await r.json().catch(() => null)) as { error?: string } | null)?.error === "pairing refused";
+		const body = JSON.stringify({ origin: "https://other.tailnet.ts.net" });
+		const server = { ...tailnet, "content-type": "application/json" };
+		// A peer gateway asking (hub/peer-pair.ts createPairer): JSON, the tailnet login, no browser headers.
+		expect(await reachedPairing(await hit(PAIR_PATH, { method: "POST", headers: server, body }))).toBe(true);
+		// Another site's page, with fetch metadata or with an Origin only.
+		const site = { ...server, "sec-fetch-site": "cross-site", origin: "https://evil.example" };
+		expect(await status(PAIR_PATH, { method: "POST", headers: site, body })).toBe(403);
+		expect(await status(PAIR_PATH, { method: "POST", headers: { ...server, origin: "https://evil.example" }, body })).toBe(403);
+		expect(await reachedPairing(await hit(PAIR_PATH, { method: "POST", headers: site, body }))).toBe(false);
+		// A simple text/plain or form post, and a body with no type at all.
+		for (const type of ["text/plain;charset=UTF-8", "application/x-www-form-urlencoded", undefined]) {
+			const headers: Record<string, string> = { ...tailnet, ...(type ? { "content-type": type } : {}) };
+			const res = await hit(PAIR_PATH, { method: "POST", headers, body });
+			expect([type, res.status, await reachedPairing(res)]).toEqual([type, 403, false]);
+		}
+		// The owner's own page asking from the same site is still answered.
+		expect(await reachedPairing(await hit(PAIR_PATH, { method: "POST", headers: { ...server, "sec-fetch-site": "same-origin", origin: `https://${TS}` }, body }))).toBe(true);
+	});
+
 	test("web.entry_check: false brings back the old behaviour", async () => {
 		(cfg.web as { entry_check?: boolean }).entry_check = false;
 		try {
