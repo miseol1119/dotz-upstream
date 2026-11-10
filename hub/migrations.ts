@@ -2,13 +2,13 @@
 // Each migration has an id and runs once per install (<data dir>/migrations.json). It is idempotent, adds or asks and never deletes user data.
 // Returns a short Korean summary when it changed something (undefined = nothing to do). A failure leaves one Korean notice and is retried at the
 // next start. The commands the migrations replace (features/*/bin/onboard.ts) stay for manual use.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { findLegacy, LEGACY_NO, LEGACY_YES, legacyGate } from "../features/youtube-instagram/lib/legacy.ts";
 import { createApp } from "./app-off.ts";
 import { issueBlock } from "./choices.ts";
 import { commentsDir, createStore } from "./comments/store.ts";
-import { log as hubLog, writeAtomic } from "./config.ts";
+import { DEFAULT_MODEL, DEFAULT_WORKER_MODEL, log as hubLog, parseSelector, readJsonOrQuarantine, writeAtomic } from "./config.ts";
 import { APPS_FILE, srcKey } from "./integrations.ts";
 
 export const MIGRATIONS_FILE = "migrations.json";
@@ -103,7 +103,38 @@ const cardAudit: Migration = {
 	},
 };
 
-export const MIGRATIONS: Migration[] = [siteApps, legacyTokens, cardAudit];
+// (d) Model settings made before the gateway kept state/model-picks.json (hub/model-guard.ts): models.* in config.json and a session's own model
+// at update time are the owner's. Each such target without a record gets one (by owner, marked as the earlier setting); a target with one keeps it.
+const modelPicks: Migration = {
+	id: "model-picks-baseline",
+	label: "기존 모델 설정 기록",
+	run: ({ dataDir }) => {
+		const file = join(dataDir, "state", "model-picks.json");
+		const picks = readJsonOrQuarantine<Record<string, unknown>>(file, () => ({}), { keepGood: false });
+		const models = readJsonOrQuarantine<any>(join(dataDir, "config.json"), () => ({}), { keepGood: false })?.models ?? {};
+		const found: [string, string][] = [];
+		for (const [target, d] of [["orchestrator", `${DEFAULT_MODEL.model}:${DEFAULT_MODEL.thinking}`], ["lanes", `${DEFAULT_MODEL.model}:${DEFAULT_MODEL.thinking}`], ["workers", DEFAULT_WORKER_MODEL]]) {
+			const m = models[target], model = typeof m?.model === "string" && m.model ? m.model : undefined, thinking = typeof m?.thinking === "string" && m.thinking ? m.thinking : undefined;
+			if (!model && !thinking) continue;
+			const base = parseSelector(model ?? d);
+			found.push([target, `${base.model}:${thinking ?? base.thinking}`]);
+		}
+		const sessions = join(dataDir, "conv-sessions");
+		for (const name of existsSync(sessions) ? readdirSync(sessions) : []) {
+			const s = readJsonOrQuarantine<any>(join(sessions, name, "state.json"), () => undefined, { keepGood: false });
+			if (typeof s?.key === "string" && typeof s.ownModel === "string" && s.ownModel) found.push([s.key, s.ownModel]);
+		}
+		const added = found.filter(([target]) => !picks[target]);
+		if (!added.length) return undefined;
+		const at = new Date().toISOString();
+		for (const [target, selector] of added) picks[target] = { ...parseSelector(selector), by: "owner", at, evidence: "earlier setting, recorded at update" };
+		mkdirSync(join(dataDir, "state"), { recursive: true });
+		writeAtomic(file, `${JSON.stringify(picks, null, 2)}\n`);
+		return `기존 모델 설정을 오너 설정으로 기록 (${added.map(([t, s]) => `${t} ${s}`).join(", ")})`;
+	},
+};
+
+export const MIGRATIONS: Migration[] = [siteApps, legacyTokens, cardAudit, modelPicks];
 
 /** Runs every migration that is not done, in order. One notice line lists what changed; each failure gets its own notice and is retried at the next start. */
 export async function runMigrations(deps: Deps): Promise<{ ran: string[]; failed: string[] }> {

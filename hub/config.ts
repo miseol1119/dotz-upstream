@@ -99,7 +99,7 @@ function loadConfig(): Config {
 }
 export const cfg: Config = loadConfig();
 // Model + thinking level a section of config.json selects; omp takes them as one `--model <model>:<thinking>` selector.
-const DEFAULT_MODEL = { model: "anthropic/claude-opus-5-5", thinking: "medium" };
+export const DEFAULT_MODEL = { model: "anthropic/claude-opus-5-5", thinking: "medium" };
 const targetOf = (t: FallbackTarget): TargetModels => cfg.models?.[t] ?? {};
 export const orchestratorModel = () => ({ model: targetOf("orchestrator").model ?? DEFAULT_MODEL.model, thinking: targetOf("orchestrator").thinking ?? DEFAULT_MODEL.thinking });
 export const lanesModel = () => ({ model: targetOf("lanes").model ?? DEFAULT_MODEL.model, thinking: targetOf("lanes").thinking ?? DEFAULT_MODEL.thinking });
