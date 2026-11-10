@@ -1,6 +1,6 @@
 // Versioned delivery (docs/releases.md): tag v<YYMMDD.N> scheduled or v<YYMMDD.N.M> forced on main plus VERSION, KST day.
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeAtomic } from "../firstrun/atomic.ts"; // not hub/config.ts: it needs a data dir at load, and CI has none
@@ -444,7 +444,14 @@ export type DispatchOptions = {
 	print?: (line: string) => void;
 	gate?: GateEnv; // where the gate clones from and how it runs its detached runner; GitHub and real processes when not given
 	signingKey?: string; // the release signing key file; $DOTZ_DIR/secrets/release-signing-key when not given
+	hubLog?: (line: string) => void; // appends to hub.log of this install (DOTZ_DIR or ~/.dotz, as hub/config.ts reads it; not imported here) when not given
 };
+
+const FLAKY_SHOWN = 5;
+
+function appendHubLog(line: string): void {
+	appendFileSync(join(process.env.DOTZ_DIR ?? join(homedir(), ".dotz"), "hub.log"), `${new Date().toISOString()} ${line}\n`);
+}
 
 // What the watch knows of a release that failed: "failed" (with the line to show) for the rest of the slot, so the watch keeps failing and its own
 // failure alert reaches the owner. A release that went out is forgotten. "running" is what the GitHub-runner flow wrote; nothing writes it now.
@@ -533,6 +540,15 @@ export async function dispatchSlot(opts: DispatchOptions): Promise<number> {
 		clearGate(opts.stateDir);
 		print(`시험이 초록이고 릴리스를 냈어요 (${gate.sha.slice(0, 8)}).`);
 		for (const line of gate.release.out.split("\n").slice(-3)) print(line);
+		if (gate.flaky.length) {
+			const names = gate.flaky.slice(0, FLAKY_SHOWN).join(", ") + (gate.flaky.length > FLAKY_SHOWN ? ` 외 ${gate.flaky.length - FLAKY_SHOWN}개` : "");
+			print(`한 번 다시 돌려서 통과한 시험 ${gate.flaky.length}개: ${names}`);
+			try {
+				(opts.hubLog ?? appendHubLog)(`release gate: ${gate.flaky.length} flaky test file(s) passed on retry (${gate.sha.slice(0, 8)}): ${gate.flaky.join(", ")}`);
+			} catch {
+				// the note in hub.log is not worth failing a release that went out
+			}
+		}
 		return 0;
 	}
 	const message =

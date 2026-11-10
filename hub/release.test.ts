@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { failedFiles, runGate, type GateEnv, type SuiteResult } from "./release-gate.ts";
+import { type Attempt, failedFiles, RETRY_MAX_FAILED_SHARE, runGate, runWithRetry, type GateEnv, type SuiteFn, type SuiteResult, testFileCount } from "./release-gate.ts";
 import {
 	compareVersions,
 	cutInSlot,
@@ -487,7 +487,7 @@ describe("release slots", () => {
 				git(seed, "tag", name);
 				git(seed, "push", "-q", "origin", name);
 			};
-			const state = { head: push("work"), suite, suites: 0, spawned: [] as string[][], alive: true, killed: [] as number[], pid: 100, released: [] as string[], release: { code: 0, out: "released" } };
+			const state = { head: push("work"), suite, runner: undefined as SuiteFn | undefined, gateLog: [] as string[], suites: 0, spawned: [] as string[][], alive: true, killed: [] as number[], pid: 100, released: [] as string[], release: { code: 0, out: "released" } };
 			const env: GateEnv = {
 				origin: url,
 				spawn: cmd => {
@@ -506,10 +506,11 @@ describe("release slots", () => {
 					slot: slotStart(now).toISOString(),
 					origin,
 					git: gitOutput,
-					runSuite: async () => {
+					runSuite: async d => {
 						state.suites++;
-						return state.suite;
+						return state.runner ? state.runner(d) : state.suite;
 					},
+					log: line => state.gateLog.push(line),
 					hasNewCommits: async (repo, sha) => (await newCommitsSinceNewestTag(repo, sha)).any,
 					release: async (_dir, sha) => {
 						state.released.push(sha);
@@ -556,6 +557,122 @@ describe("release slots", () => {
 			expect(kit.state.spawned).toHaveLength(1);
 			expect(await launch(kit, { stateDir: dir, exec, print }, "2026-11-05T18:00:10")).toBe(0);
 			expect(kit.state.released).toHaveLength(2);
+		});
+
+		// A suite runner that is not real: each call takes the next scripted run and records which files it was asked for (undefined = all of them).
+		const scripted = (runs: Attempt[]) => {
+			const calls: (readonly string[] | undefined)[] = [];
+			const attempt = async (_dir: string, files?: readonly string[]): Promise<Attempt> => {
+				calls.push(files);
+				const next = runs[calls.length - 1];
+				if (!next) throw new Error("a run beyond the script");
+				return next;
+			};
+			return { calls, attempt };
+		};
+		const names = (n: number) => Array.from({ length: n }, (_, i) => `hub/f${i}.test.ts`);
+		const failing = (failed: string[], total = 100): Attempt => ({ green: false, failed, total, detail: "" });
+		const passing = (total: number): Attempt => ({ green: true, failed: [], total, detail: "" });
+
+		test("a full run red in a few files is retried once on those files and, when they pass, is green: released, with them named as flaky", async () => {
+			const dir = stateDir();
+			const hubLines: string[] = [];
+			const out: string[] = [];
+			const kit = gateKit();
+			const run = scripted([failing(names(7)), passing(7)]);
+			kit.state.runner = d => runWithRetry(d, run.attempt);
+			const { calls, exec } = gh("ddotz");
+			expect(await launch(kit, { stateDir: dir, exec, print: l => out.push(l), hubLog: l => hubLines.push(l) }, "2026-11-05T12:00:10")).toBe(0);
+			expect(run.calls).toEqual([undefined, names(7)]);
+			expect(kit.state.released).toEqual([kit.state.head]);
+			expect(calls).toEqual([]);
+			expect(existsSync(join(dir, "release-slot"))).toBe(true);
+			expect(hubLines).toHaveLength(1);
+			for (const n of names(7)) expect(hubLines[0]).toContain(n);
+			expect(kit.state.gateLog).toHaveLength(1);
+			expect(kit.state.gateLog[0]).toContain(names(7)[6]!);
+			const shown = out.filter(l => l.includes(names(7)[0]!));
+			expect(shown).toHaveLength(1);
+			expect(shown[0]).toContain(names(7)[4]!);
+			expect(shown[0]).not.toContain(names(7)[5]!); // up to 5 names
+		});
+
+		test("a hub.log write that fails does not fail the tick or the release", async () => {
+			const dir = stateDir();
+			const kit = gateKit();
+			const run = scripted([failing(names(2)), passing(2)]);
+			kit.state.runner = d => runWithRetry(d, run.attempt);
+			const hubLog = () => {
+				throw new Error("disk full");
+			};
+			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print, hubLog }, "2026-11-05T12:00:10")).toBe(0);
+			expect(kit.state.released).toEqual([kit.state.head]);
+			expect(existsSync(join(dir, "release-slot"))).toBe(true);
+		});
+
+		test("the flaky files travel in gate-result.json", async () => {
+			const dir = stateDir();
+			const kit = gateKit();
+			const run = scripted([failing(names(2)), passing(2)]);
+			kit.state.runner = d => runWithRetry(d, run.attempt);
+			const now = kst("2026-11-05T12:00:10");
+			await tick(kit, { stateDir: dir, exec: gh("ddotz").exec, print, now });
+			await kit.finish(dir, now);
+			const result = JSON.parse(readFileSync(join(dir, "gate-result.json"), "utf8")) as { green: boolean; flaky: string[]; release: { code: number } };
+			expect(result.green).toBe(true);
+			expect(result.flaky).toEqual(names(2));
+			expect(result.release.code).toBe(0);
+		});
+
+		test("the retry fails too: nothing is released, the slot is skipped as red, with the files that still fail", async () => {
+			const dir = stateDir();
+			const kit = gateKit();
+			const run = scripted([failing(names(3)), failing([names(3)[1]!], 3)]);
+			kit.state.runner = d => runWithRetry(d, run.attempt);
+			const out: string[] = [];
+			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print: l => out.push(l) }, "2026-11-05T12:00:10")).toBe(1);
+			expect(kit.state.released).toEqual([]);
+			expect(run.calls).toHaveLength(2); // never a second retry
+			expect(readFileSync(join(dir, "release-slot"), "utf8").trim()).toBe(slotStart(kst("2026-11-05T12:00:10")).toISOString());
+			expect(out.filter(l => l.includes(names(3)[1]!))).toHaveLength(1);
+			expect(out.some(l => l.includes(names(3)[0]!))).toBe(false);
+		});
+
+		test("failing files over the share of all test files: no retry, red", async () => {
+			const dir = stateDir();
+			const kit = gateKit();
+			const over = Math.floor(100 * RETRY_MAX_FAILED_SHARE) + 1;
+			const run = scripted([failing(names(over))]);
+			kit.state.runner = d => runWithRetry(d, run.attempt);
+			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print }, "2026-11-05T12:00:10")).toBe(1);
+			expect(run.calls).toEqual([undefined]);
+			expect(kit.state.released).toEqual([]);
+		});
+
+		test("the share is checked against the total of the same report: exactly at it is retried, one more is not", async () => {
+			const at = Math.floor(100 * RETRY_MAX_FAILED_SHARE);
+			const retried = scripted([failing(names(at)), passing(at)]);
+			expect((await runWithRetry("d", retried.attempt)).flaky).toEqual(names(at));
+			const refused = scripted([failing(names(at + 1))]);
+			expect((await runWithRetry("d", refused.attempt)).green).toBe(false);
+			expect(refused.calls).toHaveLength(1);
+			const unread = scripted([failing([])]); // red with no file readable: nothing to retry
+			expect((await runWithRetry("d", unread.attempt)).green).toBe(false);
+			expect(unread.calls).toHaveLength(1);
+		});
+
+		test("a green full run is not retried and has no flaky files; a retry that fails is the last run", async () => {
+			const green = scripted([passing(100)]);
+			expect(await runWithRetry("d", green.attempt)).toEqual({ green: true, failed: [], detail: "" });
+			expect(green.calls).toHaveLength(1);
+			const stubborn = scripted([failing(names(2)), failing(names(2), 2), passing(2)]);
+			expect((await runWithRetry("d", stubborn.attempt)).green).toBe(false);
+			expect(stubborn.calls).toHaveLength(2);
+		});
+
+		test("the total of test files is the distinct files of the report", () => {
+			const xml = '<testsuite name="a" file="hub/a.test.ts" failures="0"/><testsuite name="inner" file="hub/a.test.ts" failures="0"/><testsuite name="b" file="hub/b.test.ts" failures="0"/>';
+			expect(testFileCount(xml)).toBe(2);
 		});
 
 		test("no commit after the newest tag: the suite does not run, nothing is released, and the slot is used without a failure", async () => {
