@@ -2,8 +2,10 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { writeAtomic } from "../firstrun/atomic.ts"; // not hub/config.ts: it needs a data dir at load, and CI has none
 import { ownerAddress, releaseTerms, scrub, type Term } from "./public-scrub.ts";
+import { clearGate, gateStatus, realGateEnv, runGate, runSuiteIn, startGate, type GateEnv } from "./release-gate.ts";
 import { buildReleaseNote, NOTE_LOG_FORMAT, parseNoteCommits } from "./release-note.ts";
 
 export type Release = { readonly date: string; readonly n: number; readonly hotfix: number | null; readonly text: string };
@@ -170,6 +172,7 @@ export type PublishOptions = {
 	force: boolean;
 	dryRun: boolean;
 	cwd: string;
+	sha?: string; // the commit the suite was green on (--sha): the checkout must be at it, and the release is that commit plus VERSION
 	now?: Date;
 	print?: (line: string) => void;
 	exec?: Exec;
@@ -207,6 +210,21 @@ async function publishNote(root: string, tag: string, note: string, exec: Exec, 
 	}
 }
 
+// A pinned release is the tested commit plus VERSION, tagged before this push. When main moved on while the suite ran, main is merged in
+// after the tag: the tag stays an ancestor of main (the updater moves forward only) and no untested commit is in it.
+async function pushPinned(root: string): Promise<{ code: number; out: string }> {
+	const pushed = await gitOutput(["push", "origin", "HEAD:main"], root);
+	if (pushed.code === 0) return pushed;
+	const fetched = await gitOutput(["fetch", "--quiet", "origin", "main"], root);
+	if (fetched.code !== 0) return fetched;
+	const merged = await gitOutput(["merge", "--no-edit", "origin/main"], root);
+	if (merged.code !== 0) {
+		await gitOutput(["merge", "--abort"], root);
+		return merged;
+	}
+	return gitOutput(["push", "origin", "HEAD:main"], root);
+}
+
 export async function publishVersion(opts: PublishOptions): Promise<number> {
 	const print = opts.print ?? ((line: string) => console.log(line));
 	const now = opts.now ?? new Date();
@@ -220,6 +238,14 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 
 	const fetched = await gitOutput(["fetch", "--tags", "--quiet", "origin"], root);
 	if (fetched.code !== 0) print(`원격 태그를 못 가져왔어요 (${fetched.out}). 로컬 태그로 계산할게요.`);
+
+	if (opts.sha) {
+		const head = await gitOutput(["rev-parse", "HEAD"], root);
+		if (head.out !== opts.sha) {
+			print(`체크아웃이 시험을 통과한 커밋(${opts.sha.slice(0, 8)})이 아니라서 버전을 내지 않았어요 (${head.out.slice(0, 8)}).`);
+			return 1;
+		}
+	}
 
 	if (opts.auto) {
 		const newTags = await localTags(root);
@@ -300,14 +326,14 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 	const sha = await gitOutput(["rev-parse", "--short", "HEAD"], root);
 	print(`커밋: ${sha.out} release: ${tag}`);
 
-	if ((await gitOutput(["rev-parse", "--abbrev-ref", "HEAD"], root)).out === "HEAD") {
+	if (!opts.sha && (await gitOutput(["rev-parse", "--abbrev-ref", "HEAD"], root)).out === "HEAD") {
 		const branch = await gitOutput(["switch", "-C", "main"], root);
 		if (branch.code !== 0) {
 			print(`main 브랜치로 옮기지 못했어요: ${branch.out}`);
 			return 1;
 		}
 	}
-	const pulled = await gitOutput(["pull", "--rebase", "--quiet", "origin", "main"], root);
+	const pulled = opts.sha ? { code: 0, out: "" } : await gitOutput(["pull", "--rebase", "--quiet", "origin", "main"], root);
 	if (pulled.code !== 0) {
 		await gitOutput(["rebase", "--abort"], root);
 		print(`origin/main과 동기화하지 못했어요: ${pulled.out}`);
@@ -322,7 +348,7 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 	}
 	print(`태그: ${tag}`);
 
-	const pushedMain = await gitOutput(["push", "origin", "main"], root);
+	const pushedMain = opts.sha ? await pushPinned(root) : await gitOutput(["push", "origin", "main"], root);
 	if (pushedMain.code !== 0) {
 		print(`main을 푸시하지 못했어요: ${pushedMain.out}`);
 		print("커밋과 태그는 로컬에 남아 있어요. 원격 상태를 확인한 뒤 다시 푸시해 주세요.");
@@ -356,6 +382,7 @@ export type DispatchOptions = {
 	now?: Date;
 	exec?: Exec;
 	print?: (line: string) => void;
+	gate?: GateEnv; // where the gate clones from and how it runs its detached runner; GitHub and real processes when not given
 };
 
 // What the watch knows of the run it started: "running" until GitHub reports it finished, then "failed" (with the line to show) for the rest of the
@@ -405,8 +432,9 @@ async function settleRun(opts: DispatchOptions, exec: Exec, now: Date, slot: str
 	return message;
 }
 
-// One tick of the owner's release-slot watch (docs/releases.md): once per slot, start release.yml, whose --auto run decides whether
-// anything goes out. Runs only for the repo owner's GitHub login, so a copy of the watch on another install dispatches nothing.
+// One tick of the owner's release-slot watch (docs/releases.md): once per slot, the full suite runs on the head of origin/main in a detached
+// runner (hub/release-gate.ts; a tick only starts it or reads its state, so it ends in seconds) and, when it is green, start release.yml for that commit, whose --auto run decides whether anything goes out. A red suite skips the slot.
+// Runs only for the repo owner's GitHub login, so a copy of the watch on another install dispatches nothing.
 // A later tick reads how that run ended; a failed run fails the tick (exit 1) until the next slot, which is how the owner hears of it.
 export async function dispatchSlot(opts: DispatchOptions): Promise<number> {
 	const print = opts.print ?? ((line: string) => console.log(line));
@@ -434,26 +462,61 @@ export async function dispatchSlot(opts: DispatchOptions): Promise<number> {
 		print(`[--dry-run] ${slot} 시간대의 release.yml을 시작할 차례예요.`);
 		return 0;
 	}
-	const started = await exec(["gh", "workflow", "run", "release.yml", "--repo", RELEASE_REPO, "--ref", "main"]);
+	const env = opts.gate ?? realGateEnv(`https://github.com/${RELEASE_REPO}.git`);
+	const ctx = { ...env, stateDir: opts.stateDir, slot, now };
+	const gate = gateStatus(ctx);
+	if (gate.kind === "idle") {
+		startGate(ctx, [process.execPath, fileURLToPath(import.meta.url), "--gate-run", opts.stateDir, slot, env.origin]);
+		print(`전체 시험을 따로 돌리기 시작했어요 (${slot}). 다음 틱부터 결과를 읽어요.`);
+		return 0;
+	}
+	if (gate.kind === "running") {
+		print("전체 시험이 아직 돌고 있어요.");
+		return 0;
+	}
+	if (gate.kind === "unrunnable") {
+		print(`릴리스 전 시험을 돌리지 못했어요: ${gate.reason} · 이 시간대는 그대로 두고 다음 틱에 다시 시도해요.`);
+		return 1;
+	}
+	if (gate.kind === "red") {
+		const shown = gate.failed.slice(0, 5).join(", ") + (gate.failed.length > 5 ? ` 외 ${gate.failed.length - 5}개` : "");
+		const message = `전체 시험이 빨개서 이 시간대의 릴리스를 건너뛰었어요 (${gate.sha.slice(0, 8)}): ${shown || "실패한 파일을 읽지 못했어요"} · 다음 시간대에 새 main으로 다시 시험해요.`;
+		writeAtomic(stateFile, `${slot}\n`);
+		writeAtomic(join(opts.stateDir, "release-run.json"), `${JSON.stringify({ slot, startedAt: now.toISOString(), state: "failed", message } satisfies RunState)}\n`);
+		clearGate(opts.stateDir);
+		print(message);
+		return 1;
+	}
+	const started = await exec(["gh", "workflow", "run", "release.yml", "--repo", RELEASE_REPO, "--ref", "main", "-f", `sha=${gate.sha}`]);
 	if (started.code !== 0) {
 		print(`release.yml을 시작하지 못했어요: ${started.out}`);
 		return 1;
 	}
 	writeAtomic(stateFile, `${slot}\n`);
 	writeAtomic(join(opts.stateDir, "release-run.json"), `${JSON.stringify({ slot, startedAt: now.toISOString(), state: "running" } satisfies RunState)}\n`);
+	clearGate(opts.stateDir);
 	print(`release.yml을 시작했어요 (${slot}).`);
 	return 0;
 }
 
 if (import.meta.main) {
 	const args = process.argv.slice(2);
-	const unknown = args.filter(a => a !== "--auto" && a !== "--force" && a !== "--dry-run" && a !== "--dispatch");
+	const shaAt = args.indexOf("--sha");
+	const sha = shaAt >= 0 ? args[shaAt + 1] : undefined;
+	const unknown = args.filter((a, i) => a !== "--auto" && a !== "--force" && a !== "--dry-run" && a !== "--dispatch" && i !== shaAt && !(shaAt >= 0 && i === shaAt + 1));
 	const stateDir = process.env.DOTZ_WATCH_STATE_DIR;
 	const dispatch = args.includes("--dispatch");
-	if (unknown.length || (args.includes("--auto") && args.includes("--force")) || (dispatch && (args.includes("--auto") || args.includes("--force") || !stateDir))) {
-		console.log("usage: bun hub/release.ts [--auto] [--force] [--dry-run]\n       DOTZ_WATCH_STATE_DIR=<dir> bun hub/release.ts --dispatch [--dry-run]");
+	const gateRun = args.indexOf("--gate-run"); // the gate's detached runner (release-gate.ts), started by a dispatch tick: --gate-run <stateDir> <slot> <origin>
+	if (gateRun >= 0) {
+		const [dir, slot, origin] = args.slice(gateRun + 1);
+		if (!dir || !slot || !origin) process.exit(2);
+		await runGate({ stateDir: dir, slot, origin, git: gitOutput, runSuite: runSuiteIn });
+		process.exit(0);
+	}
+	if (unknown.length || (shaAt >= 0 && (!/^[0-9a-f]{40}$/.test(sha ?? "") || !args.includes("--auto"))) || (args.includes("--auto") && args.includes("--force")) || (dispatch && (args.includes("--auto") || args.includes("--force") || !stateDir))) {
+		console.log("usage: bun hub/release.ts [--auto [--sha <40-hex commit>]] [--force] [--dry-run]\n       DOTZ_WATCH_STATE_DIR=<dir> bun hub/release.ts --dispatch [--dry-run]");
 		process.exit(2);
 	}
 	if (dispatch) process.exit(await dispatchSlot({ stateDir: stateDir!, dryRun: args.includes("--dry-run") }));
-	process.exit(await publishVersion({ auto: args.includes("--auto"), force: args.includes("--force"), dryRun: args.includes("--dry-run"), cwd: process.cwd() }));
+	process.exit(await publishVersion({ auto: args.includes("--auto"), force: args.includes("--force"), dryRun: args.includes("--dry-run"), cwd: process.cwd(), sha }));
 }

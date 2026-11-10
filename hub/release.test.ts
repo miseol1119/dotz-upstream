@@ -3,11 +3,14 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { failedFiles, runGate, type GateEnv, type SuiteResult } from "./release-gate.ts";
 import {
 	compareVersions,
 	cutInSlot,
 	dirtyTracked,
 	dispatchSlot,
+	type DispatchOptions,
+	gitOutput,
 	hasCommitsSince,
 	localTags,
 	newestVersion,
@@ -353,6 +356,45 @@ describe("release slots", () => {
 		}
 	}, 20_000); // Real git repos and pushes: 2 s alone, over the default 5 s in a full run under load.
 
+	test("a pinned release tags the tested commit plus VERSION, not the main that moved on", async () => {
+		const origin = mkdtempSync(join(tmpdir(), "dotz-release-origin-"));
+		roots.push(origin);
+		git(origin, "init", "-q", "--bare", "-b", "main");
+		const clone = () => {
+			const root = tempRepo();
+			git(root, "remote", "add", "origin", origin);
+			return root;
+		};
+		const seed = clone();
+		git(seed, "switch", "-q", "-c", "main");
+		commit(seed, "tested");
+		git(seed, "push", "-q", "origin", "main");
+		const checkout = clone();
+		git(checkout, "switch", "-q", "-c", "main");
+		git(checkout, "pull", "-q", "origin", "main");
+		const tested = git(checkout, "rev-parse", "HEAD").trim();
+		commit(seed, "untested");
+		git(seed, "push", "-q", "origin", "main");
+		const noon = kst("2026-11-05T12:00:30");
+		try {
+			process.env.GIT_COMMITTER_DATE = noon.toISOString();
+			expect(await publishVersion({ auto: true, force: false, dryRun: false, cwd: checkout, sha: "c".repeat(40), now: noon, print: () => {} })).toBe(1);
+			expect(git(origin, "tag", "--list", "v*").trim()).toBe("");
+			expect(await publishVersion({ auto: true, force: false, dryRun: false, cwd: checkout, sha: tested, now: noon, print: () => {} })).toBe(0);
+		} finally {
+			delete process.env.GIT_COMMITTER_DATE;
+		}
+		expect(git(origin, "rev-parse", "v261105.1^").trim()).toBe(tested);
+		expect(git(origin, "log", "--format=%s", "v261105.1")).not.toContain("untested");
+		git(origin, "merge-base", "--is-ancestor", "v261105.1", "main");
+		expect(git(origin, "log", "--format=%s", "main")).toContain("untested");
+	}, 20_000);
+
+	test("the failing files come from the junit file of the run", () => {
+		const xml = '<testsuite name="a" file="hub/a.test.ts" tests="3" failures="1"/><testsuite name="b" file="hub/b.test.ts" tests="2" failures="0"/>';
+		expect(failedFiles(xml)).toEqual(["hub/a.test.ts"]);
+	});
+
 	describe("dispatch", () => {
 		const stateDir = () => {
 			const dir = mkdtempSync(join(tmpdir(), "dotz-release-state-"));
@@ -370,23 +412,87 @@ describe("release slots", () => {
 			return { calls, exec };
 		};
 		const print = () => {};
+		const GREEN: SuiteResult = { green: true, failed: [], detail: "" };
+		// The gate with no network, no process and no real suite: a local bare repo is origin, spawn/alive/kill are recorded, and `finish` is the
+		// detached runner's work run in place (real git and clone, stubbed suite).
+		const gateKit = (suite: SuiteResult = GREEN) => {
+			const url = mkdtempSync(join(tmpdir(), "dotz-release-origin-"));
+			roots.push(url);
+			git(url, "init", "-q", "--bare", "-b", "main");
+			const seed = tempRepo();
+			git(seed, "remote", "add", "origin", url);
+			git(seed, "switch", "-q", "-c", "main");
+			const push = (message: string) => {
+				commit(seed, message);
+				git(seed, "push", "-q", "origin", "main");
+				return git(seed, "rev-parse", "HEAD").trim();
+			};
+			const state = { head: push("work"), suite, suites: 0, spawned: [] as string[][], alive: true, killed: [] as number[], pid: 100 };
+			const env: GateEnv = {
+				origin: url,
+				spawn: cmd => {
+					state.spawned.push([...cmd]);
+					return state.pid++;
+				},
+				alive: () => state.alive,
+				kill: pid => {
+					state.killed.push(pid);
+					state.alive = false;
+				},
+			};
+			const finish = (dir: string, now: Date, origin: string = url) =>
+				runGate({
+					stateDir: dir,
+					slot: slotStart(now).toISOString(),
+					origin,
+					git: gitOutput,
+					runSuite: async () => {
+						state.suites++;
+						return state.suite;
+					},
+				});
+			return { state, env, push, finish };
+		};
+		type Kit = ReturnType<typeof gateKit>;
+		const tick = (kit: Kit, o: Omit<DispatchOptions, "gate">) => dispatchSlot({ gate: kit.env, ...o });
+		// The three ticks of one clean slot: the one that starts the runner, the runner finishing, the one that reads the result.
+		const launch = async (kit: Kit, o: Omit<DispatchOptions, "gate" | "now">, at: string) => {
+			const now = kst(at);
+			await tick(kit, { ...o, now });
+			await kit.finish(o.stateDir, now);
+			return tick(kit, { ...o, now: new Date(now.getTime() + 30_000) });
+		};
 
-		test("the owner's watch starts the workflow once per slot", async () => {
+		test("start, running, then green: the workflow is started once for the commit the suite ran on", async () => {
 			const dir = stateDir();
+			const kit = gateKit();
 			const { calls, exec } = gh("ddotz");
-			await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:00:10") });
-			await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") });
-			expect(calls).toEqual(["gh workflow run release.yml --repo ddotz/dotz --ref main"]);
-			await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T18:00:10") });
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:00:10") })).toBe(0);
+			expect(kit.state.spawned).toHaveLength(1);
+			expect(kit.state.spawned[0]).toContain("--gate-run");
+			expect(existsSync(join(dir, "release-slot"))).toBe(false);
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(0);
+			expect(kit.state.spawned).toHaveLength(1);
+			expect(calls).toEqual([]);
+			await kit.finish(dir, kst("2026-11-05T12:00:10"));
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:02:10") })).toBe(0);
+			expect(calls).toEqual([`gh workflow run release.yml --repo ddotz/dotz --ref main -f sha=${kit.state.head}`]);
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:03:10") })).toBe(0);
+			expect(calls).toHaveLength(1);
+			expect(kit.state.suites).toBe(1);
+			expect(kit.state.spawned).toHaveLength(1);
+			expect(await launch(kit, { stateDir: dir, exec, print }, "2026-11-05T18:00:10")).toBe(0);
 			expect(calls).toHaveLength(2);
 		});
 
-		test("a non-owner install never fires", async () => {
+		test("a non-owner install never gates or fires", async () => {
 			const dir = stateDir();
+			const kit = gateKit();
 			const { calls, exec } = gh("someone-else");
-			expect(await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:00:10") })).toBe(0);
-			expect(await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T18:00:10") })).toBe(0);
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:00:10") })).toBe(0);
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T18:00:10") })).toBe(0);
 			expect(calls).toEqual([]);
+			expect(kit.state.spawned).toEqual([]);
 		});
 
 		test("no GitHub login fails the check and fires nothing", async () => {
@@ -395,18 +501,24 @@ describe("release slots", () => {
 				calls.push(cmd.join(" "));
 				return { code: 1, out: "not logged in" };
 			};
-			expect(await dispatchSlot({ stateDir: stateDir(), exec, print })).toBe(1);
+			const kit = gateKit();
+			expect(await tick(kit, { stateDir: stateDir(), exec, print })).toBe(1);
 			expect(calls).toEqual(["gh api user --jq .login"]);
+			expect(kit.state.spawned).toEqual([]);
 		});
 
-		test("a failed dispatch is retried on the next tick", async () => {
+		test("a failed dispatch is retried on the next tick without running the suite again", async () => {
 			const dir = stateDir();
+			const kit = gateKit();
 			const now = kst("2026-11-05T12:00:10");
-			expect(await dispatchSlot({ stateDir: dir, exec: gh("ddotz", 1).exec, print, now })).toBe(1);
+			await tick(kit, { stateDir: dir, exec: gh("ddotz").exec, print, now });
+			await kit.finish(dir, now);
+			expect(await tick(kit, { stateDir: dir, exec: gh("ddotz", 1).exec, print, now })).toBe(1);
 			expect(existsSync(join(dir, "release-slot"))).toBe(false);
 			const { calls, exec } = gh("ddotz");
-			expect(await dispatchSlot({ stateDir: dir, exec, print, now })).toBe(0);
+			expect(await tick(kit, { stateDir: dir, exec, print, now })).toBe(0);
 			expect(calls).toHaveLength(1);
+			expect(kit.state.suites).toBe(1);
 		});
 
 		describe("the run it started", () => {
@@ -429,45 +541,157 @@ describe("release slots", () => {
 
 			test("a finished red run fails the watch until the next slot, which dispatches again", async () => {
 				const dir = stateDir();
+				const kit = gateKit();
 				let runs: unknown[] = [];
 				const { calls, exec } = stub(() => runs);
 				const lines: string[] = [];
 				const say = (l: string) => lines.push(l);
-				expect(await dispatchSlot({ stateDir: dir, exec, print: say, now: kst("2026-11-05T12:00:10") })).toBe(0);
+				expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T12:00:10")).toBe(0);
 				runs = [run("2026-11-05T12:00:20", "in_progress", null)];
-				expect(await dispatchSlot({ stateDir: dir, exec, print: say, now: kst("2026-11-05T12:01:10") })).toBe(0);
+				expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:01:10") })).toBe(0);
 				runs = [run("2026-11-05T12:00:20", "completed", "failure")];
-				expect(await dispatchSlot({ stateDir: dir, exec, print: say, now: kst("2026-11-05T12:02:10") })).toBe(1);
+				expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:02:10") })).toBe(1);
 				expect(lines.at(-1)).toContain("https://example.test/runs/1");
-				expect(await dispatchSlot({ stateDir: dir, exec, print: say, now: kst("2026-11-05T13:00:10") })).toBe(1);
+				expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T13:00:10") })).toBe(1);
 				expect(calls).toHaveLength(1);
 				runs = [run("2026-11-05T18:00:20", "completed", "success"), run("2026-11-05T12:00:20", "completed", "failure")];
-				expect(await dispatchSlot({ stateDir: dir, exec, print: say, now: kst("2026-11-05T18:00:10") })).toBe(0);
+				expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T18:00:10")).toBe(0);
 				expect(calls).toHaveLength(2);
 			});
 
 			test("a green run is forgotten and asked about no more", async () => {
 				const dir = stateDir();
+				const kit = gateKit();
 				const { exec, lists } = stub(() => [run("2026-11-05T12:00:20", "completed", "success")]);
-				expect(await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:00:10") })).toBe(0);
-				expect(await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(0);
+				expect(await launch(kit, { stateDir: dir, exec, print }, "2026-11-05T12:00:10")).toBe(0);
+				expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(0);
 				expect(lists()).toBe(1);
-				expect(await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:02:10") })).toBe(0);
+				expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:02:10") })).toBe(0);
 				expect(lists()).toBe(1);
 			});
 
 			test("a run from before the dispatch is not taken for it", async () => {
 				const dir = stateDir();
+				const kit = gateKit();
 				const { exec } = stub(() => [run("2026-11-05T09:00:00", "completed", "failure")]);
-				expect(await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:00:10") })).toBe(0);
-				expect(await dispatchSlot({ stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(0);
+				expect(await launch(kit, { stateDir: dir, exec, print }, "2026-11-05T12:00:10")).toBe(0);
+				expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(0);
 			});
 		});
 
-		test("a dry run starts nothing and keeps the slot open", async () => {
+		test("start, then red: the slot is skipped and the watch fails with the failing files; the next slot tests the new head", async () => {
 			const dir = stateDir();
 			const { calls, exec } = gh("ddotz");
-			expect(await dispatchSlot({ stateDir: dir, exec, print, dryRun: true })).toBe(0);
+			const kit = gateKit({ green: false, failed: ["hub/a.test.ts", "hub/b.test.ts"], detail: "" });
+			const lines: string[] = [];
+			const say = (l: string) => lines.push(l);
+			expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T12:00:10")).toBe(1);
+			expect(lines.at(-1)).toContain("hub/a.test.ts, hub/b.test.ts");
+			expect(calls).toEqual([]);
+			// the rest of the slot: the watch keeps failing, the suite is not run again
+			expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:01:10") })).toBe(1);
+			expect(kit.state.suites).toBe(1);
+			expect(kit.state.spawned).toHaveLength(1);
+			expect(calls).toEqual([]);
+			// the next slot: a new head, green this time
+			kit.state.head = kit.push("next");
+			kit.state.suite = GREEN;
+			expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T18:00:10")).toBe(0);
+			expect(kit.state.suites).toBe(2);
+			expect(calls).toEqual([`gh workflow run release.yml --repo ddotz/dotz --ref main -f sha=${kit.state.head}`]);
+		});
+
+		test("a runner that died without a result fails the tick without using the slot, and the next tick starts it again", async () => {
+			const dir = stateDir();
+			const { calls, exec } = gh("ddotz");
+			const kit = gateKit();
+			const lines: string[] = [];
+			const say = (l: string) => lines.push(l);
+			expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:00:10") })).toBe(0);
+			kit.state.alive = false;
+			expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:01:10") })).toBe(1);
+			expect(lines.at(-1)).toContain("결과 없이 끝났어요");
+			expect(existsSync(join(dir, "release-slot"))).toBe(false);
+			expect(existsSync(join(dir, "gate-run.json"))).toBe(false);
+			kit.state.alive = true;
+			expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:02:10") })).toBe(0);
+			expect(kit.state.spawned).toHaveLength(2);
+			await kit.finish(dir, kst("2026-11-05T12:00:10"));
+			expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:03:10") })).toBe(0);
+			expect(calls).toHaveLength(1);
+		});
+
+		test("a run past 45 minutes is killed and started again at the next tick", async () => {
+			const dir = stateDir();
+			const { exec } = gh("ddotz");
+			const kit = gateKit();
+			await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:00:10") });
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:40:10") })).toBe(0);
+			expect(kit.state.killed).toEqual([]);
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:46:10") })).toBe(1);
+			expect(kit.state.killed).toEqual([100]);
+			expect(existsSync(join(dir, "release-slot"))).toBe(false);
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:47:10") })).toBe(0);
+			expect(kit.state.spawned).toHaveLength(2);
+		});
+
+		test("a runner that cannot reach origin leaves an error: the tick fails, the slot stays open, the next tick retries", async () => {
+			const dir = stateDir();
+			const { calls, exec } = gh("ddotz");
+			const kit = gateKit();
+			const lines: string[] = [];
+			const now = kst("2026-11-05T12:00:10");
+			await tick(kit, { stateDir: dir, exec, print, now });
+			await kit.finish(dir, now, join(dir, "no-such-origin"));
+			expect(await tick(kit, { stateDir: dir, exec, print: l => lines.push(l), now: kst("2026-11-05T12:01:10") })).toBe(1);
+			expect(lines.at(-1)).toContain("시험을 돌리지 못했어요");
+			expect(calls).toEqual([]);
+			expect(existsSync(join(dir, "release-slot"))).toBe(false);
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:02:10") })).toBe(0);
+			expect(kit.state.spawned).toHaveLength(2);
+		});
+
+		test("a new slot kills the run that is still going from the old one, then starts its own", async () => {
+			const dir = stateDir();
+			const { calls, exec } = gh("ddotz");
+			const kit = gateKit();
+			await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:00:10") });
+			expect(kit.state.killed).toEqual([]);
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T18:00:10") })).toBe(0);
+			expect(kit.state.killed).toEqual([100]);
+			expect(kit.state.spawned).toHaveLength(2);
+			await kit.finish(dir, kst("2026-11-05T18:00:10"));
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T18:01:10") })).toBe(0);
+			expect(calls).toHaveLength(1);
+		});
+
+		test("an install without .git still gates: the runner keeps its own clone in the state dir", async () => {
+			const dir = stateDir();
+			const kit = gateKit();
+			const now = kst("2026-11-05T12:00:10");
+			await tick(kit, { stateDir: dir, exec: gh("ddotz").exec, print, now });
+			expect(existsSync(join(dir, ".git"))).toBe(false);
+			const [bun, script, flag, stateArg, , originArg] = kit.state.spawned[0]!;
+			expect(script).toEndWith("release.ts");
+			expect([bun !== "", flag, stateArg, originArg]).toEqual([true, "--gate-run", dir, kit.env.origin]);
+			await kit.finish(dir, now);
+			const result = JSON.parse(readFileSync(join(dir, "gate-result.json"), "utf8"));
+			expect(result).toMatchObject({ green: true, sha: kit.state.head });
+			expect(existsSync(join(dir, "gate-repo", ".git"))).toBe(true);
+			expect(existsSync(join(dir, "gate-tree"))).toBe(false);
+			// the second run fetches into the same clone and tests the commit that arrived
+			const next = kit.push("later");
+			await kit.finish(dir, now);
+			expect(JSON.parse(readFileSync(join(dir, "gate-result.json"), "utf8")).sha).toBe(next);
+			expect(git(join(dir, "gate-repo"), "worktree", "list").trim().split("\n")).toHaveLength(1);
+		});
+
+		test("a dry run starts nothing, runs no suite and keeps the slot open", async () => {
+			const dir = stateDir();
+			const { calls, exec } = gh("ddotz");
+			const kit = gateKit();
+			expect(await tick(kit, { stateDir: dir, exec, print, dryRun: true })).toBe(0);
+			expect(kit.state.spawned).toEqual([]);
 			expect(calls).toEqual([]);
 			expect(existsSync(join(dir, "release-slot"))).toBe(false);
 		});
