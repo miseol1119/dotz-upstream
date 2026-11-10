@@ -438,3 +438,43 @@ test("a watch keeps the owner its add request names (nested or flat), and a bad 
 	expect(() => addWatch({ name: "owner-bad", command: "true", every_minutes: 60, project: "x".repeat(61) }, "")).toThrow("project must be");
 	expect(allWatches().some(w => w.name === "owner-bad")).toBe(false);
 });
+
+// A check that fails on purpose for a whole slot (the release-slot watch, up to 6 hours) must keep alerting, so only a failure that lasted a day pauses.
+const failRuns = async (name: string, runs: number, gapMs: number) => {
+	for (let i = 0; i < runs; i++) {
+		clock.now += gapMs;
+		await runWatch(name);
+	}
+};
+const stopNotes = () => notes.filter(n => n.reason.startsWith("stopped after"));
+
+test("a 1-minute watch that fails for 6 hours keeps running", async () => {
+	addWatch({ name: "t-fail-6h", command: "exit 1", every_minutes: 1, on: "fail", to: "alert" }, "");
+	await failRuns("t-fail-6h", 12, 30 * 60_000);
+	expect(state("t-fail-6h").fails).toBe(12);
+	expect(state("t-fail-6h").paused).toBeUndefined();
+	expect(stopNotes()).toHaveLength(0);
+});
+
+test("a watch that failed for a day in 10 or more runs pauses once, tells the owner once, and approve resumes it", async () => {
+	addWatch({ name: "t-fail-day", command: "exit 1", every_minutes: 1, on: "fail", to: "alert", approval_minutes: 30 }, "");
+	await failRuns("t-fail-day", 12, 3 * 3600_000);
+	expect(state("t-fail-day").paused).toBe("fail");
+	await failRuns("t-fail-day", 2, 3600_000);
+	expect(stopNotes()).toHaveLength(1);
+	approveWatch("t-fail-day");
+	expect(state("t-fail-day").paused).toBeUndefined();
+	const before = state("t-fail-day").fails;
+	await runWatch("t-fail-day");
+	expect(state("t-fail-day").fails).toBeGreaterThan(before);
+});
+
+test("a day of failures in fewer than 10 runs does not pause, and a watch without an approval gate can be approved back", async () => {
+	addWatch({ name: "t-fail-few", command: "exit 1", every_minutes: 1440, on: "fail", to: "alert" }, "");
+	await failRuns("t-fail-few", 3, 25 * 3600_000);
+	expect(state("t-fail-few").paused).toBeUndefined();
+	await failRuns("t-fail-few", 8, 3600_000);
+	expect(state("t-fail-few").paused).toBe("fail");
+	approveWatch("t-fail-few");
+	expect(state("t-fail-few").paused).toBeUndefined();
+});

@@ -522,7 +522,7 @@ function asSync() {
 
 /* ---- a failing monitor's quick actions: chips that only fill the composer of its conversation (the owner reads and sends) ---- */
 const asMon = app => { const pe = PQ.of.get(`settings:${app}`); return pe ? pe.mon : NM.items.find(x => app.startsWith("s:") ? x.schedule === app.slice(2) : x.watch === app.slice(2)); };
-const asChipTexts = m => m && m.last_result === "fail" ? [...(m.keeper ? ["다시 로그인해 줘"] : []), "원인 찾아 줘", "일시정지"] : [];
+const asChipTexts = m => m && m.last_result === "fail" ? [...(m.keeper ? ["다시 로그인해 줘"] : []), "원인 찾아 줘", m.paused ? "다시 켜 줘" : "일시정지"] : [];
 // Every monitor and app has its own settings conversation, also a monitor a project created (it is not the project's).
 const asConv = app => `settings:${app}`;
 // A quick instruction is sent as it is; whatever the owner had typed stays in the box.

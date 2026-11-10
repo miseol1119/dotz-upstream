@@ -65,6 +65,10 @@ export const watchShell = (has: (path: string) => boolean = existsSync): string 
 const WATCH_SHELL = watchShell();
 const READ_GRACE_MS = 2_000;
 export const FAIL_ALERT_EVERY_MS = 12 * 3600_000;
+// A watch that has failed this long in a row and in at least this many runs stops until the owner approves it again. A day, not a count of runs:
+// the release-slot watch fails on purpose for a whole slot (up to 6 hours) to keep alerting, and a 1-minute watch would reach any count in minutes.
+const FAIL_PAUSE_AFTER_MS = 24 * 3600_000;
+const FAIL_PAUSE_RUNS = 10;
 export const FAIL_ALERT_AFTER = 2; // failures in a row before the first alert
 // One episode of a check that fails and passes on and off is one failure alert and one recovery. A failure that starts within the flap window
 // after a recovery is the same episode: quiet, unless it lasts the window (then it is an outage again). The window is an hour, or three intervals.
@@ -311,6 +315,11 @@ async function runOnce(w: Watch): Promise<void> {
 				}
 				return;
 			}
+			if (w.state.fails >= FAIL_PAUSE_RUNS && Date.now() - (w.state.failSince ?? Date.now()) >= FAIL_PAUSE_AFTER_MS) {
+				w.state.paused = kind;
+				notify(w, `stopped after ${w.state.fails} failures in a row over a day; it runs again once the owner approves (dotz_watch approve ${w.name}) or the watch is added again`, output);
+				return;
+			}
 			const wait = w.retry?.[kind];
 			if (wait && !wait.length) {
 				w.state.paused = kind;
@@ -393,9 +402,12 @@ export function runWatch(idOrName: string): Promise<void> {
 export function approveWatch(idOrName: string): Watch {
 	const w = items.find(x => x.id === idOrName || x.name === idOrName);
 	if (!w) throw new Error(`no watch ${idOrName}`);
-	if (!w.approval_minutes) throw new Error(`watch ${w.name} has no approval gate (add it with approval_minutes)`);
-	mkdirSync(join(DATA_DIR, "approvals"), { recursive: true });
-	writeFileSync(approvalFile(w), String(Date.now()));
+	if (!w.approval_minutes && !w.state.paused) throw new Error(`watch ${w.name} has no approval gate (add it with approval_minutes)`);
+	if (w.approval_minutes) {
+		mkdirSync(join(DATA_DIR, "approvals"), { recursive: true });
+		writeFileSync(approvalFile(w), String(Date.now()));
+	}
+	if (w.state.paused && w.state.fails) w.state.failSince = Date.now(); // a stopped failure starts its day over, so one more failed run does not stop it again
 	w.state.paused = w.state.approvalAskedAt = w.state.nextAt = undefined;
 	w.state.kindFails = 0;
 	save();
