@@ -55,6 +55,12 @@
 #accounts .prow-lim { display: flex; align-items: center; gap: var(--sp-2); margin-top: var(--sp-1); color: var(--fg-2); font-size: 12px; line-height: 16px; }
 #accounts .prow-lim .k { flex: none; min-width: 64px; }
 #accounts .prow-lim .bar { flex: 1; max-width: 160px; margin-top: 0; }
+/* a card that holds accounts: the usage windows lead, small section names split it, 계정 추가 closes the accounts */
+#accounts .li.prow .prow-lim:first-child { margin-top: 0; }
+#accounts .li.acc-lbl { min-height: 0; }
+#accounts .li.acc-lbl .lbl { margin: 0; }
+#accounts .li.acc-add { min-height: 0; gap: var(--sp-2); color: var(--fg-2); }
+#accounts .sec.sec-act > .tag.acc-use { margin-left: auto; }
 /* 사용량과 월 한도 */
 #usage .lim .kv b { font-weight: 500; }
 #usage .lim .bar { margin-top: var(--sp-15); }

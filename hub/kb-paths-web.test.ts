@@ -93,7 +93,7 @@ describe("paths that may unfocus the field being typed in", () => {
 
 	test("account alias dialog: a repaint of the accounts lists keeps the alias field", async () => {
 		await run(`go("settings")`);
-		await waitFor(`current === "settings"`);
+		await waitFor(`current === "settings" && !!ACC`);   // the accounts arrive after the screen does
 		await run(`ACC.accounts = [{ name: "a", label: "a" }, { name: "b", label: "b" }]; accDialog(ACC.accounts[0])`);
 		await waitFor(`document.querySelector("dialog[open] input.fi")`);
 		await typeInto("dialog[open] input.fi", "회사");

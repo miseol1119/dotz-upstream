@@ -26,6 +26,7 @@ const providers = () => [
 		accounts: [
 			{ name: "default", label: "default", order: 1, current: false, pinned: false, blocked: "rate_limit", blocked_until: null, blocked_tag: "한도 걸림 · 내일 01:20까지", windows: [{ id: "5h", label: "5시간", left: 0, resets_at: null }] },
 			{ name: "login-2", label: "회사용 GPT", order: 2, current: true, pinned: true, blocked: null, blocked_until: null, blocked_tag: null, windows: [{ id: "5h", label: "5시간", left: 62, resets_at: null }, { id: "7d", label: "7일", left: 74, resets_at: null }] },
+			{ name: "old", label: "예전 계정", order: 3, current: false, pinned: false, blocked: "auth_error", blocked_until: null, blocked_tag: "로그인 풀림", windows: [] },
 		],
 	},
 	{
@@ -61,6 +62,7 @@ const body = () => ({
 
 const calls: Array<[string, unknown]> = [];
 let cancelSeen: (() => void) | undefined;
+let deleteSeen: (() => void) | undefined;
 const te = new TextEncoder();
 const streams = new Set<ReadableStreamDefaultController<Uint8Array>>();
 let streamWaiters: (() => void)[] = [];
@@ -90,8 +92,13 @@ const server = Bun.serve({
 		if (p === "/api/monitors" || p === "/api/integrations") return json({ items: [] });
 		if (p === "/api/kakao/rooms") return json({ on: true, rooms: [] });
 		if (p === "/api/update" || p === "/api/runtimes") return json({ error: "stub" }, 500);
-		if (p === "/api/accounts") return json(body());
+		if (p === "/api/accounts" && req.method === "GET") return json(body());
 		if (p === "/api/providers") return json({ providers: providerList });
+		if (p === "/api/accounts" && req.method === "DELETE") {
+			calls.push(["delete", url.search]);
+			deleteSeen?.();
+			return json(body());
+		}
 		if (p === "/api/accounts/pin" && req.method === "PUT") {
 			const b = (await req.json()) as unknown;
 			calls.push(["pin", b]);
@@ -144,20 +151,35 @@ const boot = async (v: View, id = "anthropic") => {
 };
 const sectionText = (v: View) => q<string[]>(v, `return [...document.querySelectorAll(".sec")].map(s => s.textContent)`);
 const groupList = (name: string) => `[...document.querySelectorAll("#accounts .sec")].find(s => s.textContent.startsWith(${JSON.stringify(name)}))?.nextElementSibling`;
-const addButton = `document.querySelector("#accounts .sec-act [data-acc-add]")`;
+const addButton = `document.querySelector('#accounts [data-prov-conn="anthropic"] [data-acc-add]')`;
 
 for (const [label, w, h] of [["phone", 390, 844], ["desktop", 1280, 900]] as const) {
 	test(`${label} ${w}px: one screen holds every provider with its login or key and its own accounts, with states and usage windows, and no sideways scroll`, async () => {
 		calls.length = 0;
 		const v = open(w, h);
 		await boot(v);
-		// each login provider is a section with its 계정 추가; the rest share one list
-		expect(await sectionText(v)).toEqual(["Claude 구독계정 추가", "ChatGPT 구독계정 추가", "Cursor계정 추가", "다른 공급자"]);
+		// each login provider is a section (사용 중 on the right for the one in use); a provider with accounts has 계정 추가 at the foot of them, one with none keeps the button in its head; the rest share one list
+		expect(await sectionText(v)).toEqual(["Claude 구독사용 중", "ChatGPT 구독", "Cursor계정 추가", "다른 공급자"]);
+		expect(await q(v, `return [...document.querySelectorAll("#accounts .sec-act")].map(s => [s.dataset.prov, !!s.querySelector(".tag.acc-use"), !!s.querySelector("[data-acc-add]")])`)).toEqual([["anthropic", true, false], ["chatgpt-subscription", false, false], ["cursor", false, true]]);
 		expect(await q(v, `return document.querySelectorAll("#accounts .li.acc:not(.gen)").length`)).toBe(3);
-		expect(await q(v, `return document.querySelectorAll("#accounts .li.acc.gen").length`)).toBe(2);
+		expect(await q(v, `return document.querySelectorAll("#accounts .li.acc.gen").length`)).toBe(3);
+		// a card with accounts: the small section 계정, the accounts, 계정 추가; then 한도에 걸리면 with 자동 전환 first; no trash can, no 쓸 수 있음 tag, no default on screen
+		const shape = await q<Record<string, string[]>>(v, `const o = {}; for (const id of ["anthropic", "chatgpt-subscription"]) o[id] = [...document.querySelector('#accounts [data-prov-conn="' + id + '"]').children].map(c => c.classList.contains("acc-lbl") ? "lbl" : c.classList.contains("acc") ? "acc" : c.classList.contains("acc-add") ? "add" : c.querySelector('[role="switch"]') ? "switch" : "row"); return o`);
+		const gptShape = shape["chatgpt-subscription"]!;
+		expect(gptShape.slice(gptShape.indexOf("lbl"))).toEqual(["lbl", "acc", "acc", "acc", "add"]);
+		const cl = shape.anthropic!;
+		expect(cl.slice(cl.indexOf("lbl"), cl.indexOf("lbl") + 1)).toEqual(["lbl"]);
+		expect(cl.lastIndexOf("acc")).toBeLessThan(cl.lastIndexOf("add"));
+		expect(cl.lastIndexOf("add")).toBeLessThan(cl.lastIndexOf("lbl"));
+		expect(cl.indexOf("switch")).toBe(cl.lastIndexOf("lbl") + 1);
+		expect(await q(v, `return document.querySelectorAll("#accounts [data-prov-conn='anthropic'] .ib, #accounts [data-prov-conn='chatgpt-subscription'] .ib").length`)).toBe(0);
+		expect(await q(v, `return [...document.querySelectorAll("#accounts [data-prov-conn] .tag")].filter(t => t.textContent.includes("쓸 수 있음")).length`)).toBe(0);
+		expect(await q(v, `return document.querySelector("#accounts").innerText.includes("default")`)).toBe(false);
+		// 다시 로그인 only on the account whose login ran out, beside its tap area
+		expect(await q(v, `return [...document.querySelectorAll("#accounts [data-acc-relogin]")].map(b => [b.dataset.accRelogin, b.closest(".li.acc").textContent.includes("예전 계정"), !!b.closest(".acc-main")])`)).toEqual([["chatgpt-subscription", true, false]]);
 		await shot(v, `accounts-providers-${w}.png`);
 		const gpt = await q<{ text: string; numbers: string[] }>(v, `const r = ${groupList("ChatGPT 구독")}; return { text: r.textContent, numbers: [...r.querySelectorAll(".acc-no")].map(n => n.textContent) }`);
-		expect(gpt.numbers).toEqual(["1", "2"]);
+		expect(gpt.numbers).toEqual(["1", "2", "3"]);
 		for (const part of ["한도 걸림 · 내일 01:20까지", "5시간 62% 남음", "7일 74% 남음", "회사용 GPT", "사용 중", "고정"]) expect(gpt.text).toContain(part);
 		// an account not in use still shows its own windows, and one soonest reset for the row
 		const claude = await q<string>(v, `return ${groupList("Claude 구독")}.textContent`);
@@ -191,12 +213,27 @@ for (const [label, w, h] of [["phone", 390, 844], ["desktop", 1280, 900]] as con
 		calls.length = 0;
 		const v = open(w, h);
 		await boot(v, "chatgpt-subscription");
-		const row = `[...${groupList("ChatGPT 구독")}.querySelectorAll(".li.acc.gen")].find(r => r.textContent.includes("default"))`;
+		const row = `[...${groupList("ChatGPT 구독")}.querySelectorAll(".li.acc.gen")].find(r => r.textContent.includes("기본"))`;
 		await run(v, `(${row}).querySelector(".acc-main").click()`);
 		await waitFor(v, `document.querySelector('dialog[open] .dtitle')?.textContent.includes("ChatGPT 구독")`);
-		expect(await q(v, `return document.querySelector('dialog[open] .dtitle').textContent`)).toBe("ChatGPT 구독 · default");
+		expect(await q(v, `return document.querySelector('dialog[open] .dtitle').textContent`)).toBe("ChatGPT 구독 · 기본");
 		await run(v, `[...document.querySelectorAll('dialog[open] button')].find(b => b.textContent.trim() === "이 계정으로 고정").click()`);
 		await waitFor(v, `!document.querySelector("dialog[open]")`);
 		expect(calls).toEqual([["pin", { provider: "chatgpt-subscription", account: "default" }]]);
 	});
 }
+
+test("an account is removed by its row, then its window, then 삭제: the card itself has no way to delete", async () => {
+	calls.length = 0;
+	const v = open(390, 844);
+	await boot(v, "chatgpt-subscription");
+	expect(await q(v, `return ${groupList("ChatGPT 구독")}.querySelectorAll("button.ib, [aria-label$='삭제']").length`)).toBe(0);
+	await run(v, `[...${groupList("ChatGPT 구독")}.querySelectorAll(".li.acc.gen")].find(r => r.textContent.includes("예전 계정")).querySelector(".acc-main").click()`);
+	await waitFor(v, `document.querySelector('dialog[open] .dtitle')?.textContent.includes("예전 계정")`);
+	await run(v, `[...document.querySelectorAll('dialog[open] button')].find(b => b.textContent.trim() === "계정 삭제").click()`);
+	await waitFor(v, `[...document.querySelectorAll('dialog[open] button')].some(b => b.textContent.trim() === "삭제")`);
+	const deleted = new Promise<void>(ok => { deleteSeen = ok; });
+	await run(v, `[...document.querySelectorAll('dialog[open] button')].find(b => b.textContent.trim() === "삭제").click()`);
+	await deleted;
+	expect(calls).toEqual([["delete", "?provider=chatgpt-subscription&name=old"]]);
+});

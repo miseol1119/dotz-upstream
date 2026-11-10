@@ -17,6 +17,13 @@ function limitName(l) {
   const m = /^Claude\s+(\d+)\s+(Hour|Day)s?\b\s*(.*)$/i.exec(l.label || "");
   return m ? `${m[1]}${/hour/i.test(m[2]) ? "시간" : "일"} 한도${m[3] ? ` ${m[3]}` : ""}` : l.label || l.id;
 }
+// The window name without the word 한도, for the usage lines at the top of an account card: 5시간, 7일, 7일 Opus.
+const limitShort = l => (/^Claude\s/i.test(l.label || "") ? limitName(l).replace(" 한도", "") : limitName(l));
+// The usage windows the report holds for one provider (the ones with a figure).
+function provLimits(p) {
+  const q = typeof SQ !== "undefined" && SQ ? (SQ.providers || []).find(x => x.provider === p.id || (p.id === "anthropic" && x.provider === "claude")) : null;
+  return q ? (q.limits || []).filter(l => limitFrac(l) != null) : [];
+}
 // One provider's row on the 계정 screen: its way in (login or key), status, usage windows and actions. In a provider's own section
 // (`own`) the section head names it; in 다른 공급자 the row does, and a key with a pool entry opens its alias.
 function provRow(p, g, own) {
@@ -27,11 +34,10 @@ function provRow(p, g, own) {
   const rm = (p.can_logout ?? p.removable) ? el("button", { class: "ib", type: "button", title: out, "aria-label": out, onclick: ev => busy(ev.currentTarget, () => logoutProvider(p)) }, icon("trash")) : null;
   const slot = key && g ? g.accounts[0] : null;
   const sub = [slot && slot.label !== "API 키" ? slot.label : "", p.account || p.masked || "", p.in_use ? "지금 사용 중" : "", p.accounts > 1 ? `계정 ${p.accounts}개` : ""].filter(Boolean).join(" · ");
-  const q = typeof SQ !== "undefined" && SQ ? (SQ.providers || []).find(x => x.provider === p.id || (p.id === "anthropic" && x.provider === "claude")) : null;
   const tx = el("div", { class: "tx" }, el("div", { class: "heads" }, el("span", { class: "hd", text: own ? (key ? "API 키" : "로그인") : p.name || p.id }),
       el("span", { class: `tag ${tone}`, text: p.auth === "oauth" ? "로그인됨" : key ? "API 키" : "연결 안 됨" })),
     sub ? el("div", { class: "sup", text: sub }) : null,
-    ...(q ? (q.limits || []).filter(l => limitFrac(l) != null) : []).map(l => el("div", { class: "prow-lim" }, el("span", { class: "k", text: limitName(l) }), bar(l), el("span", { class: "v", text: pctText(l) }))));
+    ...provLimits(p).map(l => el("div", { class: "prow-lim" }, el("span", { class: "k", text: limitName(l) }), bar(l), el("span", { class: "v", text: pctText(l) }))));
   return el("div", { class: "li prow", "data-prov": own ? null : p.id, "data-prov-conn": p.id },
     slot ? el("button", { class: "acc-main", type: "button", onclick: () => accProviderDialog(g, slot) }, tx) : tx, liEnd(act, rm));
 }

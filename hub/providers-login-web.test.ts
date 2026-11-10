@@ -141,7 +141,7 @@ for (const [label, w, h] of [["phone", 390, 844], ["desktop", 1280, 860]] as con
 		calls.length = 0;
 		const v = open(w, h);
 		await boot(v);
-		expect(await q(v, `const r = ${anthropicRow}; return [r.textContent.includes("계정 2개"), !!${button("r", "계정 추가")}, !!${button("r", "다시 로그인")}]`)).toEqual([true, false, false]);
+		expect(await q(v, `const r = ${anthropicRow}; return [r.querySelectorAll(".li.acc").length, !!${button("r", "계정 추가")}, !!${button("r", "다시 로그인")}]`)).toEqual([2, true, false]);
 		const o = await overflow(v);
 		expect(o.doc).toBeLessThanOrEqual(o.vw);
 		await shot(v, `providers-${w}.png`);
@@ -166,7 +166,7 @@ for (const [label, w, h] of [["phone", 390, 844], ["desktop", 1280, 860]] as con
 		// The page may read 설정 → 계정 once or twice while it opens, so only the login and what follows it are pinned.
 		expect(calls.filter(c => c !== "GET /api/accounts")).toEqual(["POST login", "complete L1 code-abc"]);
 		expect(calls.slice(calls.indexOf("complete L1 code-abc") + 1)).toEqual(["GET /api/accounts"]);
-		expect(await q(v, `const sec = document.querySelector("#accounts .sec-act"); return !!sec && !!${button("sec", "추가")}`)).toBe(true);
+		expect(await q(v, `const r = ${anthropicRow}; return [r.querySelectorAll(".li.acc").length, !!${button("r", "계정 추가")}]`)).toEqual([3, true]);
 		const s = await overflow(v);
 		expect(s.doc).toBeLessThanOrEqual(s.vw);
 		await shot(v, `provider-accounts-${w}.png`);

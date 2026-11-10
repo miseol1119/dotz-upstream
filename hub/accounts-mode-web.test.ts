@@ -30,9 +30,12 @@ const body = (mode: "auto" | "pinned", over: object = {}) => ({
 	...over,
 });
 
-function card(acc: object) {
+function card(acc: object, providers: object[] = []) {
 	const calls: Array<[string, string, unknown]> = [];
 	const dialogs: string[] = [];
+	const logins: unknown[] = [];
+	const acts: string[][] = [];
+	const outs: string[] = [];
 	const env: Record<string, unknown> = {
 		el,
 		liEnd: (...kids: any[]) => el("span", { class: "li-end" }, ...kids),
@@ -44,28 +47,42 @@ function card(acc: object) {
 		kstStamp: () => "05:00",
 		shortPath: (p: string) => String(p).split("/").pop(),
 		clear: () => {},
-		dialog: (o: { title: string }) => { dialogs.push(o.title); return {}; },
+		dialog: (o: { title: string; actions: { label: string; onclick: (close: () => void) => void }[] }) => { dialogs.push(o.title); acts.push(o.actions.map(a => a.label)); for (const a of o.actions) if (a.label === "로그아웃") a.onclick(() => {}); return {}; },
+		logoutProvider: (p: { id: string }) => { outs.push(p.id); },
 		current: "settings",
-		P: { providers: [] },
-		startLogin: () => {},
+		P: { providers },
+		startLogin: (p: unknown) => { logins.push(p); },
 		loadQuota: () => {},
+		provLimits: () => [],
+		limitShort: (l: any) => l.label,
+		bar: () => null,
+		pctText: () => "",
 	};
 	const mod = new Function(...Object.keys(env), `${rowToggleSrc}\n${src}\nACC = arguments[arguments.length - 1];\nreturn () => accountSection({ id: "anthropic", name: "Claude 구독" });`);
 	const section = mod(...Object.values(env), acc) as () => Node[];
-	return { nodes: section(), calls, dialogs };
+	return { nodes: section(), calls, dialogs, logins, acts, outs };
 }
 
 const switchOf = (nodes: any) => find(nodes, n => n.attrs.role === "switch")[0]!;
 const mainOf = (row: any) => find(row, n => n.attrs.class === "acc-main")[0]!;
 const gripOf = (row: any) => find(row, n => n.attrs.class === "acc-grip")[0]!;
-const rowsOf = (nodes: any) => find(nodes, n => String(n.attrs.class ?? "").startsWith("li acc"));
-const AUTO_HELP = "규칙과 한도에 따라 계정을 골라요. 쓰던 계정이 막히면 다른 계정으로 넘어가고, 모두 막히면 대체 모델 순서(API 키 포함)를 따라요. 답장 초안은 API 키로 넘어가지 않아요.";
+const rowsOf = (nodes: any) => find(nodes, n => String(n.attrs.class ?? "").split(" ").includes("acc"));
+const supOf = (row: any) => find(row, n => n.attrs.class === "sup");
 
-test("자동 전환: one settings row leads with the title, its help and an on switch; the rules and script rows show, no select or segmented control", () => {
+test("자동 전환: the card is the accounts, then the 한도에 걸리면 section (switch, ask, rules, script, one note line); the switch row has no help text", () => {
 	const { nodes } = card(body("auto"));
 	const all = text(nodes);
-	const lead = nodes[1]!.kids[0];
-	expect(text(lead).replace(/\s+/g, " ").trim()).toBe(`자동 전환 ${AUTO_HELP}`);
+	const cells = nodes[1]!.kids as Node[];
+	const labels = cells.map((k, i) => (k.attrs.class === "li acc-lbl" ? i : -1)).filter(i => i >= 0);
+	expect(labels).toHaveLength(2);
+	expect(labels[0]).toBe(0);
+	expect(cells.slice(1, labels[1]).every(k => String(k.attrs.class).split(" ").includes("acc"))).toBe(true);
+	const lead = cells[labels[1]! + 1]!;
+	expect(supOf(lead)).toHaveLength(0);
+	expect(pillOf(cells[labels[1]! + 2])).toHaveLength(1);
+	expect(text(cells[labels[1]! + 3]).replace(/\s+/g, " ")).toContain("평일 09:00-18:00");
+	expect(find(cells[cells.length - 1], n => n.attrs.class === "sup")).toHaveLength(1);
+	expect(find(nodes, n => String(n.attrs.class ?? "").includes("prow-lim"))).toHaveLength(0);
 	const sw = switchOf(lead);
 	expect(sw.attrs.class).toBe("hs-sw");
 	expect(sw.attrs["aria-checked"]).toBe("true");
@@ -88,8 +105,8 @@ test("고정: the switch is off, the help becomes the 고정 text, no 전환 규
 	const { nodes } = card(body("pinned"));
 	const all = text(nodes);
 	expect(switchOf(nodes).attrs["aria-checked"]).toBe("false");
-	expect(all).toContain("default만 써요. 한도에 걸리면 다른 계정으로 넘어가지 않고, 대체 모델 순서에 다른 단계(API 키 포함)가 있으면 그 단계로 이어 가요. 답장 초안은 API 키로 넘어가지 않아 한도가 풀릴 때까지 멈춰요.");
-	expect(all).not.toContain(AUTO_HELP);
+	expect(supOf(find(nodes, n => n.attrs.class === "li" && find(n, m => m.attrs.role === "switch").length > 0)[0])).toHaveLength(1);
+	expect(all).not.toContain("default");
 	expect(all).not.toContain("전환 규칙");
 	expect(all).not.toContain("스크립트");
 	expect(find(nodes, n => n.tag === "select")).toHaveLength(0);
@@ -97,7 +114,7 @@ test("고정: the switch is off, the help becomes the 고정 text, no 전환 규
 	expect(text(first)).toContain("사용 중 · 고정");
 	expect(first!.attrs.class).toContain(" on");
 	expect(text(second)).not.toContain("고정");
-	expect(text(second)).toContain("쓸 수 있음");
+	expect(find(second, n => String(n.attrs.class ?? "").startsWith("tag"))).toHaveLength(0);
 });
 
 test("고정: a blocked fixed account says it waits and keeps its badge and limit tag", () => {
@@ -153,4 +170,49 @@ test("every account row has its number and a grip; no arrow buttons; ArrowUp/Arr
 	expect(auto.calls).toEqual([["/api/accounts/order", "PUT", { order: ["teammate-shared", "default", "third"] }]]);
 	keys(1, "ArrowDown");
 	expect(auto.calls.at(-1)).toEqual(["/api/accounts/order", "PUT", { order: ["default", "third", "teammate-shared"] }]);
+});
+
+const pillOf = (row: any) => find(row, n => String(n.attrs.class ?? "").includes("tgl"));
+test("only an account whose login ran out gets 다시 로그인, on its own row beside the tap area; the other rows and the card have none", () => {
+	const lost = body("auto", { accounts: [account("default", { current: true }), account("teammate-shared", { blocked: "auth_error", blocked_tag: "로그인 풀림" })] });
+	const c = card(lost);
+	const [ok, out] = rowsOf(c.nodes);
+	expect(find(ok, n => n.attrs["data-acc-relogin"] != null)).toHaveLength(0);
+	const btn = find(out, n => n.attrs["data-acc-relogin"] != null);
+	expect(btn).toHaveLength(1);
+	expect(find(mainOf(out), n => n.attrs["data-acc-relogin"] != null)).toHaveLength(0);
+	expect(find(out, n => String(n.attrs.class ?? "").startsWith("tag warn"))).toHaveLength(0);
+	btn[0]!.attrs.onclick({});
+	expect(c.logins).toEqual([{ id: "anthropic", name: "Claude 구독" }]);
+	expect(find(c.nodes, n => n.attrs["data-acc-relogin"] != null)).toHaveLength(1);
+});
+
+test("a limit that only time fixes keeps its warn tag and gets no 다시 로그인; no card row has a trash can or a 쓸 수 있음 tag", () => {
+	const c = card(body("auto", { accounts: [account("default", { current: true, blocked: "rate_limit", blocked_tag: "한도 걸림 · 01:00까지" }), account("teammate-shared")] }));
+	expect(find(rowsOf(c.nodes)[0], n => String(n.attrs.class ?? "").startsWith("tag warn"))).toHaveLength(1);
+	expect(find(c.nodes, n => n.attrs["data-acc-relogin"] != null)).toHaveLength(0);
+	expect(find(c.nodes, n => n.attrs.class === "ib")).toHaveLength(0);
+	expect(find(c.nodes, n => String(n.attrs.class ?? "").startsWith("tag ok"))).toHaveLength(0);
+});
+
+test("the stored name default reads as 기본 on the rows and in the 계정 window title, and the stored name is still what the writes use", () => {
+	const c = card(body("auto"));
+	expect(text(c.nodes)).not.toContain("default");
+	mainOf(rowsOf(c.nodes)[0]!).attrs.onclick({ currentTarget: {} });
+	expect(c.dialogs).toEqual(["기본"]);
+	expect(rowsOf(c.nodes).map(r => gripOf(r).attrs["data-acc"])).toEqual(["default", "teammate-shared"]);
+});
+
+test("the only account leaves through 로그아웃 in its window (the card has no trash can); with two accounts the window deletes one instead", () => {
+	const anthropic = { id: "anthropic", name: "Claude 구독", auth: "oauth", can_logout: true };
+	const one = card(body("auto", { accounts: [account("default", { current: true })] }), [anthropic]);
+	mainOf(rowsOf(one.nodes)[0]!).attrs.onclick({ currentTarget: {} });
+	expect(one.acts[0]).toContain("로그아웃");
+	expect(one.acts[0]).not.toContain("계정 삭제");
+	expect(one.outs).toEqual(["anthropic"]);
+	const two = card(body("auto"), [anthropic]);
+	mainOf(rowsOf(two.nodes)[0]!).attrs.onclick({ currentTarget: {} });
+	expect(two.acts[0]).toContain("계정 삭제");
+	expect(two.acts[0]).not.toContain("로그아웃");
+	expect(two.outs).toEqual([]);
 });

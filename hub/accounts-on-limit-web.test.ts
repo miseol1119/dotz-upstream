@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// The 계정 card's 한도에 걸렸을 때 row (web/js/25-settings-accounts.js accountSection): the stored on_limit is marked, the unset
+// The 계정 card's 물어보기 row (under the small section name 한도에 걸리면) (web/js/25-settings-accounts.js accountSection): the stored on_limit is marked, the unset
 // state says the alert asks once, and a tap writes PUT /api/accounts/on-limit and re-renders like the other rows.
 const src = readFileSync(join(import.meta.dir, "..", "web", "js", "25-settings-accounts.js"), "utf8");
 // rowToggle, the shared 두 값 설정 pill, comes from 01-core.js.
@@ -51,6 +51,10 @@ function card(acc: object) {
 		P: { providers: [] },
 		startLogin: () => {},
 		loadQuota: () => {},
+		provLimits: () => [],
+		limitShort: (l: any) => l.label,
+		bar: () => null,
+		pctText: () => "",
 	};
 	const mod = new Function(...Object.keys(env), `${rowToggleSrc}\n${src}\nACC = arguments[arguments.length - 1];\nreturn () => accountSection({ id: "anthropic", name: "Claude 구독" });`);
 	const section = mod(...Object.values(env), acc) as () => Node[];
@@ -59,9 +63,8 @@ function card(acc: object) {
 
 const pill = (nodes: any) => find(nodes, n => String(n.attrs.class ?? "").includes("tgl"));
 
-test("한도에 걸렸을 때: one pill shows the saved value, and it reads as the second value pressed or not", () => {
+test("물어보기: one pill shows the saved value, and it reads as the second value pressed or not", () => {
 	const wait = card(body("wait"));
-	expect(text(wait.nodes)).toContain("한도에 걸렸을 때");
 	expect(pill(wait.nodes)).toHaveLength(1);
 	expect(pill(wait.nodes)[0]!.attrs["data-v"]).toBe("wait");
 	expect(pill(wait.nodes)[0]!.attrs["aria-pressed"]).toBe("false");
@@ -70,15 +73,14 @@ test("한도에 걸렸을 때: one pill shows the saved value, and it reads as t
 	expect(pill(sw.nodes)[0]!.attrs["aria-pressed"]).toBe("true");
 });
 
-test("한도에 걸렸을 때: unset says it asks once, and the first tap picks 기다리기", async () => {
+test("물어보기: unset leaves the pill empty, and the first tap picks 기다리기", async () => {
 	const c = card(body(null));
-	expect(text(c.nodes)).toContain("아직 안 정했어요 · 한도에 걸리면 한 번 물어봐요");
 	expect(pill(c.nodes)[0]!.attrs["data-v"]).toBe("");
 	await pill(c.nodes)[0]!.attrs.onclick({ currentTarget: {} });
 	expect(c.calls).toEqual([["/api/accounts/on-limit", "PUT", { on_limit: "wait" }]]);
 });
 
-test("한도에 걸렸을 때: a tap moves to the other value with PUT /api/accounts/on-limit and re-renders", async () => {
+test("물어보기: a tap moves to the other value with PUT /api/accounts/on-limit and re-renders", async () => {
 	const c = card(body("wait"));
 	await pill(c.nodes)[0]!.attrs.onclick({ currentTarget: {} });
 	expect(c.calls).toEqual([["/api/accounts/on-limit", "PUT", { on_limit: "switch" }]]);
