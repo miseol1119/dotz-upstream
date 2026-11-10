@@ -80,7 +80,7 @@ function accountSection(p, g, conn) {
     const label = a.label || a.alias || a.name;
     // every account's own windows with their reset time (the group mirrors OmO's usage file), else the two numbers dotz read
     const wins = ((g && g.accounts.find(x => x.name === a.name)) || {}).windows || [];
-    const sub = [a.name !== label ? a.name : "", ...(wins.length ? wins.map(accWin) : a.five_hour_left != null || a.seven_day_left != null ? [a.five_hour_left != null ? `5시간 ${pct(a.five_hour_left)} 남음` : "", a.seven_day_left != null ? `주간 ${pct(a.seven_day_left)} 남음` : ""] : [ACC_NO_USAGE])].filter(Boolean).join(" · ");
+    const sub = [a.name !== label ? a.name : "", ...(wins.length ? accUsage(wins) : a.five_hour_left != null || a.seven_day_left != null ? [a.five_hour_left != null ? `5시간 ${pct(a.five_hour_left)} 남음` : "", a.seven_day_left != null ? `주간 ${pct(a.seven_day_left)} 남음` : ""] : [ACC_NO_USAGE])].filter(Boolean).join(" · ");
     // 고정: tapping a row fixes that account; 자동 전환: tapping it opens its name and details (not the click right after a drag)
     const onclick = ev => { if (accSwallow) { accSwallow = false; return; } if (pinned) { if (a.name !== pin) setMode(ev.currentTarget, { mode: "pinned", account: a.name }, "고정 계정을 바꿨어요"); } else accDialog(a); };
     const rowOf = ev => ev.currentTarget.closest(".li.acc");
@@ -119,17 +119,17 @@ function accountSection(p, g, conn) {
   if (!pinned && last) rows.push(el("div", { class: "li" }, tx(last.error || last.error_text ? "마지막 실행이 실패했어요" : `마지막 결과 · ${last.label || (last.account ? accLabel(last.account) : "고르지 않음")}`, [last.error_text || last.reason, last.at ? kstStamp(Date.parse(last.at)) : ""].filter(Boolean).join(" · "))));
   return [head, el("div", { class: "list" }, conn, ...rows)];
 }
-// One usage window: what is left and, when OmO knows it, when it resets (KST).
+// An account's usage as row parts: what is left in each window, then the soonest reset still ahead (one reset per row, not one per window).
 // A logged-in subscription account whose usage has not been read yet (it has made no request so far).
 const ACC_NO_USAGE = "사용량 아직 확인 안 됨";
-const accWin = w => `${w.label} ${Math.round(w.left)}% 남음${w.resets_at ? ` (${kstStamp(w.resets_at)} 초기화)` : ""}`;
+const accUsage = ws => { const next = Math.min(...ws.map(w => w.resets_at).filter(t => t > Date.now())); return [...ws.map(w => `${w.label} ${Math.round(w.left)}% 남음`), ...(Number.isFinite(next) ? [rel(next)] : [])]; };
 // A provider OmO holds accounts for besides Claude 구독 (its own block above): its login row, then its accounts with their state and usage
 // windows, and an empty state when the pool has none.
 function accProviderSection(p, g, conn) {
   const rows = [conn];
   if (g && !g.accounts.length) rows.push(el("div", { class: "li" }, accTx(`${g.name} 계정이 없어요`, g.can_add ? "계정을 하나 넣으면 여기 보여요." : "로그인이나 API 키를 넣어 주세요.")));
   for (const a of g ? g.accounts : []) {
-    const sub = (a.windows || []).map(accWin).join(" · ") || (g.auth === "oauth" ? ACC_NO_USAGE : "");
+    const sub = accUsage(a.windows || []).join(" · ");
     const tags = [];
     if (a.current) tags.push(["사용 중", "pri"]);
     if (a.pinned) tags.push(["고정", "ok"]);

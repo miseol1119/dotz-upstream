@@ -167,9 +167,9 @@ export function accountsBody(now = Date.now(), catalog: { id: string; name: stri
 	const aliases = readAliases();
 	const usage = getUsage();
 	// every logged-in account's windows as OmO's poller last wrote them, not only the one requests use (getUsage is filled
-	// only while rules or a script read it)
+	// only while rules or a script read it); a window whose reset time has passed is an old reading, so it is left out
 	const store = readProviderStore();
-	const claudeWindows = (name: string) => windowsOf(store.usage, "anthropic-subscription", name);
+	const claudeWindows = (name: string) => windowsOf(store.usage, "anthropic-subscription", name).filter(w => w.resets_at === null || w.resets_at > now);
 	const fileLeft = (name: string, id: string) => claudeWindows(name).find(w => w.id === id)?.left ?? null;
 	const rules = readRules();
 	const lab = (n: string) => label(n, undefined, aliases);

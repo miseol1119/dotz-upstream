@@ -48,8 +48,11 @@ const resetMs = (v: unknown): number | null => {
 	const ms = typeof v === "number" ? v : typeof v === "string" ? Date.parse(v) : Number.NaN;
 	return Number.isFinite(ms) ? ms : null;
 };
-// "7d fable" -> "fable": a model-scoped window keeps its name next to the duration, so it is not a second "7일".
-const scopeOf = (label: unknown): string => (typeof label === "string" ? label.replace(/^\s*\d+\s*[mhdw]\b/i, "").trim() : "");
+// "7d fable" -> "Fable": a model-scoped window keeps its name next to the duration, so it is not a second "7일".
+const scopeOf = (label: unknown): string => {
+	const s = typeof label === "string" ? label.replace(/^\s*\d+\s*[mhdw]\b/i, "").trim() : "";
+	return s.charAt(0).toUpperCase() + s.slice(1);
+};
 // One provider's usage windows from subscription-usage.json (`<provider>/<account>` key), newest read only.
 export function windowsOf(usage: Json | undefined, omoId: string, account: string): GenericWindow[] {
 	const w = usage?.accounts?.[`${omoId}/${account}`]?.windows;
