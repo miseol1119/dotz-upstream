@@ -78,7 +78,7 @@ function decisionLines(p: Record<string, any>): string[] {
 	return out;
 }
 
-// The owner's message holds no answer by itself when it lands in a conversation with open choice questions: the bot is told which, and closes them with `resolves`.
+// The owner's message holds no answer by itself when it lands in a conversation with open choice questions: the bot is told which, judges whether the message answers one, and closes it at once with `resolves` or a closing `<resolves>` line.
 const TITLE_MAX = 60;
 const openQuestionLines = (target: string): string[] => {
 	const titles = openChoiceTitles(target).map(t => t.slice(0, TITLE_MAX));

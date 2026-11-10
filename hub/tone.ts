@@ -163,7 +163,13 @@ export function stripHandoff(raw: string): string {
 
 // A project turn's <project-info> block (hub/projectinfo.ts) is for the gateway, never text for the owner. An unclosed block runs to the end.
 export const PROJECT_INFO_BLOCK = /\s*<project-info>([\s\S]*?)(?:<\/project-info>|$)/g;
-export const stripProjectInfo = (text: string): string => (text.includes("<project-info>") ? text.replace(PROJECT_INFO_BLOCK, "").trimEnd() : text);
+export const stripProjectInfo = (text: string): string => stripResolves(text.includes("<project-info>") ? text.replace(PROJECT_INFO_BLOCK, "").trimEnd() : text);
+
+// A final answer may close with a line `<resolves>words of a question title</resolves>`: the gateway closes the open question it names (hub/outbound.ts settleResolves) and
+// the owner never reads the line, so it goes with the project-info block wherever an answer is shown or stored (stripProjectInfo).
+const RESOLVES_LINE = /^[ \t]*<resolves>([^<\n]*)<\/resolves>[ \t]*(?:\r?\n|$)/gm;
+export const resolvesOf = (text: string): string[] => (text.includes("<resolves>") ? [...text.matchAll(RESOLVES_LINE)].map(m => m[1]!.trim()) : []);
+export const stripResolves = (text: string): string => (text.includes("<resolves>") ? text.replace(RESOLVES_LINE, "").trimEnd() : text);
 
 // True when a reply still carries the harness handoff labels (even when the leading block was stripped or never led).
 export const leaksHandoff = (text: string): boolean => /\bFor you:[\s\S]*\bNow:[\s\S]*\bNext:/.test(text);

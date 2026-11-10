@@ -32,10 +32,10 @@ import { createPrompts, type Pending, type Reply, type WorkLink } from "./prompt
 import { createSendLedger } from "./sendlog.ts";
 import { createInflight } from "./inflight.ts";
 import { inOrder, localize } from "./outlang.ts";
-import { dropClaim, splitTone, stripHandoff, stripLater, stripProjectInfo } from "./tone.ts";
+import { dropClaim, resolvesOf, splitTone, stripHandoff, stripLater, stripProjectInfo, stripResolves } from "./tone.ts";
 import { isLate, isSnowflake, lateQuote, lateRequestId, replyRef, snowflakeTime, withQuote } from "./threads.ts";
 import { keepBrief } from "./draft-approval.ts";
-import { allNotices, markDraftPosted, onDecisionClosed, onDraftCardRefreshed, openDraftCards, openDraftRefs, openDraftText, orchestratorAnswered, rewriteOpenDraft } from "./notices.ts";
+import { allNotices, markDraftPosted, onDecisionClosed, onDraftCardRefreshed, openDraftCards, openDraftRefs, openDraftText, orchestratorAnswered, resolveNotices, rewriteOpenDraft } from "./notices.ts";
 import { cardPointer, cardRef, cardTitle, CARDS_LEAD, closedCardText, createApprovalQueue, loadHeld, pendingCardsNote, splitDraftCards } from "./approval-queue.ts";
 import { mailItemKey, mailKeyOfRef } from "./draft-handled.ts";
 import { draftHeads, listDrafts as listMailDrafts } from "../features/reply-drafts/lib/store.ts";
@@ -197,6 +197,14 @@ function noteProjectInfo(target: string, text: string): void {
 	const parent = target.startsWith("th:") ? threadHome(target.slice(3)) : undefined;
 	const key = parent ? `ch:${parent}` : /^ch:\d+$/.test(target) ? target : undefined;
 	if (key && recordProjectInfo(key, text)) broadcast({ kind: "project_info", key });
+}
+// An answer's closing `<resolves>…</resolves>` line closes the open questions it names, exactly as dotz_send's `resolves` does (routes.ts): only those of
+// `session`'s conversations, "*" for every one. A line that names nothing closes nothing and leaves one line in hub.log. The line itself is stripped for the owner (tone.ts).
+function settleResolves(text: string, session: string): void {
+	for (const words of resolvesOf(text)) {
+		const r = resolveNotices(words === "*" ? { all: true } : { match: words }, conv => convs.keyOf(conv ?? "") === session);
+		if (!r.resolved) log(`resolves line of ${session} matched no open question: ${words.slice(0, 80)}`);
+	}
 }
 const threadMail = (thread: string): string | undefined => {
 	const m = mailByThread(thread);
@@ -402,6 +410,7 @@ export async function out(target: string, text: string, replyTo?: string, extra:
 	const answersOwner = (extra.source === undefined || extra.source === "orchestrator") && !extra.keepsOpen;
 	const said = stripSteerMark(text);
 	text = stripLater(said);
+	if (typeof extra.session === "string") settleResolves(text, extra.session);
 	noteProjectInfo(target, text);
 	if (said && !stripProjectInfo(text)) return { delivered: true };
 	// A gateway post to the alert conversation (a failing watch) is gated like alert() below.
@@ -586,7 +595,8 @@ function wireAnswers(c: Conv): void {
 		answer => {
 			// Read here too: an answer already sent with dotz_send drops this final text, and `[later]` must arrive bare.
 			noteProjectInfo(c.queue.current()?.target ?? c.primary, answer);
-			const text = stripProjectInfo(answer) || answer;
+			settleResolves(answer, c.key);
+			const text = stripProjectInfo(answer) || stripResolves(answer);
 			// The request this answer is for: only a [done] / [fail] to the same request can close an earlier question about it (notices.ts).
 			orchestratorAnswered(text, c.queue.current()?.replyTo);
 			c.queue.onAnswer(text);
