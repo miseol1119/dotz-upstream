@@ -21,16 +21,18 @@ function rpMark(n, e) {
   const mt = n.querySelector(":scope > .mt");
   if (mt) mt.append(btn); else { btn.classList.add("out"); n.append(btn); }
 }
-function rpStart(n) {
+// `decision`: the id of the question this reply answers in the owner's own words (30-notices.js ntDirect); it rides with the quote until it is sent or dropped.
+function rpStart(n, decision = "") {
   const e = RP.src.get(n);
   if (!e) return;
   // tone: the status tag of the quoted bot message, shown in the bar like in the message (not sent; the server only gets id, author, content)
-  RP.cur = { t: target, id: n.dataset.rid, author: rpOwnerKind(e) ? "" : ($(".mn", n)?.textContent || botName), content: rpText(e).slice(0, RP_QUOTE), tone: rpOwnerKind(e) || parkedTone(parseTone(noHandoff(String(e.text ?? ""))).tone) ? "" : parseTone(noHandoff(String(e.text ?? ""))).tone };
+  RP.cur = { t: target, id: n.dataset.rid, author: rpOwnerKind(e) ? "" : ($(".mn", n)?.textContent || botName), content: rpText(e).slice(0, RP_QUOTE), tone: rpOwnerKind(e) || parkedTone(parseTone(noHandoff(String(e.text ?? ""))).tone) ? "" : parseTone(noHandoff(String(e.text ?? ""))).tone, ...(decision ? { decision } : {}) };
   rpPaint();
   const ta = $("#text");
   if (!ta.disabled) ta.focus({ preventScroll: true });
 }
 function rpPaint() {
+  if (RP.cur && RP.cur.decision && RP.cur.t !== target) delete RP.cur.decision;   // moving to another conversation: the question is no longer being answered
   const r = RP.cur && RP.cur.t === target ? RP.cur : null;
   if (!RP.bar) {
     if (!r) return;
@@ -47,7 +49,7 @@ function rpTake() {
   const r = RP.cur && RP.cur.t === target ? RP.cur : null;
   if (!r) return null;
   RP.cur = null; RP.tone = r.tone || ""; rpPaint();
-  return { id: r.id, author: r.author, content: r.content };
+  return { id: r.id, author: r.author, content: r.content, ...(r.decision ? { decision: r.decision } : {}) };
 }
 function rpRestore(reply) { if (reply) { RP.cur = { t: target, ...reply, tone: RP.tone }; rpPaint(); } }
 const rpNode = id => $("#tl [data-rid=\"" + CSS.escape(id) + "\"]");

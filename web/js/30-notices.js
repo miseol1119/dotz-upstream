@@ -561,12 +561,15 @@ function ntHomeRow(n, label = "답변 필요") {
 /* ---- detail sheet ---- */
 const NS = { id: "", det: null, h: null, node: null, busy: false, edit: null, pn: null };   // pn: a peer's notice (it is not in NT; drawn from the snapshot, 34-peer-monitoring.js)   // edit: { id, opt, text, fresh } while the owner writes the detail an option asks for   // det: a notice shown read-only (a failure alert), not looked up by id
 function ntSheetClose(restore = true) { if (NS.h) NS.h.close(restore); }
-// "직접 답하기": to the asking message in its chat (a login request: its own form).
-function ntDirect(n) {
+// "직접 답하기": to the asking message in its chat (a login request: its own form), where the composer quotes that message as the answer to this question:
+// what the owner writes next carries the question's id and settles it (hub/notices-store.ts ownerReplied). A send approval stays a plain jump.
+async function ntDirect(n) {
   ntSheetClose(false);
   if (n.pc) { const t = n.decision.to; if (pqPc(t)) go("monitoring", `c:${t}`); else toast(`${n.pc.name}에서 답해 주세요`); return; }   // a peer's question: its conversation as this page shows it
   if (n.decision.to.startsWith("auth:")) { AUTH_HID.clear(); paintAuth(true); const f = document.querySelector(".au input"); if (f) { f.scrollIntoView({ block: "center" }); f.focus(); } else toast("입력 창이 이미 닫혔어요"); return; }
-  ntJump(n);
+  if (await ntJump(n) !== undefined || n.decision.draft || n.decision.state !== "open") return;
+  const m = ntFind(n.at);
+  if (m && m.dataset.ts === n.at && RP.src.has(m)) rpStart(m, String(n.id));
 }
 // Same rule as the hub (hub/notices.ts answerDecision): an option that needs detail is answered only with the owner's text.
 const ntNeedsNote = (n, o) => !o.say && !o.action && (n.decision.draft ? draftAsksText(o) : detailOf(o));

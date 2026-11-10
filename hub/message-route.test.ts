@@ -1,6 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { setupEnv } from "../features/reply-drafts/test/helpers.ts";
 import { HUB_TOKEN } from "./config.ts";
+import { emit } from "./events.ts";
+import { listNotices, resetNoticesForTest } from "./notices.ts";
 import { makeRoute } from "./routes.ts";
 
 // POST /api/message: what the composer sends is stored once, and nothing is stored for an empty message.
@@ -20,6 +22,16 @@ describe("POST /api/message", () => {
 		expect(await lines("중복 시험")).toBe(1);
 		await call("POST", "/api/message", { text: "중복 시험", cid: "c-2" });
 		expect(await lines("중복 시험")).toBe(2);
+	});
+	test("a typed message that names a decision settles that decision with its text and no other", async () => {
+		resetNoticesForTest();
+		for (const q of ["보고서를", "폴더를"]) emit("outbox", { ts: new Date().toISOString(), kind: "out", source: "orchestrator", target: "main", text: `[ask] ${q} 어떻게 할까요?\n결정: ${q} 어떻게 할까요?\n**1) 하기**\n**2) 말기**` });
+		const ds = () => listNotices(300).items.filter(n => n.kind === "decision");
+		const first = ds()[0]!;
+		const r = await call("POST", "/api/message", { text: "이미 완료됨", decision: first.id, cid: "c-dec" });
+		expect(r.status).toBe(200);
+		expect(ds().map(n => [n.id === first.id, n.decision!.state, n.decision!.answer])).toEqual(expect.arrayContaining([[true, "answered", "이미 완료됨"], [false, "open", undefined]]));
+		resetNoticesForTest();
 	});
 	test("a message of spaces only is refused and nothing is stored", async () => {
 		const r = await call("POST", "/api/message", { text: "   " });
