@@ -37,6 +37,18 @@
 - **Each project gets its own session.** Work stopped by a restart or a dropped connection starts again by itself.
 - **It finds past conversations.** Ask for "that thing from last week". Indexing and search run on this computer only.
 
+## What leaves your computer (privacy)
+
+dotz has no server of its own and no account. This is everything it sends out, and to whom.
+
+- **Stored here.** Conversations, memory, files, secrets (`~/.dotz/secrets`), logs and the search index live on this computer. dotz has no place of its own to upload them to.
+- **Model provider.** What an agent works on (your messages, the files and command output it reads) goes to the provider you signed in to through OmO or Claude Code. dotz also reads your plan usage from Anthropic with your OmO login, and from OpenAI if the Codex CLI is signed in.
+- **Updates.** Every 10 minutes dotz asks GitHub whether this repo has a new version and installs it, sending your GitHub token if you set one. It also checks npm for a newer OmO each night. Settings → Update has switches for checking and for installing; `omp_update.mode` set to `off` stops the OmO check.
+- **Search setup.** The first time, dotz downloads a small runtime from npm and two models from Hugging Face for past-conversation search. Nothing of yours is sent, and this download has no switch.
+- **Apps you connect.** These send nothing until you connect them. Discord, Telegram, Slack and JANDI get the messages and files dotz posts there, using the bot tokens you gave it. Mail and calendar traffic runs between your own accounts and this computer. Web push sends a notification's title and first text, encrypted, to your browser vendor's push service, only for devices where you allowed notifications. Tailscale or Cloudflare carries the web app if you open it from outside. Other services you set up, such as YouTube, Instagram or a webmail site, and pages you ask it to watch, are called with your own logins. The web app itself listens on 127.0.0.1 only.
+- **Usage statistics.** dotz sends none of its own. It switches off OmO's usage telemetry and the senpi install ping, but sets nothing for Claude Code or omp, so their own settings apply.
+- **Web app.** Its pages load no font, script or stylesheet from another site.
+
 ## Install
 
 ```sh

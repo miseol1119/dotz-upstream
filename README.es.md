@@ -37,6 +37,18 @@
 - **Cada proyecto tiene su propia sesión.** Si un reinicio o un corte de red detiene una tarea, la retoma solo.
 - **Encuentra conversaciones antiguas.** Puedes preguntar por "aquello de la semana pasada". El índice y la búsqueda se hacen solo en este ordenador.
 
+## Qué sale de tu ordenador (privacidad)
+
+dotz no tiene servidor propio ni cuenta. Esto es todo lo que envía y a quién.
+
+- **Se queda aquí.** Las conversaciones, la memoria, los archivos, los secretos (`~/.dotz/secrets`), los registros y el índice de búsqueda están en este ordenador. dotz no tiene un sitio propio donde subirlos.
+- **Proveedor de modelos.** Lo que un agente trabaja (tus mensajes, los archivos y la salida de comandos que lee) va al proveedor con el que iniciaste sesión en OmO o Claude Code. dotz también lee el uso de tu plan en Anthropic con tu sesión de OmO, y en OpenAI si el CLI de Codex tiene la sesión iniciada.
+- **Actualizaciones.** Cada 10 minutos dotz pregunta a GitHub si este repositorio tiene una versión nueva y la instala; si definiste un token de GitHub, lo envía. Cada noche también consulta npm por un OmO más reciente. En Ajustes → Actualización hay interruptores para comprobar y para instalar; con `omp_update.mode` en `off` se detiene la comprobación de OmO.
+- **Preparar la búsqueda.** La primera vez, dotz descarga de npm un pequeño entorno de ejecución y de Hugging Face dos modelos para buscar en conversaciones pasadas. No se envía nada tuyo y esta descarga no tiene interruptor.
+- **Apps que conectas.** No envían nada hasta que las conectas. Discord, Telegram, Slack y JANDI reciben los mensajes y archivos que dotz publica allí con los tokens de bot que le diste. El correo y el calendario circulan entre tus propias cuentas y este ordenador. El push web envía el título y el inicio del texto de una notificación, cifrados, al servicio push del fabricante de tu navegador, solo a los dispositivos donde permitiste notificaciones. Tailscale o Cloudflare transporta la app web si la abres desde fuera. Otros servicios que configures, como YouTube, Instagram o un webmail, y las páginas que le pidas vigilar, se consultan con tus propias sesiones. La app web escucha solo en 127.0.0.1.
+- **Estadísticas de uso.** dotz no envía ninguna propia. Desactiva la telemetría de uso de OmO y el aviso de instalación de senpi, pero no configura nada en Claude Code ni en omp, así que se rigen por sus propios ajustes.
+- **App web.** Sus páginas no cargan fuentes, scripts ni hojas de estilo de otros sitios.
+
 ## Instalación
 
 ```sh
