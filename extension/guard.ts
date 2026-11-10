@@ -31,7 +31,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { broadSearchProblem, expandShellVars, shellText } from "./guard-shell.ts";
 export { shellText };
 import { callRules, expandCellVars, OMO_PROJECTS, readPaths, workerTrail } from "./guard-notes.ts";
-import { dataDir, type GuardConfig, GUARD_DEFAULTS, installedOriginal, isMain, laneShareReason, loadGuardConfig, logOnce, stateDir, statePath as stateFile, SUB_COMPACT_STOP, SUB_COMPACT_WRAP_UP } from "./guard-config.ts";
+import { dataDir, expensiveMatch, type GuardConfig, GUARD_DEFAULTS, installedOriginal, isMain, laneShareReason, loadGuardConfig, logOnce, stateDir, statePath as stateFile, SUB_COMPACT_STOP, SUB_COMPACT_WRAP_UP } from "./guard-config.ts";
 
 // Active configuration: the defaults until installGuard() loads <DOTZ_DIR>/config.json. The exported checks take their
 // limits as a parameter that defaults to it, so tests pass their own.
@@ -303,17 +303,8 @@ export function estimateFrom(input: TaskInput | undefined, g: GuardConfig = G): 
 	return total === undefined ? g.budget_default_estimate_percent : Math.min(total, 100);
 }
 
-// A model matches an `expensive_models` entry as a case-insensitive substring of its selector; an entry starting with ":"
-// names a thinking level (":max" matches "model:max" and a JSON `"thinking":"max"`, not ":maximum").
-const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const expensivePattern = (entry: string) => (entry.startsWith(":") ? new RegExp(`[:"']${escapeRe(entry.slice(1))}\\b`, "i") : new RegExp(escapeRe(entry), "i"));
-// The list only counts while the owner rule is switched on.
-const expensiveList = (g: GuardConfig) => (g.ask_before_expensive ? g.expensive_models : []);
 export function expensiveModel(value: unknown, g: GuardConfig = G): string | undefined {
-	const patterns = expensiveList(g).map(expensivePattern);
-	if (!patterns.length) return undefined;
-	const list = Array.isArray(value) ? value : value == null ? [] : [value];
-	return list.map(v => (typeof v === "string" ? v : JSON.stringify(v))).find(s => patterns.some(p => p.test(s)));
+	return expensiveMatch(value, g);
 }
 
 // The worker model a task call asks for in its own arguments (a `model` on the call or on an item). Models that come from

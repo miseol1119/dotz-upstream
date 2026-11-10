@@ -19,6 +19,7 @@ import { isProjectTarget } from "./projectchat.ts";
 import { MAIN } from "./session-key.ts";
 import { abortLane, applyChainChange as applyLaneChain, compactLane, laneLive, laneModels, lanes, restartLane, resumeByName, setLaneModel, setLaneWorkerModel, stopLane } from "./lanes.ts";
 import { cancelByOwner, applyChainChange as applyOrchestratorChain, applyModelChange, compact as compactOrchestrator, orch, restart as restartOrchestrator } from "./orchestrator.ts";
+import { midConvoEffort } from "./mid-effort.ts";
 import { availableModels, cancelLogin, completeLogin, ControlError, listProviders, loginProviders, logoutProvider, type ModelInfo, pendingLogin, quota, startLogin } from "./providers.ts";
 
 export { ControlError };
@@ -295,7 +296,7 @@ function laneCacheWarning(name: string): ForceRequired {
 // OmO sends an effort change as a per-message effort marker on these models (senpi anthropic-messages, compat
 // supportsMidConvoEffort; Anthropic docs "Change effort mid-conversation"), so the prompt cache survives it.
 const MID_CONVO_EFFORT = /claude-(opus-5|opus-5-5|sonnet-5-5|haiku-5-5|fable-5-1|mythos-5-1)$/;
-const keepsCacheOnEffort = (runtime: string, model: string) => runtime === "omo" && MID_CONVO_EFFORT.test(model);
+const keepsCacheOnEffort = (runtime: string, model: string) => runtime === "omo" && midConvoEffort(model, MID_CONVO_EFFORT);
 
 // `modelInput` may carry the thinking level as "<model>:<level>"; an explicit `thinkingInput` wins.
 export async function setModel(target: string, modelInput?: string, thinkingInput?: string, force = false): Promise<ModelChange> {

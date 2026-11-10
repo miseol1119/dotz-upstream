@@ -12,6 +12,7 @@ import { historyEvents, type HubEvent } from "./events.ts";
 import { mailByThread } from "./mail.ts";
 import { createOrchestrator, orchBusy, type OrchOpts, type Orchestrator } from "./orchestrator.ts";
 import { createCapacity } from "./convcapacity.ts";
+import { workersOf } from "./lanegates.ts";
 import { omoSelector } from "./runtime/omo.ts";
 import type { createPrompts, Pending, Reply } from "./prompts.ts";
 import { CONV_KINDS, MAIN, primaryTarget, safeDir, sessionKeyOf } from "./session-key.ts";
@@ -365,6 +366,6 @@ export const convs = createConvSessions({
 	history: historyEvents,
 	// Silent workers count: a long wait writes nothing, and the park would end it (the lanes' reply-voice stop, laneidle.ts).
 	workers: (c, file = c.o.orch.sessionFile) => runningOmoWorkers(file) + quietOmoWork(file).length,
-	workerPin: () => omoSelector(selectorOf(orchestratorModel())),
+	workerPin: () => omoSelector(workersOf(selectorOf(orchestratorModel()))),
 	log: hubLog,
 });

@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cfg, DATA_DIR, DEFAULTS, HOME, log, writeAtomic } from "./config.ts";
 import { issueBlock } from "./choices.ts";
+import { expensiveMatch, loadGuardConfig } from "../extension/guard-config.ts";
 import { addBigContext, addToolCalls, addTurn, addWake, collectSessions, newStreaks, OMO_WAKE, projectLabel as labelOf, type Src } from "./session-sources.ts";
 import { trackTimer } from "./shutdown.ts";
 
@@ -128,6 +129,8 @@ export function analyze(src: Src, since: number, exhaust: Exhaust[] = [], decisi
 	let errStreak = 0, readTok = 0, readCost = 0;
 	const run = newStreaks();
 	let level = "";
+	const guard = loadGuardConfig(DATA_DIR);
+	const dear = (v: string) => expensiveMatch(v, guard) !== undefined;
 	for (const line of readFileSync(src.file, "utf8").split("\n")) {
 		if (line.length < 20) continue;
 		const head = line.slice(0, 400);
@@ -230,16 +233,16 @@ export function analyze(src: Src, since: number, exhaust: Exhaust[] = [], decisi
 				readTok += cr;
 				readCost += u.cost?.cacheRead ?? 0;
 			}
-			if (/fable/i.test(model)) {
+			if (dear(model)) {
 				s.fable++;
 				s.fableCost += cost;
 			}
-			if (/^(max|xhigh)$/i.test(level)) {
+			if (level && dear(`:${level}`)) {
 				s.effortTurns++;
 				s.effortCost += cost;
 				s.efforts.add(`${m.model ?? "?"}:${level}`);
 			}
-			if (/fable/i.test(model) || /^(max|xhigh)$/i.test(level)) s.expensiveCost += cost; // once per turn even when both apply
+			if (dear(model) || (level && dear(`:${level}`))) s.expensiveCost += cost; // once per turn even when both apply
 			// context shrink (OmO only): the request after one at the 50% gate came back >10% smaller without a compaction
 			const shrunk = src.runtime === "omo" && !!prev && !compacted && prev.ctx + prev.out >= REDUCE_GATE * 0.98 && ctx < prev.ctx * 0.9;
 			if (shrunk) s.shrinks++;
@@ -363,12 +366,12 @@ export function findingsOf(results: Stats[], exhaust: Exhaust[] = []): Finding[]
 			});
 		}
 		if (s.fable || s.effortTurns) {
-			const parts = [s.fable ? `Fable 응답 ${s.fable}회 (${usd(s.fableCost)})` : "", s.effortTurns ? `max/xhigh 생각 수준 ${s.effortTurns}턴 (${usd(s.effortCost)}; ${[...s.efforts].join(", ")})` : ""].filter(Boolean);
+			const parts = [s.fable ? `비싼 모델 응답 ${s.fable}회 (${usd(s.fableCost)})` : "", s.effortTurns ? `비싼 생각 수준 ${s.effortTurns}턴 (${usd(s.effortCost)}; ${[...s.efforts].join(", ")})` : ""].filter(Boolean);
 			const cost = s.expensiveCost;
 			F.push({
 				flag: s.fable > 0 || s.effortTurns >= EFFORT_FLAG_TURNS, kind: "비싼 모델", who, tip: "오너가 요청한 것인지 확인",
 				what: parts.join(" + "), amount: usd(cost), save: 0, cost,
-				evidence: "규칙: Fable·max/xhigh는 오너가 요청할 때만 (오너가 요청한 세션이면 무시)",
+				evidence: "규칙: 설정(guard.expensive_models)에 적은 모델·생각 수준은 오너가 요청할 때만 (오너가 요청한 세션이면 무시)",
 				fix: "제안: 이 세션/워커의 모델 경로(역할·폴백 체인·레인 모델 선택)에서 비싼 모델이 기본으로 새어 들어오는지 확인",
 			});
 		}

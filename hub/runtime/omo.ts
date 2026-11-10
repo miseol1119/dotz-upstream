@@ -10,6 +10,7 @@ import { stickyEnv } from "../account-sticky.ts";
 import { apiKeyBan, withoutApiKeys } from "../apikey-policy.ts";
 import { chainAfter, fallbackChain, lanesMaxWorkers, log, orchestratorModel, parseSelector, selectorOf, workerIdleMin, writeAtomic } from "../config.ts";
 import { keyedWorker } from "../fallback.ts";
+import { workersOf } from "../lanegates.ts";
 import { classifyProviderError } from "../providers.ts";
 import { detectBinary } from "./detect.ts";
 import { closeHostsOf, OMO, recordStarted, TELEMETRY_OFF_ENV } from "./omo-hosts.ts";
@@ -232,7 +233,8 @@ export const ORCHESTRATOR_WORKERS = "dotz-orchestrator-workers";
 // models; every other category keeps the orchestrator's model. On an API-key entry (`lookup` null) lookups follow the worker.
 export const LOOKUP_MODEL = "anthropic/claude-sonnet-5-5:medium";
 export const LOOKUP_CATEGORIES = ["quick"];
-export function writeOrchestratorProfile(file = omoConfigFile(), worker = selectorOf(orchestratorModel()), chain = fallbackChain("orchestrator"), lookup: string | null = LOOKUP_MODEL): string | undefined {
+export function writeOrchestratorProfile(file = omoConfigFile(), main = selectorOf(orchestratorModel()), chain = fallbackChain("orchestrator"), lookup: string | null = LOOKUP_MODEL): string | undefined {
+	const worker = workersOf(main);
 	const models = [worker, ...chainAfter(worker, chain).filter(e => !e.key_file).map(e => e.model)].map(categoryModel);
 	const lookups = lookup ? [categoryModel(lookup), ...models].filter((m, i, all) => all.findIndex(x => x.model === m.model && x.reasoning === m.reasoning) === i) : models;
 	return writeProfile(ORCHESTRATOR_WORKERS, { task: workerTask(), memory: { enabled: false }, categories: Object.fromEntries(WORKER_CATEGORIES.map(c => [c, { models: LOOKUP_CATEGORIES.includes(c) ? lookups : models, prompt_append: WORKER_RULE }])) }, file);

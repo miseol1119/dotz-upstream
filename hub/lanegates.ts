@@ -1,4 +1,5 @@
-import { splitThinking } from "./config.ts";
+import { DATA_DIR, workerModel } from "./config.ts";
+import { expensiveMatch, loadGuardConfig } from "../extension/guard-config.ts";
 import { basename } from "node:path";
 
 const BRIEF_MAX = 8000;
@@ -26,8 +27,12 @@ export function checkBrief(brief: string): string | undefined {
 	return undefined;
 }
 
-// Fable, or any model at xhigh/max effort, is spent only when the owner asked for it.
-export const isExpensive = (selector: string) => /fable/i.test(selector) || /^(max|xhigh)$/i.test(splitThinking(selector).thinking ?? "");
+// A model or thinking level the install's guard config names (guard.expensive_models, on only with guard.ask_before_expensive) is spent
+// only when the owner asked for it; a default install names none. The same rule as the work guard (extension/guard-config.ts).
+export const isExpensive = (selector: string) => expensiveMatch(selector, loadGuardConfig(DATA_DIR)) !== undefined;
+
+// The model task workers run on under a main `main`: it follows the main model, except an expensive main, whose workers use models.workers.
+export const workersOf = (main: string) => (isExpensive(main) ? workerModel() : main);
 
 // Budget gate (owner rule 2026-10-18): a job is assumed to use `est` % of the 5h window (default 15) and 10% must stay.
 // The 7d window never gates; its remaining % is only shown in the message.

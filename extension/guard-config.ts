@@ -107,6 +107,18 @@ export function guardConfigFrom(raw: unknown): GuardConfig {
 	};
 }
 
+// A model matches an `expensive_models` entry as a case-insensitive substring of its selector; an entry starting with ":"
+// names a thinking level (":max" matches "model:max" and a JSON `"thinking":"max"`, not ":maximum"). The list only counts
+// while `ask_before_expensive` is on, so a default install has no expensive model. The one definition the extension and the hub share.
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const expensivePattern = (entry: string) => (entry.startsWith(":") ? new RegExp(`[:"']${escapeRe(entry.slice(1))}\\b`, "i") : new RegExp(escapeRe(entry), "i"));
+export function expensiveMatch(value: unknown, g: GuardConfig): string | undefined {
+	const patterns = (g.ask_before_expensive ? g.expensive_models : []).map(expensivePattern);
+	if (!patterns.length) return undefined;
+	const list = Array.isArray(value) ? value : value == null ? [] : [value];
+	return list.map(v => (typeof v === "string" ? v : JSON.stringify(v))).find(s => patterns.some(p => p.test(s)));
+}
+
 export function loadGuardConfig(dir = dataDir()): GuardConfig {
 	try {
 		return guardConfigFrom(JSON.parse(readFileSync(join(dir, "config.json"), "utf8")).guard);

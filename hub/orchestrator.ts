@@ -7,6 +7,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { emitEventActivity, runningSubagents, statusActivity } from "./activity.ts";
 import { pendingAsksBlock } from "./asks.ts";
+import { workersOf } from "./lanegates.ts";
 import { cfg, chainAfter, compactAtFor, DATA_DIR, DEFAULTS, fallbackChain, HUB_TOKEN, log, NAME, now, orchestratorModel, parseSelector, selectorOf, TZ, tzLabel, writeAtomic } from "./config.ts";
 import { isNote, msg } from "./i18n.ts";
 import { markSteers, steerContract, steerToken } from "./steer-mark.ts";
@@ -743,7 +744,7 @@ export function createOrchestrator(opts: OrchOpts) {
 		orch.activeModel = spawnModel;
 		chained = !chain && entries.length > 0;
 		const steer = steerToken(HUB_TOKEN, `orchestrator:${opts.key}`);
-		proc = markSteers(runtime.start({ role: "orchestrator", cwd: DATA_DIR, model: spawnModel, ...(opts.model?.() ? { workers: selectorOf(orchestratorModel()) } : {}), fallback: chain ? [] : entries.filter(e => !e.key_file).map(e => e.model), hubSwitches: Boolean(chain), resume: resume ? prior : undefined, env, systemNote: steerContract(steer) }), steer);
+		proc = markSteers(runtime.start({ role: "orchestrator", cwd: DATA_DIR, model: spawnModel, ...(opts.model?.() ? { workers: workersOf(selectorOf(orchestratorModel())) } : {}), fallback: chain ? [] : entries.filter(e => !e.key_file).map(e => e.model), hubSwitches: Boolean(chain), resume: resume ? prior : undefined, env, systemNote: steerContract(steer) }), steer);
 		orch.status = "starting";
 		orch.stoppedBy = "";
 		orch.stoppedAt = "";
