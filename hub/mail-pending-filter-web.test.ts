@@ -116,9 +116,11 @@ for (const [width, height] of [[390, 844], [1280, 900]] as const) {
 			expect(await q<string[]>(v, `return [...document.querySelectorAll("#mon-tl .dr.open .dr-act button")].map(b => b.textContent)`)).toEqual(["보내기", "고치기", "보내지 않기", "보내기", "고치기", "보내지 않기"]);
 			expect(p.over).toBe(false);
 			await Bun.write(join(SHOTS, `pending-${width}.png`), await v.screenshot());
+			expect(await q<boolean>(v, `return !!document.querySelector("#mbox-bar")`)).toBe(false);
 
 			await pick(v, "all");
 			expect((await seen(v)).cards).toEqual([]);
+			expect(await q<boolean>(v, `return !!document.querySelector("#mbox-bar")`)).toBe(true);
 		}, 30_000);
 	});
 }
@@ -147,4 +149,5 @@ test("확인 대기 with nothing waiting says so", async () => {
 	await pick(v, "pending");
 	const p = await seen(v);
 	expect([p.empty, p.rows.length, p.cards.length]).toEqual(["확인할 초안이 없어요", 0, 0]);
+	expect(await q<boolean>(v, `return !!document.querySelector("#mbox-bar")`)).toBe(false);
 }, 30_000);

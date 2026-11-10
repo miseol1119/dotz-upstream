@@ -283,9 +283,11 @@ function mbObserve() {
   if (!mbObs) mbObs = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) mbMore(); }, { root: box, rootMargin: "240px 0px" });
   mbObs.observe(s);
 }
+// No bar over a list with no mail rows (확인 대기, an empty folder): there is nothing to select.
 function mbList(vis) {
   MBOX.vis = vis;
   for (const t of [...MBOX.sel]) if (!vis.includes(t)) MBOX.sel.delete(t);
+  if (!vis.length) return null;
   const bar = mbBar();
   queueMicrotask(mbPaintBar);
   return bar;
