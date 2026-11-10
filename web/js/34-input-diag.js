@@ -36,7 +36,7 @@ function kbdLoad() {
   try { const a = JSON.parse(localStorage.getItem(KBD_LOG) || "[]"); kbdBuf = Array.isArray(a) ? a : []; } catch { kbdBuf = []; }
   return kbdBuf;
 }
-function kbdSave() { try { if (kbdBuf && kbdBuf.length) localStorage.setItem(KBD_LOG, JSON.stringify(kbdBuf)); else localStorage.removeItem(KBD_LOG); } catch {} }
+function kbdSave() { try { if (kbdBuf && kbdBuf.length) localStorage.setItem(KBD_LOG, JSON.stringify(kbdBuf)); else localStorage.removeItem(KBD_LOG); } catch (e) { console.warn("kbdiag", e); } }
 function kbdPush(entry) { const b = kbdLoad(); b.push(entry); if (b.length > KBD_CAP) b.splice(0, b.length - KBD_CAP); kbdSave(); }
 const kbdCount = () => kbdLoad().length;
 function kbdEntry(kind, field, extra) {
@@ -91,7 +91,7 @@ function kbdWatch() {
 }
 function kbdSet(on) {
   kbdActive = !!on;
-  try { if (on) localStorage.setItem(KBD_FLAG, "1"); else localStorage.removeItem(KBD_FLAG); } catch {}
+  try { if (on) localStorage.setItem(KBD_FLAG, "1"); else localStorage.removeItem(KBD_FLAG); } catch (e) { console.warn("kbdiag", e); }
   kbdWatch();
 }
 async function kbdCopy() {

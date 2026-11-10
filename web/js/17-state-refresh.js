@@ -29,7 +29,7 @@ function endedLeave() {
   if (isLaneT(t) && i.known && (i.alive || i.resumable)) { endedHold = t; return; }   // it can still be written to: stay while there is text or focus
   endedHold = "";
   setTarget(MAIN);
-  try { localStorage.removeItem(DRAFT_KEY(t)); } catch {}
+  try { localStorage.removeItem(DRAFT_KEY(t)); } catch (e) { console.warn("draft", e); }
   ts(t).draft = "";
   ta.value = [ta.value, text].filter(x => x.trim()).join("\n");
   saveDraft(); autosize(); updateHints();

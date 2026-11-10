@@ -39,11 +39,11 @@ window.addEventListener("load", sharedIntake);
 // event) so a tap that lands while the page is still starting is not dropped
 // A tap the worker hands an open window says how it got here ({tap}: path, tag) and brings a port: the page answers on it that it got the tap (else sw.js opens the
 // address instead), and reports where it landed (POST /api/push/tap, one line in the gateway log).
-const pushTapGot = ev => { try { ev.ports[0].postMessage(1); } catch {} };
+const pushTapGot = ev => { try { ev.ports[0].postMessage(1); } catch { /* no port (an older sw) or it stopped waiting: sw.js opens the address itself */ } };
 function pushTapReport(tap, reason) {
   if (!tap || !tap.path) return;
   const screen = current === "chat" ? `chat:${target}` : current;
-  fetch("/api/push/tap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tag: tap.tag || "", path: tap.path, why: tap.why || "", screen, reason: typeof reason === "string" ? reason : "" }), keepalive: true }).catch(() => {});
+  fetch("/api/push/tap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tag: tap.tag || "", path: tap.path, why: tap.why || "", screen, reason: typeof reason === "string" ? reason : "" }), keepalive: true }).catch(e => console.warn("push tap report", e));
 }
 if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", ev => { const d = ev.data || {}, h = d.open ? new URL(d.open, location.href).hash : "";
   if (d.open && !d.notice) pushTapGot(ev);   // a decision push (d.notice) is answered and opened by its id (30-notices.js)
