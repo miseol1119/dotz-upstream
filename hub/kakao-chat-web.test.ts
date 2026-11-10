@@ -57,6 +57,7 @@ const expectReq = (pred: (r: Req) => boolean, ms = 3500): Promise<Req> => {
 	});
 };
 const isReq = (method: string, path: string) => (r: Req) => r.method === method && r.path === path;
+let dropped: typeof drafts = [];   // what 보내지 않기 / 답장 안 함 took away, for 되돌리기
 
 const emit = (e: object) => hub.push(e);
 
@@ -112,7 +113,7 @@ const hub = fakeHub({
 			if (r) { if ("watched" in body!) r.watched = !!body!.watched; if ("autoDraft" in body!) r.autoDraft = !!body!.autoDraft; }
 			return json({ ok: true, watched: rooms.filter(x => x.watched).map(x => x.chatId) });
 		}
-		if (/^\/api\/kakao\/chat\/\w+\/no-reply$/.test(p) && req.method === "POST") { record({ method: "POST", path: p, body }); return json({ ok: true }); }
+		if (/^\/api\/kakao\/chat\/\w+\/no-reply$/.test(p) && (req.method === "POST" || req.method === "DELETE")) { record({ method: req.method, path: p, body }); return json({ ok: true }); }
 		const ad = /^\/api\/kakao\/chat\/(\w+)\/ask\/drop$/.exec(p);
 		if (ad && req.method === "POST") { record({ method: "POST", path: p, body }); ask = null; return json({ ok: true }); }
 		// 다시 보내기: the gateway resends what the failed send was (a draft's remaining parts, or the typed text); the old record leaves the list.
@@ -164,9 +165,11 @@ const hub = fakeHub({
 			if (c[2] === "send") { const s = { id: `s${sends.length + 1}`, text: String(body!.text), state: "sending", at: Date.now() }; sends.push(s); return json({ id: s.id, state: "sending" }, 202); }
 			return json({ ok: true });
 		}
-		const d = /^\/api\/kakao\/drafts\/(\w+)\/(send|drop)$/.exec(p);
+		const d = /^\/api\/kakao\/drafts\/(\w+)\/(send|drop|restore)$/.exec(p);
 		if (d && req.method === "POST") {
 			record({ method: "POST", path: p, body });
+			if (d[2] === "restore") { drafts = [...drafts, ...dropped.filter(x => x.code === d[1])]; return json({ ok: true }); }
+			dropped = drafts.filter(x => x.code === d[1]);
 			drafts = drafts.filter(x => x.code !== d[1]);
 			if (d[2] === "send") { const s = { id: `s${sends.length + 1}`, text: String(body!.text ?? "초안"), state: "sending", at: Date.now() }; sends.push(s); return json({ id: s.id, state: "sending" }, 202); }
 			return json({ ok: true });
@@ -473,7 +476,7 @@ describe("카카오톡 at desktop width (1280x800)", async () => {
 		await run(v, `document.querySelector('.kk-ask [data-k="pick"][data-i="0"]').click()`);
 		expect((await expectReq(r => r.method === "POST" && r.path === "/api/kakao/chat/100/draft" && r.body?.choice === "취소해")).body).toEqual({ choice: "취소해" });
 		await waitFor(v, `!document.querySelector(".kk-ask") && document.querySelector('.kk-draft[data-code="dp"] .kk-dt')`);
-		expect(await q(v, `return [...document.querySelectorAll('.kk-draft[data-code="dp"] .btn')].map(b => b.textContent)`)).toEqual(["보내기", "고치기", "보내지 않기"]);
+		expect(await q(v, `return [...document.querySelectorAll('.kk-draft[data-code="dp"] .btn')].map(b => b.textContent)`)).toEqual(["보내기", "고치기", "답장 안 함"]);
 		expect(await q(v, `return document.querySelector('.kk-draft[data-code="dp"] .kk-dt').textContent`)).toBe("답장: 취소해");
 
 		ask = { question: "다시 묻습니다", choices: ["응", "아니"] };
@@ -864,7 +867,7 @@ describe("카카오톡 이전 메시지 자동 불러오기", async () => {
 		await waitFor(v, `document.querySelector('[data-log="9021"]')`);
 		const after = await q<{ top: number; first: string; scroll: number }>(v, `const t = document.querySelector("#kk-tl").getBoundingClientRect().top, tl = document.querySelector("#kk-tl"); return { top: document.querySelector('[data-log="9071"]').getBoundingClientRect().top - t, first: [...tl.querySelectorAll("[data-log]")][0].dataset.log, scroll: tl.scrollTop }`);
 		expect(after.first).toBe("9021");
-		expect(Math.abs(after.top - before.top)).toBeLessThanOrEqual(2);
+		expect(Math.round(Math.abs(after.top - before.top))).toBeLessThanOrEqual(2);   // layout positions are fractional
 		expect(after.scroll).toBeGreaterThan(0);
 		expect(pages()).toBe(2);
 		await shot(v, "18-desktop-autoolder.png");
@@ -900,7 +903,7 @@ describe("카카오톡 link previews at 390px", async () => {
 describe("카카오톡 요청 입력창", async () => {
 	const v = await open(1280, 800);
 
-	test("the bar sits under the chat window and the reply card under the bar; with no draft waiting a request makes a 새 메시지 초안 through the same draft route", async () => {
+	test("the reply card sits under the chat window and above the bar (status line, chat, card, bar); with no draft waiting a request makes a 새 메시지 초안 through the same draft route", async () => {
 		reset();
 		drafts = [];
 		await boot(v);
@@ -908,25 +911,26 @@ describe("카카오톡 요청 입력창", async () => {
 		const g = await q<{ gap: number; formAfterWindow: boolean }>(v, `const w = document.querySelector(".kk-box").getBoundingClientRect(), f = document.querySelector("#kk-form").getBoundingClientRect(); return { gap: Math.round(f.top - w.bottom), formAfterWindow: f.top >= w.bottom }`);
 		expect(g.formAfterWindow).toBe(true);
 		expect(g.gap).toBeLessThanOrEqual(16);
+		expect(await q(v, `return [...document.querySelectorAll("#kk-owed, #kk-chat > .kk-box, #kk-drafts, #kk-form")].map(e => e.id || "box")`)).toEqual(["kk-owed", "box", "kk-drafts", "kk-form"]);
 		await run(v, `const t = document.querySelector("#kk-text"); t.value = "내일 7시로 미루자고 정중하게"; t.dispatchEvent(new Event("input", { bubbles: true })); document.querySelector("#kk-send-btn").click()`);
 		expect((await expectReq(r => r.method === "POST" && r.path === "/api/kakao/chat/100/draft")).body).toEqual({ intent: "내일 7시로 미루자고 정중하게" });
 		await waitFor(v, `document.querySelector('.kk-draft[data-code="di"] .kk-dp') && !document.querySelector("#kk-draft-btn").disabled`);
-		const card = await q<Record<string, any>>(v, `const c = document.querySelector('.kk-draft[data-code="di"]'), f = document.querySelector("#kk-form").getBoundingClientRect(), bs = [...c.querySelectorAll(".rq-acts .btn")]; return { head: c.querySelector(".kk-dh").textContent, parts: [...c.querySelectorAll(".kk-dp")].map(p => p.textContent), buttons: bs.map(b => b.textContent), heights: [...new Set(bs.map(b => b.getBoundingClientRect().height))], pill: bs.some(b => parseFloat(getComputedStyle(b).borderRadius) >= b.getBoundingClientRect().height / 2), below: c.getBoundingClientRect().top >= f.bottom }`);
-		expect(card).toEqual({ head: "새 메시지 초안 · 메시지 2개", parts: ["내일 7시로 미루는 게 어떨까요?", "일정 조정해 주세요"], buttons: ["보내기", "고치기", "보내지 않기"], heights: [32], pill: false, below: true });
+		const card = await q<Record<string, any>>(v, `const c = document.querySelector('.kk-draft[data-code="di"]'), f = document.querySelector("#kk-form").getBoundingClientRect(), bs = [...c.querySelectorAll(".rq-acts .btn")]; return { head: c.querySelector(".kk-dh").textContent, parts: [...c.querySelectorAll(".kk-dp")].map(p => p.textContent), buttons: bs.map(b => b.textContent), heights: [...new Set(bs.map(b => b.getBoundingClientRect().height))], pill: bs.some(b => parseFloat(getComputedStyle(b).borderRadius) >= b.getBoundingClientRect().height / 2), above: c.getBoundingClientRect().bottom <= f.top }`);
+		expect(card).toEqual({ head: "새 메시지 초안 · 메시지 2개", parts: ["내일 7시로 미루는 게 어떨까요?", "일정 조정해 주세요"], buttons: ["보내기", "고치기", "보내지 않기"], heights: [32], pill: false, above: true });   // a new message answers nothing, so its card keeps 보내지 않기
 		await shot(v, "17-desktop-compose.png");
 	});
 
 	const pv = await open(390, 844);
-	test("on a phone the request bar fits the width and the card follows it", async () => {
+	test("on a phone the request bar fits the width and the card sits above it", async () => {
 		reset();
 		drafts = [];
 		await boot(pv);
 		await openRoom(pv);
 		await run(pv, `const t = document.querySelector("#kk-text"); t.value = "내일 7시로 미루자고 정중하게"; t.dispatchEvent(new Event("input", { bubbles: true })); document.querySelector("#kk-send-btn").click()`);
 		await waitFor(pv, `document.querySelector('.kk-draft[data-code="di"] .kk-dp')`);
-		const s = await q<Record<string, number>>(pv, `const c = document.querySelector('.kk-draft[data-code="di"]').getBoundingClientRect(), f = document.querySelector("#kk-form").getBoundingClientRect(); return { right: Math.max(c.right, f.right), vw: innerWidth, cardTop: c.top, formBottom: f.bottom }`);
+		const s = await q<Record<string, number>>(pv, `const c = document.querySelector('.kk-draft[data-code="di"]').getBoundingClientRect(), f = document.querySelector("#kk-form").getBoundingClientRect(); return { right: Math.max(c.right, f.right), vw: innerWidth, cardBottom: c.bottom, formTop: f.top }`);
 		expect(s.right).toBeLessThanOrEqual(s.vw);
-		expect(s.cardTop).toBeGreaterThanOrEqual(s.formBottom);
+		expect(s.cardBottom).toBeLessThanOrEqual(s.formTop);
 		await shot(pv, "17-mobile-compose.png");
 	});
 });
@@ -1146,15 +1150,33 @@ for (const [w, h] of [[390, 844], [1280, 800]] as const)
 		});
 
 		if (w === 1280)
-			test("답장 안 함 takes the 미답장 pill off the header and the room row at the tap, before any reload", async () => {
+			test("답장 안 함 takes the 미답장 pill off the line under the head and the room row at the tap, before any reload", async () => {
 				useOpen();
 				await boot(v);
 				await openRoom(v, "300");
-				await waitFor(v, `document.querySelector('#kk-head .unrep-no')`);
-				const s = await q<Record<string, boolean>>(v, `const before = !!document.querySelector('.kk-row[data-chat="300"] .tag.unreplied'); document.querySelector('#kk-head .unrep-no').click();
-					return { before, row: !!document.querySelector('.kk-row[data-chat="300"] .tag.unreplied'), head: !!document.querySelector("#kk-head .tag.unreplied"), button: !!document.querySelector('#kk-head .unrep-no') }`);
-				expect(s).toEqual({ before: true, row: false, head: false, button: false });
+				await waitFor(v, `document.querySelector('#kk-owed .unrep-no')`);
+				const s = await q<Record<string, boolean>>(v, `const before = !!document.querySelector('.kk-row[data-chat="300"] .tag.unreplied'); document.querySelector('#kk-owed .unrep-no').click();
+					return { before, row: !!document.querySelector('.kk-row[data-chat="300"] .tag.unreplied'), line: !!document.querySelector("#kk-owed .tag.unreplied"), button: !!document.querySelector('#kk-owed .unrep-no') }`);
+				expect(s).toEqual({ before: true, row: false, line: false, button: false });
 				await expectReq(isReq("POST", "/api/kakao/chat/300/no-reply"));
+			});
+
+		if (w === 1280)
+			test("the reply card's 답장 안 함 drops the draft and ends the room's 미답장 with it; 되돌리기 brings both back", async () => {
+				useOpen();
+				drafts = [{ code: "dw", text: "나중에 연락드릴게요", basisLogId: "6001", created: Date.now() }];
+				await boot(v);
+				await openRoom(v, "300");
+				await waitFor(v, `document.querySelector('.kk-draft[data-code="dw"] [data-k="drop"]') && document.querySelector("#kk-owed .tag.unreplied")`);
+				expect(await q(v, `return [document.querySelector('.kk-draft[data-code="dw"] [data-k="drop"]').textContent, document.querySelectorAll("#kk-owed .unrep-no").length]`)).toEqual(["답장 안 함", 0]);
+				await run(v, `document.querySelector('.kk-draft[data-code="dw"] [data-k="drop"]').click()`);
+				await expectReq(isReq("POST", "/api/kakao/drafts/dw/drop"));
+				await expectReq(isReq("POST", "/api/kakao/chat/300/no-reply"));
+				await waitFor(v, `!document.querySelector(".kk-draft") && !document.querySelector("#kk-owed .tag.unreplied") && !document.querySelector('.kk-row[data-chat="300"] .tag.unreplied')`);
+				await run(v, `[...document.querySelectorAll(".snack button")].find(b => b.textContent === "되돌리기").click()`);
+				await expectReq(isReq("DELETE", "/api/kakao/chat/300/no-reply"));
+				await expectReq(isReq("POST", "/api/kakao/drafts/dw/restore"));
+				await waitFor(v, `!!document.querySelector('.kk-draft[data-code="dw"]') && !!document.querySelector('.kk-row[data-chat="300"] .tag.unreplied') && !!document.querySelector("#kk-owed .tag.unreplied") && !document.querySelector("#kk-owed .unrep-no")`);
 			});
 	});
 

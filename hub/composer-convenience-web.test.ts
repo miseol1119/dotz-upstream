@@ -107,18 +107,17 @@ describe("composer files per conversation", () => {
 for (const [width, height, phone] of [[390, 844, true], [1280, 800, false]] as const) {
 	describe(`open KakaoTalk room at ${width}px`, () => {
 		const v = open(width, height);
-		test(phone ? "the phone shows 미답장 and 답장 안 함 above the messages, and 답장 안 함 marks the room" : "the desktop keeps them in the room head only", async () => {
+		test("미답장 and 답장 안 함 sit in the line under the room head at every width (the head holds neither), and 답장 안 함 marks the room", async () => {
 			decisions = [];
 			ROOM.unreplied = true;
 			await boot(v);
 			await run(v, `go("monitoring", "i:kakao"); setTimeout(() => kkOpen("100"), 50)`);
 			await waitFor(v, `KK.open === "100" && !KK.loading`);
-			const shown = await q<{ owed: boolean; tags: string[]; head: boolean }>(v, `const o = $("#kk-owed"); return { owed: getComputedStyle(o).display !== "none" && o.offsetHeight > 0, tags: [...o.querySelectorAll(".tag.unreplied, .unrep-no")].map(n => n.textContent), head: getComputedStyle($("#kk-head")).display !== "none" }`);
-			expect(shown).toEqual({ owed: phone, tags: ["미답장", "답장 안 함"], head: !phone });
+			const shown = await q<{ owed: boolean; tags: string[]; inHead: number; order: string[] }>(v, `const o = $("#kk-owed"); return { owed: getComputedStyle(o).display !== "none" && o.offsetHeight > 0, tags: [...o.querySelectorAll(".tag.unreplied, .unrep-no")].map(n => n.textContent), inHead: $("#kk-head").querySelectorAll(".tag.unreplied, .unrep-no").length, order: [...document.querySelectorAll("#kk-head, #kk-owed, #kk-chat > .kk-box")].map(e => e.id || "box") }`);
+			expect(shown).toEqual({ owed: true, tags: ["미답장", "답장 안 함"], inHead: 0, order: ["kk-head", "kk-owed", "box"] });
 			await shot(v, `kakao-owed-${width}.png`);
-			if (!phone) return;
 			await run(v, `$("#kk-owed .unrep-no").click()`);
-			expect(await q<boolean>(v, `return $("#kk-owed").hidden`)).toBe(true);
+			expect(await q<number>(v, `return $("#kk-owed").querySelectorAll(".tag.unreplied, .unrep-no").length`)).toBe(0);
 			await waitFor(v, `[...document.querySelectorAll(".snack span")].some(s => s.textContent === "답장 안 함으로 표시했어요")`);
 			expect(reqs.some(r => r.method === "POST" && r.path === "/api/kakao/chat/100/no-reply")).toBe(true);
 		});

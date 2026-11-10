@@ -44,10 +44,9 @@
 .kk-pr { display: flex; align-items: center; gap: var(--sp-3); min-height: var(--row-h); padding: var(--row-py) var(--sp-4); }
 .kk-pr + .kk-pr { border-top: 1px solid var(--line); }
 /* 자동 초안: the room's one two-value switch, a thin card above the chat window */
-.kk-auto { display: flex; align-items: center; gap: var(--sp-3); min-height: 60px; padding: var(--sp-2) var(--sp-4); border-radius: var(--r-card); background: var(--card); }
+.kk-auto { display: flex; align-items: center; gap: var(--sp-3); margin-left: auto; }
 .kk-auto[hidden] { display: none; }
-.kk-auto .cv-n { font: 600 15px/22px var(--font); }
-.kk-auto .cv-p { font-size: 12px; line-height: 16px; color: var(--fg-2); }
+.kk-auto .cv-n { font: 400 15px/22px var(--font); }
 .kk-av { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: hsl(var(--h) 45% 82%); color: hsl(var(--h) 45% 26%); font: 600 15px/var(--lh-row) var(--font); }
 .kk-av.sp { background: transparent; }
 :root[data-theme="dark"] .kk-av { background: hsl(var(--h) 22% 30%); color: hsl(var(--h) 45% 86%); }
@@ -92,9 +91,11 @@
 .kk-head:not(:empty) { display: flex; }
 @media (max-width: 1099px) { .kk-head, .kk-head:not(:empty) { display: none; } }
 .kk-owed { display: none; }
-@media (max-width: 1099px) { .kk-owed:not([hidden]) { display: flex; align-items: center; gap: var(--sp-2); padding: 0 var(--sp-1); } }
+.kk-owed:not([hidden]) { display: flex; align-items: center; gap: var(--sp-2); min-height: 44px; padding: 0 var(--sp-1); }
+.kk-owed-l { display: flex; align-items: center; gap: var(--sp-2); }
 .kk-box { position: relative; flex: 1 0 auto; min-height: 260px; display: flex; border-radius: var(--r-card); background: var(--kk-bg); overflow: hidden; }
 .kk-chat > .kk-box { flex: 1 0 min(400px, 52dvh); }
+#kk-chat > .kk-box { flex: 1 1 0; min-height: 0; }
 /* Messages leaving the list fade out at both edges instead of being cut; the padding keeps the first and last one clear of the fade at rest. */
 .kk-tl { flex: 1; min-width: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: var(--sp-4); -webkit-mask-image: linear-gradient(transparent, #000 12px, #000 calc(100% - 12px), transparent); mask-image: linear-gradient(transparent, #000 12px, #000 calc(100% - 12px), transparent); }
 /* the chat window's column is centered with a width cap: on a wide pane both sides keep the same distance to the edge, like a KakaoTalk window */
@@ -236,6 +237,12 @@
 .kk-draft .btns { gap: var(--sp-15); }
 .kk-choices { flex-wrap: wrap; }
 .kk-draft .btn { height: var(--btn-h-sm); padding: 0 var(--sp-3); font-size: 13px; }
+/* the room's reply card sits under the chat: at most 40% of the screen, only the bubbles scroll, the buttons stay */
+#kk-chat .kk-drafts { margin: 0 0 var(--sp-2); min-height: 0; max-height: 40dvh; overflow-y: auto; }
+#kk-chat .kk-draft { display: flex; flex-direction: column; min-height: 0; max-height: 40dvh; }
+#kk-chat .kk-draft > * { flex: none; }
+#kk-chat .kk-draft > .rq-body { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+#kk-chat .kk-draft .kk-dt.kk-dps { max-height: none; overflow: visible; }
 .kk-dt { max-height: min(16dvh, 120px); margin: var(--sp-05) 0 var(--sp-2); overflow-y: auto; font: 400 14px/21px var(--font); white-space: pre-wrap; overflow-wrap: anywhere; }
 /* a draft of several messages: one bubble each, in send order (a part already in the room is muted) */
 .kk-dt.kk-dps { display: flex; flex-direction: column; align-items: flex-end; gap: var(--sp-1); max-height: min(28dvh, 220px); white-space: normal; }

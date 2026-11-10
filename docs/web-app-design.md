@@ -1576,12 +1576,12 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 카카오톡 화면 (모니터링 > 카카오톡 앱 패널)
 - 목적: 지켜볼 대화방을 고르고, 방마다 카카오톡 같은 대화 화면과 답장 초안 카드를 한 패널에서 써요.
-- 구성: `#kk.kk`(`#v-monitoring` 안, 평소 hidden)가 왼쪽 방 열 `#kk-rooms`(aria-label `카카오톡 대화방`)와 오른쪽 대화 `#kk-chat`로 나뉘어요. 대화 안은 위에서 아래로 `#kk-head`(방 머리), `#kk-owed`, `#kk-auto`, `.kk-box`(`#kk-tl` 타임라인 + `#kk-pill`), `#kk-ro`(읽기 전용 막대), `#kk-foot`(요청 입력줄 + 초안 카드 `#kk-drafts`).
+- 구성: `#kk.kk`(`#v-monitoring` 안, 평소 hidden)가 왼쪽 방 열 `#kk-rooms`(aria-label `카카오톡 대화방`)와 오른쪽 대화 `#kk-chat`로 나뉘어요. 대화 안은 위에서 아래로 `#kk-head`(방 머리), `#kk-owed`(상태 줄: 왼쪽 미답장, 오른쪽 자동 초안 `#kk-auto`), `.kk-box`(`#kk-tl` 타임라인 + `#kk-pill`, 남은 높이를 채우고 안에서 스크롤), `#kk-ro`(읽기 전용 막대), `#kk-foot`(초안 카드 `#kk-drafts`, 그 밑에 요청 입력줄).
 - 기능: `kkMode(item, shown, pc)`(web/js/30-monitoring.js가 호출)가 패널을 켜고 끄고 `#v-monitoring`에 `kk-on` 클래스를 줘요. 패널이 보이면 방 목록을 읽고 60초마다 다시 맞춰요(`kkResync`). 다른 컴퓨터 패널이면 2초마다 `kkPeerPoll`.
 - 상태:
   - 넓은 화면(>=1100px)은 방 열 옆에 대화가 같이 보이고, 그보다 좁으면(`narrowChat()` = max-width 1099px) 두 화면으로 나뉘어 `KK.open`에 따라 `.chat-open`이 바뀌고 앱바의 뒤로 화살표(`kkBack`)가 방 목록으로 돌아가요.
   - 다른 컴퓨터 변형: `KK.pc`가 있으면 모든 GET이 `pqLink`/`/api/peer/proxy`를 거치고, 컴퓨터를 바꾸면 패널을 비우고 처음부터 시작해요.
-  - 폰에서는 방 머리를 숨기고 `#kk-owed` 줄에 미답장 알약과 `답장 안 함`을 보여줘요(17-kakao.css:90-92).
+  - 미답장 알약과 자동 초안 스위치는 폭과 관계없이 머리 밑 `#kk-owed` 한 줄에 있어요. 초안이 없고 답장이 남았을 때만 알약 옆에 `답장 안 함`이 있고, 초안이 있으면 그 카드의 `답장 안 함`이 대신해요.
 - 데이터: 아래 하위 화면 항목 참고. SSE는 `kakao`, `kakao_send`, `kakao_draft`, `kakao_rooms`, `kakao_unreplied`, `kakao_read`(web/js/99-boot.js -> `kkLive`).
 - 근거: web/js/30-kakao.js:433-465 (요소 조립), :1173 `kkMode`, :604 `kkPaintAll`, :766 `kkBack`.
 - css: web/css/17-kakao.css (주 파일), 일부 web/css/07-chat.css, 15-reply-card.css, 15-draft-original.css, 18-app-settings.css, 18-comments.css, 01-tokens.css가 `kk-` 클래스를 같이 써요. 폭 분기: 17-kakao.css `@media (max-width: 1099px)` :11, `(min-width: 1100px)` :15, :56, `(max-width: 1099px)` :90, :92, `(max-width: 639px)` :127, :145, :39-40, :271, `(min-width: 640px)` :270, `(pointer: coarse), (max-width: 639px)` :39, `prefers-reduced-motion` :85, :198.
@@ -1614,9 +1614,9 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 카카오톡 방 대화 화면 (머리, 읽기 전용, 자동 초안)
 - 목적: 고른 방의 메시지를 읽고 방 설정을 해요.
-- 구성: 방 머리 `#kk-head`(아바타, 이름, 종류 글, 미답장이면 알약 + `답장 안 함` 칩, 앱 설정 진입 `asEntry(app)`), 폰용 미답장 줄 `#kk-owed`, 자동 초안 카드 `#kk-auto`(제목 `자동 초안`, 설명 `답할 거리가 있으면 초안을 만들어요`, 스위치 `button.kk-sw` role=switch aria-label `자동 초안`), 읽기 전용 막대 `#kk-ro`.
+- 구성: 방 머리 `#kk-head`(아바타, 이름, 종류 글, 앱 설정 진입 `asEntry(app)`), 상태 줄 `#kk-owed`(왼쪽 `.kk-owed-l`: 미답장 알약 + 초안이 없을 때만 `답장 안 함` 칩, 오른쪽 `#kk-auto`: 글자 `자동 초안`과 스위치 `button.kk-sw` role=switch aria-label `자동 초안`, 둘레 카드 없음), 읽기 전용 막대 `#kk-ro`.
 - 기능:
-  - `답장 안 함`(`kkNoReply`): 알약이 바로 사라지고 `POST /api/kakao/chat/<id>/no-reply`. 성공 토스트 `답장 안 함으로 표시했어요`, 실패하면 알약 복귀와 서버 메시지 토스트.
+  - `답장 안 함`(`kkNoReply`, 상태 줄): 알약이 바로 사라지고 `POST /api/kakao/chat/<id>/no-reply`. 성공 토스트 `답장 안 함으로 표시했어요`, 실패하면 알약 복귀와 서버 메시지 토스트.
   - 자동 초안 스위치: `kkSetRoom(r, {autoDraft: !r.autoDraft})`. 지켜보는 방에서만 보여요.
   - `감시 시작`(`data-k=watch`): 지켜보지 않는 방을 읽기 전용으로 열었을 때 `kkSetRoom(room,{watched:true})`.
   - `kkClose`: 방 닫기(방이 목록에서 사라지면 자동).
@@ -1630,7 +1630,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
   - 방을 열면 마지막으로 쓰던 입력 내용을 방별로 복원(`KK.typed`).
 - 데이터: 방 열기 `GET /api/kakao/chat/<id>?limit=50`(응답 room, messages, read, drafts, sends, ask, kakaoUnread). `POST /api/kakao/chat/<id>/read {logId}`(맨 아래 도달 + 화면이 보이는 동안만, 성공 시 방 안 읽음 0). 갱신 `kkTail`(`?after=<마지막 logId>` 반복, 이어 최신 페이지 병합). SSE `kakao`(열린 방이면 `kkTail`), `kakao_read`(`kkReads`: `GET /api/kakao/chat/<id>/reads?from=<첫 logId>`로 읽음 숫자만 갱신).
 - 근거: web/js/30-kakao.js:608 `kkPaintChat`, :736 `kkOpen`, :760 `kkClose`, :638 `kkNoReply`, :454 `kkPaintAuto`, :633 `kkWatching`, :808 `kkTail`, :854 `kkMaybeRead`, :867 `kkReads`.
-- css: web/css/17-kakao.css (`.kk-head`, `.kk-owed`, `.kk-auto`, `.kk-ro`, `.kk-sw`); 폰에서 머리 숨김 :90.
+- css: web/css/17-kakao.css (`.kk-head`, `.kk-owed`, `.kk-auto`, `.kk-ro`, `.kk-sw`, `#kk-chat .kk-drafts`); 좁은 폭에서 머리 숨김.
 
 ### 카카오톡 타임라인과 말풍선
 - 목적: 카카오톡처럼 날짜 구분, 보낸 사람 묶음, 읽지 않은 사람 수와 함께 메시지를 그려요.
@@ -1682,7 +1682,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 카카오톡 요청 입력줄 (답장 초안 요청, 직접 보내기)
 - 목적: 방 아래 입력줄에 쓴 말은 방에 곧바로 가지 않고 어시스턴트에게 가는 요청이에요. 직접 보내기만 방에 그대로 나가요.
-- 구성: `#kk-foot`(`.composer.kk-composer`): 고치는 중 막대 `#kk-edit`(`답장 초안을 고치는 중이에요` + `취소`), 폼 `#kk-form`(`textarea#kk-text` 최대 500자, aria-label `답장 요청`, 칩 `#kk-draft-btn`(`답장 초안`), 칩 `#kk-direct-btn`(`직접 보내기`), 전송 버튼 `#kk-send-btn`(submit, aria-label/title `요청 보내기`)), 초안 영역 `#kk-drafts`.
+- 구성: `#kk-foot`(`.composer.kk-composer`): 고치는 중 막대 `#kk-edit`(`답장 초안을 고치는 중이에요` + `취소`), 폼 `#kk-form`(`textarea#kk-text` 최대 500자, aria-label `답장 요청`, 칩 `#kk-draft-btn`(`답장 초안`), 칩 `#kk-direct-btn`(`직접 보내기`), 전송 버튼 `#kk-send-btn`(submit, aria-label/title `요청 보내기`)), 초안 카드 영역 `#kk-drafts`는 이 줄 위(대화 바로 밑)에 있어요.
 - 기능:
   - 전송(`kkSend`): 초안 수정 중이 아니면 `kkAskBot`: 대기 중인 초안이 있으면 가장 최신 초안을 입력대로 고치고(`kkMakeDraft(undefined,{code,change})`), 없으면 새 메시지 의도로 초안을 만들어요(`kkComposeMake`). 입력은 500자까지.
   - `답장 초안` 칩: `kkMakeDraft()`로 자동 초안 요청.
@@ -1690,7 +1690,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
   - 초안 직접 수정(`kkEdit`): 입력줄에 초안 글을 채우고 이때 전송 버튼은 `보내기`(초안 경로 `POST /api/kakao/drafts/<code>/send {text}`)로 바뀜. `취소`는 `kkEditCancel`.
   - 키보드: 데스크톱은 Enter 전송, Shift+Enter 줄바꿈, 폰과 터치(`pointer: coarse` 또는 639px 이하)는 Enter가 줄바꿈. IME 조합 중 Enter는 전송 안 함. 입력창은 140px까지 자동 높이.
 - 상태(정확한 문구):
-  - placeholder `요청을 입력하세요 · 예: 좀 더 짧게`, 초안 수정 중 `고친 메시지`.
+  - placeholder `요청을 입력하세요 · 예: 좀 더 짧게`, 초안이 있으면 `초안을 어떻게 고칠까요? · 예: 좀 더 짧게`, 초안 수정 중 `고친 메시지`.
   - 초안 만드는 중: 칩 글 `초안 만드는 중…`(disabled), 카드 자리에 `답장 초안을 만드는 중이에요…`(role=status). 만드는 중 다시 요청하면 토스트 `초안을 만드는 중이에요 · 끝나면 다시 요청해 주세요`. 120초 안에 안 오면 `초안이 아직 오지 않았어요`.
   - 다른 컴퓨터 방에서 초안이 없을 때 요청: 토스트 `다른 컴퓨터의 방에서는 초안을 만든 뒤에 고쳐 달라고 요청할 수 있어요`. 그 방에서는 `직접 보내기` 칩이 숨어요(`KK.pc`). 칩은 입력이 비었거나 초안 수정 중이어도 숨어요.
   - 입력 내용은 방별로 보관해 방을 바꿔도 복원돼요.
@@ -1701,12 +1701,13 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 
 ### 카카오톡 답장 초안 카드와 질문 카드
 - 목적: 어시스턴트가 만든 초안을 확인하고 보내기, 고치기, 보내지 않기를 골라요. 질문이 있으면 먼저 고르게 해요.
-- 구성: `#kk-drafts` 안에 (있으면) 질문 카드 `.kk-draft.kk-ask`, 만드는 중 표시 `.kk-mk`, 초안마다 `rqCard`(web/js/10-reply-card.js 공용 답장 카드, `.kk-draft`, data-code): 머리(카카오 앱 라벨 또는 `<이름>님께 답장` 근거, 컴퓨터 이름, 시각), 근거 원문(상대 이름 · 시각, 원문), 라벨 `.kk-dh`, 본문(여러 메시지면 말풍선 여러 개 `.kk-dps`/`.kk-dp`), 첨부 줄(텍스트 전용이라 `attachmentsNone`), 동작.
+- 구성: `#kk-drafts` 안에 (있으면) 질문 카드 `.kk-draft.kk-ask`, 만드는 중 표시 `.kk-mk`, 초안마다 `rqCard`(web/js/10-reply-card.js 공용 답장 카드, `bare`, `.kk-draft`, data-code): 머리·근거 원문·첨부 줄 없이 라벨 `.kk-dh`(`답장 초안 · 메시지 N개`), 본문(메시지마다 노란 말풍선 `.kk-dp`, 하나여도 말풍선), 동작 `보내기` `고치기` `답장 안 함`. 카드는 화면 높이의 40%까지이고 넘으면 말풍선 부분만 스크롤, 버튼은 늘 보여요.
 - 기능:
   - 질문 카드: 제목 `답장 전에 골라 주세요`, 질문 글, 선택 버튼마다 `kkMakeDraft(choice)`, `직접 쓸게`(`POST /api/kakao/chat/<id>/ask/drop` 후 입력창 포커스).
   - 초안 카드 `보내기`: `POST /api/kakao/drafts/<code>/send`, 여러 메시지 초안은 한 번에 모두 보내요. 보내면 카드가 사라지고 타임라인에 전송 중 메시지가 붙어요.
   - `고치기`: 카드 안에 고칠 내용 입력(`kkReviseBox`, `rqReviseNode`)이 열리고 `go`는 `kkMakeDraft(undefined,{code,change})`(새 초안이 오기 전까지 기존 초안 유지), `취소`, `직접 수정`(`kkEdit`)도 제공.
-  - `보내지 않기`: `POST /api/kakao/drafts/<code>/drop` 후 토스트 `보내지 않았어요` + `되돌리기`(`kkRestore`: `POST /api/kakao/drafts/<code>/restore`, 토스트 `초안을 되돌렸어요`).
+  - `답장 안 함`(답장 초안의 카드): `POST /api/kakao/drafts/<code>/drop`으로 초안을 버리고, 방이 미답장이면 `POST /api/kakao/chat/<id>/no-reply`까지 해서 미답장도 끝내요. 토스트 `답장 안 함으로 표시했어요` + `되돌리기`(`DELETE /api/kakao/chat/<id>/no-reply` 뒤 `kkRestore`: `POST /api/kakao/drafts/<code>/restore`, 토스트 `초안을 되돌렸어요`). 방이 미답장이 아니면 초안만 버리고 토스트 `보내지 않았어요` + `되돌리기`예요.
+  - `보내지 않기`(새 메시지 초안의 카드, 답장이 아니라서 이름이 달라요): 초안만 버려요. 토스트 `보내지 않았어요` + `되돌리기`.
 - 상태: 카드 라벨(`kkDraftLabel`): `답장 초안` 또는 `새 메시지 초안`(의도로 만든 것), 여러 메시지면 `· 메시지 N개` 덧붙임. 고치는 중에는 카드가 `고치는 중…`(status). 버튼은 처리 중 disabled, 실패 시 서버 글 토스트 후 `kkTail`로 상태 재확인. 새 초안이 도착하면 카드 영역이 화면에 스크롤돼 들어와요. 다른 컴퓨터 방의 카드는 컴퓨터 이름을 머리에 표시하고 앱 라벨은 생략.
 - 데이터: 위 API, 응답 `drafts[]`(code, text, parts, sentParts, created, intent, basisLogId), `ask`({question, choices}), `sends[]`. 같은 초안은 답장 확인 목록(30-replies.js)에도 나타나요(`kakao_draft`, `kakao_send` 이벤트에서 `rqSoon`).
 - 근거: web/js/30-kakao.js:1015 `kkDraftCard`, :985 `kkAskCard`, :1003 `kkReviseBox`, :1011 `kkRestore`, :1046 `kkEdit`, :1052 `kkEditCancel`, :1008-1009 `kkDraftParts`/`kkDraftLabel`.

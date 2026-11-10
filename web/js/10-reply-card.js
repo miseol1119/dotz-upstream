@@ -24,9 +24,10 @@ function rqHeadNode(h) {
 }
 // A body is long when it would take more than RQ_LINES lines at a phone's width (about 36 Korean characters a line).
 const rqLong = text => String(text || "").split("\n").reduce((n, l) => n + Math.max(1, Math.ceil([...l].length / 36)), 0) > RQ_LINES;
+// c.bare: a card with only its label, body and buttons (the room's draft card sits right under the chat it answers, 30-kakao.js); b.one: a single part is a bubble too.
 // b: { text, parts (a KakaoTalk draft's messages: one bubble each, sentParts of them already in the room), node (the caller's own body), cls, partCls, full (never clamped: a sheet scrolls it) }
 function rqBodyNode(key, b) {
-  const parts = Array.isArray(b.parts) && b.parts.length > 1 ? b.parts : null, long = !b.full && rqLong(parts ? parts.join("\n") : b.text), open = RQ_OPEN.has(key);
+  const parts = Array.isArray(b.parts) && b.parts.length > (b.one ? 0 : 1) ? b.parts : null, long = !b.full && rqLong(parts ? parts.join("\n") : b.text), open = RQ_OPEN.has(key);
   const inner = b.node || (parts ? el("div", { class: `${b.cls || "rq-text"} rq-parts` }, ...parts.map((p, i) => el("div", { class: `${b.partCls || "rq-part"}${i < (b.sentParts | 0) ? " sent" : ""}`, text: p }))) : el("div", { class: b.cls || "rq-text", text: b.text }));
   const box = el("div", { class: `rq-body${long && !open ? " clamp" : ""}` }, inner);
   if (!long) return box;
@@ -42,7 +43,7 @@ function rqBodyNode(key, b) {
 // stands at the right end of the row.
 function rqActsNode(a) {
   const b = (cls, k, text, fn) => el("button", { class: cls, type: "button", "data-k": k, disabled: !!a.busy || !fn, text, onclick: fn });
-  return el("div", { class: "dr-act dr-row rq-acts" }, b("btn sm dr-send", "send", "보내기", a.send), b("btn tonal sm", "edit", "고치기", a.edit), b("btn text sm dr-drop", "drop", "보내지 않기", a.drop), a.manual ? rqManualBtn(a.manual, a.busy) : null);
+  return el("div", { class: "dr-act dr-row rq-acts" }, b("btn sm dr-send", "send", "보내기", a.send), b("btn tonal sm", "edit", "고치기", a.edit), b("btn text sm dr-drop", "drop", a.dropText || "보내지 않기", a.drop), a.manual ? rqManualBtn(a.manual, a.busy) : null);
 }
 const rqManualBtn = (fn, busy) => el("button", { class: "btn text sm rq-manual", type: "button", "data-k": "manual", "aria-label": "직접 수정", disabled: !!busy, onclick: fn }, icon("pencil"), el("span", { text: "직접 수정" }));
 // 고치기: what to change, typed once; the bot rewrites the draft. o: { go(change), cancel(), manual() (직접 수정, optional), pick (a node before the field, such
@@ -116,11 +117,11 @@ function rqMailParts(dr, o) {
 // acts (rqActsNode) }.
 function rqCard(c) {
   const foot = c.sent ? rqSentNode(c.sentAt) : c.status ? el("div", { class: "kk-st", role: "status", text: c.status }) : c.revise ? c.revise : c.acts ? rqActsNode(c.acts) : null;
-  const att = c.attach && c.attach.nodeType ? c.attach : rqAttachNode(c.attach || {});
-  const cm = !!c.head.who;   // a comment card: its text quoted under the head, the post title a grey hint, the draft as the body
+  const att = c.bare ? null : c.attach && c.attach.nodeType ? c.attach : rqAttachNode(c.attach || {});
+  const cm = !!(c.head && c.head.who);   // a comment card: its text quoted under the head, the post title a grey hint, the draft as the body
   return el("div", { class: `rq${cm ? " cm" : ""}${c.cls ? ` ${c.cls}` : ""}`, ...(c.attrs || {}) },
-    rqHeadNode(c.head),
-    c.original && c.original.text ? rqOrigNode(c.key, c.original) : null,
+    c.bare ? null : rqHeadNode(c.head),
+    !c.bare && c.original && c.original.text ? rqOrigNode(c.key, c.original) : null,
     c.brief || null,
     c.label ? el("div", { class: c.labelCls || "rq-lb", text: c.label }) : null,
     c.to ? (cm ? null : el("div", { class: "rq-to dr-to" }, el("span", { class: "dr-k", text: c.to[0] }), el("span", { class: "dr-chip", text: c.to[1] || "-" }))) : c.recv || null,   // a mail keeps its 받는이 rows

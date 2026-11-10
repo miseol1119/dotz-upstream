@@ -122,6 +122,19 @@ describe("unsent text stays with its room", () => {
 	});
 });
 
+describe("the room's reply card", () => {
+	test("after a room switch it is the open room's own, right under the chat and above the request bar (a new message's draft keeps 보내지 않기)", async () => {
+		const v = await boot();
+		const open = async (id: string) => { await run(v, `kkOpen(${JSON.stringify(id)})`); await answer(v, kkPath(id)); };
+		await open("A");
+		await open("B");
+		const s = await ev<{ order: string[]; codes: string[]; gap: number; above: boolean; drop: string[]; line: number }>(v, `(() => { const b = $("#kk-chat > .kk-box").getBoundingClientRect(), c = $("#kk-drafts").getBoundingClientRect(), f = $("#kk-form").getBoundingClientRect();
+			return { order: [...document.querySelectorAll("#kk-owed, #kk-chat > .kk-box, #kk-drafts, #kk-form")].map(e => e.id || "box"), codes: [...document.querySelectorAll("#kk-drafts .kk-draft")].map(n => n.dataset.code), gap: Math.round(c.top - b.bottom), above: c.bottom <= f.top, drop: [...document.querySelectorAll("#kk-drafts .dr-drop")].map(n => n.textContent), line: document.querySelectorAll("#kk-owed .unrep-no").length }; })()`);
+		expect(s).toEqual({ order: ["kk-owed", "box", "kk-drafts", "kk-form"], codes: ["dB"], gap: s.gap, above: true, drop: ["보내지 않기"], line: 0 });
+		expect(s.gap).toBeLessThanOrEqual(16);
+	});
+});
+
 describe("comment threads opened back to back", () => {
 	test("answered second then first: the view and the card are the second's, and no revise note survives", async () => {
 		const v = await boot();

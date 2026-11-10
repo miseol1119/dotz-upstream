@@ -438,7 +438,7 @@ const kkPill = el("button", { class: "btn kk-pill", id: "kk-pill", type: "button
 const kkDrafts = el("div", { class: "kk-drafts", id: "kk-drafts" });
 const kkEditBar = el("div", { class: "kk-edit", id: "kk-edit", hidden: true }, el("span", { text: "답장 초안을 고치는 중이에요" }), el("button", { class: "btn text", type: "button", "data-k": "cancel", text: "취소", onclick: () => kkEditCancel() }));
 // The bar under the chat window is a request to the assistant (kkAskBot): it revises the open draft or writes a new one, and the reply card below asks for 보내기.
-const KK_ASK = "요청을 입력하세요 · 예: 좀 더 짧게";
+const KK_ASK = "요청을 입력하세요 · 예: 좀 더 짧게", KK_REVISE = "초안을 어떻게 고칠까요? · 예: 좀 더 짧게";
 const kkTa = el("textarea", { id: "kk-text", rows: "1", autocomplete: "off", maxlength: "500", placeholder: KK_ASK, "aria-label": "답장 요청" });
 const kkSendBtn = el("button", { class: "ib pri", id: "kk-send-btn", type: "submit", "aria-label": "요청 보내기", title: "요청 보내기" }, icon("send"));
 const kkDraftBtn = el("button", { class: "cchip kk-dbtn", id: "kk-draft-btn", type: "button", onclick: () => kkMakeDraft() }, icon("spark"), el("span", { text: "답장 초안" }));
@@ -447,20 +447,25 @@ const kkDirectBtn = el("button", { class: "cchip kk-dbtn", id: "kk-direct-btn", 
 const kkDirectSync = () => { kkDirectBtn.hidden = !kkTa.value.trim() || !!KK.edit || !!KK.pc; };
 kkTa.addEventListener("input", kkDirectSync);
 const kkForm = el("form", { class: "sendrow kk-send", id: "kk-form", onsubmit: ev => { ev.preventDefault(); kkSend(); } }, kkTa, el("div", { class: "cbar" }, kkDraftBtn, kkDirectBtn), kkSendBtn);
-const kkFoot = el("div", { class: "composer kk-composer", id: "kk-foot" }, kkEditBar, kkForm, kkDrafts);
+// The room's reply card sits right under the chat it answers, above the request bar.
+const kkFoot = el("div", { class: "composer kk-composer", id: "kk-foot" }, kkDrafts, kkEditBar, kkForm);
 // 자동 초안 of the open room: the one two-value switch of this screen (the watch toggles are eyes). Built once; kkPaintAuto only flips it.
 const kkAutoSw = el("button", { class: "kk-sw", type: "button", role: "switch", "aria-checked": "false", "aria-label": "자동 초안", "data-k": "auto", onclick: () => { const r = kkRoom(KK.open); if (r) kkSetRoom(r, { autoDraft: !r.autoDraft }); } }, el("span", { class: "kk-knob" }));
-const kkAuto = el("div", { class: "kk-auto", id: "kk-auto", hidden: true }, el("span", { class: "cv-b" }, el("span", { class: "cv-n", text: "자동 초안" })), kkAutoSw);
+const kkAuto = el("span", { class: "kk-auto", id: "kk-auto", hidden: true }, el("span", { class: "cv-b" }, el("span", { class: "cv-n", text: "자동 초안" })), kkAutoSw);
+// The one line under the room head: 미답장 (with 답장 안 함 while no draft card carries it) on the left, 자동 초안 on the right. Its left part is rebuilt only when what it shows changes.
+const kkOwedL = el("span", { class: "kk-owed-l" });
+const kkOwed = el("div", { class: "kk-owed", id: "kk-owed", hidden: true }, kkOwedL, kkAuto);
+let kkOwedSig = "";
 function kkPaintAuto() {
-  const r = KK.open ? kkRoom(KK.open) : null, show = !!r && !!r.watched;
+  const r = KK.open ? kkRoom(KK.open) : null, show = !!r && !!r.watched, owed = !!r && kkWatching() && !!r.unreplied, bare = owed && !KK.drafts.length, sig = `${KK.open}|${owed}|${bare}`;
   kkAuto.hidden = !show;
   if (show) { kkAutoSw.classList.toggle("on", !!r.autoDraft); kkAutoSw.setAttribute("aria-checked", r.autoDraft ? "true" : "false"); }
+  if (sig !== kkOwedSig) { kkOwedSig = sig; clear(kkOwedL).append(...(owed ? [unrepPill(), ...(bare ? [kkNoReply(r)] : [])] : [])); }
+  kkOwed.hidden = !show && !owed;
 }
 // A room that is not watched opens read-only: this bar (at every width) says so in place of the composer and starts watching it.
 const kkRo = el("div", { class: "kk-ro", id: "kk-ro", role: "status", hidden: true });
-// A phone hides the room head (17-kakao.css), so 미답장 and 답장 안 함 of the open room sit in this bar above the messages there.
-const kkOwed = el("div", { class: "kk-owed", id: "kk-owed", hidden: true });
-const kkChat = el("div", { class: "kk-chat", id: "kk-chat" }, kkHead, kkOwed, kkAuto, el("div", { class: "kk-box" }, kkTl, kkPill), kkRo, kkFoot);
+const kkChat = el("div", { class: "kk-chat", id: "kk-chat" }, kkHead, kkOwed, el("div", { class: "kk-box" }, kkTl, kkPill), kkRo, kkFoot);
 const kkPane = el("div", { class: "kk", id: "kk", hidden: true }, kkRooms, kkChat);
 $("#v-monitoring").append(kkPane);
 // Tapping a sender's avatar or name in a room opens his 사용자별 분석 panel.
@@ -619,9 +624,7 @@ function kkPaintChat() {
   if (sig !== KK.headSig) {
     KK.headSig = sig;
     clear(kkHead);
-    if (open) kkHead.append(kkAvatar(info.name), el("span", { class: "cv-b" }, el("span", { class: "cv-n", text: info.name || "" }), el("span", { class: "cv-p", text: kkKindLine(info) || (info.group ? "단체 대화방" : "1:1 대화") })), ...(owed ? [unrepPill(), kkNoReply(room)] : []), ...asEntry(app));
-    clear(kkOwed).append(...(open && owed ? [unrepPill(), kkNoReply(room)] : []));
-    kkOwed.hidden = !(open && owed);
+    if (open) kkHead.append(kkAvatar(info.name), el("span", { class: "cv-b" }, el("span", { class: "cv-n", text: info.name || "" }), el("span", { class: "cv-p", text: kkKindLine(info) || (info.group ? "단체 대화방" : "1:1 대화") })), ...asEntry(app));
     monSchedule();   // the item's head gives the gear to the room head while a room is open
   }
   if (!open) { clear(kkIn).append(el("div", { class: "kk-note", text: "대화방을 골라 주세요" })); return; }
@@ -1016,17 +1019,13 @@ async function kkRestore(code) {
 function kkDraftCard(d) {
   const run = async (btn, fn) => { btn.disabled = true; try { await fn(); } catch (e) { toast(e.message, true); kkTail(); } finally { btn.disabled = false; } };
   const making = !!KK.open && KK.drafting === KK.open && KK.reviseCode === d.code, rv = !making && KK.revise && KK.revise.code === d.code ? KK.revise : null;
-  const parts = kkDraftParts(d), inst = (INTG.items.find(i => i.key === "kakao") || {}).label;
-  // The message the draft answers (its basis): "<이름>님께 답장" and the original quoted, as the prototype's reply card has it; a new message (intent) has none.
-  const basis = d.intent ? null : KK.msgs.find(m => m.logId === d.basisLogId && !m.fromMe && !kkSys(m)) || null;
-  // A KakaoTalk draft is text only: its card says so in the 첨부 줄 (10-reply-card.js rqAttachNode), never hiding it.
-  const card = { key: `kk:${d.code}`, cls: "kk-draft", attrs: { "data-code": d.code }, head: { app: "kakao", ...(basis ? { who: basis.sender || "상대", src: KK.pc ? "" : inst } : { label: KK.pc ? "" : inst }), pc: KK.pc ? KK.pc.name : pqSelf(), at: d.created },
-    ...(basis ? { original: { who: `${basis.sender || "상대"} · ${rcWhen(new Date(basis.sentAt).toISOString())}`, text: kkBody(basis).text } } : {}),
-    label: kkDraftLabel(d), labelCls: "kk-dh",
-    body: { text: d.text, parts, sentParts: d.sentParts, cls: parts.length > 1 ? "kk-dt kk-dps" : "kk-dt", partCls: "kk-dp" }, attach: { attachmentsNone: true, cannotAttach: [] } };
+  // The card sits right under the chat it answers: no head, quoted original or 첨부 line (10-reply-card.js bare); the draft's messages are yellow bubbles that scroll inside the card, the buttons stay.
+  const card = { key: `kk:${d.code}`, cls: "kk-draft", attrs: { "data-code": d.code }, bare: true, label: kkDraftLabel(d), labelCls: "kk-dh",
+    body: { text: d.text, parts: kkDraftParts(d), one: true, full: true, sentParts: d.sentParts, cls: "kk-dt kk-dps", partCls: "kk-dp" } };
   if (making) return rqCard({ ...card, status: "고치는 중…" });
   if (rv) return rqCard({ ...card, revise: kkReviseBox(d, rv) });
   return rqCard({ ...card, acts: {
+    dropText: d.intent ? "" : "답장 안 함",   // a new message answers nothing: its draft keeps 보내지 않기
     send: ev => run(ev.currentTarget, async () => {
       const id = KK.open, r = await api(`/api/kakao/drafts/${enc(d.code)}/send`, "POST", {});
       if (KK.open !== id) return;
@@ -1035,9 +1034,9 @@ function kkDraftCard(d) {
     }),
     edit: () => { KK.revise = { code: d.code, text: "" }; kkPaintFoot(); const i = $(".kk-rv", kkDrafts); if (i) i.focus(); },
     drop: ev => run(ev.currentTarget, async () => {
-      const id = KK.open;
+      const id = KK.open, r = kkRoom(id), wave = !d.intent && !!r && !!r.unreplied, nr = `/api/kakao/chat/${enc(id)}/no-reply`;   // on a reply's draft 답장 안 함 also ends the room's 미답장 (되돌리기 brings both back)
       await api(`/api/kakao/drafts/${enc(d.code)}/drop`, "POST", {});
-      rqDroppedToast(() => kkRestore(d.code));
+      if (wave) { await api(nr, "POST", {}); r.unreplied = false; kkPaintRooms(); loadIntegrations(); toast("답장 안 함으로 표시했어요", false, { label: "되돌리기", onclick: () => api(nr, "DELETE").then(() => { r.unreplied = true; kkPaintRooms(); kkPaintAuto(); return kkRestore(d.code); }, e => toast(e.message, true)) }, 6000); } else rqDroppedToast(() => kkRestore(d.code));
       if (KK.open !== id) return;
       KK.drafts = KK.drafts.filter(x => x.code !== d.code);
       if (KK.edit && KK.edit.code === d.code) kkEditCancel(); else kkPaintFoot();
@@ -1071,9 +1070,10 @@ function kkPaintFoot() {
   if (hadRv) { const i = $(".kk-rv", kkDrafts); if (i) i.focus({ preventScroll: true }); }
   kkEditBar.hidden = !edit;
   kkDraftBtn.disabled = making;
+  kkPaintAuto();
   kkDraftBtn.lastChild.textContent = making ? "초안 만드는 중…" : "답장 초안";
   // 직접 수정 puts a draft's text in the bar: then the bar sends it (the draft's own route); otherwise it is the request to the assistant.
-  kkTa.placeholder = edit ? "고친 메시지" : KK_ASK;
+  kkTa.placeholder = edit ? "고친 메시지" : KK.drafts.length ? KK_REVISE : KK_ASK;
   const label = edit ? "보내기" : "요청 보내기";
   kkSendBtn.setAttribute("aria-label", label); kkSendBtn.title = label;
 }
