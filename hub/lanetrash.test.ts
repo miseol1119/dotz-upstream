@@ -166,3 +166,44 @@ test("trash entries go for good after the keep period", () => {
 	expect(purgeTrash(clock.now + TRASH_KEEP_MS)).toContain(d!.ok ? d!.id : "?");
 	expect(trashList()).toEqual([]);
 });
+
+test("a channel already deleted, gone with its entry, or kept for a home thread is not deleted again when the timer fires", async () => {
+	for (const n of ["gone", "done", "kept"]) {
+		lane(n);
+		mapping[n] = { id: `ch-${n}` };
+	}
+	const [gone, done, kept] = deleteLanes(["gone", "done", "kept"]).map(r => (r.ok ? r.id : ""));
+	rmSync(join(TRASH_DIR, gone!), { recursive: true, force: true });
+	const edit = (id: string, change: (ch: Record<string, unknown>) => void) => {
+		const file = join(TRASH_DIR, id, "meta.json");
+		const meta = JSON.parse(readFileSync(file, "utf8"));
+		change(meta.channel);
+		writeFileSync(file, JSON.stringify(meta));
+	};
+	edit(done!, ch => (ch.deleted = true));
+	edit(kept!, ch => (ch.home = "999"));
+	await advance(CHANNEL_DELAY_MS);
+	expect(removed).toEqual([]);
+});
+
+test("a restore keeps a session file that was written again at its old path", () => {
+	const session = lane("again").sessionFile!;
+	const [d] = deleteLanes(["again"]);
+	writeFileSync(session, "newer\n");
+	const [r] = restoreLanes([d!.ok ? d!.id : ""]);
+	expect(r!.ok).toBe(true);
+	expect(readFileSync(session, "utf8")).toBe("newer\n");
+});
+
+test("a restore is refused when the name is taken in memory only, or only its folder is back on disk", () => {
+	lane("mem");
+	lane("dir");
+	const ids = deleteLanes(["mem", "dir"]).map(r => (r.ok ? r.id : ""));
+	lane("mem");
+	rmSync(join(paths.lanes, "mem"), { recursive: true, force: true });
+	mkdirSync(join(paths.lanes, "dir"), { recursive: true });
+	const out = restoreLanes(ids);
+	expect(out.map(r => r.ok)).toEqual([false, false]);
+	expect(out.map(r => (r.ok ? "" : r.error))).toEqual([expect.stringContaining("이미 있어서"), expect.stringContaining("이미 있어서")]);
+	expect(trashList().map(t => t.name).sort()).toEqual(["dir", "mem"]);
+});

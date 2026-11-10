@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { claimHolder, claimSend } from "./draft-claim.ts";
@@ -45,4 +45,26 @@ test("a claim left by a process that is gone may have sent: it is kept until the
 	writeFileSync(f, String(process.ppid));
 	expect(claimHolder(f)).toBe("live");
 	expect(claimSend(f, true)).toBeUndefined();
+});
+
+test("a claim whose pid cannot be read is held by a live sender and never taken over", () => {
+	const f = join(dir, "sending", "R4");
+	for (const content of ["", "garbage", "-5", "1.5 Mon"]) {
+		writeFileSync(f, content);
+		expect(claimHolder(f), content).toBe("live");
+		expect(claimSend(f, true), content).toBeUndefined();
+		expect(existsSync(f)).toBe(true);
+	}
+});
+
+test("an error other than an existing claim is thrown, not read as a lost race", () => {
+	expect(() => claimSend(join(dir, "sending", `R5-${"x".repeat(300)}`))).toThrow();
+});
+
+test("a claim path that cannot be read as a claim is left alone even when the caller takes over", () => {
+	const f = join(dir, "sending", "R6");
+	mkdirSync(join(f, "inner"), { recursive: true });
+	expect(claimHolder(f)).toBe("none");
+	expect(claimSend(f, true)).toBeUndefined();
+	expect(existsSync(join(f, "inner"))).toBe(true);
 });
