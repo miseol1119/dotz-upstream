@@ -167,7 +167,9 @@ details.think .md { padding: var(--sp-1) var(--sp-2) var(--sp-2) var(--box-ind);
 .hr .hp { flex: none; color: var(--fg-3); font-size: var(--fs-meta); line-height: var(--lh-meta); font-variant-numeric: tabular-nums; }
 .hr .hs.unreplied { color: var(--unreplied); font-weight: 600; }
 .hr .hs { flex: none; min-width: 44px; text-align: right; color: var(--fg-2); font-size: var(--fs-meta); line-height: var(--lh-meta); font-weight: 500; }
-.hr .hs.pri { color: var(--accent); } .hr .hs.warn { color: var(--warn); } .hr .hs.err { color: var(--err); }
+.hr .hs.pri { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-15); color: var(--accent); }
+.hr .hs.pri::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }   /* the word keeps its color; the dot is the tag pattern */
+.hr .hs.warn { color: var(--warn); } .hr .hs.err { color: var(--err); }
 /* a session row (sessionRow in 18-lanes.js): the parent project leads the second line, the activity trails it */
 .hr .ha:has(.sproj) { display: flex; align-items: baseline; gap: var(--sp-15); }
 .hr .sproj { flex: 0 1 auto; min-width: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; color: var(--fg); font-weight: 500; }

@@ -167,7 +167,7 @@ function paintSysLine(row, job) {
   if (open) open.title = w.result_at ? "결과 보기" : "작업 열기";
   if (st.dataset.s === s[1]) return;
   const was = st.dataset.s, card = st.classList.contains("ct-pill"), paint = () => {
-    if (card) { st.className = `cv-sys-st ct-pill ${s[0]}`; st.replaceChildren(s[0] === "ok" ? icon("check") : el("span", { class: `dot ${s[0]}` }), el("span", { text: s[1] })); }
+    if (card) { st.className = `cv-sys-st ct-pill ${s[0]}`; st.replaceChildren(el("span", { class: `dot ${s[0]}` }), el("span", { text: s[1] })); }
     else { st.firstChild.className = `dot ${s[0]}`; st.lastChild.textContent = s[1]; }
     hcSysFiles(st, w);
   };

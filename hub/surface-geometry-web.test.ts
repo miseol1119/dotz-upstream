@@ -151,3 +151,48 @@ test("the update state tolerates a last check that carries no version, and no on
 	expect(r.kept).toBe(true);
 	expect(r.placeholders).toEqual([]);
 });
+
+/* 6. a status shown as a word has its color dot right before it (the tag pattern: 6px --tone, or the .dot span) */
+type Dot = { text: string; kind: string; w: number; h: number; round: boolean; painted: boolean; gap: number };
+const dotsOf = (v: View, sel: string) => q<Dot[]>(v, `
+	const rgba = c => c.match(/[\\d.]+/g).map(Number), clear = c => rgba(c).length > 3 && rgba(c)[3] === 0;
+	return [...document.querySelectorAll(${JSON.stringify(sel)})].map(e => {
+		const cs = getComputedStyle(e), b = getComputedStyle(e, "::before"), d = e.querySelector(":scope > .dot");
+		const text = e.textContent.trim();
+		if (d) { const s = getComputedStyle(d), r = d.getBoundingClientRect(), n = d.nextElementSibling ? d.nextElementSibling.getBoundingClientRect() : r;
+			return { text, kind: "span", w: r.width, h: r.height, round: s.borderRadius === "50%", painted: !clear(s.backgroundColor), gap: Math.round((n.left - r.right) * 10) / 10 }; }
+		if (b.content === "none") return { text, kind: "none", w: 0, h: 0, round: false, painted: false, gap: 99 };
+		return { text, kind: "before", w: parseFloat(b.width), h: parseFloat(b.height), round: b.borderRadius === "50%", painted: !clear(b.backgroundColor), gap: parseFloat(cs.columnGap) || 99 };
+	});`);
+const hasDot = (d: Dot) => { expect(d.kind).not.toBe("none"); expect(d.w).toBeGreaterThanOrEqual(6); expect(d.w).toBeLessThanOrEqual(12); expect(d.h).toBe(d.w); expect(d.round).toBe(true); expect(d.painted).toBe(true); expect(d.gap).toBeLessThanOrEqual(8); };
+test("390px: the home row's 진행 중 word has a round colored dot right before it and keeps the accent color", async () => {
+	const v = await page(390, "light", `go("home")`, `!!document.querySelector("#home-cards .hr .hs.pri")`);
+	await v.evaluate(`void document.querySelector(".hr .hs.pri").scrollIntoView({ block: "center" })`);
+	await shot(v, "6-home-pri");
+	const dots = await dotsOf(v, ".hr .hs.pri");
+	expect(dots.length).toBeGreaterThan(0);
+	dots.forEach(hasDot);
+	const c = await q<{ fg: string; accent: string; right: number }>(v, `
+		const e = document.querySelector(".hr .hs.pri"), probe = document.createElement("i"); probe.style.color = "var(--accent)"; document.body.append(probe);
+		const accent = getComputedStyle(probe).color; probe.remove();
+		return { fg: getComputedStyle(e).color, accent, right: Math.round(e.getBoundingClientRect().right) };`);
+	expect(c.fg).toBe(c.accent);
+	expect(c.right).toBeLessThanOrEqual(390);
+});
+test("390px: the chat task card's 완료 pill is a green dot plus the word, like 진행 중", async () => {
+	const v = await page(390, "light", `go("chat", "main")`, `current === "chat" && CV.placed && document.querySelectorAll(".cv-task .ct-pill").length >= 2`);
+	await v.evaluate(`void document.querySelector(".cv-task .ct-pill.ok").scrollIntoView({ block: "center" })`);
+	await shot(v, "6-chat-pill");
+	const dots = await dotsOf(v, ".cv-task .ct-pill");
+	expect(dots.map(d => d.text)).toContain("완료");
+	dots.forEach(hasDot);
+	expect(await q<number>(v, `return document.querySelectorAll(".cv-task .ct-pill svg").length`)).toBe(0);
+});
+test("390px: the notices screen's 실패 tag has the dot too", async () => {
+	const v = await page(390, "light", `go("notices")`, `NT.loaded && !!document.querySelector("#v-notices .ln .tag")`);
+	await shot(v, "6-notices-fail");
+	const dots = (await dotsOf(v, "#v-notices .ln .tag")).filter(d => d.text === "실패");
+	expect(dots.length).toBeGreaterThan(0);
+	dots.forEach(hasDot);
+});
+
