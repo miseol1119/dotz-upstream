@@ -642,5 +642,6 @@ Do this, briefly:
 			done: { here: "This computer", open: "Open", phone: "Phone or another computer", phoneSup: "{url} · sign in with the same Tailscale account", connected: "Connected", discordSup: "Talk to {name} in the chat channel of its category", openApp: "Open the web app", opening: "Opening the web app" },
 		},
 	},
+	sendFail: { login: "the mail login expired; sign in again", offline: "could not reach the mail service", other: "the mail tool reported an error (details are in the log)" },
 };
 export type Catalog = typeof en;

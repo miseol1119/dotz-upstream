@@ -1,4 +1,5 @@
 import { afterAll, beforeEach, expect, spyOn, test } from "bun:test";
+import { msg as catalog } from "../../../hub/i18n.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { messages, sqliteDb } from "../../../hub/kakao/db.ts";
@@ -182,7 +183,8 @@ test("zele send: read first, then reply with --to and --body; a refusal is repor
 	const refuse: Runner = async argv => (argvs.push(argv), argv[2] === "reply" ? { code: 1, stdout: "", stderr: "newer message in thread" } : { code: 0, stdout: "", stderr: "" });
 	const refused = await sendWith(rec, refuse);
 	expect(refused.ok).toBe(false);
-	expect(refused.message).toContain("newer message in thread");
+	expect(refused.message).toContain(catalog().sendFail.other);
+	expect(refused.message).not.toContain("newer message in thread");
 	argvs.length = 0;
 	const noRead: Runner = async argv => (argv[1] === "whoami" || argvs.push(argv), { code: 1, stdout: "", stderr: "not found" });
 	expect((await sendWith(rec, noRead)).ok).toBe(false);

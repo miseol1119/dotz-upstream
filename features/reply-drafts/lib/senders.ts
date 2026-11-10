@@ -4,6 +4,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { MailSearch } from "../../../hub/comments/mail-match.ts";
+import { log } from "../../../hub/config.ts";
+import { msg } from "../../../hub/i18n.ts";
 import { type AppRaw, readAppsFile } from "../../../hub/integrations.ts";
 import { loadPlugins, pluginNeedsAccount, pluginReply, pluginRepliesWithFiles, pluginsLoaded, pluginsReply } from "../../../hub/plugins.ts";
 import { dataDir } from "./settings.ts";
@@ -153,7 +155,15 @@ export const canAttach = (source: string): boolean => source === "zele" || (!web
 const fail = (message: string): SendOutcome => ({ ok: false, message });
 // Node prints its warnings first on stderr; they must not stand in for the reason the owner reads.
 const NODE_NOISE = /^\(node:\d+\) |^\(Use `node --trace-warnings/;
-const tail = (r: { stdout: string; stderr: string }) => (r.stderr.split("\n").filter(l => !NODE_NOISE.test(l)).join("\n").trim() || r.stdout.trim()).slice(0, 160);
+// The tool's own words (English, often with stack lines) never reach the owner: they go to the log, and the owner reads one short reason.
+const LOGIN_LOST = /invalid_grant|token.*(expired|revoked)|not (logged|signed) in|unauthori[sz]ed|\b401\b|re-?auth/i;
+const OFFLINE = /ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|fetch failed|network|socket hang up|offline/i;
+export const sendReasonKey = (raw: string): keyof ReturnType<typeof msg>["sendFail"] => (LOGIN_LOST.test(raw) ? "login" : OFFLINE.test(raw) ? "offline" : "other");
+const tail = (r: { stdout: string; stderr: string }): string => {
+	const raw = (r.stderr.split("\n").filter(l => !NODE_NOISE.test(l)).join("\n").trim() || r.stdout.trim()).slice(0, 2000);
+	if (raw) log(`reply draft: mail tool failed: ${raw}`);
+	return msg().sendFail[sendReasonKey(raw)];
+};
 
 export async function sendWith(rec: DraftRec, run: Runner): Promise<SendOutcome> {
 	if (rec.kind !== "mail") return fail(MANUAL);

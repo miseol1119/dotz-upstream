@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseDraftApproval } from "../../../hub/draft-approval.ts";
+import { msg } from "../../../hub/i18n.ts";
 import { runMailCli } from "../../../hub/mail-cli.ts";
 import { runDraft } from "../bin/draft.ts";
 import { sendDraft } from "../lib/flow.ts";
@@ -82,7 +83,7 @@ describe("mail reply: draft -> 1) 보내기 -> zele reply with the file", () => 
 		expect(failed.code).toBe(1);
 		expect(told.posts).toEqual([{ path: "/api/approvals/failed", body: { op: "report", ref: rec.id, conv: `mail:${rec.ref}`, text: failed.lines[0] } }]);
 		expect(failed.lines[0]).toContain("보내지 못했어요");
-		expect(failed.lines[0]).toContain("zele: thread changed");
+		expect(failed.lines[0]).toContain(msg().sendFail.other);
 		expect(getDraft(rec.id)!.status).toBe("pending");
 		expect(stagedFiles(rec.id)).toHaveLength(1);
 		const up = fakeZele();

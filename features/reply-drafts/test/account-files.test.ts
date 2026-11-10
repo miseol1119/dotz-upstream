@@ -5,12 +5,13 @@ import { join } from "node:path";
 import { realMailLink } from "../../../hub/comments/mail-link.ts";
 import { parseDraftApproval } from "../../../hub/draft-approval.ts";
 import { saveUpload } from "../../../hub/files.ts";
+import { msg } from "../../../hub/i18n.ts";
 import { composeMail, runMailCli } from "../../../hub/mail-cli.ts";
 import { loadPlugins } from "../../../hub/plugins.ts";
 import { runDraft } from "../bin/draft.ts";
 import { ACCOUNT_HELD, askText, reviseDraft, sendDraft } from "../lib/flow.ts";
 import { offerMailDraft } from "../lib/offer.ts";
-import { readArgv, readMailBody, replyArgv, sendArgv, sendWith, zeleAccountOf } from "../lib/senders.ts";
+import { readArgv, readMailBody, replyArgv, sendArgv, sendReasonKey, sendWith, zeleAccountOf } from "../lib/senders.ts";
 import { paths } from "../lib/settings.ts";
 import { addStagedFile, stagedFiles, stagedName } from "../lib/staged.ts";
 import { addDraft, answerDrafts, getDraft, listDrafts, type DraftRec } from "../lib/store.ts";
@@ -136,10 +137,17 @@ describe("zele argv with several accounts", () => {
 		expect(f.calls.map(c => c.slice(0, 6))).toEqual([["zele", "mail", "read", "T42", "--account", A2], ["zele", "mail", "reply", "T42", "--account", A2]]);
 	});
 
-	test("a failed send names zele's error, not the runtime warning printed before it", async () => {
+	test("a failed send gives a short reason, not zele's English error or the runtime warning printed before it", async () => {
 		const stderr = "(node:72075) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\nMultiple accounts matched\n";
 		const out = await sendWith(rec({ compose: true, mailId: "compose-x", ref: "compose-x" }), async () => ({ code: 1, stdout: "", stderr }));
-		expect(out).toMatchObject({ ok: false, message: "보내지 못했어요: Multiple accounts matched" });
+		expect(out).toMatchObject({ ok: false, message: `보내지 못했어요: ${msg().sendFail.other}` });
+	});
+
+	test("an expired login or a lost connection is told as its own short reason, never with the tool's stack lines", async () => {
+		const stack = "Error: invalid_grant: Token has been expired or revoked.\n    at refresh (file:///opt/zele/dist/auth.js:88:11)";
+		const out = await sendWith(rec({ compose: true, mailId: "compose-x", ref: "compose-x" }), async () => ({ code: 1, stdout: "", stderr: stack }));
+		expect(out).toEqual({ ok: false, message: `보내지 못했어요: ${msg().sendFail.login}` });
+		expect(["Error: invalid_grant: Token expired", "fetch failed", "connect ECONNREFUSED 1.2.3.4:443", "boom"].map(sendReasonKey)).toEqual(["login", "offline", "offline", "other"]);
 	});
 
 	test("an older draft without an account takes the account of its stored mail", async () => {

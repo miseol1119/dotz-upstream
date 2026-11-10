@@ -621,4 +621,5 @@ export const ko: Catalog = {
 			done: { here: "이 컴퓨터", open: "열림", phone: "휴대폰이나 다른 컴퓨터", phoneSup: "{url} · 같은 Tailscale 계정으로 로그인해서 열어요", connected: "연결됨", discordSup: "{name} 카테고리의 대화 채널에 말을 걸면 돼요", openApp: "웹 앱 열기", opening: "웹 앱을 여는 중이에요" },
 		},
 	},
+	sendFail: { login: "메일 로그인이 풀렸어요. 다시 로그인해 주세요", offline: "메일 서버에 연결하지 못했어요", other: "메일 도구에서 오류가 났어요. 자세한 내용은 로그에 있어요" },
 };
