@@ -38,7 +38,7 @@ describe("the 알림 panel and its count", () => {
 	test("lists only the alert; replies of conversations and sessions are not notices there", async () => {
 		await boot();
 		const p = await panel();
-		expect(p.big).toBe("2");   // the screen's unread (cls conv is not on it): the alert and the session result; the card lists only the alert
+		expect(p.big).toBe("1");   // the card counts the rows it lists: the session result is unread on the screen but is not a row here
 		expect(p.rows).toEqual(["NAS 디스크 공간이 10% 남았어요"]);
 	});
 
