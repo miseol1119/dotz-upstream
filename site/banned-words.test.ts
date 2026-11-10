@@ -27,6 +27,7 @@ test("the bundle loses every form, and a list item its separator", () => {
   expect(out).toBe('"메일" "메일 · 댓글" kind: "메신저" // Messenger-style Messenger');
 });
 
+// Copies site/ and web/ and runs a real build in a child bun; minutes of CPU contention on a shared machine make the 5 s default too tight.
 test("build-demo exits non-zero on a planted word and names the file", async () => {
   const root = site(), repo = join(import.meta.dir, "..");
   const skip = (src: string) => !src.includes("node_modules");
@@ -38,4 +39,4 @@ test("build-demo exits non-zero on a planted word and names the file", async () 
   const [err, code] = await Promise.all([new Response(run.stderr).text(), run.exited]);
   expect(code).not.toBe(0);
   expect(err).toContain("planted.txt:1");
-});
+}, 30_000);
