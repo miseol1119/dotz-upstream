@@ -313,7 +313,33 @@ export function metrics(files: readonly Src[], graph?: Map<string, string[]>) {
 	};
 }
 
-if (import.meta.main) {
+// Ceilings only go down. Every key whose ceiling is higher in head than in base, and every key head has that base does not, in head's key order.
+export type Raised = { key: string; from: number | undefined; to: number };
+export const ceilingsRaised = (base: Counts, head: Counts): Raised[] =>
+	Object.entries(head).flatMap(([key, to]) => (base[key] === undefined || to > base[key] ? [{ key, from: base[key], to }] : []));
+const flatCeilings = (text: string | undefined): Counts | undefined => {
+	let groups: unknown;
+	try { groups = JSON.parse(text ?? ""); } catch { return undefined; } // unreadable text is the "no baseline" case, reported by the caller
+	if (typeof groups !== "object" || groups === null || Array.isArray(groups)) return undefined;
+	const flat: Counts = {};
+	for (const [group, counts] of Object.entries(groups)) for (const [k, n] of Object.entries(counts as Counts)) flat[`${group} ${k}`] = n;
+	return flat;
+};
+// hub/engineering-ceilings.json at the baseline and at the pushed commit. A side that cannot be read never blocks: one warning line, ok.
+export const freezeReport = (baseText: string | undefined, headText: string | undefined): { ok: boolean; lines: string[] } => {
+	const base = flatCeilings(baseText), head = flatCeilings(headText);
+	if (!base || !head) return { ok: true, lines: ["pre-push: ceiling freeze skipped, the baseline ceilings cannot be read"] };
+	const lines = ceilingsRaised(base, head).map(r => `ceiling raised ${r.key}: ${r.from ?? "none"} -> ${r.to}`);
+	return { ok: lines.length === 0, lines };
+};
+
+if (import.meta.main && process.argv[2] === "--ceiling-freeze") {
+	// bun hub/engineering-rules.ts --ceiling-freeze <baseline json file> <pushed json file>: exit 1 and one line per raised key; a missing file counts as unreadable.
+	const read = (p: string | undefined) => (p && existsSync(p) ? readFileSync(p, "utf8") : undefined);
+	const r = freezeReport(read(process.argv[3]), read(process.argv[4]));
+	for (const l of r.lines) console.error(l);
+	process.exit(r.ok ? 0 : 1);
+} else if (import.meta.main) {
 	const m = metrics(loadTree(join(import.meta.dir, "..")));
 	if (process.argv.includes("--json")) console.log(JSON.stringify(m, null, 2));
 	else for (const [k, v] of Object.entries(m)) {

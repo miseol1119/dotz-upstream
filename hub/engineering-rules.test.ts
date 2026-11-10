@@ -5,7 +5,7 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join, posix } from "node:path";
 import { listLines, PRIVACY_ALLOW } from "./public-scrub.ts";
 import {
-	boundaryEdges, cycles, deadExports, deadWebGlobals, duplicateGlobals, helperCopies, hubWebImports, importGraph, isTest, loadTree, longFunctions, metrics,
+	boundaryEdges, ceilingsRaised, cycles, deadExports, deadWebGlobals, duplicateGlobals, freezeReport, helperCopies, hubWebImports, importGraph, isTest, loadTree, longFunctions, metrics,
 	nonAtomicWrites, oversizeFiles, pastedBlocks, prodOf, swallowedErrors, testTiming, unboundedCalls, unmappedModules, webJs, webStaticImports, type Src,
 } from "./engineering-rules.ts";
 
@@ -13,6 +13,10 @@ import {
 // only new violations fail. A fix lowers the number (or removes the entry); never raise one to get a change past this test. A count that has dropped
 // below its ceiling is logged by ratchet() so the ceiling can follow it down.
 type Counts = Record<string, number>;
+// The ceilings live in hub/engineering-ceilings.json so .githooks/pre-push can read the same file at another commit and refuse a push that raises one. Their
+// per-entry reasons stay as comments here by name where they matter: createPrompts 725 (a woken run's restated worker result stays with the conversation that got
+// the first answer, resultTo); extension->hub 13 (the post-compaction recall renders state.json with the first message's renderState in hub/recall-parts.ts, not a copy).
+const CEILINGS: Record<string, Counts> = JSON.parse(readFileSync(join(import.meta.dir, "engineering-ceilings.json"), "utf8"));
 // The tree and its import graph are read once; rule 15 reuses both.
 const TREE = loadTree(join(import.meta.dir, ".."));
 const GRAPH = importGraph(prodOf(TREE));
@@ -20,20 +24,10 @@ const M = metrics(TREE, GRAPH);
 
 // Files over 800 lines are one reviewer's working memory too many; each is capped at its size rounded up to the next 25, room for a fix, not a feature.
 const FILE_LINE_LIMIT = 800;
-const FILE_LINE_CEILINGS: Counts = {
-	"extension/guard.ts": 1125, "hub/custom.ts": 900, "hub/discord.ts": 950, "hub/messenger-agent.ts": 875,
-	"hub/orchestrator.ts": 1075, "hub/providers.ts": 825, "hub/routes.ts": 1025, "hub/selfupdate.ts": 1000, "web/js/30-kakao.js": 1200, "web/js/30-monitoring.js": 1000,
-};
+const FILE_LINE_CEILINGS: Counts = CEILINGS.fileLines;
 // A top-level function past 300 lines hides its own seams; same cap rule (next 25 up), key is `file name`.
 const FN_LINE_LIMIT = 300;
-const FN_LINE_CEILINGS: Counts = {
-	"extension/guard.ts installGuard": 375, "hub/bgwork.ts createBgWork": 375, "hub/comments/engine.ts createEngine": 625, "hub/devices.ts createDevices": 325,
-	"hub/kakao/web.ts createKakaoWeb": 650, "hub/messenger-agent.ts createAgentAdapter": 350,
-	"hub/orchestrator.ts createOrchestrator": 975, "hub/peer-monitor.ts createPeerMonitor": 400,
-	"hub/prompts.ts createPrompts": 725, // 725th: a woken run's restated worker result stays with the conversation that got the first answer (resultTo)
-	"hub/routes.ts makeRoute": 625,
-	"web/js/07-board.js makeBoard": 375,
-};
+const FN_LINE_CEILINGS: Counts = CEILINGS.functionLines;
 // Modules that import each other cannot be loaded, tested or replaced one by one; these are the cycles that exist today (members, sorted).
 const IMPORT_CYCLES = [
 	"features/youtube-instagram/lib/quota.ts features/youtube-instagram/lib/watchkit.ts",
@@ -43,33 +37,25 @@ const IMPORT_CYCLES = [
 	"hub/laneevents.ts hub/lanefailover.ts hub/laneprompt.ts hub/lanereport.ts hub/lanerun.ts",
 ];
 // Import edges (file to file) that cross a layer: the hub is the core, so a new edge into it from outside, or out of it into a feature, is a new coupling.
-const BOUNDARY_CEILINGS: Counts = {
-	"hub->features": 50, // the hub mounts feature routes and tools
-	"hub->onboard": 6, // setup flows the hub triggers
-	"hub->extension": 2, // shared guard code
-	"extension->hub": 13, // the extension reuses hub helpers it cannot duplicate; 13th: the post-compaction recall renders state.json with the first message's renderState (hub/recall-parts.ts), not a copy
-	"onboard->hub": 1, // onboarding reads hub config
-	"features->onboard": 2, // features reuse onboarding prompts
-	"feature->feature": 18, // a feature importing another feature couples two things meant to be removable alone
-};
+const BOUNDARY_CEILINGS: Counts = CEILINGS.boundaries;
 // A swallowed error is a bug nobody sees. Per top dir: an empty catch or .catch(() => null) with no comment saying why the swallow is fine.
-const SWALLOW_CEILINGS: Counts = { extension: 11, features: 27, hub: 193, onboard: 4, "setup.ts": 1, web: 78 };
+const SWALLOW_CEILINGS: Counts = CEILINGS.swallowedErrors;
 // State a process can read back mid-write (a crash leaves half a file) must use writeAtomic from hub/config.ts; these are the plain writes left.
-const NON_ATOMIC_WRITE_CEILINGS: Counts = { extension: 3, features: 8, hub: 43, onboard: 1, "setup.ts": 2 };
+const NON_ATOMIC_WRITE_CEILINGS: Counts = CEILINGS.nonAtomicWrites;
 // A fetch or process call with no timeout or abort can hang its caller for good; the web page is excluded because the browser owns that.
-const UNBOUNDED_CALL_CEILINGS: Counts = { extension: 2, features: 13, hub: 71, onboard: 7, "setup.ts": 4 };
+const UNBOUNDED_CALL_CEILINGS: Counts = CEILINGS.unboundedCalls;
 // Timing assertions flake under load (the machine load average reaches 50 here) and fixed sleeps are luck, so tests wait on events instead.
-const TEST_TIMING_CEILINGS: Counts = { fixedSleeps: 3, budgetFiles: 1 };
+const TEST_TIMING_CEILINGS: Counts = CEILINGS.testTiming;
 // Exports nothing refers to, not even their own file or a test; remove the export or the code (the entry is `file name`).
 const DEAD_EXPORTS: string[] = [];
 // Page globals named once in the page, its markup, the hub tests and the site.
 const DEAD_WEB_GLOBALS: string[] = [];
 // docs/ARCHITECTURE.md is how one finds an existing feature before writing a second one; hub/*.ts files it does not name today, by count.
-const UNMAPPED_MODULES = 151;
+const UNMAPPED_MODULES = CEILINGS.moduleMap.hub ?? 0;
 // A second private copy of a helper is how two paths drift; files defining each top-level helper today.
-const HELPER_COPY_CEILINGS: Counts = { readJson: 13, json: 17, sameOrigin: 4, git: 7, shq: 5, sleep: 3 };
+const HELPER_COPY_CEILINGS: Counts = CEILINGS.helperCopies;
 // A 12-line block pasted into two files gets fixed in one of them; blocks that exist today.
-const PASTED_BLOCKS = 0;
+const PASTED_BLOCKS = CEILINGS.pastedBlocks.blocks ?? 0;
 
 // hub/config.ts throws when it is imported under NODE_ENV=test with a real data dir (hub/live-guard.ts testDataRefusal). The suite's bunfig preload sets a temp
 // DOTZ_DIR in process.env, but a child a test starts without an env option gets the environment bun started with: NODE_ENV=test from bun test, no temp data dir.
@@ -331,4 +317,34 @@ test("the doc listing works in a tree without git, like the pre-push hook's arch
 	} finally {
 		rmSync(root, { recursive: true, force: true });
 	}
+});
+
+// The ceilings only go down: a commit that raises one, or adds a key the baseline has no ceiling for, is refused by .githooks/pre-push.
+describe("ceiling freeze", () => {
+	const base = { "hub/routes.ts": 1025, "hub/bgwork.ts": 400 };
+	test("a raised ceiling is returned", () => {
+		expect(ceilingsRaised(base, { ...base, "hub/routes.ts": 1050 })).toEqual([{ key: "hub/routes.ts", from: 1025, to: 1050 }]);
+	});
+	test("a key the baseline does not have is returned", () => {
+		expect(ceilingsRaised(base, { ...base, "hub/new.ts": 810 })).toEqual([{ key: "hub/new.ts", from: undefined, to: 810 }]);
+	});
+	test("a lowered, equal or removed ceiling is allowed", () => {
+		expect(ceilingsRaised(base, { "hub/routes.ts": 1000 })).toEqual([]);
+		expect(ceilingsRaised(base, base)).toEqual([]);
+		expect(ceilingsRaised(base, {})).toEqual([]);
+	});
+	const file = (groups: Record<string, Counts>) => JSON.stringify(groups);
+	test("the report names each raised key as group key: a -> b and refuses", () => {
+		const r = freezeReport(file({ fileLines: { "hub/a.ts": 900 } }), file({ fileLines: { "hub/a.ts": 925, "hub/b.ts": 850 } }));
+		expect(r.ok).toBe(false);
+		expect(r.lines).toEqual(["ceiling raised fileLines hub/a.ts: 900 -> 925", "ceiling raised fileLines hub/b.ts: none -> 850"]);
+	});
+	test("an unreadable baseline passes with one warning line", () => {
+		for (const unreadable of [undefined, "", "not json", "[1]"]) {
+			const r = freezeReport(unreadable, file({ fileLines: { "hub/a.ts": 925 } }));
+			expect(r.ok).toBe(true);
+			expect(r.lines).toHaveLength(1);
+			expect(r.lines[0]).toMatch(/^pre-push: ceiling freeze skipped/);
+		}
+	});
 });
