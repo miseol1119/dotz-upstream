@@ -438,7 +438,7 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 		const cfAccess = webAccess.cfAccess();
 		const pairing = await devices?.pairRoute(req, url, cfAccess ? r => cfAccess.verifyRequest(r) : undefined);
 		if (pairing) return pairing;
-		const peer = checkPeer(req);
+		const peer = checkPeer(req, undefined, tailnet);
 		if (peer === "denied") return new Response("forbidden", { status: 403 });
 		// The login link and the login page's request are answered before the owner check (they are how a browser becomes the owner); a peer request never gets here (checkPeer above).
 		if (peer === "none" && req.method === "GET" && url.pathname === "/local-login") return localLogin.page(req, url, webAccess.mode(), srv?.requestIP(req)?.address);

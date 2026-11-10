@@ -1,6 +1,6 @@
 // Gateway-to-gateway trust for the merged 모니터링 view (docs/peer-monitoring.md). Two gates, both required:
 //   1. tailnet source: the request came in through `tailscale serve`, which adds Tailscale-User-Login (the hub listens on 127.0.0.1 only,
-//      so a request without it is a local process, never a peer);
+//      so a request without it is a local process, never a peer) under this node's tailnet name as Host;
 //   2. peer token, sent as `x-dotz-peer`: the shared <data dir>/secrets/peer-token (the same value on every gateway, copied by hand), or a token this
 //      gateway issued to one paired peer (hub/peer-pair.ts: made automatically between nodes of the same tailscale login).
 // The token is read at call time and never logged. A request that carries `x-dotz-peer` at all is a peer request and may reach only
@@ -58,12 +58,12 @@ export const PEER_POST = [/^\/api\/peer\/act$/, /^\/api\/peer\/lease$/, /^\/api\
 
 export type PeerCheck = "none" | "ok" | "denied";
 // "none": not a peer request (the normal owner checks apply). "ok": a peer may have this path. "denied": refuse with 403.
-export function checkPeer(req: Request, tokens?: string | readonly string[]): PeerCheck {
+export function checkPeer(req: Request, tokens?: string | readonly string[], tailnet = true): PeerCheck {
 	const sent = req.headers.get(PEER_HEADER);
 	if (sent === null) return "none";
 	const accepted = tokens === undefined ? peerTokens() : typeof tokens === "string" ? [tokens] : tokens;
 	if (!sent || !accepted.filter(t => same(sent, t)).length) return "denied";
-	if (!req.headers.get("tailscale-user-login")) return "denied";
+	if (!tailnet || !req.headers.get("tailscale-user-login")) return "denied"; // `tailnet`: the Host was this node's tailnet name (hub/entry-check.ts entryHost), so a login header written by a local process on a loopback Host does not count
 	const path = new URL(req.url).pathname;
 	const list = req.method === "GET" || req.method === "HEAD" ? PEER_GET : req.method === "POST" ? PEER_POST : [];
 	return list.some(r => r.test(path)) ? "ok" : "denied";

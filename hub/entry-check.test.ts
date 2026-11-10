@@ -78,6 +78,13 @@ describe("입구 검사", () => {
 		expect(await status("/api/peer/lease", { method: "POST", headers: { ...peer, "content-type": "application/json" }, body: "{}" })).not.toBe(403);
 	});
 
+	test("a peer token counts only on a request that came through the tailnet name, not on a loopback Host with a login header", async () => {
+		const peer = { "x-dotz-peer": PEER, ...tailnet };
+		expect(await status("/api/notices", { host: LOOPBACK, headers: peer })).toBe(403);
+		expect(await status("/api/notices", { host: "", headers: peer })).toBe(403);
+		expect(await status("/api/notices", { headers: peer })).toBe(200);
+	});
+
 	test("web.entry_check: false brings back the old behaviour", async () => {
 		(cfg.web as { entry_check?: boolean }).entry_check = false;
 		try {
