@@ -38,7 +38,8 @@ afterAll(() => hub.stop());
 
 const WANT = [["기획팀 · 손익 검토", "답을 기다림"], ["기획팀 · 분기 안건 검토", "진행 중"], ["회의록 정리", "진행 중"]];
 const homeRows = `(() => { renderHomeNow(); return [...document.querySelectorAll('#v-home .hn[data-k="running"] .srow')].map(r => [r.querySelector(".nm").textContent, r.getAttribute("aria-label").split(" · ")[2]]); })()`;
-const chatRows = `(() => { const sec = [...document.querySelectorAll("#chat-convo .cv-sec")].find(n => n.textContent === "진행 중"); const above = sec && sec.previousElementSibling; return above === document.querySelector("#chat-convo > *") && [...above.querySelectorAll(".cv-row")].map(r => r.dataset.t).join() === "main,worklog" ? [...sec.nextElementSibling.querySelectorAll(".cv-row")].map(r => [r.querySelector(".cv-n").textContent, r.querySelector(".tag").textContent]) : null; })()`;
+// Under the 진행 중 header a running row says its state with the blue dot alone (the word is its aria-label); a waiting row keeps its 답을 기다림 tag.
+const chatRows = `(() => { const sec = [...document.querySelectorAll("#chat-convo .cv-sec")].find(n => n.textContent === "진행 중"); const above = sec && sec.previousElementSibling; return above === document.querySelector("#chat-convo > *") && [...above.querySelectorAll(".cv-row")].map(r => r.dataset.t).join() === "main,worklog" ? [...sec.nextElementSibling.querySelectorAll(".cv-row")].map(r => { const tag = r.querySelector(".cv-m2 .tag"), dot = r.querySelector(".cv-m2 .dot.pri"); return [r.querySelector(".cv-n").textContent, tag ? tag.textContent : dot.getAttribute("aria-label")]; }) : null; })()`;
 const listed = async (expr: string, want: unknown) => { await waitFor(v, `JSON.stringify(${expr}) === ${JSON.stringify(JSON.stringify(want))}`); };
 
 test("홈 and 채팅, under 땅콩 and 작업내역, list the same sessions: waiting first, named project · title, finished and held ones left out", async () => {

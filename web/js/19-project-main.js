@@ -587,7 +587,7 @@ function ctxDialog(m) {
     classic: true,
     title: `${modelName(m.model)} 컨텍스트`,
     body: el("div", { class: "col" },
-      el("p", { class: "sup", text: `이 모델을 쓰는 모든 세션(${m.used_by.map(ctxUser).join(", ")})에 적용돼요. 비우면 기본값을 써요.` }),
+      el("p", { class: "sup", text: `이 모델을 쓰는 모든 세션(${m.used_by.map(ctxUser).join(", ")})에 적용돼요.` }),
       textField("컨텍스트 크기 (토큰)", win),
       el("p", { class: "sup", text: L.window ? `${num(L.window.min)}~${num(L.window.max)} 토큰` : "" }),
       textField("자동 압축 시작 (토큰 또는 %)", at),

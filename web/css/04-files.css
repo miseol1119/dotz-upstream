@@ -4,9 +4,9 @@
 /* the path under each file: one short line (shortPath in 15-attachments.js), the full path in the title, a tap copies it.
    width:0 + min-width:100% keeps a path inside its own chip's column: it never widens .fitem, so two files side by side keep
 two separate paths under their own chips and a long one ends in an ellipsis. */
-.fpath, .lb-p, .tv-p { display: block; width: 0; min-width: 100%; max-width: 100%; padding: 0; border: 0; background: none; color: var(--fg-3); font: 400 12px/18px var(--font); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: copy; }
+.fpath, .lb-p { display: block; width: 0; min-width: 100%; max-width: 100%; padding: 0; border: 0; background: none; color: var(--fg-3); font: 400 12px/18px var(--font); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: copy; }
 .fpath { margin-top: var(--sp-1); }
-@media (hover: hover) { .fpath:hover, .lb-p:hover, .tv-p:hover { color: var(--fg-2); } }
+@media (hover: hover) { .fpath:hover, .lb-p:hover { color: var(--fg-2); } }
 .fbox > .fatt { padding-right: var(--sp-12); max-width: min(260px, 90cqw); }
 .fdl { position: absolute; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 16px; color: var(--fg-2); text-decoration: none; }
 .fdl svg { width: 16px; height: 16px; }
@@ -308,11 +308,10 @@ details.work.live .wdot { display: block; }
 button.fatt { border: 0; font: inherit; text-align: left; cursor: pointer; }
 dialog.tbox { width: min(760px, 100vw); height: min(80dvh, 100dvh); max-width: none; max-height: none; margin: auto; padding: 0; border: 0; border-radius: 20px; background: var(--pop); color: var(--fg); box-shadow: 0 12px 40px rgb(0 0 0 / .22); overflow: hidden; }
 dialog.tbox::backdrop { background: rgb(10 10 12 / .5); }
-.tbox .tv-in { display: grid; grid-template-rows: auto auto minmax(0, 1fr); height: 100%; }
-.tbox .tv-p { padding: var(--sp-2) var(--sp-5); border-bottom: 1px solid var(--line); color: var(--fg-3); }
+.tbox .tv-in { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100%; }
 .tbox .tv-bar { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5); border-bottom: 1px solid var(--line); font-size: 14px; }
 .tbox .tv-n { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
-.tbox .tv-bar a, .tbox .tv-bar button { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 var(--sp-3); border: 0; border-radius: var(--r-ctl); background: var(--layer); color: var(--fg-2); font-size: 13px; text-decoration: none; }
+.tbox .tv-bar a, .tbox .tv-bar button { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 var(--sp-3); border: 0; border-radius: var(--r-ctl); background: var(--active); color: var(--fg-2); font-size: 13px; text-decoration: none; }
 .tbox .tv-bar button.x { width: 32px; padding: 0; }
 .tbox .tv-body { min-height: 0; overflow: auto; padding: var(--sp-4) var(--sp-5) var(--sp-6); font-size: 15px; line-height: 26px; overflow-wrap: anywhere; }
 .tbox .tv-body:focus { outline: 0; }

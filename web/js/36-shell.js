@@ -158,7 +158,9 @@ async function openShell({ command } = {}) {
       // pointerdown keeps the terminal focused, so the soft keyboard stays up while a key is pressed
       onpointerdown: ev => ev.preventDefault(),
       onclick: () => { if (seq === "ctrl") { SH.ctrl = !SH.ctrl; shCtrlPaint(); } else { shInput(seq); } if (SH.term) SH.term.focus(); } }, label))) : null;
-  const body = el("div", { class: "sh-wrap" }, host, pw, keys);
+  // a failed load answers in the body, where it has room, with the way to try again (the header holds only short states)
+  const fail = el("div", { class: "sh-fail", role: "alert", hidden: true }, el("p", { class: "sup" }), el("button", { type: "button", class: "btn tonal", onclick: () => boot() }, "다시 시도"));
+  const body = el("div", { class: "sh-wrap" }, host, fail, pw, keys);
   const name = (typeof prSelf === "function" && prSelf() && prSelf().name) || "이 컴퓨터";
   const h = dialog({ title: `터미널 · ${name}`, body, wide: true, onclose: () => {
     shDisconnect(); if (SH.ro) SH.ro.disconnect();
@@ -174,9 +176,11 @@ async function openShell({ command } = {}) {
   if (hb) hb.prepend(st, pwBtn, more);
   SH.dlg = h; SH.ui = { host, st, pw, pwIn, pwBtn, keys };
   pwIn.addEventListener("keydown", ev => { if (ev.isComposing || ev.keyCode === 229) return; if (ev.key === "Enter") { ev.preventDefault(); shSendPw(); } });
-  shStatus("불러오는 중…");
-  try { await shLib(); } catch (e) { shStatus(e.message, "err"); return; }
+  async function boot() {
+  fail.hidden = true; shStatus("불러오는 중…");
+  try { await shLib(); } catch (e) { shStatus(""); fail.firstChild.textContent = e.message; fail.hidden = false; host.hidden = true; return; }
   if (SH.dlg !== h) return;
+  host.hidden = false;
   const touch = shTouch();
   const t = new Terminal({ cursorBlink: true, scrollback: 5000, fontFamily: shCss("--mono") || "monospace", fontSize: touch ? 14 : 13, lineHeight: 1.2, theme: shTheme(), allowProposedApi: false, macOptionIsMeta: true });
   const fit = new FitAddon.FitAddon();
@@ -192,4 +196,6 @@ async function openShell({ command } = {}) {
   if (command) SH.pend = command;
   t.focus();
   shConnect();
+  }
+  boot();
 }

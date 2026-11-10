@@ -330,7 +330,6 @@ async function viewer(path, name, pc) {
       el("div", { class: "tv-bar" }, el("span", { class: "tv-n", text: name }),
         el("a", { href: fileUrl(path, true, pc), download: name }, "다운로드"),
         el("button", { class: "x", type: "button", "aria-label": "닫기", onclick: () => d.close() }, icon("close"))),
-      pathCopy(path, "tv-p"),
       body));
   d.addEventListener("close", () => d.remove());
   d.addEventListener("click", ev => { if (ev.target === d) d.close(); });

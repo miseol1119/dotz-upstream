@@ -256,7 +256,7 @@ function mnDialog() {
   const i = MN.info;
   const inp = el("input", { class: "fi", type: "text", value: i.custom || "", maxlength: "24", autocomplete: "off", placeholder: i.default, "aria-label": "컴퓨터 이름" });
   const save = (v, msg) => (btn, close) => busy(btn, async () => { MN.info = await api("/api/machine", "PUT", { name: v }); close(); toast(msg); prLoad(); renderSettings(); });
-  const d = dialog({ title: "이 컴퓨터 이름", mid: true, body: el("div", { class: "col" }, el("div", { class: "sup", text: "비우면 기본 이름(" + i.default + ")을 써요." }), inp), actions: [
+  const d = dialog({ title: "이 컴퓨터 이름", mid: true, body: el("div", { class: "col" }, inp), actions: [
     i.custom ? { label: "기본 이름으로", kind: "text", onclick: (c, b) => save("", "기본 이름으로 돌렸어요")(b, c) } : null,
     { label: "저장", kind: "pri", onclick: (c, b) => save(inp.value.trim(), "이름을 저장했어요")(b, c) }].filter(Boolean) });
   inp.addEventListener("keydown", ev => { if (ev.key === "Enter" && !ev.isComposing) { ev.preventDefault(); d.node.querySelector(".dact .btn:last-child").click(); } });

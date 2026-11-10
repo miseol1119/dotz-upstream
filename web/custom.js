@@ -84,6 +84,7 @@ button.cu-r:hover, a.cu-r:hover { background: var(--card-hover); }
 .btn.tonal.cu-add { align-self: flex-start; background: var(--card); }
 .btn.tonal.cu-add:hover { background: var(--card-hover); }
 .cu-ft { display: flex; justify-content: flex-end; gap: var(--sp-2); }
+.cu-ft .btn.tonal { background: var(--card); }
 @media (pointer: coarse), (max-width: 899px) { .cu-form .fi, .cu-form textarea.fi { font-size: 16px; } }
 @media (max-width: 1099px) {
   .cu-fp { grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); max-width: 560px; margin: 0 auto; }
@@ -439,7 +440,7 @@ button.pv-res:hover { background: var(--card-hover); }
     const form = el("form", { class: "cu-form", novalidate: true },
       cur && cur.error ? el("div", { class: "cu-ferr", text: `지금 파일에 문제가 있어요: ${cur.error}. 저장하면 이 내용으로 바꿔 써요.` }) : null,
       titleField, viewBox, bodyField, cmdOnly, more, ferrHome,
-      el("div", { class: "cu-ft" }, el("button", { class: "btn text", type: "button", text: "취소", onclick: () => go("home") }), save));
+      el("div", { class: "cu-ft" }, el("button", { class: "btn tonal", type: "button", text: "취소", onclick: () => go("home") }), save));
     const actions = () => [...actsBox.children].map(r => r._value());
     const paintPreview = () => {
       const t = title.value.trim(), cmd = src === "command", ghost = !cmd && !body.value.trim();

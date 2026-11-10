@@ -15,8 +15,8 @@
 .brand-c.p-need::after { background: var(--warn); }
 .appbar.hasp:not(.back) h1 { position: relative; padding-right: var(--sp-4); }
 .appbar.hasp:not(.back) h1::before { position: absolute; right: 2px; top: 50%; margin-top: calc(var(--sp-15) * -1); }
-.appbar.hasp:not(.back) h1.pdot { padding-right: calc(var(--sp-4) + var(--sp-2) + var(--sp-05)); }
-.appbar.hasp:not(.back) h1.pdot::after { right: 14px; }
+.appbar.hasp:not(.back) h1.pdot { min-width: var(--btn-hit); }
+.appbar.hasp:not(.back) h1.pdot::after { right: 0; bottom: auto; top: calc(50% - var(--sp-4)); }
 .appbar:not(.back) h1.p-need::after { background: var(--warn); }
 /* the switcher (proto.css .pop): "내 컴퓨터" over one low row per computer - status dot, name over one quiet line, the check or the waiting count at the right -
    and 컴퓨터 관리 under a line. With the sidebar's brand row on screen it is a popover right under that row (no scrim, .anch); the phone keeps its bottom sheet. */
