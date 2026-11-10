@@ -400,6 +400,16 @@ describe("web/DESIGN.md rules", () => {
 		expect(found).toEqual([]);
 	});
 
+	test("a list inside a dialog sits in the dialog's own scrolling region and sets no height cap of its own", () => {
+		// the sheet body (.fs-body) is the scroller between title and footer; a max-height on a list inside it leaves an empty band and a second scroller
+		const found: string[] = [];
+		for (const [file, text] of realCss()) for (const r of parseCss(file, text)) {
+			if (!/(^|[\s,])(\.pickbox|\.fs-body\s+\.(list|pickbox)|\.dbody\.fs-body\s+\.(list|pickbox))\b/.test(r.selector)) continue;
+			for (const [k, v] of r.decls) if (k === "max-height" || k === "height") found.push(`${file} ${r.selector} ${k}: ${v}`);
+		}
+		expect(found).toEqual([]);
+	});
+
 	test("icons are drawn at 14, 16 or 20px with a 1.75 or 2 stroke", () => {
 		const found: string[] = [];
 		for (const [file, text] of realCss()) for (const r of parseCss(file, text)) {
