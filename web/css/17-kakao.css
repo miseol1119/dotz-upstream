@@ -52,7 +52,7 @@
 .kk-av.sp { background: transparent; }
 :root[data-theme="dark"] .kk-av { background: hsl(var(--h) 22% 30%); color: hsl(var(--h) 45% 86%); }
 .kk-row .cv-m { flex-direction: column; align-items: flex-end; gap: var(--sp-1); }
-.kk-t { color: var(--fg-3); font: 400 12px/16px var(--font); white-space: nowrap; }
+.kk-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--fg-3); font: 400 12px/16px var(--font); white-space: nowrap; }
 @media (min-width: 1100px) { :is(.kk-rooms) .kk-av { width: 32px; height: 32px; font-size: 14px; } }
 
 /* The KakaoTalk room list reads as the prototype's: the head and the note sit on the page, the rooms in one card, a grey initial, the last message under

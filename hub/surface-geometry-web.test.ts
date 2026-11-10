@@ -77,3 +77,18 @@ test("390px dark: the secondary text of a menu item reaches 4.5:1 on the menu an
 	expect(c.small).toBeGreaterThanOrEqual(4.5);
 	expect(c.hover).toBeGreaterThanOrEqual(4.5);
 });
+
+const openList = (w: number) => page(w, "light", `go("chat", "list")`, `document.querySelectorAll("#v-chat .cv-row .cv-t").length >= 2`);
+test("390px: a conversation row whose time cell is very long keeps its title readable and the time cell inside the row", async () => {
+	const v = await openList(390);
+	await v.evaluate(`void document.querySelectorAll("#v-chat .cv-row .cv-t").forEach(t => { t.textContent = ${JSON.stringify(TOKEN)}; })`);
+	await painted(v);
+	await shot(v, "2-row-long-time");
+	const rows = await q<{ title: number; cellOut: number }[]>(v, `
+		return [...document.querySelectorAll("#v-chat .cv-row")].filter(r => r.querySelector(".cv-t") && r.offsetWidth).map(r => {
+			const rr = r.getBoundingClientRect(), m = r.querySelector(".cv-m").getBoundingClientRect(), b = r.querySelector(".cv-b").getBoundingClientRect();
+			return { title: Math.round(b.width), cellOut: Math.round(Math.max(0, m.right - rr.right)) };
+		});`);
+	expect(rows.length).toBeGreaterThan(1);
+	expect(rows.filter(r => r.title < 96 || r.cellOut > 0).length).toBe(0);
+});
