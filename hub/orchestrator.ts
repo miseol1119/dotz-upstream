@@ -366,6 +366,12 @@ export function createOrchestrator(opts: OrchOpts) {
 		for await (const ev of p.events) {
 			emitEventActivity(opts.source, ev);
 			noteEvent(orch.ctx, ev, port);
+			// What a compaction left (summary, kept messages, contract): past half the compaction point the session compacts again within hours.
+			if (ev.type === "usage" && checkCompacted && ev.tokens !== undefined && ev.tokens < (orch.ctx.compaction.tokensBefore ?? Infinity)) {
+				checkCompacted = false;
+				log(`${who} compaction left ${ev.tokens} tokens (compaction point ${compactAt()})`);
+				if (ev.tokens * 2 > compactAt()) orch.status === "idle" ? rotate() : (rotateWhenIdle = true);
+			}
 			switch (ev.type) {
 				case "turn_start":
 					orch.resuming = false;
@@ -478,6 +484,7 @@ export function createOrchestrator(opts: OrchOpts) {
 				case "compaction":
 					if (ev.state === "done") {
 						compactRetried = false;
+						checkCompacted = true;
 						// The compacted session keeps going: the next owner message reminds it to retain, and carries the lane
 						// questions still waiting for the owner (the summary may have cut them); the dotz extension re-reads the
 						// contract and state.json (open_tasks) into it.
@@ -649,6 +656,7 @@ export function createOrchestrator(opts: OrchOpts) {
 	// progress, so that is only the fallback when compaction fails (and the omp/Claude Code behaviour).
 	let rotateWhenIdle = false;
 	let compactRetried = false;
+	let checkCompacted = false;
 	const compacting = () => orch.ctx.compaction.state === "queued" || orch.ctx.compaction.state === "compacting";
 	function limitContext(): void {
 		if (!rotateWhenIdle && adapter?.caps.contextLimit === "compact") {
