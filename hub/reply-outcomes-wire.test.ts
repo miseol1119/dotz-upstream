@@ -1,15 +1,18 @@
 // pickedSend (hub/reply-outcomes.ts) against the answer text the real gateway paths leave on a card: the web button (webAnswer), a Discord
 // button (discordGatewayAnswer) and the batch answer. A retry of a failed send is only offered for a card whose answer it can read.
 // The drafts are mails of a source this machine cannot send from, refused after the approval check, so nothing leaves this machine.
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, beforeEach, expect, test } from "bun:test";
 import { onEmit } from "./events.ts";
 import { draftApprovalBlock } from "./draft-approval.ts";
 import { ignoreNotice, listNotices } from "./notices.ts";
 import { out } from "./outbound.ts";
 import { approvalRoute, discordGatewayAnswer, sender, webAnswer } from "./approval-wire.ts";
 import { pickedSend } from "./reply-outcomes.ts";
+import { cfg } from "./config.ts";
 import { addDraft, newId } from "../features/reply-drafts/lib/store.ts";
 
+// The subject is how the three routes record the answer, not the cancel window: with it off the approved sends start at once.
+beforeEach(() => void (cfg.web.send_undo_sec = 0));
 const CONV = "mail:ro-wire-test";
 const draft = (body: string) => {
 	const id = newId();
