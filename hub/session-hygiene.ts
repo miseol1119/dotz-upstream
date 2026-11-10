@@ -218,6 +218,8 @@ function isIndexed(db: Database, file: string, st: { size: number; mtimeMs: numb
 export const sessionRoots = (): string[] => [
 	join(process.env.OMO_CODING_AGENT_DIR ?? process.env.PI_AGENT_DIR ?? join(homedir(), ".omo", "agent"), "sessions"),
 	join(homedir(), ".omp", "agent", "sessions"),
+	// Claude Code keeps <config>/projects/<cwd>/<id>.jsonl (hub/runtime/claude.ts): the same folder/file depth.
+	join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects"),
 ];
 
 if (import.meta.main) {

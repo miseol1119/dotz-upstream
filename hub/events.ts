@@ -7,6 +7,7 @@ import { stripSteerMark } from "./steer-mark.ts";
 import { mailByThread, mailTarget } from "./mail.ts";
 import { deriveSpec } from "./message-spec-derive.ts";
 import { noteBroken, ownerKind, ownerText, shownEvent } from "./owner-text.ts";
+import { maskSecrets } from "./public-scrub.ts";
 import { dropClaim, statedTone, stripHandoff } from "./tone.ts";
 
 export type HubEvent = { ts: string; kind: string; source: string; text: string; [key: string]: unknown };
@@ -19,6 +20,19 @@ const isAnswer = (e: HubEvent): boolean =>
  * message or decision answer from the other computer's page carries it too. Both arrive as web messages under the owner's login, so only this tells them apart. */
 export const isPeerMessage = (e: HubEvent): boolean =>
 	!!e.via && (e.kind === "message" || e.kind === "lane_message") && !e.decision && !e.picks && !/^(?:mail|th|settings):/.test(String(e.conv || e.channel || ""));
+
+/** What goes into inbox/outbox: a secret pasted into a message is masked in the file (hub/public-scrub.ts maskSecrets); the live event, its ids and its replies are untouched. */
+export function maskedForDisk(event: HubEvent): HubEvent {
+	let changed = false;
+	const mask = (s: string): string => {
+		const text = maskSecrets(s).text;
+		if (text !== s) changed = true;
+		return text;
+	};
+	const text = typeof event.text === "string" ? mask(event.text) : event.text;
+	const parts = Array.isArray(event.parts) ? event.parts.map((p: any) => (typeof p?.text === "string" ? { ...p, text: mask(p.text) } : p)) : undefined;
+	return changed ? { ...event, text, ...(parts ? { parts } : {}) } : event;
+}
 
 const recent: HubEvent[] = [];
 const subscribers = new Set<ReadableStreamDefaultController<string>>();
@@ -54,7 +68,7 @@ export function emit(box: "inbox" | "outbox", event: HubEvent): void {
 		const spec = deriveSpec(dropClaim(text), NAME, tone);
 		if (spec) event.spec = spec;
 	}
-	appendFileSync(box === "inbox" ? paths.inbox : paths.outbox, `${box === "inbox" ? sealLine(paths.inbox, event) : JSON.stringify(event)}\n`);
+	appendFileSync(box === "inbox" ? paths.inbox : paths.outbox, `${box === "inbox" ? sealLine(paths.inbox, maskedForDisk(event)) : JSON.stringify(maskedForDisk(event))}\n`);
 	if (typeof event.text === "string" && event.text.includes("[file]")) snapshotSent(event.text);
 	recent.push(event);
 	if (recent.length > 300) recent.shift();

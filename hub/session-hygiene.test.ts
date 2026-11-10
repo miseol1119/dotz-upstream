@@ -8,7 +8,7 @@ import type { Database } from "bun:sqlite";
 import { maskSecrets } from "./public-scrub.ts";
 import { forget, ingest, openRecall } from "./recall-index.ts";
 import { search } from "./recall-search.ts";
-import { runSessionHygiene } from "./session-hygiene.ts";
+import { runSessionHygiene, sessionRoots } from "./session-hygiene.ts";
 
 const DAY = 86_400_000;
 const FAKE_GH = `ghp_${"A1b2".repeat(9)}`;
@@ -156,5 +156,52 @@ describe("session hygiene", () => {
 		sync();
 		expect(find("삭제요청")).toEqual([]);
 		expect(existsSync(live)).toBe(false);
+	});
+});
+
+describe("Claude runtime sessions", () => {
+	test("the Claude projects folder is a session root, and an idle Claude session file is masked there", () => {
+		const prev = process.env.CLAUDE_CONFIG_DIR;
+		process.env.CLAUDE_CONFIG_DIR = join(base, "claude");
+		try {
+			const projects = join(base, "claude", "projects");
+			expect(sessionRoots()).toContain(projects);
+			const dir = join(projects, "-home-x-dotz");
+			mkdirSync(dir, { recursive: true });
+			const file = join(dir, `${UUID}.jsonl`);
+			const line = (role: string, text: string) => JSON.stringify({ type: role, sessionId: UUID, message: { role, content: text } });
+			writeFileSync(file, `${line("user", `키는 ${FAKE_GH} 이야`)}\n${line("assistant", "알겠어")}\n`);
+			const old = new Date(Date.now() - 2 * DAY);
+			utimesSync(file, old, old);
+			const r = runSessionHygiene({ roots: sessionRoots(), secrets: [], keepDays: 90, dryRun: false, recall: db });
+			expect(r.masked.files).toBe(1);
+			const text = readFileSync(file, "utf8");
+			expect(text).not.toContain(FAKE_GH);
+			expect(text).toContain("[가림:github]");
+			expect(text).toContain(UUID);
+			expect(statSync(file).mode & 0o777).toBe(0o600);
+		} finally {
+			if (prev === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+			else process.env.CLAUDE_CONFIG_DIR = prev;
+		}
+	});
+
+	test("an old Claude session file the recall index never read is kept", () => {
+		const prev = process.env.CLAUDE_CONFIG_DIR;
+		process.env.CLAUDE_CONFIG_DIR = join(base, "claude");
+		try {
+			const dir = join(base, "claude", "projects", "-home-x-dotz");
+			mkdirSync(dir, { recursive: true });
+			const file = join(dir, `${UUID}.jsonl`);
+			writeFileSync(file, `${JSON.stringify({ type: "user", message: { role: "user", content: "오래된 대화" } })}\n`);
+			const old = new Date(Date.now() - 91 * DAY);
+			utimesSync(file, old, old);
+			const r = runSessionHygiene({ roots: sessionRoots(), secrets: [], keepDays: 90, dryRun: false, recall: db });
+			expect(r.retention.deleted).toBe(0);
+			expect(existsSync(file)).toBe(true);
+		} finally {
+			if (prev === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+			else process.env.CLAUDE_CONFIG_DIR = prev;
+		}
 	});
 });
