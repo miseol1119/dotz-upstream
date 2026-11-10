@@ -128,6 +128,87 @@ test("--git installs a clone that updates through git, without a stamp", () => {
 	expect(up.json.status).toBe("updated");
 	expect(existsSync(join(app, "RELEASE_2"))).toBe(true);
 }, 60_000);
+// A fresh install without DOTZ_REF gets the newest release tag, not the commits main has gained since (local origin, no network).
+const originWith = (name: string, tags: string[]) => {
+	const origin = join(root, name);
+	copyTree(origin);
+	const git = (...a: string[]) => {
+		const r = run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "gc.auto=0", "-c", "maintenance.auto=false", ...a], {}, origin);
+		expect(r.code).toBe(0);
+		return r.out;
+	};
+	git("init", "-q", "-b", "main");
+	git("add", "-A");
+	tags.forEach((tag, i) => {
+		writeFileSync(join(origin, "VERSION"), `${tag.slice(1)}\n`);
+		writeFileSync(join(origin, `AT_${i}`), "x\n");
+		git("add", "-A");
+		git("commit", "-q", "-m", `release ${tag}`);
+		git("tag", tag);
+	});
+	writeFileSync(join(origin, "UNRELEASED"), "x\n");
+	git("add", "-A");
+	git("commit", "-q", "-m", "work after the last tag");
+	return origin;
+};
+
+test("without DOTZ_REF the install is the newest release tag (a hotfix counts, order does not), not main", () => {
+	const origin = originWith("origin-tags", ["v261101.1", "v261101.2", "v261101.2.1", "v261101.1.1"]);
+	const app = join(root, "app-tag");
+	const i = installer({ DOTZ_HOME: app, DOTZ_GIT_URL: origin }, "--git");
+	if (i.code !== 0) throw new Error(i.out);
+	expect(readFileSync(join(app, "VERSION"), "utf8").trim()).toBe("261101.2.1");
+	expect(existsSync(join(app, "UNRELEASED"))).toBe(false);
+}, 60_000);
+
+test("without DOTZ_REF and with no release tag the install falls back to main", () => {
+	const origin = originWith("origin-no-tags", []);
+	const app = join(root, "app-main");
+	const i = installer({ DOTZ_HOME: app, DOTZ_GIT_URL: origin }, "--git");
+	if (i.code !== 0) throw new Error(i.out);
+	expect(existsSync(join(app, "UNRELEASED"))).toBe(true);
+}, 60_000);
+
+// The GitHub tarball path with curl and gh stubbed first on PATH (no network, no real gh): `tags` is what the tags API answers (a failing answer
+// when null), and every URL curl was asked for lands in the log, so the test sees which ref the install resolved and downloaded.
+const githubInstall = (name: string, tags: string[] | null, extra: Record<string, string> = {}) => {
+	const bin = join(root, `${name}-bin`), log = join(root, `${name}.log`), tgz = join(root, `${name}.tar.gz`);
+	mkdirSync(bin);
+	tarball(tgz);
+	const sha = "a".repeat(40);
+	writeFileSync(join(bin, "tags.json"), JSON.stringify((tags ?? []).map(t => ({ name: t }))));
+	writeFileSync(join(bin, "curl"), `#!/bin/sh\nout=; prev=; for a; do [ "$prev" = -o ] && out=$a; prev=$a; last=$a; done\nprintf '%s\\n' "$*" >> "${log}"\ncase $last in\n*/tags*) ${tags ? `cat "${bin}/tags.json"` : "exit 22"} ;;\n*/commits/*) printf '%s' ${sha} ;;\nhttps://codeload.github.com/*|*/tarball/*) cp "${tgz}" "$out" ;;\n*) exit 22 ;;\nesac\n`);
+	writeFileSync(join(bin, "gh"), "#!/bin/sh\nexit 1\n");
+	chmodSync(join(bin, "curl"), 0o755);
+	chmodSync(join(bin, "gh"), 0o755);
+	const app = join(root, `app-${name}`);
+	const i = installer({ DOTZ_HOME: app, PATH: `${bin}:${process.env.PATH}`, ...extra });
+	if (i.code !== 0) throw new Error(i.out);
+	return { requests: readFileSync(log, "utf8"), stamp: readFileSync(join(app, ".dotz-install"), "utf8") };
+};
+
+test("a GitHub install without DOTZ_REF downloads the newest release tag, whatever order the tags API lists them in", () => {
+	const s = githubInstall("gh-tag", ["v261101.1", "v261101.2.1", "v261101.2", "v261030.9", "not-a-release"]);
+	expect(s.requests).toContain("/commits/v261101.2.1");
+	expect(s.requests).not.toContain("/commits/main");
+	expect(s.stamp).toContain("ref=v261101.2.1\n");
+});
+
+test("a GITHUB_TOKEN install asks for the tags with the token and downloads the tag", () => {
+	const s = githubInstall("gh-token", ["v261101.1"], { GITHUB_TOKEN: "stub-token" });
+	expect(s.requests).toMatch(/Authorization: Bearer stub-token .*\/tags/);
+	expect(s.requests).toContain("/tarball/" + "a".repeat(40));
+	expect(s.stamp).toContain("ref=v261101.1\n");
+	expect(s.stamp).toContain("auth=token\n");
+});
+
+test("a GitHub install where no tag can be read falls back to main, and DOTZ_REF still wins over the tags", () => {
+	expect(githubInstall("gh-none", null).requests).toContain("/commits/main");
+	const pinned = githubInstall("gh-pinned", ["v261101.1"], { DOTZ_REF: "v261030.9" });
+	expect(pinned.requests).toContain("/commits/v261030.9");
+	expect(pinned.requests).not.toContain("/tags");
+});
+
 // The web onboarding branch (docs/web-onboarding.md, "설치 스크립트 분기"). launchctl, systemctl, open and xdg-open are stubs first on PATH that only
 // log their calls, so no real service, browser or the live label dev.dotz.gateway is ever touched. --no-open keeps the run from waiting for a gateway.
 const ADDRESS = /http:\/\/127\.0\.0\.1:(\d+)\/setup\?token=([A-Za-z0-9_-]+)/;

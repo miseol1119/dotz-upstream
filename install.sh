@@ -23,7 +23,7 @@
 #
 # Environment:
 #   DOTZ_REPO     GitHub owner/name                     (default ddotz/dotz)
-#   DOTZ_REF      branch, tag or commit                 (default main)
+#   DOTZ_REF      branch, tag or commit                 (default the newest release tag, else main)
 #   DOTZ_TARBALL  source tarball instead of GitHub: https://..., file:///abs/path.tar.gz or a local path
 #   DOTZ_HOME     where the code goes                   (default ~/.local/share/dotz)
 #   DOTZ_DIR      data dir (config, secrets, memory)    (default ~/.dotz)
@@ -37,6 +37,7 @@ set -eu
 
 REPO=${DOTZ_REPO:-ddotz/dotz}
 REF=${DOTZ_REF:-main}
+PINNED=${DOTZ_REF:+1} # without DOTZ_REF a GitHub install takes the newest release tag (what self-update installs), not whatever main gained since
 TARBALL=${DOTZ_TARBALL:-}
 APP=${DOTZ_HOME:-$HOME/.local/share/dotz}
 DATA=${DOTZ_DIR:-$HOME/.dotz}
@@ -166,6 +167,9 @@ TGZ=$TMP/src.tar.gz
 TOKEN=${GITHUB_TOKEN:-${GH_TOKEN:-}}
 # What the self-update stamp records: KIND github|url, the commit SHA (empty when unknown), AUTH public|token|gh.
 KIND=github AUTH=public SHA='' TARBALL_URL=''
+# Release tags are v<YYMMDD>.<N>[.<M>] (hub/release.ts); the newest by number, so a hotfix counts and the listing order does not.
+newest_tag() { grep -E '^v[0-9]{6}\.[0-9]+(\.[0-9]+)?$' | sort -t. -k1.2,1n -k2,2n -k3,3n | tail -n 1; }
+tag_names() { grep -o '"name": *"v[^"]*"' | sed 's/.*"\(v[^"]*\)"$/\1/'; }
 valid_sha() { case $1 in *[!0-9a-f]*) return 1 ;; esac; [ "${#1}" -eq 40 ]; }
 sha256_of() { if have shasum; then shasum -a 256 "$1" | cut -d' ' -f1; elif have sha256sum; then sha256sum "$1" | cut -d' ' -f1; fi; }
 if [ -n "$GIT" ]; then
@@ -186,7 +190,18 @@ if [ -n "$GIT" ]; then
 	else
 		die "cannot clone $SRC: $(tail -n 1 "$TMP/clone.err"). If the repo is private, sign in with 'gh auth login' or set GITHUB_TOKEN"
 	fi
-	git -C "$CLONE" checkout --quiet "$REF" || die "ref $REF not found in $SRC"
+	TAG=
+	[ -n "$PINNED" ] || TAG=$(git -C "$CLONE" tag -l 'v*' | newest_tag)
+	if [ -n "$TAG" ]; then
+		REF=$TAG
+		SRC="$GIT_URL@$REF (git clone)"
+		BRANCH=$(git -C "$CLONE" symbolic-ref -q --short HEAD || true)
+		# The clone's branch is moved onto the tag, so self-update fast-forwards it to the next release.
+		git -C "$CLONE" checkout --quiet ${BRANCH:+-B "$BRANCH"} "$TAG" || die "cannot check out $TAG in $SRC"
+		say "installing the newest release, $REF"
+	else
+		git -C "$CLONE" checkout --quiet "$REF" || die "ref $REF not found in $SRC"
+	fi
 	TOP=$CLONE
 else
 	if [ -n "$TARBALL" ]; then
@@ -202,8 +217,18 @@ else
 		SRC=$TARBALL
 		SHA=$(sha256_of "$TGZ")
 	else
-		SRC="github.com/$REPO@$REF"
 		API=https://api.github.com/repos/$REPO
+		if [ -z "$PINNED" ]; then
+			# The newest release tag; none found (private repo without access, no network, none cut yet): main as before.
+			if [ -n "$TOKEN" ]; then
+				TAG=$(curl -fsSL -H "Authorization: Bearer $TOKEN" "$API/tags?per_page=100" 2>/dev/null | tag_names | newest_tag)
+			else
+				TAG=$(curl -fsSL "$API/tags?per_page=100" 2>/dev/null | tag_names | newest_tag)
+				[ -n "$TAG" ] || ! have gh || ! gh auth status >/dev/null 2>&1 || TAG=$(gh api "repos/$REPO/tags?per_page=100" 2>/dev/null | tag_names | newest_tag)
+			fi
+			if [ -n "$TAG" ]; then REF=$TAG; say "installing the newest release, $REF"; fi
+		fi
+		SRC="github.com/$REPO@$REF"
 		# The commit is resolved first and the tarball fetched by that SHA, so the stamp is exactly what was installed.
 		if [ -n "$TOKEN" ]; then
 			AUTH=token
