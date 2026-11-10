@@ -178,6 +178,7 @@ export type PublishOptions = {
 	exec?: Exec;
 	terms?: readonly Term[];
 	address?: string; // how the owner is addressed; this install's config when not given
+	buildDemo?: Exec; // rebuilds site/demo from web/ before the release commit (cmd is unused); `bun site/build-demo.ts` in the checkout when not given
 };
 
 async function releaseNote(root: string, tag: string, base: string | null, rev: string, terms: readonly Term[], address: string): Promise<string> {
@@ -223,6 +224,23 @@ async function pushPinned(root: string): Promise<{ code: number; out: string }> 
 		return merged;
 	}
 	return gitOutput(["push", "origin", "HEAD:main"], root);
+}
+
+// The public demo is a build of web/, so the release commit carries a fresh one. A build that fails is logged and the release goes out with the
+// demo as it was: whatever the failed build left in site/ is put back. Returns whether the site/ changes should join the release commit.
+async function rebuildDemo(root: string, build: Exec | undefined, print: (line: string) => void): Promise<boolean> {
+	if (!build && !existsSync(join(root, "site", "build-demo.ts"))) return false;
+	const untracked = async () => new Set((await gitOutput(["ls-files", "--others", "--exclude-standard", "--", "site"], root)).out.split("\n").filter(Boolean));
+	const before = await untracked();
+	const made = await (build ?? ((cmd: readonly string[]) => run(cmd, root)))(["bun", "site/build-demo.ts"]).catch((e: unknown) => ({ code: 1, out: String(e) }));
+	if (made.code === 0) {
+		print("데모: web/로 site/demo를 다시 만들었어요");
+		return true;
+	}
+	print(`데모를 다시 만들지 못해서 이번 릴리스는 데모 갱신 없이 내요: ${made.out.slice(-500)}`);
+	await gitOutput(["checkout", "--", "site"], root);
+	for (const file of await untracked()) if (!before.has(file)) rmSync(join(root, file), { force: true });
+	return false;
 }
 
 export async function publishVersion(opts: PublishOptions): Promise<number> {
@@ -304,12 +322,18 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 		return 1;
 	}
 
+	const demo = await rebuildDemo(root, opts.buildDemo, print);
 	writeFileSync(join(root, "VERSION"), `${version.text}\n`);
 	print(`VERSION: ${version.text}`);
 
 	const added = await gitOutput(["add", "VERSION"], root);
 	if (added.code !== 0) {
 		print(`VERSION을 스테이징하지 못했어요: ${added.out}`);
+		return 1;
+	}
+	const addedDemo = demo ? await gitOutput(["add", "-u", "--", "site"], root) : { code: 0, out: "" };
+	if (addedDemo.code !== 0) {
+		print(`다시 만든 데모를 스테이징하지 못했어요: ${addedDemo.out}`);
 		return 1;
 	}
 	// CI has no git identity: set one in this checkout so the commit and the later pull --rebase both have a committer.
@@ -370,8 +394,8 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 
 type Exec = (cmd: readonly string[]) => Promise<{ code: number; out: string }>;
 
-async function run(cmd: readonly string[]): Promise<{ code: number; out: string }> {
-	const proc = Bun.spawn([...cmd], { stdout: "pipe", stderr: "pipe", timeout: 60_000 });
+async function run(cmd: readonly string[], cwd?: string): Promise<{ code: number; out: string }> {
+	const proc = Bun.spawn([...cmd], { cwd, stdout: "pipe", stderr: "pipe", timeout: 120_000 });
 	const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
 	return { code: await proc.exited, out: `${out}${err}`.trim() };
 }

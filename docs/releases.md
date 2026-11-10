@@ -5,7 +5,7 @@ A version is `YYMMDD.N`: the KST calendar day, then 1, 2 or 3 for the scheduled 
 Commits pushed to `main` reach nobody by themselves; the tag is the only thing installs see, so work piles up and a release
 batches it. Releases are cut at 12:00, 18:00 and 24:00 KST; each install's updater checks every 10 minutes and moves to the
 newest tag it finds. the owner's machine starts `.github/workflows/release.yml` in those three windows (below), and it runs `bun hub/release.ts --auto --sha <tested commit>`: with no commit after the newest tag
-it prints one line and stops, otherwise it writes `VERSION`, commits, tags and pushes `main` plus the tag. A 24:00 KST cut
+it prints one line and stops, otherwise it rebuilds the public demo (`bun site/build-demo.ts`; a failed build is logged and the release goes out without the demo update), writes `VERSION`, commits both together, tags and pushes `main` plus the tag. A 24:00 KST cut
 falls on the next KST day, so it becomes that day's `.1`.
 `N` is the number of scheduled versions already tagged that day plus one, so a day whose first release came at 18:00 is
 `.1`, not `.2`. A fourth scheduled release in one day is refused with the reason; so is a dirty tracked tree and a tag dated

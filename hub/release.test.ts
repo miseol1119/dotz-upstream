@@ -255,6 +255,60 @@ describe("release note", () => {
 		expect(git(origin, "tag", "--list", "v*").trim()).toBe("v261106.1");
 		expect(lines.join("\n")).toContain("# dotz v261106.1");
 	});
+
+	// A checkout whose site/demo was built from an older web/, with an origin to push to.
+	const withDemo = () => {
+		const parent = mkdtempSync(join(tmpdir(), "dotz-release-gh-"));
+		roots.push(parent);
+		const origin = join(parent, "github.com", "ddotz", "dotz.git");
+		mkdirSync(origin, { recursive: true });
+		git(origin, "init", "-q", "--bare", "-b", "main");
+		const root = tempRepo();
+		git(root, "remote", "add", "origin", origin);
+		git(root, "switch", "-q", "-c", "main");
+		mkdirSync(join(root, "site", "demo"), { recursive: true });
+		writeFileSync(join(root, "site", "demo", "app.js"), "old demo\n");
+		git(root, "add", ".");
+		commit(root, "base");
+		git(root, "push", "-q", "origin", "main");
+		const release = (buildDemo: (cmd: readonly string[]) => Promise<{ code: number; out: string }>, lines: string[] = []) =>
+			publishVersion({ auto: false, force: false, dryRun: false, cwd: root, now: kst("2026-11-06T13:00:00"), print: l => lines.push(l), exec: async () => ({ code: 0, out: "" }), buildDemo, terms: [], address: "" });
+		return { root, origin, release };
+	};
+
+	test("the release commit carries the rebuilt demo together with VERSION", async () => {
+		const { root, origin, release } = withDemo();
+		const lines: string[] = [];
+		const cmds: (readonly string[])[] = [];
+		const code = await release(async cmd => {
+			cmds.push(cmd);
+			writeFileSync(join(root, "site", "demo", "app.js"), "rebuilt demo\n");
+			return { code: 0, out: "" };
+		}, lines);
+		expect(code).toBe(0);
+		expect(cmds).toEqual([["bun", "site/build-demo.ts"]]);
+		expect(git(origin, "tag", "--list", "v*").trim()).toBe("v261106.1");
+		expect(git(root, "show", "--name-only", "--format=", "v261106.1").split("\n").filter(Boolean).sort()).toEqual(["VERSION", "site/demo/app.js"]);
+		expect(git(root, "show", "v261106.1:site/demo/app.js")).toBe("rebuilt demo\n");
+		expect(git(origin, "show", "main:site/demo/app.js")).toBe("rebuilt demo\n");
+		expect(lines.join("\n")).toContain("데모");
+	});
+
+	for (const [name, build] of [
+		["reports a failure", (root: string) => async () => { writeFileSync(join(root, "site", "demo", "app.js"), "half written\n"); writeFileSync(join(root, "site", "demo", "new.js"), "stray\n"); return { code: 1, out: "banned word in the bundle" }; }],
+		["throws", (root: string) => async () => { writeFileSync(join(root, "site", "demo", "app.js"), "half written\n"); throw new Error("bun is not installed"); }],
+	] as const) {
+		test(`a builder that ${name} is logged and the release goes out without the demo update`, async () => {
+			const { root, origin, release } = withDemo();
+			const lines: string[] = [];
+			expect(await release(build(root), lines)).toBe(0);
+			expect(git(origin, "tag", "--list", "v*").trim()).toBe("v261106.1");
+			expect(git(root, "show", "--name-only", "--format=", "v261106.1").trim()).toBe("VERSION");
+			expect(readFileSync(join(root, "site", "demo", "app.js"), "utf8")).toBe("old demo\n");
+			expect(existsSync(join(root, "site", "demo", "new.js"))).toBe(false);
+			expect(lines.join("\n")).toContain("데모를 다시 만들지 못해서");
+		});
+	}
 });
 
 describe("summarizeChanges", () => {
