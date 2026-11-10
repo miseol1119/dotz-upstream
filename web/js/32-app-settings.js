@@ -491,12 +491,13 @@ function asPaint() {
   put("advanced", 7, asOwn(app) ? asWatchRmNode(app) : asRemoveNode(app));
   const wmon = asOwn(app) ? asMon(app) : null;
   const conn = asOwn(app) ? (wmon ? asStatRow(app, wmon, null) : null) : asConnNode(app);
-  clear(box).append(
+  const kids = [
     ...(conn ? [conn] : []),
     ...AS_SECTIONS.flatMap(([k, title]) => {
       const rows = secs.get(k).map((r, i) => ({ ...r, i })).sort((a, b) => a.rank - b.rank || a.i - b.i).map(r => r.node);
       return rows.length ? [el("div", { class: "as-sec", "data-sec": k, text: title }), ...rows] : [];
-    }));
+    })];
+  paintKeep(box, kids, asPaint, app);
 }
 // The settings screen: a view pushed over the conversation (back button on a phone and on a wide screen) with the status card and every option row.
 // The conversation keeps only the chat; its header's ⋯ button opens this.
