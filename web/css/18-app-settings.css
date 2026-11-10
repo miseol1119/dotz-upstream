@@ -6,9 +6,15 @@
 .sec.sec-act > .tag { margin-left: 0; }
 .sec.sec-act > .tag + .btn { margin-left: auto; }
 /* a section label sits 8px above its card and 24px below the card before it (proto.css .sec) */
-#settings > .list + .sec { margin-top: var(--sp-6); }
-#settings > .sec { margin-bottom: var(--sp-2); }
-#settings > .sec:first-child { margin-top: var(--sp-2); }
+#settings > .list + .sec, #settings > .set-col > .list + .sec { margin-top: var(--sp-6); }
+#settings > .sec, #settings > .set-col > .sec { margin-bottom: var(--sp-2); }
+#settings > .sec:first-child, #settings > .set-col:first-child > .sec:first-child { margin-top: var(--sp-2); }
+/* the first screen is two columns from 1100px (22-settings-pages.js settingsCols); one column below, where the second box's first title keeps the gap a title after a card has */
+#settings > .set-col + .set-col > .sec:first-child { margin-top: var(--sp-6); }
+@media (min-width: 1100px) {
+  #settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--sp-6); align-items: start; }
+  #settings > .set-col + .set-col > .sec:first-child { margin-top: var(--sp-2); }
+}
 #settings .list + .list { margin-top: var(--sp-3); }
 #settings .sec .tag { height: var(--tag-h); }
 

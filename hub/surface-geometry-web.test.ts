@@ -255,3 +255,38 @@ for (const w of [390, 1280]) {
 		await typeOk(v, ".fs-card .tr-q > span");
 	});
 }
+
+/* settings first screen: two columns from 1100px, one column below with the same gap before every group title */
+const SETTINGS_READY = `current === "settings" && document.querySelectorAll("#settings > .set-col").length === 2 && document.querySelectorAll("#settings .list").length >= 4`;
+test("1280px: the settings first screen is two columns that start at one height and need no scroll", async () => {
+	const v = await page(1280, "light", `go("settings")`, SETTINGS_READY);
+	await shot(v, "settings-two-columns");
+	const m = await q<{ cols: { top: number; left: number; right: number; secTop: number; n: number }[]; scroll: number[] }>(v, `
+		const cols = [...document.querySelectorAll("#settings > .set-col")].map(e => { const b = e.getBoundingClientRect(), s = e.querySelector(".sec").getBoundingClientRect(); return { top: b.top, left: b.left, right: b.right, secTop: s.top, n: e.querySelectorAll(".sec").length }; });
+		const v = document.querySelector(".views");
+		return { cols, scroll: [v.scrollHeight, v.clientHeight, document.documentElement.scrollWidth, innerWidth] };`);
+	expect(m.cols.length).toBe(2);
+	expect(m.cols[0].top).toBe(m.cols[1].top);
+	expect(m.cols[0].secTop).toBe(m.cols[1].secTop);
+	expect(m.cols[1].left).toBeGreaterThanOrEqual(m.cols[0].right);
+	expect(m.cols[1].right).toBeLessThanOrEqual(m.scroll[3]);
+	expect(m.cols.every(c => c.n >= 2)).toBe(true);
+	expect(m.scroll[0]).toBeLessThanOrEqual(m.scroll[1]);
+	expect(m.scroll[2]).toBe(m.scroll[3]);
+});
+for (const w of [390, 1099]) {
+	test(`${w}px: the settings first screen stays one column and every group title after the first has the same gap above it`, async () => {
+		const v = await page(w, "light", `go("settings")`, SETTINGS_READY);
+		const m = await q<{ lefts: number[]; widths: number[]; gaps: number[]; stacked: boolean }>(v, `
+			const cols = [...document.querySelectorAll("#settings > .set-col")].map(e => e.getBoundingClientRect());
+			const items = [...document.querySelectorAll("#settings .sec, #settings .list")].map(e => ({ sec: e.classList.contains("sec"), b: e.getBoundingClientRect() }));
+			const gaps = items.map((x, i) => (x.sec && i > 0 ? x.b.top - items[i - 1].b.bottom : null)).filter(g => g !== null);
+			return { lefts: cols.map(c => c.left), widths: cols.map(c => c.width), gaps, stacked: cols[1].top >= cols[0].bottom };`);
+		expect(new Set(m.lefts).size).toBe(1);
+		expect(new Set(m.widths).size).toBe(1);
+		expect(m.stacked).toBe(true);
+		expect(m.gaps.length).toBeGreaterThanOrEqual(3);
+		expect(new Set(m.gaps).size).toBe(1);
+		expect(m.gaps[0]).toBeGreaterThan(0);
+	});
+}

@@ -69,6 +69,16 @@ function stPushSub() {
 }
 
 /* ---------- 설정 (the list) ---------- */
+// The first screen's groups (a .sec title + its .list) go into two .set-col boxes: 앱 and 시스템 on the right, every other group on the left. One column on a narrow window (18-app-settings.css).
+function settingsCols(nodes) {
+  const left = el("div", { class: "set-col" }), right = el("div", { class: "set-col" });
+  let col = left;
+  for (const n of nodes) {
+    if (n.classList.contains("sec")) col = n.textContent === "앱" || n.textContent === "시스템" ? right : left;
+    col.append(n);
+  }
+  return [left, right];
+}
 function settingsList(go) {
   const om = M && M.orchestrator;
   const connected = P ? P.providers.filter(isConnected).length : null;

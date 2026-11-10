@@ -309,5 +309,5 @@ function renderSettings() {
   const page = Object.hasOwn(SET_PAGE, current) ? SET_PAGE[current] : null;
   const box = $(page ? `#${current}` : "#settings");
   if (box.contains(document.activeElement) && openMenu) return;
-  clear(box).append(...(page ? page.build() : settingsList(go)));
+  clear(box).append(...(page ? page.build() : settingsCols(settingsList(go))));
 }
