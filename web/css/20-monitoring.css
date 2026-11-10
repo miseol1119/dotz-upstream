@@ -27,6 +27,7 @@
 .mon-ptag.pri { --tone: var(--accent); color: var(--fg-2); font-weight: 600; }
 .mon-ptag.ok { --tone: var(--ok); color: var(--ok); font-weight: 600; }
 .mon-ptag.warn { --tone: var(--warn); color: var(--warn); font-weight: 600; }
+.mon-ptag.off { font-weight: 600; }
 .mon-ptag.err { --tone: var(--err); color: var(--err); font-weight: 600; }
 
 /* the open item's head: the row of icon, name and state, then the bar / banner under it (wide screens; a phone puts them in the timeline) */

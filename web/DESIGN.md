@@ -118,7 +118,7 @@ float shadow (`--float`, `--shadow-menu`, `--shadow-dialog`, `--shadow-sheet`). 
 
 | Pattern | Use when | Shape |
 |---|---|---|
-| Status | a word that says the state of a row or card (`.tag`, `.mon-ptag`, `.ct-pill`, `.tr-st`, `.dr-hit`) | no fill, no padding: a 6px tone dot (`::before`, `--tone`) + the word, 600 in the tone colour; `.pri`/blue states keep the blue in the dot and the word in `--fg-2`. A tag with no tone is a meta word (`--fg-3`, 500). Status text is >= 4.5:1 in light and dark. |
+| Status | a word that says the state of a row or card (`.tag`, `.mon-ptag`, `.ct-pill`, `.tr-st`, `.dr-hit`) | no fill, no padding: a 6px tone dot (`::before`, `--tone`) + the word, 600 in the tone colour; `.pri`/blue states keep the blue in the dot and the word in `--fg-2`; `.off` (꺼짐, turned off on purpose) is the same shape in gray (`--fg-3` dot and word). A tag with no tone is a meta word (`--fg-3`, 500). Status text is >= 4.5:1 in light and dark. |
 | Filter | narrows the same list (`.mr-f` in `.mr-filter`/`.pl-chips`/`.mon-tabs`, `.nsc-fb`) | one segmented track (`--seg-track`, `--r-seg`) drawn by the segments, the chosen one a `--seg-on` cell (`--r-seg-in`) + `--fg` 600. Each segment stays the button (touch hit areas sit on it). A long row scrolls sideways, `segKeep` keeps the chosen one in view. |
 | Screen tab | swaps the whole view under it (`.mx-tab` mailboxes, `.cm-tabs` 댓글/DM: a different list, not a narrower one) | words over a 1px `--line` hairline, chosen = `--fg` 600 + 2px `--fg` underline; side padding `--sp-3` and the full `--btn-hit` 44px height as the hit area. |
 

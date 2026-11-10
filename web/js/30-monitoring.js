@@ -10,7 +10,6 @@ const NM = { items: [], loaded: false, failed: false, at: 0 };
 // Opening the monitoring screen reads the list again only when the last read is older than the 60 s refresh below (watch notices refresh it sooner).
 const NM_FRESH_MS = 60000;
 const monitorsFresh = () => NM.loaded && Date.now() - NM.at < NM_FRESH_MS;
-const MON_KIND = { watch: "모니터링", schedule: "예약" };
 // The list's groups after 감시 소식: app-type integrations (hub/integrations.ts kind "app"), then the plain monitors.
 const MON_GROUP = { app: "앱", plain: "일반 모니터링" };
 // sel: the open item's key ("notice", "i:<integration>", "m:<monitor name>"); list: the list is on screen instead of the item, on every width. An app's item has the whole column; a monitor opens beside the list of monitors (monListRows).
@@ -66,7 +65,7 @@ const monRel = (ms, past) => {
   const t = min < 60 ? `${min}분` : min < 1440 ? `${Math.floor(min / 60)}시간` : `${Math.floor(min / 1440)}일`;
   return past ? `${t} 전` : `${t} 후`;
 };
-const MON_PTAG = { ok: ["정상", "ok"], changed: ["바뀜", "warn"], fail: ["실패", "err"], disconnected: ["연결 끊김", "err"], need: ["확인 필요", "warn"], off: ["꺼짐", ""], late: ["늦어짐", "warn"], run: ["확인 중", "pri"] };
+const MON_PTAG = { ok: ["정상", "ok"], changed: ["바뀜", "warn"], fail: ["실패", "err"], disconnected: ["연결 끊김", "err"], need: ["확인 필요", "warn"], off: ["꺼짐", "off"], late: ["늦어짐", "warn"], run: ["확인 중", "pri"] };
 // A monitor's one status, read the same on every screen (the list row's badge, the detail's state line and tag, the home card, the app settings):
 // connection > paused > fail > late > changed > ok > not run yet. key is a MON_PTAG key; text and tone are its words and colour.
 function monStatus(m, now = Date.now()) {
@@ -900,16 +899,20 @@ function monSideNodes(rows) {
 // A monitor row in the list carries the same bar under its status line; the row itself is the shared convRow, so the block is appended here.
 // A monitor row carries its bar as the last child of the whole row (not of the text column), so the bar and its meta line take the full left-column
 // width even when a peer row's machine chip and result badge leave the text column narrow.
+// A row with no wait to show (paused, no next run, or on a computer that does not answer) has no bar: its subtitle says what there is instead.
+// A peer row keeps its subtitle under the name, since that line names the computer it runs on.
 function monDecorateRows(side, items) {
   for (const row of side.querySelectorAll(".cv-row[data-k]")) {
     const it = items.find(i => i.key === row.dataset.k);
     if (!it || !it.mon) continue;
-    row.classList.add("has-mon-prog");
+    const kind = monProgState(it.mon, Date.now()).kind, bar = !it.hostOff && kind !== "none" && kind !== "off";
+    row.classList.toggle("has-mon-prog", bar);
     const status = row.querySelector(".cv-b .cv-p"), old = row.querySelector(".mon-prog-wrap");
-    // The bar's colour says the result; only a disconnected monitor keeps its words (연결 끊김 and since when).
-    if (status && it.mon.connection === "disconnected") { status.classList.add("mon-row-status"); row.append(status); }
-    else if (status) status.remove();
     if (old) old.remove();
+    if (!bar) continue;
+    // The bar's colour says the result; only a disconnected monitor keeps its words (연결 끊김 and since when).
+    if (status && !it.pc && it.mon.connection === "disconnected") { status.classList.add("mon-row-status"); row.append(status); }
+    else if (status && !it.pc) status.remove();
     row.append(monProgNode(it.mon, { compact: true, tag: false, short: true }));
   }
 }

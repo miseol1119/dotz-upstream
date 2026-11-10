@@ -22,7 +22,7 @@ const NOW = Date.parse("2026-10-27T12:00:00Z"), past = new Date(NOW - 3600_000).
 describe("monStatus: connection > paused > fail > late > changed > ok > not run", () => {
 	const key = (m: object) => monStatus(m, NOW).key;
 	test("a paused monitor is 꺼짐 whatever its last result and its overdue next run", () => {
-		expect(monStatus({ paused: true, last_run: past, last_result: "ok", next_run: past }, NOW)).toEqual({ key: "off", text: "꺼짐", tone: "" });
+		expect(monStatus({ paused: true, last_run: past, last_result: "ok", next_run: past }, NOW)).toEqual({ key: "off", text: "꺼짐", tone: "off" });
 		expect(key({ paused: true, last_run: past, last_result: "fail" })).toBe("off");
 	});
 	test("a lost connection wins over paused and fail", () => {
@@ -140,7 +140,7 @@ describe("screens", () => {
 		expect(got.card).toBe("off");
 		expect(got.cardText).toContain("꺼짐");
 		expect(got.cardText).not.toContain("정상");
-		expect(got.badge).toEqual(["꺼짐", ""]);
+		expect(got.badge).toEqual(["꺼짐", "off"]);
 		expect(got.state).toBe("꺼짐");
 		expect(got.stat).toContain("꺼짐");
 		expect(got.row).toContain("꺼짐");
@@ -153,7 +153,7 @@ describe("screens", () => {
 		await v.evaluate(`(go("monitoring"), 0)`);
 		await v.evaluate(until(`PQ.loaded && monItems().some(i => i.pc)`, "peer rows not merged"));
 		const rows = await q<[string, string][]>(v, `return monRows(monItems(), null).filter(r => r.k && /^(i:|p:.*[|]i:)/.test(r.k)).map(r => [r.k, r.hint]);`);
-		expect(rows).toEqual([["i:mail", "답장 대기 1건"], ["i:kakao", "연결 끊김"], ["i:youtube", "확인할 것 없어요"], ["p:http://peer-b.invalid|i:mail", "답장 대기 2건"]]);
+		expect(rows).toEqual([["i:mail", "답장 대기 1건"], ["i:kakao", "연결 끊김"], ["i:youtube", "확인할 것 없어요"], ["p:http://peer-b.invalid|i:mail", "peer-b에서 돌아요 · 답장 대기 2건"]]);
 	});
 
 	test("the 모니터링 nav badge is the one 답장 대기 number (rqWaiting); failing and disconnected rows are not in it but show as the small dot while it is 0", async () => {

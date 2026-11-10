@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { advanceTimers, fakeHub, json, waitFor, type View } from "./test-web.ts";
 
-// 모니터링 shows this computer's items and every peer's together (web/js/34-peer-monitoring.js): a machine chip on each peer row, '연결 안 됨'
-// on a peer that does not answer, the peer's reports in 감시 소식 and the machine name beside each detail title. Headless; the peers are fixtures.
+// 모니터링 shows this computer's items and every peer's together (web/js/34-peer-monitoring.js): a peer row names its computer in the subtitle,
+// keeps one status on the right like every row (꺼짐 > 연결 안 됨 > its own), says 연결 안 됨 for a peer that does not answer, the peer's reports in 감시 소식 and the machine name beside each detail title. Headless; the peers are fixtures.
 const MINI = "http://mini.test";
 const at = (min: number) => new Date(Date.UTC(2026, 9, 20, 3, min)).toISOString();
 const localMon = { name: "local-check", watch: "local-check", kind: "watch", last_run: at(10), last_result: "ok", next_run: at(40), every: "30분" };
@@ -29,7 +29,7 @@ const peers = [
 			conversations: [{ target: "mail:abc", unread: 1, read: null, mail: MAIL, last: LAST }],
 		},
 	},
-	{ name: "서재", url: "http://study.test", online: false, stale: true, items: { name: "서재", rev: "r2", monitors: [{ name: "study-disk", kind: "watch", last_run: at(2), last_result: "ok" }], notices: [], integrations: [], conversations: [] } },
+	{ name: "서재", url: "http://study.test", online: false, stale: true, items: { name: "서재", rev: "r2", monitors: [{ name: "study-disk", kind: "watch", last_run: at(2), last_result: "ok" }, { name: "study-sync", kind: "watch", paused: true, last_run: at(2), last_result: "ok" }], notices: [], integrations: [], conversations: [] } },
 	{ name: "창고", url: "http://store.test", online: false, stale: false, items: null },
 ];
 
@@ -86,18 +86,25 @@ const boot = async (width: number, height: number) => {
 };
 
 describe("merged 모니터링", () => {
-	test("peer rows carry the machine chip, an offline peer says 연결 안 됨, the feed lists the peer's report first", async () => {
+	test("a peer row has one status on the right and names its computer in the subtitle, an offline peer says 연결 안 됨, the feed lists the peer's report first", async () => {
 		const v = await boot(1280, 800);
-		expect(await text(v, `${rowOf(`p:${MINI}|m:peer-backup`)}.querySelector(".tag").textContent`)).toBe("맥미니");
-		expect(await text(v, `${rowOf(`p:${MINI}|i:mail`)}.querySelector(".tag").textContent`)).toBe("맥미니");
-		const localTags = JSON.parse(await text(v, `JSON.stringify([...${rowOf("m:local-check")}.querySelectorAll(".tag")].map(t => t.textContent))`));
-		expect(localTags).toHaveLength(1);
-		expect(localTags[0]).not.toBe("맥미니");
+		// [status words on the right, subtitle, bars] of a row
+		const row = async (key: string) => JSON.parse(await text(v, `(r => JSON.stringify([[...r.querySelectorAll(".cv-m .tag")].map(t => t.textContent), (r.querySelector(".cv-p") || {}).textContent || "", r.querySelectorAll(".mon-prog").length]))(${rowOf(key)})`)) as [string[], string, number];
+		const backup = await row(`p:${MINI}|m:peer-backup`);
+		expect(backup[0]).toEqual([await text(v, `monStatus(PQ.list[0].items.monitors[0]).text`)]);
+		expect(backup[1]).toStartWith("맥미니에서 돌아요 · ");
+		expect(backup[2]).toBe(1);
+		expect((await row(`p:${MINI}|i:mail`))[1]).toStartWith("맥미니에서 돌아요");
+		expect((await row("m:local-check"))[0]).toHaveLength(1);
 		// the other computer's disconnected app says so here too, not "확인할 것 없어요"
-		expect(await text(v, `${rowOf(`p:${MINI}|i:kakao`)}.textContent`)).toContain(PEER_DOWN);
-		const stale = await text(v, `[...${rowOf("p:http://study.test|m:study-disk")}.querySelectorAll(".tag")].map(t => t.textContent).join(",")`);
-		expect(stale).toBe("서재,연결 안 됨");
-		expect(await text(v, `${rowOf("p:http://store.test|off")}.querySelector(".cv-n").textContent`)).toBe("창고 · 연결 안 됨");
+		const kakao = await row(`p:${MINI}|i:kakao`);
+		expect(kakao[0]).toEqual(["연결 끊김"]);
+		expect(kakao[1]).toBe(`맥미니에서 돌아요 · ${PEER_DOWN}`);
+		// a computer that does not answer: 연결 안 됨 is the one status, and a paused watch there still says 꺼짐; neither draws a bar
+		expect(await row("p:http://study.test|m:study-disk")).toEqual([["연결 안 됨"], "서재에서 돌아요 · 서재 연결 안 됨", 0]);
+		expect(await row("p:http://study.test|m:study-sync")).toEqual([["꺼짐"], "서재에서 돌아요 · 서재 연결 안 됨", 0]);
+		expect(await text(v, `${rowOf("p:http://store.test|off")}.querySelector(".cv-n").textContent`)).toBe("창고 모니터링");
+		expect((await row("p:http://store.test|off"))[0]).toEqual(["연결 안 됨"]);
 		await v.evaluate(`(go("monitoring", "notice"), 0)`);
 		await waitFor(v, `$("#mon-tl .rc")`);
 		const titles = JSON.parse(await text(v, `JSON.stringify([...document.querySelectorAll("#mon-tl .rc")].map(c => c.querySelector(".rc-title").textContent))`));

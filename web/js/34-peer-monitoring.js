@@ -200,6 +200,11 @@ function pqMail(c, pc, itemKey) {
   return t;
 }
 
+// A peer row keeps one status on the right like every row (docs/ui-spec.md 모니터링 줄의 상태): 꺼짐 > 연결 안 됨 (that computer does not answer, so
+// what it last sent is old) > the item's own status. Which computer it runs on, and that it does not answer, is the subtitle's opening phrase.
+const pqStatus = (p, own, off) => off ? ["꺼짐", "off"] : p.online ? own : ["연결 안 됨", "warn"];
+const pqWhere = (p, line) => [`${p.name}에서 돌아요`, p.online ? line : `${p.name} 연결 안 됨`].filter(Boolean).join(" · ");
+
 // Peer rows into monItems(): apps after the local apps, monitors after the local monitors, watch reports into 감시 소식.
 function pqMerge(items) {
   const peers = PQ.list.filter(p => p && p.url);
@@ -207,8 +212,8 @@ function pqMerge(items) {
   const apps = [], proj = [], plain = [], off = [], news = [];
   for (const p of peers) {
     const pc = pqPcOf(p), s = p.items, key = k => `p:${p.url}|${k}`;
-    if (!s) { off.push({ key: key("off"), group: MON_GROUP.plain, name: `${p.name} · 연결 안 됨`, ic: "activity", notices: [], mails: [], unread: 0, hint: "", at: "", pc, off: true }); continue; }
-    const chips = [[p.name, ""], ...(p.online ? [] : [["연결 안 됨", "warn"]])], sn = (s.notices || []).map(n => ({ ...n, pc })), shown = new Set();
+    if (!s) { off.push({ key: key("off"), group: MON_GROUP.plain, name: `${p.name} 모니터링`, ic: "activity", notices: [], mails: [], unread: 0, hint: `${p.name} 연결 안 됨 · 아직 받은 목록이 없어요`, badge: ["연결 안 됨", "warn"], at: "", pc, off: true }); continue; }
+    const sn = (s.notices || []).map(n => ({ ...n, pc })), shown = new Set();
     const owned = monOwnedBy(s.integrations || [], s.monitors || []), ownedNames = new Set([...owned.values()].flat());
     for (const it of s.integrations || []) {
       if (it.iconPath && !ICONS[it.icon]) ICONS[it.icon] = it.iconPath;
@@ -218,7 +223,7 @@ function pqMerge(items) {
       const needs = it.needs || { drafts: 0, unread: it.unread | 0, sentToday: 0 }, conn = it.state === "disconnected";
       const at = [...notices.map(monNoticeAt), ...mails.map(t => (CONV.get(t) || {}).ts || "")].sort().pop() || "";
       PQ.of.set(`settings:${pqApp(it.key, pc)}`, { pc, key: key(`i:${it.key}`), app: true, label: it.label });   // the app's settings conversation lives on that computer
-      apps.push({ key: key(`i:${it.key}`), group: MON_GROUP.app, name: it.label, ic: it.icon, notices, mails, kk: it.key === "kakao", app: true, inst: it.key, drafts: needs.drafts | 0, unread: needs.drafts || needs.unread, unreplied: needs.unreplied | 0, conn, hint: conn && it.hint ? it.hint : monNeedLine(needs, conn), at, pc, chips, owned: owned.get(it.key) || [], badge: monFail(owned.get(it.key) || []) });
+      apps.push({ key: key(`i:${it.key}`), group: MON_GROUP.app, name: it.label, ic: it.icon, notices, mails, kk: it.key === "kakao", app: true, inst: it.key, drafts: needs.drafts | 0, unread: needs.drafts || needs.unread, unreplied: needs.unreplied | 0, conn, hint: pqWhere(p, conn && it.hint ? it.hint : monNeedLine(needs, conn)), at, pc, hostOff: !p.online, owned: owned.get(it.key) || [], badge: pqStatus(p, conn ? ["연결 끊김", "err"] : monFail(owned.get(it.key) || []), false) });
     }
     const mons = (s.monitors || []).slice().sort((a, b) => (b.last_result === "fail") - (a.last_result === "fail") || (Date.parse(a.next_run) || Infinity) - (Date.parse(b.next_run) || Infinity));
     for (const m of mons) {
@@ -230,8 +235,8 @@ function pqMerge(items) {
       if (m.kind === "watch" && m.watch && !NM.items.some(x => x.watch === m.watch)) PQ.of.set(`settings:w:${m.watch}`, { pc, key: key(`m:${m.name}`), mon: m });
       const fresh = last && (!m.last_run || ntAt(last) >= Date.parse(m.last_run) - 60_000);
       (monProject(m) ? proj : plain).push({ key: key(`m:${m.name}`), group: monGroupOf(m), ...(monProject(m) ? { proj: true } : {}), name: monTitle(m), raw: monRaw(m), ic: "activity", notices, mails: [], mon: m, msig: [m.last_run, m.next_run, m.last_result, m.paused, m.connection].join("|"), unread: 0,
-        hint: fresh ? monClean(monStrip(monLine(last), monNames(m)), monRunLine(m)) : monRunLine(m), at: m.last_run || (last ? monNoticeAt(last) : ""),
-        badge: m.connection === "disconnected" ? ["연결 끊김", "err"] : m.paused ? ["꺼짐", ""] : m.last_result === "fail" ? ["실패", "err"] : m.kind === "schedule" ? [MON_KIND.schedule, ""] : null, pc, chips });
+        hint: pqWhere(p, m.connection === "disconnected" ? monConnShort(m) : fresh ? monClean(monStrip(monLine(last), monNames(m)), monRunLine(m)) : monRunLine(m)), at: m.last_run || (last ? monNoticeAt(last) : ""),
+        badge: pqStatus(p, (st => [st.text, st.tone])(monStatus(m)), m.paused), pc, hostOff: !p.online });
     }
     news.push(...ntWithRepeats(sn).filter(n => n.kind === "watch" && !n.app && !shown.has(n.id)));
   }

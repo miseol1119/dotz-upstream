@@ -76,6 +76,9 @@ const clean = n => {
 	const c = n.cloneNode(true);
 	for (const x of c.querySelectorAll(".mon-pc")) x.remove();
 	for (const x of c.querySelectorAll(".tag")) if (x.textContent === "맥미니") x.remove();
+	// a peer row names its computer in its subtitle ("맥미니에서 돌아요 · …"); the rest of the row is the local one
+	for (const x of c.querySelectorAll(".cv-p")) if (x.textContent.startsWith("맥미니에서 돌아요")) { x.closest(".cv-row")?.classList.remove("pv"); x.remove(); }
+	if (c.classList.contains("cv-row")) c.classList.remove("pv");
 	for (const x of [c, ...c.querySelectorAll("*")]) for (const a of [...x.attributes]) if (/^(data-k|data-t|data-run|data-watch|data-nid|data-as-open|data-as-more|data-sig|id|aria-labelledby)$/.test(a.name)) x.removeAttribute(a.name);
 	return c.outerHTML;
 };`;
@@ -98,9 +101,9 @@ describe.each([[390, 844], [1280, 800]])("a monitor on the Mac mini and the same
 		expect(peer.row).toBe(local.row);
 		expect(peer.detail).toBe(local.detail);
 		expect(peer.head).toBe(local.head);
-		expect(peer.box).toEqual(local.box);
+		expect({ ...peer.box, row: peer.box.row[0] }).toEqual({ ...local.box, row: local.box.row[0] });
 		expect(await q(peerView, `return document.querySelector("#mon-head .mon-pc").textContent`)).toBe("맥미니");
-		expect(await q(peerView, `return [...document.querySelectorAll("#mon-side .cv-row")].find(r => r.dataset.k === ${JSON.stringify(KEYS.peer)}).textContent`)).toContain("맥미니");
+		expect(await q(peerView, `return [...document.querySelectorAll("#mon-side .cv-row")].find(r => r.dataset.k === ${JSON.stringify(KEYS.peer)}).querySelector(".cv-p").textContent`)).toStartWith("맥미니에서 돌아요 · ");
 		expect(await q<number>(peerView, `return document.documentElement.scrollWidth`)).toBeLessThanOrEqual(width);
 	});
 
