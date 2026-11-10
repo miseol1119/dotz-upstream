@@ -31,7 +31,9 @@ export type AccountReport = { provider: "anthropic"; account: string; via: "omo-
 // The account's 리셋권 (Anthropic's "limit reset", program cedar_ember): how many are left, by kind (주간, Fable), the nearest expiry,
 // and the grant a use spends (next_grant_id, else the usable one that expires first). usable: a grant applies now and the account's
 // organization id is known locally (the use call needs it, and dotz makes no extra request to learn it).
-export type ClaudeResets = { held: number; usable: boolean; expires_at: number | null; kinds: { kind: string; left: number }[]; grant?: { id: string; kind: string } };
+// One kind's share: its count, nearest expiry, whether one of its grants can be spent now, and the grant 사용 spends for it.
+export type ClaudeResetKind = { kind: string; left: number; expires_at: number | null; usable: boolean; grant_id?: string };
+export type ClaudeResets = { held: number; usable: boolean; expires_at: number | null; kinds: ClaudeResetKind[]; grant?: { id: string; kind: string } };
 
 type Json = Record<string, any>;
 const readJson = (file: string): Json | undefined => {
@@ -245,14 +247,15 @@ export function claudeResets(body: Json, canUse: () => boolean): ClaudeResets | 
 	if (!c || typeof c !== "object") return undefined;
 	const grants = claudeGrants(body);
 	if (!grants.length && c.eligible === false) return undefined;
-	const kinds: { kind: string; left: number }[] = [];
-	for (const g of grants) {
-		const k = kinds.find(x => x.kind === g.kind);
-		if (k) k.left += g.left;
-		else kinds.push({ kind: g.kind, left: g.left });
-	}
 	const ready = c.eligible === false ? [] : grants.filter(g => g.now);
 	const next = ready.find(g => g.id === c.next_grant_id) ?? ready[0];
+	const kinds: ClaudeResetKind[] = [];
+	for (const g of grants) {
+		const k = kinds.find(x => x.kind === g.kind);
+		if (k) { k.left += g.left; continue; }
+		const mine = ready.filter(x => x.kind === g.kind), pick = next?.kind === g.kind ? next : mine[0];
+		kinds.push({ kind: g.kind, left: g.left, expires_at: g.expires, usable: !!pick && canUse(), ...(pick ? { grant_id: pick.id } : {}) });
+	}
 	return { held: grants.reduce((n, g) => n + g.left, 0), usable: !!next && canUse(), expires_at: grants[0]?.expires ?? null, kinds, ...(next ? { grant: { id: next.id, kind: next.kind } } : {}) };
 }
 // The organization id an OmO account's reset call goes to: its Claude CLI dir's .claude.json (oauthAccount.organizationUuid), read

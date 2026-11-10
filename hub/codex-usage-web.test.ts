@@ -6,10 +6,12 @@ import { fakeHub, inbox, json, run, waitFor, type View } from "./test-web.ts";
 const ACCOUNT = "me@example.com";
 const EXPIRES = Date.parse("2030-01-15T00:00:00Z");
 let resets = { held: 2, usable: true, expires_at: EXPIRES as number | null };
+type KindRow = { kind: string; left: number; expires_at: number | null; usable: boolean; grant_id?: string };
+let claude: { held: number; usable: boolean; expires_at: number | null; kinds: KindRow[]; grant?: { id: string; kind: string } } | undefined;
 const quota = () => ({
 	fetched_at: Date.now(),
 	providers: [
-		{ provider: "anthropic", account: ACCOUNT, plan: "Max 5x", limits: [{ id: "5h", label: "Claude 5 Hour", window: "5h", used: 30, limit: 100, remaining: 70, unit: "percent", resets_at: null, status: "ok" }] },
+		{ provider: "anthropic", account: ACCOUNT, plan: "Max 5x", resets: claude, limits: [{ id: "5h", label: "Claude 5 Hour", window: "5h", used: 30, limit: 100, remaining: 70, unit: "percent", resets_at: null, status: "ok" }] },
 		{
 			provider: "codex", name: "Codex", account: ACCOUNT, plan: "Plus", resets,
 			limits: [
@@ -88,4 +90,39 @@ test("사용 only opens the confirm step; 취소 sends nothing, 리셋권 쓰기
 	await waitFor(v, `document.querySelector("#usage .lim.rc b")?.textContent === "1개"`);
 	expect((await row())?.off).toBe(true);
 	expect(posts.length).toBe(1);
+});
+
+const KINDS: KindRow[] = [
+	{ kind: "주간", left: 1, expires_at: EXPIRES, usable: true, grant_id: "weekly-1" },
+	{ kind: "Fable", left: 3, expires_at: EXPIRES + 86_400_000, usable: true, grant_id: "fable-1" },
+];
+const claudeRows = () => q<{ label: string; count: string; off: boolean }[]>(`return [...document.querySelectorAll("#usage .card:first-child .lim.rc")].map(r => ({ label: r.querySelector(".k").textContent, count: r.querySelector("b").textContent, off: r.querySelector("button").disabled }));`);
+const useKind = async (label: string) => {
+	await run(v, `[...document.querySelectorAll("#usage .card:first-child .lim.rc")].find(r => r.querySelector(".k").textContent.startsWith(${JSON.stringify(label)})).querySelector("button").click()`);
+	await waitFor(v, `document.querySelector("dialog.cf")`);
+	await run(v, `[...document.querySelectorAll("dialog.cf .dact button")].find(b => b.textContent === "리셋권 쓰기").click()`);
+};
+
+test("a Claude card draws one 리셋권 row per kind, and each 사용 sends its own grant", async () => {
+	claude = { held: 4, usable: true, expires_at: EXPIRES, kinds: KINDS, grant: { id: "weekly-1", kind: "주간" } };
+	await open({ held: 2, usable: true, expires_at: EXPIRES });
+	const rows = await claudeRows();
+	expect(rows.map(r => r.count)).toEqual(["1개", "3개"]);
+	expect(rows.map(r => r.off)).toEqual([false, false]);
+	await useKind("Fable");
+	await posts.until(p => p.length === 1, 5000, "Fable POST");
+	await waitFor(v, `!document.querySelector("dialog.cf")`);
+	await useKind("주간");
+	await posts.until(p => p.length === 2, 5000, "weekly POST");
+	expect(posts).toEqual([
+		{ provider: "anthropic", account: ACCOUNT, grant_id: "fable-1", confirm: true },
+		{ provider: "anthropic", account: ACCOUNT, grant_id: "weekly-1", confirm: true },
+	]);
+});
+
+test("a kind that is not usable has its 사용 off while the other stays on", async () => {
+	claude = { held: 4, usable: true, expires_at: EXPIRES, kinds: [{ ...KINDS[0]!, usable: false, grant_id: undefined }, KINDS[1]!], grant: { id: "fable-1", kind: "Fable" } };
+	await open({ held: 2, usable: true, expires_at: EXPIRES });
+	expect((await claudeRows()).map(r => r.off)).toEqual([true, false]);
+	claude = undefined;
 });

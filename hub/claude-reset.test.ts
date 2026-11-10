@@ -83,11 +83,22 @@ test("several grants: the count sums what is left, by kind, with the nearest exp
 		held: 4,
 		usable: true,
 		expires_at: Date.parse("2029-12-16T04:59:00Z"),
-		kinds: [{ kind: "주간", left: 1 }, { kind: "Fable", left: 3 }],
+		kinds: [
+			{ kind: "주간", left: 1, expires_at: Date.parse("2029-12-16T04:59:00Z"), usable: true, grant_id: "free_reset_weekly" },
+			{ kind: "Fable", left: 3, expires_at: Date.parse("2030-03-09T07:59:00Z"), usable: true, grant_id: "fable-12mo" },
+		],
 		grant: { id: "free_reset_weekly", kind: "주간" },
 	});
 	// no org id known locally: shown, not usable
 	expect(claudeResets(usage(), () => false)).toMatchObject({ held: 4, usable: false });
+});
+
+test("each kind carries its own expiry, usability and the grant to spend for it", () => {
+	const kinds = (r: ReturnType<typeof claudeResets>) => r?.kinds.map(k => [k.kind, k.left, k.usable, k.grant_id]);
+	expect(kinds(claudeResets(usage(), () => true))).toEqual([["주간", 1, true, "free_reset_weekly"], ["Fable", 3, true, "fable-12mo"]]);
+	expect(kinds(claudeResets(usage(), () => false))?.map(k => k[2])).toEqual([false, false]);
+	const noWeekly = GRANTS.map(g => (g.id === "free_reset_weekly" ? { ...g, usable_now: false } : g));
+	expect(kinds(claudeResets(usage({ eligible: true, next_grant_id: "launch-fable", grants: noWeekly }), () => true))).toEqual([["주간", 1, false, undefined], ["Fable", 3, true, "launch-fable"]]);
 });
 
 test("null (no query), ineligible with no grants and a missing block show nothing", () => {

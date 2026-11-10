@@ -199,23 +199,29 @@ let quotaTimer;
 // 리셋권 of one account (hub/codex-usage.ts, Claude: hub/usage-account.ts claudeResets): how many it holds (Claude: by kind) and the nearest
 // expiry. 사용 works only with one usable, and asks first, naming the pass (Claude) or the limits it refills and how many stay; only that
 // confirm sends POST /api/quota/reset-credit with confirm: true.
+// A Claude account draws one row per kind (주간, Fable, ...), each with its own count, expiry and grant; without kinds, and for Codex, one row.
 function resetRow(p, name) {
+  const ks = p.provider === "anthropic" && p.resets.kinds && p.resets.kinds.length ? p.resets.kinds : [null];
+  return ks.map(k => resetLine(p, name, k));
+}
+function resetLine(p, name, k) {
   const r = p.resets, claude = p.provider === "anthropic", wins = (p.limits || []).map(limitName).join("와 ");
+  const held = k ? k.left : r.held, usable = k ? k.usable : r.usable, expires = k ? k.expires_at : r.expires_at, grant = k ? (k.grant_id ? { id: k.grant_id, kind: k.kind } : null) : r.grant;
+  const label = k ? `${k.kind} 리셋권` : "리셋권";
   const why = !claude && r.held && !r.usable ? "한도에 걸리면 쓸 수 있어요" : "";
-  const kinds = claude ? (r.kinds || []).map(k => `${k.kind} ${k.left}`).join(" · ") : "";
-  const sub = [kinds, r.held && r.expires_at ? `${dayLabel(r.expires_at)} 만료` : "", why].filter(Boolean).join(" · ");
+  const sub = [held && expires ? `${dayLabel(expires)} 만료` : "", why].filter(Boolean).join(" · ");
   const say = { reset: "한도를 다시 채웠어요", nothing_to_reset: "다시 채울 한도가 없어서 쓰지 않았어요", not_limited: "다시 채울 한도가 없어서 쓰지 않았어요", no_credit: "남은 리셋권이 없어요", already_redeemed: "이미 쓴 리셋권이에요", already_used: "이미 쓴 리셋권이에요", cooldown: "조금 뒤에 다시 쓸 수 있어요" };
-  const what = claude ? `${p.account_label || p.account}의 ${r.grant ? `${r.grant.kind} ` : ""}리셋권으로 한도를` : `${p.account}의 ${wins || "한도"}를`;
-  const send = claude ? { provider: "anthropic", account: p.account, grant_id: r.grant && r.grant.id, confirm: true } : { account: p.account, confirm: true };
+  const what = claude ? `${p.account_label || p.account}의 ${grant ? `${grant.kind} ` : ""}리셋권으로 한도를` : `${p.account}의 ${wins || "한도"}를`;
+  const send = claude ? { provider: "anthropic", account: p.account, grant_id: grant && grant.id, confirm: true } : { account: p.account, confirm: true };
   const use = () => dialog({ confirm: true, title: "리셋권을 쓸까요?",
-    body: el("div", { class: "sup", text: `${name} ${what} 지금 다시 채워요. 쓰고 나면 리셋권이 ${r.held - 1}개 남아요. 되돌릴 수는 없어요.` }),
+    body: el("div", { class: "sup", text: `${name} ${what} 지금 다시 채워요. 쓰고 나면 ${label}이 ${held - 1}개 남아요. 되돌릴 수는 없어요.` }),
     actions: [{ label: "취소", onclick: c => c() }, { label: "리셋권 쓰기", kind: "pri", onclick: (c, b) => busy(b, async () => {
       try { const out = await api("/api/quota/reset-credit", "POST", send); c(); toast(say[out.outcome] || "리셋권을 썼어요"); loadQuota(true); }
       catch (e) { c(); toast(e.message || "리셋권을 쓰지 못했어요", true); loadQuota(true); }
     }) }] });
   return el("div", { class: "lim rc" },
-    el("div", { class: "kv" }, el("span", { class: "k", text: "리셋권" }),
-      el("span", { class: "rc-end" }, el("b", { text: `${r.held}개` }), el("button", { class: "btn tonal inrow", type: "button", disabled: !(r.held > 0 && r.usable), "aria-label": `${name} 리셋권 사용`, onclick: use }, "사용"))),
+    el("div", { class: "kv" }, el("span", { class: "k", text: label }),
+      el("span", { class: "rc-end" }, el("b", { text: `${held}개` }), el("button", { class: "btn tonal inrow", type: "button", disabled: !(held > 0 && usable), "aria-label": `${name} ${label} 사용`, onclick: use }, "사용"))),
     sub ? el("div", { class: "sup", text: sub }) : null);
 }
 async function loadQuota(fresh) {
@@ -242,7 +248,7 @@ async function loadQuota(fresh) {
         l.resets_at ? el("div", { class: "sup", text: rel(l.resets_at) }) : null));
     }
     if (!(p.limits || []).length) card.append(el("div", { class: "sup", text: "없어요" }));
-    if (p.resets) card.append(resetRow(p, name));
+    if (p.resets) card.append(...resetRow(p, name));
     grid.append(card);
   }
   // The monthly API spend limit the owner set on the platform console, and how much of it is used (hub/api-budget.ts).
