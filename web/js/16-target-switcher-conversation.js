@@ -119,13 +119,19 @@ new ResizeObserver(() => { const sw = $("#thead .tsw"); if (sw) fitChips(sw); })
 // A credential the agent asked for: answered here or on Discord. Values go straight to the gateway, which stores them in a
 // 0600 secrets file; they are never kept in the page.
 const AUTH_DONE = new Set(), AUTH_HID = new Set(), AUTH_CARDS = new Map();   // AUTH_HID: closed with the x or back, still waiting (the notice's 입력 창으로 가기 shows it again)
-let authH = null, authId = "";
-function paintAuth() {
+let authH = null, authId = "", authWaits = false;
+// `force` = the owner asked for it (the notice's 입력 창으로 가기); otherwise a request that arrives while a text field has the focus waits until the field is left, so its sheet does not take the focus (and a phone's keyboard) from what is being typed.
+function paintAuth(force) {
   const list = ((S && S.auth) || []).filter(a => !AUTH_DONE.has(a.id));
   for (const id of [...AUTH_CARDS.keys()]) if (!list.some(a => a.id === id)) { AUTH_CARDS.get(id).remove(); AUTH_CARDS.delete(id); }
   for (const a of list) if (!AUTH_CARDS.has(a.id)) AUTH_CARDS.set(a.id, authCard(a));
   const cur = list.find(a => !AUTH_HID.has(a.id));
   if (!cur) { if (authH) { authId = ""; authH.close(false); } return; }
+  const typing = !authH && !force && typingIn();
+  if (typing) {
+    if (!authWaits) { authWaits = true; typing.addEventListener("focusout", () => { authWaits = false; afterTap(() => paintAuth()); }, { once: true }); }
+    return;
+  }
   if (!authH) { const h = fsOpen({ onClose: () => { if (authId) AUTH_HID.add(authId); authId = ""; if (authH === h) authH = null; } }); authH = h; }
   if (authId === cur.id) return;
   authId = cur.id;

@@ -565,7 +565,7 @@ function ntSheetClose(restore = true) { if (NS.h) NS.h.close(restore); }
 function ntDirect(n) {
   ntSheetClose(false);
   if (n.pc) { const t = n.decision.to; if (pqPc(t)) go("monitoring", `c:${t}`); else toast(`${n.pc.name}에서 답해 주세요`); return; }   // a peer's question: its conversation as this page shows it
-  if (n.decision.to.startsWith("auth:")) { AUTH_HID.clear(); paintAuth(); const f = document.querySelector(".au input"); if (f) { f.scrollIntoView({ block: "center" }); f.focus(); } else toast("입력 창이 이미 닫혔어요"); return; }
+  if (n.decision.to.startsWith("auth:")) { AUTH_HID.clear(); paintAuth(true); const f = document.querySelector(".au input"); if (f) { f.scrollIntoView({ block: "center" }); f.focus(); } else toast("입력 창이 이미 닫혔어요"); return; }
   ntJump(n);
 }
 // Same rule as the hub (hub/notices.ts answerDecision): an option that needs detail is answered only with the owner's text.
