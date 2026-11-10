@@ -77,7 +77,7 @@ export const setReplyModelChoices = (c: ReplyModelChoices): void => {
 	replyChoices = c;
 };
 // 이 메일에서 쓸 모델: the model the mail conversations of one instance run on (hub/conv-model.ts); "" follows main. Same model list as the reply model.
-const convModelField = (app: string): SettingField => ({ key: "conv_model", label: "이 메일에서 쓸 모델", type: "enum", help: "메일마다 열리는 대화가 쓰는 모델이에요. 메인 따라가기면 메인 대화의 모델을 그대로 써요. 대화마다 따로 고르면 그게 먼저예요", store: "custom/apps.json", path: `${app}.conv_model`, options: replyChoices.options, labels: { ...replyChoices.labels, "": "메인 따라가기" }, def: "", section: "advanced" });
+const convModelField = (app: string): SettingField => ({ key: "conv_model", label: "이 메일에서 쓸 모델", type: "enum", help: "메일마다 열리는 대화가 써요", store: "custom/apps.json", path: `${app}.conv_model`, options: replyChoices.options, labels: { ...replyChoices.labels, "": "메인 따라가기" }, def: "", section: "advanced" });
 // 디스코드에도 올리기: custom/apps.json {"<mail instance>":{"discord":true}} (off when missing). Drawn only while Discord is connected; main.ts installs the probe.
 let discordConnected = (): boolean => false;
 // The 새 소식 class switch of 설정 → Discord (hub/discord-post.ts postSettings().news): what a non-mail app's 디스코드에도 보내기 shows while unset.
