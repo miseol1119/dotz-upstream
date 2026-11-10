@@ -52,7 +52,8 @@ function routeReplace(hash) {
 
 // An entry remembers where its screen was scrolled when something is stacked on top of it, and gets it back when the browser's back returns to it.
 const scrollKeep = S => history.replaceState({ ...S, sy: { v: $("#views").scrollTop, m: ($("#mon-timeline") || {}).scrollTop | 0 } }, "", hurl(S.c));
-function scrollBack(S) { if (!S || !S.sy) return; $("#views").scrollTop = S.sy.v; const m = $("#mon-timeline"); if (m) m.scrollTop = S.sy.m; }
+function scrollBack(S) { if (!S || !S.sy || (S.w || S.c).length < 2) return;   // 홈 always opens at its top (08-home.js homeTop)
+  $("#views").scrollTop = S.sy.v; const m = $("#mon-timeline"); if (m) m.scrollTop = S.sy.m; }
 // Stacks W[from..] one entry each on top of the stack C (stacked order c, logical chain w).
 // H.auto: the last view was opened by the app (a list's own first pane), not pressed by the user: the entry is marked a.
 const pushChain = (W, from, C) => {
