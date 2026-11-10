@@ -24,6 +24,9 @@ const WORKLOG = [
 ];
 const PROJ = [{ ts: PROJ_AT, kind: "out", source: "orchestrator", target: "ch:1", text: "[done] 프로젝트 일을 마쳤어요" }];
 const SETTINGS = [{ ts: SET_AT, kind: "out", source: "orchestrator", target: "settings:disk", text: "[done] 감시 설정을 바꿨어요" }];
+// A project thread with 1800 messages; the pushed one is far enough back that paging older messages (web/js/30-notices.js ntReach) does not reach it.
+const LONG_AT = ts(100);
+const LONG = Array.from({ length: 1800 }, (_, i) => ({ ts: ts(i), kind: "out", source: "orchestrator", target: "ch:2", text: `긴 대화 ${i}번이에요.` }));
 const base = { read: false, tone: "", text: "내용" };
 const decision = { options: [{ n: 1, label: "네" }, { n: 2, label: "아니요" }], to: "main", reply_to: ASK_AT, group: 1, state: "open" };
 const report = (i: number) => ({ ...base, id: `w${i}`, kind: "watch", cls: "news", title: "디스크 감시", text: `사용량 ${i}%`, open: "alert", src: "alert", watch: "disk", ts: ts(200 + i), updated: ts(200 + i), at: ts(200 + i) });
@@ -57,7 +60,14 @@ const api = (peers: () => object[]) => async (_req: Request, url: URL) => {
 	await held.get(url.pathname);
 	if (url.pathname === "/api/history") {
 		const t = url.searchParams.get("target"), before = url.searchParams.get("before");
-		const all = t === "main" ? MAIN : t === "lane:a" ? LANE : t === "mail:abc" ? MAIL : t === "alert" ? ALERTS : t === "worklog" ? WORKLOG : t === "ch:1" ? PROJ : t === "settings:disk" ? SETTINGS : [];
+		const all = t === "ch:2" ? LONG : t === "main" ? MAIN : t === "lane:a" ? LANE : t === "mail:abc" ? MAIL : t === "alert" ? ALERTS : t === "worklog" ? WORKLOG : t === "ch:1" ? PROJ : t === "settings:disk" ? SETTINGS : [];
+		const around = url.searchParams.get("around");
+		if (around) {   // like hub/routes.ts and hub/events.ts historyPage
+			const hit = all.findIndex(e => e.ts === around), limit = Number(url.searchParams.get("limit") ?? 150) || 150;
+			if (hit < 0) return json({ target: t, events: [] });
+			const lo = Math.max(0, hit - (limit >> 1));
+			return json({ target: t, events: all.slice(lo, lo + limit), at: all[hit]!.ts, prev: all[lo - 1]?.ts, next: all[lo + limit]?.ts });
+		}
 		const list = before ? all.filter(e => e.ts < before) : all;
 		return json({ target: t, events: list.slice(-Number(url.searchParams.get("limit") ?? 60) || -60) });
 	}
@@ -67,7 +77,7 @@ const api = (peers: () => object[]) => async (_req: Request, url: URL) => {
 	if (url.pathname === "/api/peers") return json(peers());
 	return undefined;
 };
-const state = () => ({ ...idleState({ channels: { work: { 1: { name: "프로젝트" } } } }), lanes, notices_unread: notices.length });
+const state = () => ({ ...idleState({ channels: { work: { 1: { name: "프로젝트" }, 2: { name: "긴 대화" } } } }), lanes, notices_unread: notices.length });
 let other!: ReturnType<typeof fakeHub>;
 const hub = fakeHub({ state, api: api(() => [{ name: "맥북", url: hub.origin, self: true, online: true }, { name: "맥미니", url: other.origin, self: false, online: true }]) });
 other = fakeHub({ state, api: api(() => [{ name: "맥미니", url: other.origin, self: true, online: true }, { name: "맥북", url: hub.origin, self: false, online: true }]) });
@@ -75,22 +85,27 @@ afterAll(() => { hub.stop(); other.stop(); });
 
 // web/sw.js as shipped, platform stubbed: a tap on a notification opens a window or hands the message to the open one.
 const swOf = (origin: string, wins: unknown[]) => {
-	const h: Record<string, (ev: unknown) => void> = {}, shown: { data: unknown }[] = [], opened: string[] = [];
+	const h: Record<string, (ev: unknown) => void> = {}, shown: { data: unknown }[] = [], opened: string[] = [], timers: (() => void)[] = [];
 	const self = {
 		addEventListener: (k: string, f: (ev: unknown) => void) => { h[k] = f; },
 		clients: { matchAll: async () => wins, openWindow: async (u: string) => { opened.push(u); } },
 		registration: { showNotification: async (_t: string, o: { data: unknown }) => { shown.push(o); }, getNotifications: async () => [], pushManager: { getSubscription: async () => null } },
 	};
-	new Function("self", "location", "caches", readFileSync(join(import.meta.dir, "..", "web", "sw.js"), "utf8"))(self, new URL(origin), { open: async () => ({ put: async () => {} }) });
+	// The test preload replaces setTimeout with a manual scheduler shared by the whole process: the worker gets its own, which `fire` runs.
+	const setTimer = (fn: () => void) => timers.push(fn);
+	new Function("self", "location", "caches", "setTimeout", "clearTimeout", readFileSync(join(import.meta.dir, "..", "web", "sw.js"), "utf8"))(self, new URL(origin), { open: async () => ({ put: async () => {} }) }, setTimer, () => {});
 	return {
 		opened,
-		tap: async (msg: object) => {
+		fire: () => void timers.splice(0).forEach(f => f()),
+		// `ring` runs once the click is handed to the worker, before the worker is waited for.
+		tap: async (msg: object, ring?: () => Promise<void>) => {
 			const wait: Promise<unknown>[] = [];
 			h.push!({ data: { json: () => msg }, waitUntil: (p: Promise<unknown>) => wait.push(p) });
 			await Promise.all(wait);
 			const data = shown[shown.length - 1]!.data;
 			wait.length = 0;
 			h.notificationclick!({ notification: { close: () => {}, data }, action: "", waitUntil: (p: Promise<unknown>) => wait.push(p) });
+			await ring?.();
 			await Promise.all(wait);
 		},
 	};
@@ -274,5 +289,43 @@ describe("another computer's push", () => {
 			await gone;
 			await expectLanded(view, c.k as Spec);
 		});
+	});
+});
+
+// The tap goes through the worker (web/sw.js notificationclick) into the real page, with windows that are not the plain top-level app window.
+describe.each([["phone", 390], ["wide window", WIDE]] as const)("worker tap, %s", (_name, width) => {
+	test("app closed, the message is far back in a long conversation", async () => {
+		const sw = swOf(hub.origin, []);
+		await sw.tap(event({ ts: LONG_AT, target: "ch:2", text: "[done] 긴 대화의 결과예요" }));
+		expect(sw.opened).toHaveLength(1);
+		const view = await hub.view({ width, height: 844 }, sw.opened[0]!.slice(hub.origin.length));
+		await ready(view);
+		await expectLanded(view, { conv: "ch:2", at: LONG_AT, push: {} });
+	});
+	test("app open in a user app window (/apps/x/) and no app window", async () => {
+		// A window of a user app has no receiver for the tap and never answers: the worker must not hand the tap to it.
+		const sw = swOf(hub.origin, [{ url: `${hub.origin}/apps/x/`, focus: async () => {}, postMessage: () => {} }]);
+		await sw.tap(KINDS["answer (notice)"]!.push);
+		expect(sw.opened).toHaveLength(1);
+		const view = await hub.view({ width, height: 844 }, sw.opened[0]!.slice(hub.origin.length));
+		await ready(view);
+		await expectLanded(view, KINDS["answer (notice)"]!);
+	});
+	test("app open but its window does not answer", async () => {
+		const posted: unknown[] = [];
+		let handed!: () => void;
+		const arrival = new Promise<void>(r => (handed = r));
+		const sw = swOf(hub.origin, [{ url: `${hub.origin}/`, focus: async () => {}, postMessage: (m: unknown) => { posted.push(m); handed(); } }]);
+		// The window has the message and says nothing; the tap is done when the worker's own waitUntil is, after it gave up waiting for the answer.
+		await sw.tap(KINDS["answer (notice)"]!.push, async () => {
+			await arrival;
+			expect(sw.opened).toHaveLength(0);   // still waiting for it
+			sw.fire();
+		});
+		expect(posted).toHaveLength(1);
+		expect(sw.opened).toHaveLength(1);
+		const view = await hub.view({ width, height: 844 }, sw.opened[0]!.slice(hub.origin.length));
+		await ready(view);
+		await expectLanded(view, KINDS["answer (notice)"]!);
 	});
 });
