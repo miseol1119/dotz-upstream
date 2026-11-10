@@ -95,10 +95,16 @@ export function installLaneHandlers(): void {
 		const tone = parseTone(text).tone;
 		const real = tone === "ask" || tone === "fail" || tone === "done";
 		void inOrder(channel, async () => {
-			const local = await localize(clipKeepingAsk(dropForLine(text), real ? 1800 : 900), channel, "lane");
-			const shown = real || parkedTone(tone) ? local : `[run] ${local}`;
-			emit("outbox", { ts: now(), kind: "out", source: channel, target: channel, text: shown, ...(real ? {} : { update_key: "progress" }) });
-			return shown;
+			const clipped = clipKeepingAsk(dropForLine(text), real ? 1800 : 900);
+			const row = (t: string) => {
+				const shown = real || parkedTone(tone) ? t : `[run] ${t}`;
+				emit("outbox", { ts: now(), kind: "out", source: channel, target: channel, text: shown, ...(real ? {} : { update_key: "progress" }) });
+				return shown;
+			};
+			// A progress line is replaced by the next one on the web: the original shows at once and its rewrite takes its place.
+			let first: string | undefined;
+			const local = await localize(clipped, channel, "lane", real ? undefined : t => void (first = row(t)));
+			return first !== undefined && local === clipped ? first : row(local);
 		})
 			.then(shown => (real ? send(channel, shown) : discord.progress(channel, "progress", shown)))
 			.catch(e => log(`lane progress send failed: ${e}`));

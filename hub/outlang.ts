@@ -221,9 +221,12 @@ export function withTurnLanguage(body: string): string {
 }
 
 // The text to send: the original unless it is not in the owner's language and the rewrite succeeded.
-export async function localize(text: string, target: string, source?: string): Promise<string> {
+// `early`: for a line the next one replaces (a progress line); it is called with the original before the rewrite starts, so the owner reads
+// it at once instead of after the rewrite (median 4.6 s), and the rewrite takes its place.
+export async function localize(text: string, target: string, source?: string, early?: (original: string) => void): Promise<string> {
 	if (!needsRewrite(text, source)) return text;
 	if (source === "orchestrator") drifted = true;
+	early?.(text);
 	try {
 		const r = await translate(text, lang());
 		const bad = sane(text, r.text);
