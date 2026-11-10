@@ -34,7 +34,7 @@ code.path-short { display: inline-block; max-width: 100%; vertical-align: bottom
 .tag.off { font-weight: 600; }
 .tag.unreplied { --tone: var(--unreplied); color: var(--unreplied); font-weight: 600; }
 .nb.unreplied { background: color-mix(in srgb, var(--unreplied) 14%, transparent); color: var(--unreplied); font-weight: 600; }
-:is(.tag, .mon-ptag, .tr-st):is(.ok, .warn, .err, .pri, .off, .unreplied, .sent, .failed, .sending, .queued)::before, .dr-hit::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--tone); }
+:is(.tag, .mon-ptag, .tr-st):is(.ok, .warn, .err, .pri, .off, .unreplied, .sent, .failed, .sending, .queued, .undo)::before, .dr-hit::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--tone); }
 .dot.unreplied { background: var(--unreplied); }
 button.cchip.unrep-no { height: 22px; padding: 0 var(--sp-2); font-size: 11.5px; color: var(--unreplied); }
 /* 초안 작성 beside 답장 안 함: the one action that moves the mail forward, so it carries the accent (30-monitoring.js mailDraftButton).

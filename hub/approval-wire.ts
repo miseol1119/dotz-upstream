@@ -8,7 +8,7 @@
 // and the single-card answers of the web (routes.ts) and Discord (main.ts), which take this path when the gateway can send the draft.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { log, now, writeAtomic } from "./config.ts";
+import { cfg, log, now, writeAtomic } from "./config.ts";
 import { broadcast, emit } from "./events.ts";
 import { approvals, convOfTarget, newMid, out } from "./outbound.ts";
 import { answerDecision, type DecisionSend, allNotices, markDraftSend, openDraftCards, settleOpenDecision } from "./notices.ts";
@@ -23,7 +23,7 @@ import { claimFile, getDraft, patchDraft } from "../features/reply-drafts/lib/st
 import { claimHolder } from "./draft-claim.ts";
 import { createApprovalSender, MAY_HAVE_GONE_OUT, refOfQuestion, runCli, sendActionOf, type SendAction, type SendJob, type SendLook, type SendResult, type SendTarget } from "./approval-send.ts";
 import { answerBatch, batchCard, STALE_OPTIONS, type BatchCard, type BatchPick } from "./approval-batch.ts";
-import { DRAFT_BODY_MAX, withAttachIssues, withStagedFiles } from "./draft-approval.ts";
+import { DRAFT_BODY_MAX, DRAFT_UNDO, withAttachIssues, withStagedFiles } from "./draft-approval.ts";
 import { askText, pendingDraftFiles, pendingDraftIssues, syncCardFiles } from "./draft-attach.ts";
 
 // How many waiting cards of one conversation make the web open its triage view instead of one card at a time (settings: web.triage_min).
@@ -70,8 +70,8 @@ function cardOwedMail(r: SendResult): void {
 }
 
 export const reportSend = (r: SendResult): void => {
-	markDraftSend(r.conv, r.ref, r.state, r.text);
-	broadcast({ ts: now(), kind: "approval_send", source: "gateway", ...r });
+	markDraftSend(r.conv, r.ref, r.state, r.text, r.until);
+	broadcast({ ts: now(), kind: "approval_send", source: "gateway", ...r, ...(r.until ? { left: Math.max(0, r.until - now()) } : {}) });
 	if (r.state === "sent") cardOwedMail(r);
 	if (r.state !== "failed" && r.state !== "unsure") return;
 	const what = r.title.replace(/\s*\([^()]*\)\s*$/, "");
@@ -94,7 +94,13 @@ function lookSend(j: SendJob): SendLook {
 	if (mail) return mail.status === "sent" ? { state: "sent" } : claimHolder(claimFile(j.ref)) === "live" ? { state: "alive" } : { state: "failed", text: MAY_HAVE_GONE_OUT };
 	return commentSendOutcome(j.ref) ?? { state: "failed", text: MAY_HAVE_GONE_OUT };
 }
-export const sender = createApprovalSender({ kind: sendTargetOf, run: runCli, report: reportSend, log, store: jobStore, look: lookSend });
+// The cancel window (settings: web.send_undo_sec, seconds, default 10, 0 = off) is read when a send is approved.
+const undoMs = (): number => ((s => (typeof s === "number" && Number.isFinite(s) && s >= 0 ? s : 10))(cfg.web.send_undo_sec)) * 1000;
+// A send taken back: the owner's cancel becomes his latest word on the draft (hub/draft-approval.ts draftVerdict), so the old 보내기 sends nothing from a CLI either.
+function revokeSend(j: SendJob): void {
+	recordAnswer({ source: "web", channel: channelOf(j.conv), author: "owner", text: DRAFT_UNDO, picks: [{ q: j.title, n: 0, label: DRAFT_UNDO }] });
+}
+export const sender = createApprovalSender({ kind: sendTargetOf, run: runCli, report: reportSend, log, store: jobStore, look: lookSend, undoMs, revoke: revokeSend });
 let sendsBooted = false;
 // A card left 확인 필요 follows the comment's record: proof read back, the owner's 완료 or 다시 보내기, or the old sender that finished after all.
 function settleUnsureCards(): void {
@@ -179,7 +185,11 @@ export async function webAnswer(id: string, body: { n?: unknown; label?: unknown
 	if (typeof body.label === "string" && card?.decision?.state === "open" && opt?.label !== body.label) return { status: 409, body: { error: STALE_OPTIONS } };
 	const gw = card && opt && !body.files?.length ? gatewaySendOf(card.decision!.to, card.title, opt.label) : undefined;
 	const r = await answerDecision(id, body, async a => (gw ? recordAnswer({ source: "web", channel: channelOf(a.to), author: login, text: a.text, picks: a.picks ?? [], decision: a.notice }) : deliver(a)));
-	if (gw && r.status === 200 && !r.body.already) sender.enqueue({ ref: gw.ref, conv: card!.decision!.to, action: gw.action, title: card!.title });
+	if (gw && r.status === 200 && !r.body.already) {
+		sender.enqueue({ ref: gw.ref, conv: card!.decision!.to, action: gw.action, title: card!.title });
+		const held = sender.results().find(x => x.ref === gw.ref && x.state === "undo");
+		if (held) return { ...r, body: { ...r.body, send: { state: held.state, until: held.until, left: Math.max(0, (held.until ?? 0) - now()) } } };
+	}
 	return r;
 }
 
@@ -261,6 +271,13 @@ export async function approvalRoute(req: Request, url: URL, deps: { login: strin
 		}
 		if (!convs.length) return json({ error: "고른 카드가 없어요" }, 400);
 		return json({ ok: true, sending, toBot });
+	}
+	// 취소 inside the send window: nothing is sent and the draft waits for approval again (hub/approval-send.ts cancel).
+	if (url.pathname === "/api/approvals/undo" && req.method === "POST") {
+		const b = (await req.json().catch(() => ({}))) as { ref?: unknown };
+		if (typeof b.ref !== "string") return json({ error: "ref is required" }, 400);
+		const state = sender.cancel(b.ref);
+		return state === "cancelled" ? json({ ok: true, state }) : json({ error: state === "late" ? "이미 보내고 있어서 취소할 수 없어요" : "취소할 보내기가 없어요", state }, 409);
 	}
 	if (url.pathname === "/api/approvals/failed" && req.method === "POST") {
 		const b = (await req.json().catch(() => ({}))) as { op?: unknown; items?: unknown; ref?: unknown; conv?: unknown; text?: unknown };

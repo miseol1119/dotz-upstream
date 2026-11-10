@@ -42,6 +42,8 @@ export const DRAFT_OWN = "어떻게 보낼지 직접 입력";
 // A mail whose words and files disagree (hub/attach-check.ts) is not sent by 1) 보내기; its card carries the finding on one line and this 4th option,
 // which sends it as it is. The refused send starts its text with ATTACH_REFUSED.
 export const DRAFT_AS_IS = "이대로 보내기";
+/** Recorded by the gateway when the owner cancels inside the send window: the latest word, so the old 보내기 no longer lets a CLI send. */
+export const DRAFT_UNDO = "보내기 취소";
 export const ATTACH_MARK = "-# ⚠️ 첨부 확인: ";
 export const ATTACH_REFUSED = "첨부를 확인해 주세요:";
 // The send-time lint (placeholder, forbidden expression, recipient) refused the mail; the findings follow.
@@ -50,7 +52,7 @@ export const LINT_REFUSED = "보내기 직전 검사에서 걸려서 보내지 �
 export const ATTACH_AS_IS_HINT = "그래도 보내려면 카드에서 '이대로 보내기'를 고르거나 '이대로 보내'라고 답해 주세요";
 const ATTACH_HELD = ". 첨부가 맞을 때까지는 보내지 않아요";
 const asIsResult = (withMail: boolean) => (withMail ? "첨부가 맞지 않아도 답글과 메일을 이대로 보내요" : "첨부가 맞지 않아도 이 글을 이대로 보내요");
-export type DraftAction = "send" | "edit" | "drop" | "send-main" | "send-mail" | "own" | "send-as-is";
+export type DraftAction = "send" | "edit" | "drop" | "send-main" | "send-mail" | "own" | "send-as-is" | "undo";
 export type DraftToLabel = "받는이" | "대상" | "대화방";
 export const DRAFT_BODY_MAX = 6000;
 
@@ -540,7 +542,7 @@ export function quotedDraft(text: string): string | undefined {
 	return out?.join("\n").replace(/(?:\n>)+$/, "");
 }
 
-const ACTIONS: Record<string, DraftAction> = { [DRAFT_SEND]: "send", [DRAFT_EDIT]: "edit", [DRAFT_DROP]: "drop", [DRAFT_ONLY_MAIN]: "send-main", [DRAFT_ONLY_MAIL]: "send-mail", [DRAFT_OWN]: "own", [DRAFT_AS_IS]: "send-as-is" };
+const ACTIONS: Record<string, DraftAction> = { [DRAFT_SEND]: "send", [DRAFT_EDIT]: "edit", [DRAFT_DROP]: "drop", [DRAFT_ONLY_MAIN]: "send-main", [DRAFT_ONLY_MAIL]: "send-mail", [DRAFT_OWN]: "own", [DRAFT_AS_IS]: "send-as-is", [DRAFT_UNDO]: "undo" };
 // What a picked label means; anything else (a label outside the three and the send modes) is not a draft answer.
 export function draftActionOf(label: string): DraftAction | undefined {
 	return Object.hasOwn(ACTIONS, label) ? ACTIONS[label] : undefined;

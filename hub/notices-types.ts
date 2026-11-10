@@ -82,7 +82,7 @@ export type Decision = {
 	// ends like a plain question (the resolving signals may close it).
 	assumed?: true;
 	// An approved draft the gateway sends itself (hub/approval-send.ts): how that send went, shown on the answered card.
-	send?: { state: "queued" | "sending" | "sent" | "failed" | "unsure"; text?: string; at: string; /** Which try this is, set when a failed send was queued again (absent = the first). */ attempts?: number };
+	send?: { state: "undo" | "queued" | "sending" | "sent" | "failed" | "unsure" | "back"; text?: string; at: string; /** `undo`: when the cancel window ends (ms). */ until?: number; /** Which try this is, set when a failed send was queued again (absent = the first). */ attempts?: number };
 	// Where the send-approval card went on Discord (outbound.ts markDraftPosted): kept so the message is closed when the card is, also after a restart.
 	card?: { target: string; ids: string[] };
 };

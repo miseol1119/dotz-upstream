@@ -75,7 +75,7 @@ function parseChoices(text) {
 const isChoiceMsg = pc => pc.blocks.some(b => b.options.length > 1);
 const isHeadedChoice = pc => pc.blocks.some(b => b.headed && b.options.length > 1);
 const choiceAsks = (e, tone, pc) => tone === "ask" || isHeadedChoice(pc) || (e.kind === "out" && e.source === "gateway" && e.target === "alert" && isChoiceMsg(pc));
-const DC = { cur: null, picks: {}, step: {}, fold: {}, st: {}, edit: {}, fresh: "", note: {}, files: {}, fbusy: {} };   // files: uploads picked in 직접 수정 (sent as the answer's `files`), fbusy: one is going up
+const DC = { cur: null, picks: {}, step: {}, fold: {}, st: {}, edit: {}, fresh: "", note: {}, files: {}, fbusy: {}, undo: {} };   // files: uploads picked in 직접 수정 (sent as the answer's `files`), fbusy: one is going up
 // A draft waiting for send approval (hub/draft-approval.ts): the notice carries it, the sheet shows it above 보내기 / 고치기 / 보내지 않기.
 const DRAFT_EDIT = "고치기", DRAFT_OWN = "어떻게 보낼지 직접 입력";
 // The draft options that carry the owner's text: 고치기 (what to change) and the send mode 직접 입력 (how to send). Mirrors hub draftNeedsText.
@@ -151,12 +151,12 @@ async function answerDecision(dc, text, opt, note) {
   try {
     // A card with one block whose question is a decision notice answers through the notice path (30-notices.js), so both stay in step.
     const nd = opt && dc.blocks.length === 1 ? ntFor(t, dc.at, opt) : null;
-    if (nd) await ntPost(nd, opt.n, note, files, opt.label);
+    const held = nd ? await ntPost(nd, opt.n, note, files, opt.label) : null;
     // The agent gets the question with each chosen option and the asking message (hub/intake.ts decisionLines); the bubble stays short.
     const pk = DC.picks[dc.key] || [], picks = dc.blocks.flatMap((b, i) => (pk[i] ? [{ q: b.title || dc.question || "", n: pk[i].n, label: pk[i].label, ...(pk[i].note && !dc.draft ? { note: pk[i].note } : {}) }] : []));
     const r = nd ? null : await api("/api/message", "POST", { text, ...(files.length ? { files } : {}), ...(picks.length ? { picks } : {}), ...(dc.at ? { reply_to: dc.at } : {}), ...(lane ? { lane } : {}), ...(isProjT(t) ? { project: projOf(t) } : {}), ...(isMailT(t) ? { mail: mailOf(t) } : {}), ...(isFixedT(t) ? { conv: t } : {}), ...(isWorking(t) ? { mode: "steer" } : {}) });
     if (r && r.queued) { QUEUE = QUEUE.filter(i => i.id !== r.queued.id).concat(r.queued); renderQueue(); }
-    DC.st[dc.key] = "sent"; delete DC.edit[dc.key]; delete DC.note[dc.key];
+    DC.st[dc.key] = held && held.state === "undo" && dc.draft ? dcUndoStart(dc, held) : "sent"; delete DC.edit[dc.key]; delete DC.note[dc.key];
     if (t === target) { chatStick = true; scrollChat(true); }
   } catch (e) { delete DC.st[dc.key]; toast(e.message, true); }   // the picks stay, so a retry does not start the card over
   paintDecision();
@@ -410,7 +410,7 @@ function draftNode(d, o) {
     draftBodyNode(d.body, "dc-dr-b", { tabindex: "0", role: "region", "aria-label": "보낼 내용" }), draftFilesNode(d, o), draftMailNode(d.mail, o));
 }
 // What the status line says after an answer: a 고치기 on a draft is the bot rewriting it.
-const dcStText = (dc, st) => (dc.draft && ((DC.picks[dc.key] || [])[0] || {}).label === DRAFT_EDIT ? "고치는 중…" : st === "sending" ? "보내는 중…" : "보냈어요 · 처리하는 중");
+const dcStText = (dc, st) => (st === "undo" ? dcUndoText(dc) : dc.draft && ((DC.picks[dc.key] || [])[0] || {}).label === DRAFT_EDIT ? "고치는 중…" : st === "sending" ? "보내는 중…" : "보냈어요 · 처리하는 중");
 // 고치기 on a draft, or an option that needs detail (안 됨 …): the owner types the change / reason, then the answer goes out with it.
 // 고치기 on a draft asks "어떻게 고칠까요?" and the bot rewrites it; 직접 수정 (ed.manual) is the owner's own text, sent as the change "이 내용으로 고쳐 주세요: ...".
 const DRAFT_HINT = "더 짧게, 존댓말로, 견적서도 첨부한다고 써 줘", MANUAL_LEAD = "이 내용으로 고쳐 주세요: ";
@@ -490,7 +490,7 @@ function renderSheet(box, dc, picks, step) {
   else if (d) {
     // One compact row: the first choice (보내기) filled, 고치기 tonal, the rest as text, and 직접 수정 as a small link at the end.
     const opts = dc.blocks[0].options, oe = opts.find(o => o.label === DRAFT_EDIT);
-    const btns = opts.map((o, i) => el("button", { class: `dc-act${i === 0 ? " main" : o.label === DRAFT_EDIT ? " alt" : ""}${picks[0] && picks[0].n === o.n ? " on" : ""}`, type: "button", disabled: !!st, onclick: () => pickOption(dc, 0, o) }, o.label));
+    const btns = st === "undo" ? [dcUndoBtn(dc, "dc-act main")] : opts.map((o, i) => el("button", { class: `dc-act${i === 0 ? " main" : o.label === DRAFT_EDIT ? " alt" : ""}${picks[0] && picks[0].n === o.n ? " on" : ""}`, type: "button", disabled: !!st, onclick: () => pickOption(dc, 0, o) }, o.label));
     const man = oe && !st ? el("button", { class: "dc-manual", type: "button", title: "직접 수정", "aria-label": "직접 수정", onclick: () => { delete DC.note[dc.key]; DC.edit[dc.key] = { bi: 0, opt: oe, manual: true }; paintDecision(); } }, icon("pencil"), el("span", { text: "직접 수정" })) : null;
     foot.append(el("div", { class: "dc-acts" }, ...btns, ...(man ? [man] : [])));
   } else if (dc.blocks.length > 1) foot.append(...multiNodes(dc, picks, st));
@@ -501,7 +501,7 @@ function renderSheet(box, dc, picks, step) {
       for (const o of blk.options) foot.append(choiceRow(dc, step, o, picks, st));
     }
   }
-  if (st) foot.append(el("div", { class: "dc-st", role: "status", text: dcStText(dc, st) }));
+  const sn = dcStNode(dc, st); if (sn) foot.append(sn);
   if (org) col.append(body, foot);
   if (!paintKeep(box, org ? [head, org.bar, el("div", { class: "od-stage" }, org.orig, col)] : [head, ...(body ? [body] : []), foot], dcAgain(box))) return;
   if (body) body.scrollTop = top;
@@ -555,14 +555,15 @@ function renderDecision(box, dc, picks, step) {
     if (blk) {
       if (blk.title && dc.blocks.length > 1) body.append(el("div", { class: "dc-sub", text: blk.title }));
       // Once the answer goes out the card keeps only the chosen row (the others leave), so 보냈어요 reads in the same place.
-      for (const o of st && !dc.draft && picks[step] ? blk.options.filter(x => x.n === picks[step].n) : blk.options) body.append(el("button", { class: `dc-row${picks[step] && picks[step].n === o.n ? " on" : ""}`, type: "button", disabled: !!st, onclick: () => pickOption(dc, step, o) },
+      if (st === "undo" && dc.draft) body.append(dcUndoBtn(dc, "dc-row dc-undo"));
+      else for (const o of st && !dc.draft && picks[step] ? blk.options.filter(x => x.n === picks[step].n) : blk.options) body.append(el("button", { class: `dc-row${picks[step] && picks[step].n === o.n ? " on" : ""}`, type: "button", disabled: !!st, onclick: () => pickOption(dc, step, o) },
         el("span", { class: "dc-key", text: String(o.n) }),
         el("span", { class: "dc-tx" }, el("span", { class: "dc-lb" }, o.label), o.desc ? el("span", { class: "dc-ds", text: dcDesc(o) }) : null)));
     }
     kids.push(body);
     }
   }
-  if (st) kids.push(el("div", { class: "dc-st", role: "status", text: dcStText(dc, st) }));
+  const sn = dcStNode(dc, st); if (sn) kids.push(sn);
   if (!paintKeep(box, kids, dcAgain(box))) return;
   box.classList.toggle("fold", fold);
   const nb = $(".dc-body", box); if (nb) nb.scrollTop = top;
@@ -594,14 +595,15 @@ async function answerInline(nd, opt) {
     await noticeSheetOpen(nd.pc ? nd : nd.id); ntAnswer(nd, opt); return;
   }
   dcSending.add(nd.id); syncInlineChoices();
-  try { await ntPost(nd, opt.n, undefined, undefined, opt.label); dcAnswerToast(nd, opt); } catch (e) { toast(e.message, true); }
+  try { dcAnswerToast(nd, opt, await ntPost(nd, opt.n, undefined, undefined, opt.label)); } catch (e) { toast(e.message, true); }
   dcSending.delete(nd.id); syncInlineChoices();
 }
 // What a draft answered in place did, with the next step: 보냈어요 · 메일 열기 (the mail it answered), 보내지 않았어요 · 되돌리기 (the draft waits again).
-function dcAnswerToast(nd, opt) {
+function dcAnswerToast(nd, opt, held) {
   const to = String(nd.decision.to || "");
   if (!nd.decision.draft) return;
-  if (opt.label === "보내기") toast("보냈어요", false, to.startsWith("mail:") ? { label: "메일 열기", onclick: () => go("monitoring", `c:${to}`) } : null);
+  if (opt.label === "보내기" && held && held.state === "undo") toast("곧 보내요", false, { label: "보내기 취소", onclick: () => dcUndoPost(nd.decision.draft.ref) }, held.left);
+  else if (opt.label === "보내기") toast("보냈어요", false, to.startsWith("mail:") ? { label: "메일 열기", onclick: () => go("monitoring", `c:${to}`) } : null);
   else if (opt.label === "보내지 않기") toast("보내지 않았어요", false, { label: "되돌리기", onclick: () => dcReopen(nd) });
 }
 async function dcReopen(nd) {
@@ -754,7 +756,7 @@ function dcPointer(box, n) {
 // a phone the keyboard closes and reopens while the owner types (owner 2026-10-22), so a live update that changes none of it leaves the card alone.
 function dcSig(dc, picks, step) {
   const dr = dc.draft ? [dc.draft.to, (dc.draft.cc || []).join(","), dc.draft.mode || ""] : 0;
-  return JSON.stringify([dc.key, dc.question, dc.each ? dc.blocks.map(b => b.nd.id) : 0, picks.map(o => o && o.n), step, !!DC.fold[dc.t], DC.st[dc.key] || "", DC.edit[dc.key] ? DC.edit[dc.key].opt.n + (DC.edit[dc.key].manual ? "m" : "") : 0, dr, (DC.files[dc.key] || []).length, !!DC.fbusy[dc.key]]);
+  return JSON.stringify([dc.key, dc.question, dc.each ? dc.blocks.map(b => b.nd.id) : 0, picks.map(o => o && o.n), step, !!DC.fold[dc.t], DC.st[dc.key] || "", DC.edit[dc.key] ? DC.edit[dc.key].opt.n + (DC.edit[dc.key].manual ? "m" : "") : 0, dr, (DC.files[dc.key] || []).length, !!DC.fbusy[dc.key], dcBackNote(dc)]);
 }
 // What was decided stays in the conversation once the card is gone (owner 2026-11-03): the owner's answer message already carries the
 // question and the chosen option (hub/intake.ts decisionLines, `picks`), so the record is drawn from it here and from history after a

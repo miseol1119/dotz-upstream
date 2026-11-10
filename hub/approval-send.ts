@@ -11,6 +11,11 @@
 // again by itself: `look` tells whether its draft is sent (then it is marked sent), its sender still runs (it is checked again later), or neither (it ends failed
 // with a text that says the mail may have gone out; only the owner's 다시 보내기 sends it again). A comment nobody can say went up ends `unsure` (hub/comments/recover.ts).
 //
+// Cancel window: unless the window is 0 (web.send_undo_sec), an approved send waits that long as `undo` before it is queued. The job is kept (approved at, window) in the same
+// file; `cancel` inside the window never runs the send, `revoke` writes the owner's cancel into the inbox (the CLIs' own gate then refuses the old 보내기) and the card is
+// back to waiting for approval. A restart inside the window never sends by itself: the job comes back as `back` (told once, on the card) and waits for a new 보내기.
+// Only a send that starts here is delayed: a CLI an agent runs by hand after the owner's approval does not pass through this file.
+//
 // Refs the gateway does not know (a card the bot wrote by hand, a KakaoTalk draft, a 직접 입력 pick) still go to the bot as before.
 import { join } from "node:path";
 import { draftActionOf } from "./draft-approval.ts";
@@ -23,8 +28,12 @@ export type SendAction = "send" | "send-main" | "send-mail" | "send-as-is";
 export type SendJob = { ref: string; conv: string; action: SendAction; title: string; retry?: true };
 /** What is known of a job that was sending when the gateway stopped. */
 export type SendLook = { state: "sent" } | { state: "alive" } | { state: "failed" | "unsure"; text: string };
-type Kept = SendJob & { state: "queued" | "sending" };
-export type SendResult = { ref: string; conv: string; title: string; state: "queued" | "sending" | "sent" | "failed" | "unsure"; text: string; at: number };
+type Hold = { approvedAt: number; wait: number };
+type Kept = SendJob & { state: "queued" | "sending" | "undo" } & Partial<Hold>;
+/** `undo`: approved, inside the cancel window (`until`); `back`: not sent, the draft waits for approval again (cancelled, or the gateway restarted in the window). */
+export type SendResult = { ref: string; conv: string; title: string; state: "undo" | "queued" | "sending" | "sent" | "failed" | "unsure" | "back"; text: string; at: number; until?: number };
+export const UNDONE = "보내기를 취소했어요. 보내려면 다시 보내기를 눌러 주세요";
+export const RETURNED_ON_RESTART = "게이트웨이가 다시 시작돼서 보내지 않았어요. 보내려면 다시 보내기를 눌러 주세요";
 
 const ROOT = join(import.meta.dir, "..");
 
@@ -56,7 +65,15 @@ export type SenderDeps = {
 	store?: { load: () => unknown[]; save: (body: string) => void };
 	/** Judges a job that was sending when the gateway stopped (default: it may have gone out). */
 	look?: (j: SendJob) => SendLook;
+	/** The cancel window in ms, read when a send is approved (0 or absent = off: the send starts at once). */
+	undoMs?: () => number;
+	/** Calls `fn` after `ms` (default: a timer that does not keep the process alive). */
+	after?: (ms: number, fn: () => void) => void;
+	/** A job in the window is not going out (cancelled, or the gateway restarted): take back the owner's 보내기 so nothing can send it until he approves again. */
+	revoke?: (j: SendJob, why: "cancel" | "restart") => void;
 };
+
+const timerAfter = (ms: number, fn: () => void): void => void (setTimeout(fn, ms) as { unref?: () => void }).unref?.();
 
 export const MAY_HAVE_GONE_OUT = "게이트웨이가 멈추면서 보내던 중이었어요. 이미 나갔을 수 있으니 보낸 것을 확인한 뒤, 안 나갔을 때만 다시 보내기를 눌러 주세요";
 
@@ -83,15 +100,15 @@ export function createApprovalSender(deps: SenderDeps) {
 	};
 	// Jobs left sending by an earlier run whose sender may still be running: checked again by `recheck`.
 	const orphans = new Map<string, SendJob>();
-	const set = (j: SendJob, state: SendResult["state"], text = "") => {
-		if (state === "queued" || state === "sending") kept.set(j.ref, { ref: j.ref, conv: j.conv, action: j.action, title: j.title, ...(j.retry ? { retry: true as const } : {}), state });
+	const set = (j: SendJob, state: SendResult["state"], text = "", hold?: Hold) => {
+		if (state === "queued" || state === "sending" || state === "undo") kept.set(j.ref, { ref: j.ref, conv: j.conv, action: j.action, title: j.title, ...(j.retry ? { retry: true as const } : {}), state, ...(hold ?? {}) });
 		else kept.delete(j.ref);
 		persist();
-		const r: SendResult = { ref: j.ref, conv: j.conv, title: j.title, state, text, at: now() };
+		const r: SendResult = { ref: j.ref, conv: j.conv, title: j.title, state, text, at: now(), ...(hold ? { until: hold.approvedAt + hold.wait } : {}) };
 		results.delete(j.ref);
 		results.set(j.ref, r);
-		// The oldest finished result goes: a queued or sending one is what stops a second approval (enqueue), so it stays however many wait.
-		if (results.size > KEEP) for (const [ref, old] of results) if (old.state !== "queued" && old.state !== "sending") { results.delete(ref); break; }
+		// The oldest finished result goes: a queued, sending or undo one is what stops a second approval (enqueue), so it stays however many wait.
+		if (results.size > KEEP) for (const [ref, old] of results) if (old.state !== "queued" && old.state !== "sending" && old.state !== "undo") { results.delete(ref); break; }
 		deps.report(r);
 	};
 
@@ -101,15 +118,50 @@ export function createApprovalSender(deps: SenderDeps) {
 		return !!t && !!sendArgv(t.kind, ref, action!);
 	};
 
-	/** Queues one approved send; false when the gateway cannot send it or the same draft is already queued, sending or sent. */
-	function enqueue(j: SendJob): boolean {
+	// Approved sends inside the cancel window, by draft ref.
+	const pending = new Map<string, { j: SendJob; t: SendTarget; until: number }>();
+
+	/** Queues one approved send (after the cancel window, unless `hold` is false or it is a 다시 보내기); false when the gateway cannot send it; a draft already in the window, queued, sending or sent sends nothing more. */
+	function enqueue(j: SendJob, o: { hold?: false } = {}): boolean {
 		const t = deps.kind(j.ref, j.action);
 		if (!t || !sendArgv(t.kind, j.ref, j.action)) return false;
 		const st = results.get(j.ref)?.state;
-		if (st === "queued" || st === "sending" || st === "sent" || st === "unsure") {
+		if (st === "undo" || st === "queued" || st === "sending" || st === "sent" || st === "unsure") {
 			deps.log(`approved send ${j.ref} in ${j.conv} is already ${st}; the second approval sends nothing`);
 			return true;
 		}
+		const wait = o.hold === false || j.retry ? 0 : Math.max(0, deps.undoMs?.() ?? 0);
+		if (wait > 0) {
+			const approvedAt = now();
+			pending.set(j.ref, { j, t, until: approvedAt + wait });
+			set(j, "undo", "", { approvedAt, wait });
+			(deps.after ?? timerAfter)(wait, tick);
+			return true;
+		}
+		start(j, t);
+		return true;
+	}
+
+	/** The jobs whose window is over start now, in the order they were approved. */
+	function tick(): void {
+		for (const [ref, p] of [...pending]) {
+			if (now() < p.until) continue;
+			pending.delete(ref);
+			start(p.j, p.t);
+		}
+	}
+
+	/** A job in the window will not be sent: the owner's pick is taken back, then the card waits for approval again. */
+	function back(j: SendJob, why: "cancel" | "restart"): void {
+		try {
+			deps.revoke?.(j, why);
+		} catch (e) {
+			deps.log(`approved send ${j.ref}: the cancel was not written to the inbox: ${(e as Error).message}`);
+		}
+		set(j, "back", why === "cancel" ? UNDONE : RETURNED_ON_RESTART);
+	}
+
+	function start(j: SendJob, t: SendTarget): void {
 		set(j, "queued");
 		const lane = lanes.get(t.lane);
 		if (lane) lane.jobs.push({ ...j, kind: t.kind });
@@ -153,14 +205,14 @@ export function createApprovalSender(deps: SenderDeps) {
 
 	return {
 		can,
-		enqueue,
+		enqueue: (j: SendJob) => enqueue(j),
 		/** Once, on boot: takes up the jobs the file kept (see the top of this file). */
 		recover: () => {
 			if (recovered || !deps.store) return;
 			recovered = true;
 			let left: Kept[];
 			try {
-				left = deps.store.load().filter((x): x is Kept => !!x && typeof x === "object" && typeof (x as Kept).ref === "string" && typeof (x as Kept).conv === "string" && typeof (x as Kept).title === "string" && ["send", "send-main", "send-mail", "send-as-is"].includes((x as Kept).action) && ((x as Kept).state === "queued" || (x as Kept).state === "sending"));
+				left = deps.store.load().filter((x): x is Kept => !!x && typeof x === "object" && typeof (x as Kept).ref === "string" && typeof (x as Kept).conv === "string" && typeof (x as Kept).title === "string" && ["send", "send-main", "send-mail", "send-as-is"].includes((x as Kept).action) && ((x as Kept).state === "queued" || (x as Kept).state === "sending" || (x as Kept).state === "undo"));
 			} catch (e) {
 				deps.log(`approved sends: the job file is unreadable: ${(e as Error).message}`);
 				return;
@@ -168,15 +220,29 @@ export function createApprovalSender(deps: SenderDeps) {
 			// All of them stay in the file until each is settled, so a stop in the middle of this loop loses none.
 			for (const k of left) kept.set(k.ref, k);
 			saved = JSON.stringify(left);
-			for (const { state, ...j } of left) {
-				if (state === "sending") settleLeft(j);
+			for (const { state, approvedAt: _a, wait: _w, ...j } of left) {
+				if (state === "undo") back(j, "restart");
+				else if (state === "sending") settleLeft(j);
 				else if (look(j).state === "sent") set(j, "sent");
-				else if (!enqueue(j)) set(j, "failed", "보내기로 한 초안을 더 이상 보낼 수 없어요. 이미 처리됐는지 확인해 주세요");
+				else if (!enqueue(j, { hold: false })) set(j, "failed", "보내기로 한 초안을 더 이상 보낼 수 없어요. 이미 처리됐는지 확인해 주세요");
 			}
 		},
 		/** Checks again the jobs a boot found still running. */
 		recheck: () => {
+			tick();
 			for (const j of [...orphans.values()]) settleLeft(j);
+		},
+		/** The owner's cancel: "cancelled" while the job is inside its window (the send function is never called), "late" once it started or went out, "none" for a draft this sender does not hold. */
+		cancel: (ref: string): "cancelled" | "late" | "none" => {
+			tick();
+			const p = pending.get(ref);
+			if (!p) {
+				const st = results.get(ref)?.state;
+				return st === "queued" || st === "sending" || st === "sent" ? "late" : "none";
+			}
+			pending.delete(ref);
+			back(p.j, "cancel");
+			return "cancelled";
 		},
 		/** An unsure job got its answer (proof read back, the owner's pick, its old sender finished). */
 		settle: (j: SendJob, state: "sent" | "failed", text = "") => set(j, state, text),

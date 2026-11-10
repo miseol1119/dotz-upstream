@@ -2,16 +2,17 @@
 // card shows the next card at once with no model turn, the send runs in the background and its result lands on the card, a failure is one
 // [fail] note, and the batch answer sends the picked cards, hands 고치기 to the bot in one message and leaves the skipped ones waiting.
 // The drafts are mails of a source this machine cannot send from, refused after the approval check, so nothing leaves this machine.
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, beforeEach, expect, test } from "bun:test";
 import { type HubEvent, onEmit } from "./events.ts";
 import { draftApprovalBlock } from "./draft-approval.ts";
 import { ignoreNotice, listNotices } from "./notices.ts";
 import { out } from "./outbound.ts";
 import { approvalRoute, reportSend, sendTargetOf, sender, webAnswer } from "./approval-wire.ts";
 import { commentsDir, createStore } from "./comments/store.ts";
-import { DATA_DIR } from "./config.ts";
+import { DATA_DIR, cfg } from "./config.ts";
 import { addDraft, newId } from "../features/reply-drafts/lib/store.ts";
 
+beforeEach(() => void (cfg.web.send_undo_sec = 0));
 const CONV = "mail:aw-test";
 const draft = (body: string) => {
 	const id = newId();

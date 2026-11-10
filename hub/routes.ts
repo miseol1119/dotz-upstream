@@ -617,7 +617,7 @@ export function makeRoute({ tailnetName = ownTailnetName, busyNow, restartGatewa
 		const noticesResponse = await routeNotices(req, url);
 		if (noticesResponse) return noticesResponse;
 		// The waiting send-approval cards of a conversation, their batch answer and the owner's own edit of a draft (hub/approval-wire.ts).
-		if (url.pathname === "/api/approvals" || url.pathname === "/api/approvals/failed" || /^\/api\/drafts\/[^/]+\/body$/.test(url.pathname)) {
+		if (url.pathname === "/api/approvals" || url.pathname === "/api/approvals/failed" || url.pathname === "/api/approvals/undo" || /^\/api\/drafts\/[^/]+\/body$/.test(url.pathname)) {
 			const login = req.headers.get("tailscale-user-login") ?? "local";
 			const res = await approvalRoute(req, url, { login, triageMin: cfg.web.triage_min ?? TRIAGE_MIN_DEFAULT, deliver: (to, text, picks, decision) => deliverAnswer({ to, text, picks, notice: decision ?? "", login }) });
 			if (res) return res;

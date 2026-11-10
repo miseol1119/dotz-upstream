@@ -72,11 +72,18 @@ function trState(c) {
   }
   return d;
 }
-const TR_ST = { drop: "보내지 않았어요", queued: "보낼 차례를 기다려요", sending: "보내는 중…", sent: "보냈어요", failed: "보내지 못했어요", unsure: "확인이 필요해요", bot: "봇이 보내요", edit: "봇이 고치는 중이에요", gone: "다른 곳에서 처리됐어요", err: "답을 보내지 못했어요" };
+const TR_ST = { drop: "보내지 않았어요", undo: "곧 보내요", back: "보내지 않았어요", queued: "보낼 차례를 기다려요", sending: "보내는 중…", sent: "보냈어요", failed: "보내지 못했어요", unsure: "확인이 필요해요", bot: "봇이 보내요", edit: "봇이 고치는 중이에요", gone: "다른 곳에서 처리됐어요", err: "답을 보내지 못했어요" };
 const trChip = c => {
   const s = trState(c);
+  if (s && s.state === "undo") return el("span", { class: "tr-st undo", "data-trst": trK(c) }, TR_ST.undo, el("button", { class: "btn text sm", type: "button", onclick: () => trUndo(c) }, "보내기 취소"));
   return s ? el("span", { class: `tr-st ${s.state}`, "data-trst": trK(c), title: s.text || null, text: TR_ST[s.state] || s.state }) : el("span", { class: "tr-st", "data-trst": trK(c), hidden: true });
 };
+// 보내기 취소 inside the gateway's cancel window: nothing is sent and the card waits again.
+async function trUndo(c) {
+  if (!(await dcUndoPost(c.ref))) return;
+  delete TR.done[trK(c)];
+  await trLoad(); trPaint();
+}
 function trLive(e) {
   if (!e || !e.ref) return;
   TR.results[e.ref] = e;

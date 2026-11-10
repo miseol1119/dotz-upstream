@@ -61,15 +61,16 @@ export const openDraftRefs = (to: string): string[] => items.flatMap(i => (isOpe
 export const openDraftCards = (to?: string): { id: string; to: string; ref: string; title: string; draft: DraftApproval; at: string; text: string }[] =>
 	items.flatMap(i => (isOpenDecision(i) && (to === undefined || i.decision!.to === to) && i.decision!.draft?.ref ? [{ id: i.id, to: i.decision!.to, ref: i.decision!.draft.ref, title: i.title, draft: i.decision!.draft, at: i.at ?? i.ts, text: i.text }] : []));
 /** The newest card of draft `ref` in `to` shows how the gateway's send of it went. */
-export function markDraftSend(to: string, ref: string, state: NonNullable<Decision["send"]>["state"], text = ""): void {
+export function markDraftSend(to: string, ref: string, state: NonNullable<Decision["send"]>["state"], text = "", until?: number): void {
 	const n = items.findLast(i => i.decision?.to === to && openDraftRef(i) === ref);
 	if (!n) return;
 	const at = now();
 	const prev = n.decision!.send;
 	const attempts = state === "queued" && prev?.state === "failed" ? (prev.attempts ?? 1) + 1 : prev?.attempts;
-	n.decision!.send = { state, ...(text ? { text: text.slice(0, 300) } : {}), at, ...(attempts ? { attempts } : {}) };
+	n.decision!.send = { state, ...(text ? { text: text.slice(0, 300) } : {}), at, ...(attempts ? { attempts } : {}), ...(until ? { until } : {}) };
 	// A send refused for its files leaves the draft pending: its card opens again with the reason, so it can be answered (이대로 보내기) or the files fixed.
-	if (state === "failed" && text.startsWith(ATTACH_REFUSED) && n.decision!.state !== "open") reopenNotices([n.id]);
+	// A send taken back (cancelled in its window, or the gateway restarted in it) leaves the draft pending: the card opens again with the reason, once, on the card.
+	if (((state === "failed" && text.startsWith(ATTACH_REFUSED)) || state === "back") && n.decision!.state !== "open") reopenNotices([n.id]);
 	else announce([n], at);
 }
 // The bot posted the open card of draft `ref` again with changes (or the queue changed its "남은 N건" line): the open card shows the new text in place.

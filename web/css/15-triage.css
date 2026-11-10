@@ -32,7 +32,7 @@
 .tr-st { --tone: var(--fg-3); display: inline-flex; align-items: center; gap: var(--sp-15); flex: none; color: var(--fg-2); font: 600 12px/22px var(--font); }
 .tr-st.sent { --tone: var(--ok); color: var(--ok); }
 .tr-st.failed, .tr-st.err { --tone: var(--err); color: var(--err); }
-.tr-st.sending, .tr-st.queued { --tone: var(--accent); }
+.tr-st.sending, .tr-st.queued, .tr-st.undo { --tone: var(--accent); }
 .tr-ft { gap: var(--sp-2); }
 .tr-acts { display: flex; gap: var(--sp-2); justify-content: flex-start; flex-wrap: wrap; }
 .tr-b { height: 40px; min-width: 0; padding: 0 var(--sp-4); font-size: 15px; }
