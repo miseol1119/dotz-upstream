@@ -3,7 +3,7 @@ import { dropSection, renderState, STATE_CAP } from "./recall-parts.ts";
 
 const PATH = "/data/state.json";
 
-test("renderState: one line per open task with next and lane, other keys by name only", () => {
+test("renderState: one line per open task, newest first, with next and lane, other keys by name only", () => {
 	const raw = JSON.stringify({
 		open_tasks: [
 			{ id: "t1", what: "ship the port", since: "2026-10-20", next: "run the tests" },
@@ -14,7 +14,7 @@ test("renderState: one line per open task with next and lane, other keys by name
 		last_seen: "2026-10-21",
 	});
 	expect(renderState(raw, PATH)).toBe(
-		["open_tasks:", "- t1: ship the port (next: run the tests)", "- t2: review PR (next: wait for CI) [lane: pr-review]", "- t3: idea", "other keys: notes, last_seen"].join("\n"),
+		["open_tasks:", "- t3: idea", "- t2: review PR (next: wait for CI) [lane: pr-review]", "- t1: ship the port (next: run the tests)", "other keys: notes, last_seen"].join("\n"),
 	);
 });
 
@@ -25,7 +25,8 @@ test("renderState: an oversized state is cut at a line boundary under the cap, w
 	const lines = out.split("\n");
 	expect(lines.at(-1)).toBe(`[... cut at ${STATE_CAP} characters; read ${PATH} for the rest]`);
 	expect(lines.at(-2)).toMatch(/^- task-\d+: work item number \d+ \(next: keep going\)$/);
-	expect(out).not.toContain("task-199");
+	expect(lines[1]).toMatch(/^- task-199:/);
+	expect(out).not.toContain("task-0:");
 });
 
 test("renderState: invalid JSON (or a non-object) falls back to the raw 4000-character slice", () => {

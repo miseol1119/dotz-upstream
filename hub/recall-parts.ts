@@ -1,4 +1,5 @@
-// Pure pieces of the orchestrator's recall prompt (the first message of a session, which the runtime keeps through every compaction).
+// Pure pieces of the orchestrator's recall prompt (the first message of a session, and the re-read after a compaction: the
+// runtime drops every entry before a compaction's first kept one, the first message included).
 
 export const STATE_CAP = 2500;
 export const OWNER_CAP = 3000;
@@ -6,7 +7,8 @@ export const OWNER_CAP = 3000;
 type OpenTask = { id?: unknown; what?: unknown; next?: unknown; lane?: unknown };
 
 // state.json as a compact listing: one line per open task, the other top-level keys by name only, cut at a line
-// boundary under `max` characters with a marker that names the file. Not a JSON object: the old raw slice.
+// boundary under `max` characters with a marker that names the file. Newest first (state.json appends new tasks at the end),
+// so a cut drops the oldest. Not a JSON object: the old raw slice.
 export function renderState(raw: string, path: string, max = STATE_CAP): string {
 	let state: unknown;
 	try {
@@ -19,7 +21,7 @@ export function renderState(raw: string, path: string, max = STATE_CAP): string 
 	const lines: string[] = [];
 	if (Array.isArray(tasks)) {
 		lines.push("open_tasks:");
-		for (const t of tasks as OpenTask[]) {
+		for (const t of (tasks as OpenTask[]).toReversed()) {
 			const task = t && typeof t === "object" ? t : {};
 			const text = (v: unknown) => (typeof v === "string" ? v : v === undefined || v === null ? "" : JSON.stringify(v));
 			lines.push(`- ${text(task.id)}: ${text(task.what)}${task.next ? ` (next: ${text(task.next)})` : ""}${task.lane ? ` [lane: ${text(task.lane)}]` : ""}`);

@@ -42,7 +42,7 @@ const BOUNDARY_CEILINGS: Counts = {
 	"hub->features": 50, // the hub mounts feature routes and tools
 	"hub->onboard": 6, // setup flows the hub triggers
 	"hub->extension": 2, // shared guard code
-	"extension->hub": 12, // the extension reuses hub helpers it cannot duplicate
+	"extension->hub": 13, // the extension reuses hub helpers it cannot duplicate; 13th: the post-compaction recall renders state.json with the first message's renderState (hub/recall-parts.ts), not a copy
 	"onboard->hub": 1, // onboarding reads hub config
 	"features->onboard": 2, // features reuse onboarding prompts
 	"feature->feature": 18, // a feature importing another feature couples two things meant to be removable alone
