@@ -1214,7 +1214,7 @@
    0,
    {
     "type": "prompt",
-    "message": "#3cy0v8zgjnd0a Build the thing.\nDone when: tests pass\n\n---\n[dotz lane alpha…"
+    "message": "#dy7312sf5vyn Build the thing.\nDone when: tests pass\n\n---\n[dotz lane alpha…"
    }
   ],
   [
@@ -1779,6 +1779,13 @@
    "rate"
   ],
   [
+   "stdin",
+   1,
+   {
+    "type": "abort"
+   }
+  ],
+  [
    "kill",
    1,
    9
@@ -1839,7 +1846,7 @@
    2,
    {
     "type": "prompt",
-    "message": "#1ve19muprtkey [dotz gateway] Your process was restarted after it stopped r…"
+    "message": "#svgsqi22m8qw 앞 턴이 도구 호출 없이 #분 멈춰서 끊었어요.\n\n[dotz gateway] Your process was…"
    }
   ],
   [

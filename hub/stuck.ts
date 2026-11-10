@@ -3,9 +3,9 @@
 // from the process, growth of its session file, or >= 2 s of CPU time used by its process tree between two samples (a long test
 // run emits no event but burns CPU). Nothing is done while the caller says a wait is legitimate (workers, compaction, an open
 // owner question) or the turn is not open. At most STUCK_CAP recoveries per hour; past that the caller is alerted once.
-import { closeSync, fstatSync, mkdirSync, openSync, readdirSync, readSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, fstatSync, mkdirSync, openSync, readdirSync, readSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { DATA_DIR, log, stuckTurnMs } from "./config.ts";
+import { DATA_DIR, log, stuckTurnMs, writeAtomic } from "./config.ts";
 import type { AgentEvent } from "./runtime/types.ts";
 
 export const ABORT_GRACE_MS = 60_000;
@@ -57,7 +57,7 @@ export function treeCpuSeconds(ps: string, pid: number): number | undefined {
 export type CpuSampler = (pid: number) => Promise<number | undefined>;
 let sampler: CpuSampler = async pid => {
 	try {
-		const p = Bun.spawn(["/bin/ps", "-A", "-o", "pid=,ppid=,time="], { stdout: "pipe", stderr: "ignore" });
+		const p = Bun.spawn(["/bin/ps", "-A", "-o", "pid=,ppid=,time="], { stdout: "pipe", stderr: "ignore", timeout: 5000, killSignal: "SIGKILL" });
 		const out = await new Response(p.stdout).text();
 		await p.exited;
 		return treeCpuSeconds(out, pid);
@@ -86,7 +86,9 @@ export function callShape(tool: string | undefined, args: string | undefined): s
 	let parsed: unknown = args;
 	try {
 		parsed = JSON.parse(args);
-	} catch {}
+	} catch {
+		// Not JSON: the raw text is scanned for tool.<name>( calls as it is.
+	}
 	const lang = parsed && typeof parsed === "object" ? ((parsed as Record<string, unknown>).language ?? (parsed as Record<string, unknown>).lang) : undefined;
 	const counts = new Map<string, number>();
 	for (const text of stringsOf(parsed)) for (const m of text.matchAll(/\btool\.([A-Za-z_]\w{0,39})\(/g)) counts.set(m[1]!, (counts.get(m[1]!) ?? 0) + 1);
@@ -94,9 +96,10 @@ export function callShape(tool: string | undefined, args: string | undefined): s
 	return `eval ${typeof lang === "string" && /^[A-Za-z]{1,12}$/.test(lang) ? `${lang.toLowerCase()} ` : ""}셀${calls.length ? ` 안의 ${calls.join(", ")}` : ""}`;
 }
 
-export type StuckInfo = { shape: string; minutes: number };
+export type StuckInfo = { shape?: string; minutes: number };
 /** The line that opens the redelivered request after a stuck recovery. */
-export const stuckLine = (i: StuckInfo): string => `앞 턴이 ${i.shape}에서 ${i.minutes}분 멈춰서 끊었어요. 같은 호출 모양을 되풀이하지 마세요.`;
+export const stuckLine = (i: StuckInfo): string =>
+	i.shape ? `앞 턴이 ${i.shape}에서 ${i.minutes}분 멈춰서 끊었어요. 같은 호출 모양을 되풀이하지 마세요.` : `앞 턴이 도구 호출 없이 ${i.minutes}분 멈춰서 끊었어요.`;
 /** `wrap` with `line` in front of the first text only (one session reads them all). */
 export function leadWith(wrap: (text: string) => string, line: string | undefined): (text: string) => string {
 	let pending = line;
@@ -242,7 +245,7 @@ export async function takeSnapshot(key: string, pid: number | undefined, session
 		const dir = join(DATA_DIR, "stuck");
 		mkdirSync(dir, { recursive: true });
 		const path = join(dir, `${new Date().toISOString()}-${key.replace(/[^\w.-]+/g, "_").slice(0, 60)}.txt`);
-		writeFileSync(path, Buffer.from(sections.join("\n\n") + "\n").subarray(0, SNAPSHOT_MAX_BYTES));
+		writeAtomic(path, Buffer.from(sections.join("\n\n") + "\n").subarray(0, SNAPSHOT_MAX_BYTES).toString());
 		const old = readdirSync(dir).filter(f => f.endsWith(".txt")).sort();
 		for (const f of old.slice(0, Math.max(0, old.length - SNAPSHOT_KEEP))) unlinkSync(join(dir, f));
 		log(`stuck: snapshot ${path}`);
@@ -358,7 +361,7 @@ export function createStuckWatch(o: StuckWatchOpts) {
 					s.recoveries.push(now);
 					s.abortedAt = now;
 					abortedAfter = minutes;
-					info = { shape: [...open.values()].at(-1)?.shape ?? "도구 호출 밖", minutes };
+					info = { shape: [...open.values()].at(-1)?.shape, minutes };
 					o.stuck(minutes);
 					o.abort();
 					break;
@@ -382,4 +385,83 @@ export function createStuckWatch(o: StuckWatchOpts) {
 	}
 	/** What the last abort found: the open tool call's shape and the minutes of silence; kept until the next turn starts. */
 	return { progress, begin, end, reset: stop, tick, info: (): StuckInfo | undefined => info };
+}
+
+export type OrchStuckHost = {
+	key: string;
+	pid: () => number | undefined;
+	sessionFile: () => string | undefined;
+	working: () => boolean;
+	/** Workers running or a compaction: a wait, not a stall. */
+	busy: () => boolean;
+	/** Mark the turn failed (its request stays open) and abort the process. */
+	abort: () => void;
+	/** Restart the process, a diagnostic snapshot first (orchestrator.ts restart). */
+	restart: (why: string) => void;
+	alert: (text: string) => void;
+};
+
+/**
+ * The stuck watch of one orchestrator session (main or a conversation), kept out of createOrchestrator: the stuck abort and restart, the
+ * restart of an owner abort the process ignored, the line opening the replay after a stuck recovery, and the handler that tells the
+ * conversation and the guard that names a legitimate wait (an open owner question), both set by hub/outbound.ts.
+ */
+export function orchStuck(h: OrchStuckHost) {
+	let onStuck: (minutes: number) => void = () => {};
+	let guard: () => boolean = () => false;
+	let ownerTimer: ReturnType<typeof setTimeout> | undefined;
+	let lead: string | undefined;
+	const stuckRestart = (why: string): void => {
+		const info = watch.info();
+		lead = info ? stuckLine(info) : undefined;
+		h.restart(why);
+	};
+	const watch = createStuckWatch({
+		key: h.key,
+		pid: h.pid,
+		sessionFile: h.sessionFile,
+		exempt: () => !h.working() || h.busy() || guard(),
+		abort: h.abort,
+		restart: why => stuckRestart(`stuck turn: ${why}`),
+		stuck: minutes => onStuck(minutes),
+		capped: minutes => h.alert(`작업이 ${minutes}분 동안 멈춰 있어요. 한 시간 안에 이미 세 번 끊고 다시 이어갔기 때문에 이번에는 그대로 두었어요.`),
+	});
+	const disarm = (): void => {
+		clearTimeout(ownerTimer);
+		ownerTimer = undefined;
+	};
+	return {
+		setHandler: (fn: (minutes: number) => void): void => void (onStuck = fn),
+		setGuard: (fn: () => boolean): void => void (guard = fn),
+		event: (ev: AgentEvent): void => watch.progress(ev.type, ev),
+		begin: (): void => watch.begin(),
+		/** At turn_end. True when the stuck abort ended the turn: the restart is under way and the caller replays the open requests. */
+		ended(): boolean {
+			disarm();
+			if (!watch.end()) return false;
+			stuckRestart("stuck turn: aborted after no progress");
+			return true;
+		},
+		reset(): void {
+			watch.reset();
+			disarm();
+		},
+		/** The owner aborted the running turn: a process that ignores it stays working for good, so it is restarted after the grace. The
+		 * cancelled request is not replayed (prompts.ts reopen) and nothing more is posted; the owner already heard "중단했어요". */
+		ownerAbort(abort: () => void): void {
+			const pid = h.pid();
+			abort();
+			disarm();
+			ownerTimer = setTimeout(() => {
+				ownerTimer = undefined;
+				if (h.pid() === pid && h.working()) h.restart("owner abort did not stop the turn");
+			}, ABORT_GRACE_MS);
+		},
+		/** The line opening the replay after a stuck recovery, once. */
+		takeLead(): string | undefined {
+			const l = lead;
+			lead = undefined;
+			return l;
+		},
+	};
 }

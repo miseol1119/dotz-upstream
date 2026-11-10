@@ -92,6 +92,7 @@ beforeAll(() => {
 	l.setIdleHandler(() => {});
 });
 afterAll(() => {
+	delete process.env.DOTZ_STUCK_MS;
 	delete adapters.fakeomo;
 	Object.assign(cfg, savedCfg);
 });

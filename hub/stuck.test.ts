@@ -91,6 +91,7 @@ beforeAll(() => {
 	});
 });
 afterAll(() => {
+	delete process.env.DOTZ_STUCK_MS;
 	delete adapters.fake;
 	Object.assign(cfg, savedCfg);
 });

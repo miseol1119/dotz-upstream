@@ -25,7 +25,7 @@ import { LATER_LINE, stripLater } from "./tone.ts";
 import { checkSoon as checkAccountSoon } from "./account-rules.ts";
 import { handover, lastAnswerAt, newOrchState, recallText } from "./orchestrator-parts.ts";
 import { noteModelChange } from "./model-guard.ts";
-import { ABORT_GRACE_MS, createStuckWatch, stuckLine, takeSnapshot } from "./stuck.ts";
+import { orchStuck, takeSnapshot } from "./stuck.ts";
 
 const ROTATE_BYTES = 50e6;
 // The compaction point of a session: the running model's own (config context.models, the 컨텍스트 screen) or
@@ -93,30 +93,11 @@ export function createOrchestrator(opts: OrchOpts) {
 	// The running turn stopped on a provider error (a usage limit, a dead login, a failure past its retries): its request was not
 	// answered and must stay open for the retry, not be closed as a turn that wrote nothing (prompts.ts settleTurn).
 	let turnFailed = false;
-	// A turn that shows no progress (no event, session growth or process-tree CPU) for stuckTurnMs() is aborted, then the process is
-	// restarted when the abort does not end it (hub/stuck.ts); the handler tells the conversation, the guard names a wait that is legitimate.
-	let onStuck: (minutes: number) => void = () => {};
-	let stuckGuard: () => boolean = () => false;
-	const setStuckHandler = (fn: (minutes: number) => void): void => void (onStuck = fn);
-	const setStuckGuard = (fn: () => boolean): void => void (stuckGuard = fn);
-	// The owner's abort that the process did not honor: armed by cancelByOwner, disarmed by the turn's end.
-	let ownerAbortTimer: Timer | undefined;
 	// The runtime of the running process, chosen at each start().
 	let adapter: RuntimeAdapter | undefined;
 	const orchestratorPid = (): number | undefined => proc?.pid;
-	const stuckWatch = createStuckWatch({
-		key: opts.key,
-		pid: orchestratorPid,
-		sessionFile: () => orch.sessionFile,
-		exempt: () => orch.status !== "working" || runningSubagents(opts.source) > 0 || compacting() || stuckGuard(),
-		abort: () => {
-			turnFailed = true;
-			proc?.abort();
-		},
-		restart: why => stuckRestart(`stuck turn: ${why}`),
-		stuck: minutes => onStuck(minutes),
-		capped: minutes => onAlert(`${NAME}: 작업이 ${minutes}분 동안 멈춰 있어요. 한 시간 안에 이미 세 번 끊고 다시 이어갔기 때문에 이번에는 그대로 두었어요.`),
-	});
+	// A turn with no progress for stuckTurnMs() is aborted (its request stays open), then restarted when the abort does not end it (hub/stuck.ts).
+	const stuck = orchStuck({ key: opts.key, pid: orchestratorPid, sessionFile: () => orch.sessionFile, working: () => orch.status === "working", busy: () => runningSubagents(opts.source) > 0 || compacting(), abort: () => ((turnFailed = true), proc?.abort()), restart: why => restart(why, true), alert: text => onAlert(`${NAME}: ${text}`) });
 	let stopping = false;
 	let rotating = false;
 	let restarting = false;
@@ -156,14 +137,10 @@ export function createOrchestrator(opts: OrchOpts) {
 	// An owner prompt leads with one line of what runs now (lanes, workers), so the orchestrator need not poll for it; the
 	// provider is registered by main.ts (lanes.ts would be an import cycle) and the line is empty when nothing runs.
 	let turnHeader: () => string = () => "";
-	function setTurnHeader(fn: () => string): void {
-		turnHeader = fn;
-	}
+	const setTurnHeader = (fn: () => string): void => void (turnHeader = fn);
 	// What the usage-limit resume note adds: the background workers that stalled meanwhile (outbound.ts, bgwork.ts takeStalled).
 	let resumeExtra: () => string = () => "";
-	function setResumeExtra(fn: () => string): void {
-		resumeExtra = fn;
-	}
+	const setResumeExtra = (fn: () => string): void => void (resumeExtra = fn);
 	function sendOwner(text: string, header = false): void {
 		settleRevert(false);
 		const nudge = retainNext ? `\n\n${msg().retainNudge}` : "";
@@ -189,32 +166,17 @@ export function createOrchestrator(opts: OrchOpts) {
 	}
 	// One line for the worklog when the runtime moves the orchestrator (or one of its task workers) to the next model of a fallback chain.
 	let onNotice: (text: string) => void = () => {};
-	function setNoticeHandler(fn: (text: string) => void): void {
-		onNotice = fn;
-	}
+	const setNoticeHandler = (fn: (text: string) => void): void => void (onNotice = fn);
 	let onAlert: (text: string) => void = () => {};
-	function setAlertHandler(fn: (text: string) => void): void {
-		onAlert = fn;
-	}
+	const setAlertHandler = (fn: (text: string) => void): void => void (onAlert = fn);
 	// An error episode begins: the owner is asked once (main.ts posts the [ask]).
 	let onError: (e: OrchError) => void = () => {};
-	function setErrorHandler(fn: (e: OrchError) => void): void {
-		onError = fn;
-	}
+	const setErrorHandler = (fn: (e: OrchError) => void): void => void (onError = fn);
 	// After any orchestrator restart: the owner's open prompts go in again (outbound.ts replayOpen); returns how many, and the
 	// texts it took over (a held copy of those must not be sent a second time).
-	// `stuckLead` is set when the restart follows a stuck turn: the handler puts it in front of the first text it sends again.
+	// `stuckLead` (after a stuck turn) goes in front of the first text sent again.
 	let onRestarted: (stuckLead?: string) => { replayed: number; texts: string[] } = () => ({ replayed: 0, texts: [] });
-	function setRestartedHandler(fn: (stuckLead?: string) => { replayed: number; texts: string[] }): void {
-		onRestarted = fn;
-	}
-	// Set by a stuck recovery, used by the next start's replay.
-	let stuckReplayLead: string | undefined;
-	const stuckRestart = (why: string): void => {
-		const info = stuckWatch.info();
-		stuckReplayLead = info ? stuckLine(info) : undefined;
-		restart(why, true);
-	};
+	const setRestartedHandler = (fn: typeof onRestarted): void => void (onRestarted = fn);
 	let replayAfterStart = false;
 	let spawnedAt: { at: number; how: "fresh" | "resumed" } | undefined;
 	let probeAfterStart = false;
@@ -399,7 +361,7 @@ export function createOrchestrator(opts: OrchOpts) {
 
 	async function readEvents(p: AgentProcess): Promise<void> {
 		for await (const ev of p.events) {
-			stuckWatch.progress(ev.type, ev);
+			stuck.event(ev);
 			emitEventActivity(opts.source, ev);
 			noteEvent(orch.ctx, ev, port);
 			// What a compaction left (summary, kept messages, contract): past half the compaction point the session compacts again within hours.
@@ -421,7 +383,7 @@ export function createOrchestrator(opts: OrchOpts) {
 				}
 					clearTimeout(errorHold);
 					orch.status = "working";
-					stuckWatch.begin();
+					stuck.begin();
 					unstarted.length = 0;
 					clearTimeout(watchdog);
 					clearTimeout(transientTimer);
@@ -430,14 +392,7 @@ export function createOrchestrator(opts: OrchOpts) {
 				case "turn_end":
 					orch.status = orch.status === "rate-limited" ? "rate-limited" : "idle";
 					orch.resuming = false;
-					clearTimeout(ownerAbortTimer);
-					ownerAbortTimer = undefined;
-					// Our stuck abort ended the turn: the process restarts now (before any idle handling) and the open requests go in again.
-					if (stuckWatch.end()) {
-						replayAfterStart = true;
-						stuckRestart("stuck turn: aborted after no progress");
-						break;
-					}
+					if (stuck.ended()) { replayAfterStart = true; break; }
 					settleRevert(true);
 					if (orch.status === "idle" && settleChain()) break;
 					lastTurnEnd = Date.now();
@@ -810,8 +765,7 @@ export function createOrchestrator(opts: OrchOpts) {
 			if (proc !== self) return;
 			proc = undefined;
 			orch.status = "stopped";
-			stuckWatch.reset();
-			clearTimeout(ownerAbortTimer);
+			stuck.reset();
 			clearTimeout(errorHold);
 			abandonCompact(orch.ctx, "the orchestrator process exited");
 			if (unstarted.length) log(`${who} exited with ${unstarted.length} prompt(s) it never started; holding them for the next process`);
@@ -854,11 +808,9 @@ export function createOrchestrator(opts: OrchOpts) {
 		// A restart lost the turn in flight and what the process had not started: every open prompt goes in again once; the held
 		// copies of those are dropped rather than sent twice (a held text the queue does not know still goes out below).
 		let replayed = 0;
-		const stuckLead = stuckReplayLead;
-		stuckReplayLead = undefined;
 		if (replayAfterStart) {
 			replayAfterStart = false;
-			const r = onRestarted(stuckLead);
+			const r = onRestarted(stuck.takeLead());
 			replayed = r.replayed;
 			for (let i = held.length - 1; i >= 0; i--) if (r.texts.includes(held[i]!.text)) held.splice(i, 1);
 		}
@@ -923,8 +875,6 @@ export function createOrchestrator(opts: OrchOpts) {
 		resumeTimer = undefined;
 		clearTimeout(askTimer);
 		askTimer = undefined;
-		stuckWatch.reset();
-		clearTimeout(ownerAbortTimer);
 		proc?.kill();
 	}
 
@@ -941,14 +891,7 @@ export function createOrchestrator(opts: OrchOpts) {
 		restarting = true;
 		clearTimeout(watchdog);
 		const old = proc;
-		const kill = (): void => {
-			if (proc !== old) return;
-			old.kill();
-			setTimeout(() => {
-				if (proc === old) old.kill(true);
-			}, 10_000);
-		};
-		// A stuck process leaves a diagnostic file first (hub/stuck.ts, at most a few seconds); the kill follows whatever happens to it.
+		const kill = (): unknown => proc === old && (old.kill(), setTimeout(() => proc === old && old.kill(true), 10_000));
 		if (snapshot) void takeSnapshot(opts.key, old.pid, orch.sessionFile).then(kill);
 		else kill();
 	}
@@ -1072,17 +1015,7 @@ export function createOrchestrator(opts: OrchOpts) {
 	function cancelByOwner(): void {
 		const target = ownerCancel();
 		if (target) for (const f of cancelHooks) f(target);
-		if (proc && orch.status === "working") {
-			const p = proc;
-			p.abort();
-			// A process that ignores the abort stays "working" for good: restarted when no turn_end follows within the grace. The
-			// cancelled request is not replayed (prompts.ts reopen); the owner already heard "중단했어요".
-			clearTimeout(ownerAbortTimer);
-			ownerAbortTimer = setTimeout(() => {
-				ownerAbortTimer = undefined;
-				if (proc === p && orch.status === "working") restart("owner abort did not stop the turn", true);
-			}, ABORT_GRACE_MS);
-		}
+		if (proc && orch.status === "working") stuck.ownerAbort(() => proc?.abort());
 	}
 
 	// Compacts the orchestrator's context: now when idle, after the running turn otherwise. Rewrites the prompt cache once.
@@ -1110,13 +1043,11 @@ export function createOrchestrator(opts: OrchOpts) {
 		if (!proc) return false;
 		stopping = true;
 		clearTimeout(watchdog);
-		stuckWatch.reset();
-		clearTimeout(ownerAbortTimer);
 		proc.kill();
 		return true;
 	}
 
-	return { key: opts.key, source: opts.source, orch, orchestratorPid, setTurnHeader, setResumeExtra, setWorkerHandlers, setNoticeHandler, setAlertHandler, setErrorHandler, setRestartedHandler, setStuckHandler, setStuckGuard, resumeAfterError, canResume, resumeNow, setIdleHandler, setAnswerHandlers, nightlyHandover, start, keepaliveSupported, deliver, steer, stop, park, restart, applyModelChange, applyChainChange, applyAccountChange, applyAccountPin, abort, setOwnerCancel, onOwnerCancel, cancelByOwner, compact, lastTurnEndAt: () => lastTurnEnd, heldCount: () => held.length + unstarted.length, turnFailed: () => turnFailed };
+	return { key: opts.key, source: opts.source, orch, orchestratorPid, setTurnHeader, setResumeExtra, setWorkerHandlers, setNoticeHandler, setAlertHandler, setErrorHandler, setRestartedHandler, setStuckHandler: stuck.setHandler, setStuckGuard: stuck.setGuard, resumeAfterError, canResume, resumeNow, setIdleHandler, setAnswerHandlers, nightlyHandover, start, keepaliveSupported, deliver, steer, stop, park, restart, applyModelChange, applyChainChange, applyAccountChange, applyAccountPin, abort, setOwnerCancel, onOwnerCancel, cancelByOwner, compact, lastTurnEndAt: () => lastTurnEnd, heldCount: () => held.length + unstarted.length, turnFailed: () => turnFailed };
 }
 export type Orchestrator = ReturnType<typeof createOrchestrator>;
 
