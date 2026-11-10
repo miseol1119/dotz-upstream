@@ -107,6 +107,7 @@ function makeQueue(key: string, o: Orchestrator, pendingFile: string, bg: () => 
 			return w && { id: w.id, description: w.description };
 		},
 		joinNote: w => msg().joinWorker(w.id, w.description),
+		noAnswerNote: () => msg().turnNoAnswer,
 		hasJoinNote: text => text.split("\n").some(line => isNote(line, "joinLead")),
 		// The session's workers as bgwork lists them (read only at delivery and turn end): another conversation's running worker must
 		// not answer through this conversation's turn, and one that finished elsewhere gets its own request asked again.

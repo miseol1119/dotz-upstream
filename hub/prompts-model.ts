@@ -29,6 +29,7 @@ export type PromptDeps = {
 	/** A gateway note in a conversation that answers nothing (the deferral acknowledgement must not settle the open prompt). */
 	announce?: (target: string, text: string, worker?: string) => void;
 	interim?: (target: string, text: string) => void;   // what a [later] turn wrote around the word: a message that answers nothing
+	noAnswerNote?: () => string;   // what the owner is told when a turn ended without writing any text
 	/** The background worker now running for a conversation (the oldest one), when it is already listed. */
 	workFor?: (target: string) => { id: string; description: string } | undefined;
 	/** The gateway note (one line) that points a new owner message at the worker already running for its conversation. */

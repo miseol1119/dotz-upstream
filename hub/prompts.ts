@@ -319,7 +319,10 @@ export function createPrompts(deps: PromptDeps) {
 		// also right after a restart) is a new one and must not be taken for a continuation of this prompt (2026-10-20 12:51Z).
 		if (!p.done && p.target && !p.deferred) {
 			deps.log(`turn ended without an answer to ${p.target}; ${p.last ? "sending its last text" : "it wrote no text"}`);
+			// No text and nothing sent for a message of ours (a nudge for a request already waiting is not one): the owner is told, not left with a closed request and no answer.
+			const unanswered = p.replyTo !== undefined && !isAnswered(p.replyTo) && !p.sent.some(s => sameConv(s.target, p.target!)) && !openDeferred().some(d => d.replyTo === p.replyTo);
 			if (p.last || p.held?.length) onAnswer(p.last ?? "");
+			else if (unanswered && deps.noAnswerNote) onAnswer(deps.noAnswerNote());
 			else p.done = true;
 		}
 		flushHeld(p);
