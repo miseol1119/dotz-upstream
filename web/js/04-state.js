@@ -117,7 +117,7 @@ function keptLanes(bad) {
   dialog({ title: bad.length === 1 ? `${bad[0].name} 세션은 그대로 뒀어요` : `세션 ${bad.length}개는 그대로 뒀어요`,
     body: el("div", { class: "dl-body" }, el("p", { text: "아무것도 지우지 않고 그대로 뒀어요." }),
       el("ul", { class: "dl-list" }, ...bad.map(x => el("li", { text: `${x.name} · ${keptWhy(String(x.error || ""))}` })))),
-    actions: [{ label: "확인", kind: "fill", onclick: c => c() }] });
+    actions: [{ label: "확인", kind: "fill", onclick: c => c() }], mid: true });
 }
 async function restoreEnded(ids) {
   try {

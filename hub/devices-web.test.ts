@@ -106,6 +106,25 @@ describe("연결된 기기 설정 화면", () => {
 		expect(calls).toEqual(["PATCH cred-phone 아이폰 15"]);
 	});
 
+	test("the name window is a bottom sheet on a phone and the same centered card as before on a PC", async () => {
+		devices = initial();
+		const rect = async (w: number, h: number) => {
+			const v = await open(w, h);
+			await click(v, '#devices [data-dev="cred-phone"]');
+			await waitFor(v, `${top} && ${top}.getAnimations().length === 0`);
+			return ev<{ x: number; y: number; w: number; h: number; btn: number; field: string; sheet: string }>(v, `(() => { const r = ${top}.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, btn: Math.min(...[...${top}.querySelectorAll(".dact .btn")].map(b => b.getBoundingClientRect().height)), field: getComputedStyle(${top}.querySelector("input")).backgroundColor, sheet: getComputedStyle(${top}).backgroundColor }; })()`);
+		};
+		const pc = await rect(1280, 800), ph = await rect(390, 844);
+		// the PC numbers are the ones this window had before it became a sheet
+		expect({ x: pc.x, y: pc.y, w: pc.w, h: pc.h, btn: pc.btn }).toEqual({ x: 430, y: 276, w: 420, h: 248, btn: 36 });
+		expect(ph.y).toBeGreaterThan(300);   // the sheet is as tall as its content, not the whole screen
+		expect(ph.y + ph.h).toBe(844);
+		expect(ph.btn).toBeGreaterThanOrEqual(44);
+		// the name field shows as a field: its fill is not the sheet's own colour
+		expect(ph.field).not.toBe(ph.sheet);
+		expect(pc.field).not.toBe(pc.sheet);
+	});
+
 	test("unpair asks first; for this device it warns about the logout, for another it removes the row", async () => {
 		devices = initial();
 		calls.length = 0;

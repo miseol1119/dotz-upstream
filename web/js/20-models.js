@@ -2,9 +2,12 @@
 const pending = {};
 let providerFilter = "";
 const applyKo = { live: "적용했어요", restarted: "적용했어요 · 재시작됨", "next-start": "다음 시작부터 적용돼요", "next-turn": "다음 턴부터 적용돼요" };
+// A load that failed stays said until one succeeds: a later redraw (the providers arriving) must not turn it back into 불러오는 중.
+let modelsFail = false;
+const modelsFailNode = () => emptyNode("모델 정보를 불러오지 못했어요", () => loadModels());
 async function loadModels(quiet) {
-  try { M = await api("/api/models"); }
-  catch (e) { if (!quiet && current === "models") clear($("#models")).append(emptyNode("모델 정보를 불러오지 못했어요", () => loadModels())); return; }
+  try { M = await api("/api/models"); modelsFail = false; }
+  catch (e) { modelsFail = true; if (!quiet && current === "models") clear($("#models")).append(modelsFailNode()); return; }
   if (current === "models") renderModels();
   if (current === "home") renderHome();
   if (current === "settings") renderSettings();
@@ -101,7 +104,7 @@ function renderModels() {
   const box = $("#models");
   if (fbDragging) return;
   closeMenu(false);
-  if (!M) { clear(box).append(emptyNode("불러오는 중…")); return; }
+  if (!M) { clear(box).append(modelsFail ? modelsFailNode() : emptyNode("불러오는 중…")); return; }
   const provs = [...new Set((M.available || []).map(a => a.provider))].sort((a, b) => providerName(a).localeCompare(providerName(b)));
   const filter = selectField("공급자", providerFilter ? providerName(providerFilter) : "공급자 전체", [{ value: "", label: "전체" }, ...provs.map(p => ({ value: p, label: providerName(p) }))], providerFilter, v => { providerFilter = v; renderModels(); });
   clear(box).append(

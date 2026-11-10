@@ -351,10 +351,10 @@ function confirmInSheet({ host, onEnd }, { title, body, actions, onclose }) {
   const first = actBox.querySelector(".btn:last-child"); if (first) first.focus({ preventScroll: true });
   return h;
 }
-function dialog({ title, body, actions = [], onclose, wide, classic, confirm }) {
+function dialog({ title, body, actions = [], onclose, wide, classic, confirm, mid }) {
   if (confirm) { const sheet = openSheet(); if (sheet) return confirmInSheet(sheet, { title, body, actions, onclose }); }
   const small = classic || confirm;
-  const d = el("dialog", { class: `dlg${wide ? " wide" : ""}${confirm ? " cf" : classic ? " cl" : " fs-card"}` });
+  const d = el("dialog", { class: `dlg${wide ? " wide" : ""}${confirm ? " cf" : classic ? " cl" : mid ? " fs-card mid" : " fs-card"}` });
   const bodyBox = el("div", { class: small ? "dbody" : "dbody fs-body" }, body);
   const actBox = el("div", { class: small ? "dact" : "dact fs-ft row" });
   // The ✕ and a tap outside the box both close it and drop the edit, like Esc and the Android back gesture (dialogHist) already do.

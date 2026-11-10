@@ -41,7 +41,7 @@ function dvOpen(d) {
   const body = el("div", { class: "col" }, textField("기기 이름", name),
     el("div", { class: "sup", text: `${dvDate(d.created)} 연결 · ${dvUsed(d)}` }),
     d.current ? el("div", { class: "tag ok dcs-saved", text: "지금 쓰고 있는 기기" }) : null);
-  dialog({ title: d.name, body, actions: [
+  dialog({ title: d.name, body, mid: true, actions: [
     { label: "해제", kind: "danger", onclick: async (c, b) => {
       const text = d.current
         ? "이 기기는 바로 로그아웃돼요. 다시 쓰려면 메신저로 받은 코드로 새로 연결해야 해요."
@@ -92,5 +92,5 @@ function dvNew(self) {
     el("div", { class: "sup", text: "코드는 10분 동안 한 번만 쓸 수 있고, 메신저와 이 화면을 합쳐 한 시간에 3번까지 만들 수 있어요." }),
     el("div", { class: "dcs-acts" }, el("button", { type: "button", class: "btn tonal", "data-dev-make": "1", onclick: ev => make(ev.currentTarget), text: "여기서 코드 만들기" })),
     res);
-  dialog({ title: self ? "이 기기에 패스키 추가" : "새 기기 연결", body, onclose: () => loadDevices(), actions: [{ label: "닫기", onclick: c => c() }] });
+  dialog({ title: self ? "이 기기에 패스키 추가" : "새 기기 연결", body, onclose: () => loadDevices(), mid: true });
 }

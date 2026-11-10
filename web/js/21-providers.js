@@ -102,8 +102,8 @@ function addProviderDialog() {
       body.append(pk, keyBox);
     }
   } else { free = input({ type: "text" }); pick = { kind: "api_key" }; body.append(textField("공급자", free), keyBox); }
-  dlg = dialog({ title: "공급자 추가", body });
-  if (addable && !addable.length) dlg.setActions([{ label: "닫기", onclick: c => c() }]);
+  dlg = dialog({ title: "공급자 추가", body, mid: true });
+  if (addable && !addable.length) dlg.setActions([]);
   else paintKey();
 }
 // A login still open (a closed tab, /login in the chat) blocks a new one: pick it up where it stopped, or drop it and start over.
@@ -191,7 +191,7 @@ async function startLogin(p, pending) {
   });
   dlg = dialog({
     title: p.can_add_account || p.add_account ? `${name} 계정 추가` : `${name} 로그인`,
-    body: [intro, openBox, field, ask, picks, msg],
+    body: [intro, openBox, field, ask, picks, msg], mid: true,
     onclose: () => { stop(); if (!finished) api(`/api/providers/${enc(p.id)}/login`, "DELETE").catch(() => {}); },
   });
   paintStep(r);

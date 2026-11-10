@@ -303,6 +303,22 @@ describe("메일 쓰기", () => {
 		await run(v, `document.querySelector(".mbox-fab").click()`);
 		expect(await ev<string>(v, `document.querySelector('.mbox-sheet [data-k="mail-subject"]').value`)).toBe("초안");
 	}, 30_000);
+
+	test("on a phone the folded bar sits above the tab bar, says 펼치기, and opens again with the text kept", async () => {
+		const v = await openList(390, 844);
+		await run(v, `document.querySelector(".mbox-fab").click()`);
+		await waitFor(v, `document.querySelector(".mbox-sheet")`);
+		await fill(v, '.mbox-sheet [data-k="mail-subject"]', "초안");
+		await run(v, `document.querySelector(".mbox-sheet .mbox-min").click()`);
+		const bar = `(() => { const s = document.querySelector(".mbox-sheet"), b = s.querySelector(".mbox-min"); return { min: s.classList.contains("min"), bottom: s.getBoundingClientRect().bottom, nav: document.querySelector("#nav").getBoundingClientRect().top, label: b.getAttribute("aria-label"), title: b.title, anim: s.getAnimations().length }; })()`;
+		await waitFor(v, `${bar}.min && ${bar}.anim === 0`);
+		const folded = await ev<{ bottom: number; nav: number; label: string; title: string }>(v, bar);
+		expect(folded.nav).toBeLessThan(844);
+		expect(folded.bottom).toBeLessThanOrEqual(folded.nav);
+		expect([folded.label, folded.title]).toEqual(["펼치기", "펼치기"]);
+		await run(v, `document.querySelector(".mbox-sheet .mbox-min").click()`);
+		expect(await ev(v, `(() => { const s = document.querySelector(".mbox-sheet"); return [s.classList.contains("min"), s.querySelector(".mbox-min").getAttribute("aria-label"), s.querySelector('[data-k="mail-subject"]').value]; })()`)).toEqual([false, "최소화", "초안"]);
+	}, 30_000);
 });
 
 describe("the open mail", () => {

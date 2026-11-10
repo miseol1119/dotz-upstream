@@ -387,24 +387,35 @@ async function mbSave(st, extra, btn) {
   return r;
 }
 // The floating sheet: docked at the bottom right of a wide screen (minimize / close), the whole screen on a phone. Closing a sheet with text asks first.
+// Folded or open. A folded bar on a phone sits right above the tab bar (--mbox-lift = the room under it), and its button says which way it goes.
+function mbFold(node, min) {
+  node.classList.toggle("min", min);
+  const b = node.querySelector(".mbox-min"), word = min ? "펼치기" : "최소화";
+  b.setAttribute("aria-label", word); b.title = word; b.replaceChildren(icon(min ? "drop" : "minus"));
+  const nr = $("#nav").getBoundingClientRect();
+  node.style.setProperty("--mbox-lift", min && nr.height > 0 && nr.top > innerHeight / 2 ? `${Math.ceil(innerHeight - nr.top)}px` : "0px");
+}
 function mbCompose(init = {}) {
-  if (MBOX.cs && MBOX.cs.node.isConnected) { MBOX.cs.node.classList.remove("min"); MBOX.cs.node.querySelector(".mbox-in").focus(); return; }
+  if (MBOX.cs && MBOX.cs.node.isConnected) { mbFold(MBOX.cs.node, false); MBOX.cs.node.querySelector(".mbox-in").focus(); return; }
   const st = { to: "", cc: "", subject: "", body: "", files: [], up: [], showCc: false, ...init };
   const host = el("div", { class: "mbox-sb" });
   const form = mbForm(st, host, { rows: "10" });
   const node = el("div", { class: "mbox-sheet", role: "dialog", "aria-label": "새 메일" });
   // The sheet fades down and away before it is removed; it is no longer the open one from the first moment.
-  const leave = async () => { MBOX.cs = null; node.inert = true; await motionOut(node, "rise"); node.remove(); };
+  const leave = async () => { MBOX.cs = null; refit.disconnect(); node.inert = true; await motionOut(node, "rise"); node.remove(); };
   const close = async () => { if (!mbEmpty(st) && !await ask("작성 중인 메일", "쓰던 내용을 버릴까요?", "버리기", true)) return; leave(); };
   const save = ev => mbSave(st, {}, ev.currentTarget).then(r => { if (r) leave(); });
   node.append(
     el("div", { class: "mbox-sh" }, el("span", { class: "mbox-st", text: "새 메일" }),
-      el("button", { class: "ib mbox-min", type: "button", "aria-label": "최소화", title: "최소화", onclick: () => node.classList.toggle("min") }, icon("minus")),
+      el("button", { class: "ib mbox-min", type: "button", "aria-label": "최소화", title: "최소화", onclick: () => mbFold(node, !node.classList.contains("min")) }, icon("minus")),
       el("button", { class: "ib mbox-close", type: "button", "aria-label": "닫기", title: "닫기", onclick: close }, icon("close"))),
     host,
     el("div", { class: "mbox-sf" }, el("button", { class: "btn pri mbox-save", type: "button", "data-k": "mail-compose-save", onclick: save }, "초안 만들기"),
       el("button", { class: "ib mbox-attach", type: "button", "aria-label": "파일 붙이기", title: "파일 붙이기", onclick: () => form.pick() }, icon("clip"))));
   document.body.append(node);
+  // the tab bar comes and goes with the screen and the window: a folded bar follows it
+  const refit = new ResizeObserver(() => { if (node.classList.contains("min")) mbFold(node, true); });
+  refit.observe($("#nav")); refit.observe(document.documentElement);
   motionIn(node, "rise", 240);
   MBOX.cs = { node, st };
   node.querySelector(".mbox-in").focus();

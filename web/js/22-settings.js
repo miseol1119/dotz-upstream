@@ -122,7 +122,7 @@ async function fbKeyDialog(e, done) {
     if (cur.present) { done(cur.file); return c(); }
     toast("API 키를 붙여 넣어 주세요", true);
   }) });
-  dialog({ title: "API 키", body: el("div", { class: "col" }, el("p", { class: "sup", text: "저장한 키는 다시 보여 주지 않아요." }), status, textField("API 키", key), adv), actions });
+  dialog({ title: "API 키", body: el("div", { class: "col" }, el("p", { class: "sup", text: "저장한 키는 다시 보여 주지 않아요." }), status, textField("API 키", key), adv), actions, mid: true });
   setTimeout(() => key.focus(), 0);
 }
 // Drag a fallback step by its handle to another place in its chain (pointer events); the handle's arrow keys and the editor's arrow

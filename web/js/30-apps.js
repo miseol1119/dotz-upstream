@@ -46,7 +46,7 @@ function appsRows() {
   }
   if (APPS.errors.length) {
     rows.push({ header: "불러오지 못한 앱" });
-    for (const e of APPS.errors) rows.push({ k: `e:${e.id}`, name: e.id, av: appsAv("file", "err"), hint: e.reason, badge: ["오류", "err"], open: () => dialog({ title: `${e.id}을(를) 불러오지 못했어요`, body: el("div", { class: "apps-err" }, el("p", { text: e.reason }), el("p", { class: "sup", text: e.dir })), actions: [{ label: "닫기", onclick: c => c() }] }) });
+    for (const e of APPS.errors) rows.push({ k: `e:${e.id}`, name: e.id, av: appsAv("file", "err"), hint: e.reason, badge: ["오류", "err"], open: () => dialog({ title: `${e.id}을(를) 불러오지 못했어요`, body: el("div", { class: "apps-err" }, el("p", { text: e.reason }), el("p", { class: "sup", text: e.dir })), mid: true }) });
   }
   if (!APPS.loaded) rows.push({ header: APPS.failed ? "앱을 불러오지 못했어요" : "앱 불러오는 중…" });
   return rows;
@@ -89,7 +89,7 @@ function appsSettings(a) {
     a.start ? el("div", { class: "apps-block" }, el("div", { class: "apps-kk", text: "앱 실행" }), el("p", { class: "apps-note", text: "이 앱은 스스로 실행되지 않아요. 아래 명령으로 띄워 주세요." }), el("pre", { class: "apps-pre", text: [a.start.cwd ? `cd ${a.start.cwd}` : "", `${a.start.env ? Object.entries(a.start.env).map(([k, v]) => `${k}=${v}`).join(" ") + " " : ""}${a.start.command}`].filter(Boolean).join("\n") })) : null,
     a.watches && a.watches.length ? el("div", { class: "apps-block" }, el("div", { class: "apps-kk", text: "감시" }), el("p", { class: "apps-note", text: a.watches.join(", ") })) : null,
     a.settings && Object.keys(a.settings).length ? el("div", { class: "apps-block" }, el("div", { class: "apps-kk", text: "설정" }), kvRows(a.settings)) : null);
-  dialog({ title: `${a.label} 설정`, body, actions: [{ label: "닫기", onclick: c => c() }] });
+  dialog({ title: `${a.label} 설정`, body, mid: true });
 }
 function appsMenu(anchor, a) {
   const own = a.source === "manifest";
