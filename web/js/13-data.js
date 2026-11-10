@@ -276,7 +276,9 @@ function setTarget(t) {
   loadTodo(t);
 }
 function enterTarget() {
-  $(current === "activity" ? "#v-activity" : "#v-chat").append($("#composer"));
+  // Appending moves the node and a moved focused field loses its focus (and a phone its keyboard): the composer moves only when it is on the other view, and keeps the focus there.
+  const view = $(current === "activity" ? "#v-activity" : "#v-chat"), typing = document.activeElement === ta;
+  if ($("#composer").parentNode !== view) { view.append($("#composer")); if (typing) ta.focus({ preventScroll: true }); }
   markSeen();
   updateComposerMeta(); renderBars(); renderSubs(); renderWorking(); paintDecision();
   if (current === "chat") { if (!CV.placed) scrollChat(true); } else scrollTerm(true);
