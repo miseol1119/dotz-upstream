@@ -252,7 +252,7 @@ describe("actions on a selection", () => {
 		await waitFor(v, `!${rowJs("읽음 표시를 못 하는 메일함")}`);
 	}, 30_000);
 
-	test("삭제 into the mailbox trash asks nothing: 실행 취소 brings the row back and sends nothing, otherwise the trash is sent", async () => {
+	test("삭제 into the mailbox trash asks nothing: 되돌리기 brings the row back and sends nothing, otherwise the trash is sent", async () => {
 		const v = await openList(1280, 800);
 		await tick(v, "회의 일정 변경");
 		await run(v, `${bar(v, "삭제")}.click()`);
@@ -478,7 +478,7 @@ describe("삭제하면 원본도 삭제", () => {
 		expect(posts[0]!.path).toBe("/api/mail/delete-original");
 		await run(v, `mailDelete("mail:fx-c")`);
 		await waitFor(v, `document.querySelector("dialog[open]")`);
-		expect(await confirm(v)).toContain("메일함엔 남아 있어요");
+		expect(await confirm(v)).toContain("메일함에는 그대로 남아 있어요");
 		await yes(v);
 		await posted(2);
 		expect(posts[1]).toEqual({ path: "/api/mail/fx-c", body: null });

@@ -173,7 +173,7 @@ function prPick(p, o = {}) {
 function prForgetBtn(p, off) {
   if (!off || p.via || p.public) return null;
   return el("button", { type: "button", class: "btn tonal inrow pr-forget", text: "지우기", "aria-label": `${p.name} 목록에서 지우기`, onclick: async () => {
-    if (!await ask(`${p.name} 지우기`, "내 컴퓨터 목록에서 지울까요? 다시 켜면 목록에 돌아와요.", "지우기", true)) return;
+    if (!await ask(`${p.name} 지우기`, "내 컴퓨터 목록에서만 빼요. 그 컴퓨터는 그대로이고, 다시 켜면 목록에 돌아와요.", "지우기", true)) return;
     try { await api(`/api/peers?url=${enc(p.url)}`, "DELETE"); toast(`${p.name}을(를) 지웠어요`); } catch (e) { toast(`${p.name}을(를) 지우지 못했어요`, true); }
     prLoad();
   } });

@@ -93,7 +93,7 @@ function appsSettings(a) {
 }
 function appsMenu(anchor, a) {
   const own = a.source === "manifest";
-  const items = [{ value: "settings", label: "설정" }, ...(own ? [{ value: "off", label: a.off ? "켜기" : "끄기" }] : []), ...(own ? [{ value: "remove", label: "제거" }] : [])];
+  const items = [{ value: "settings", label: "설정" }, ...(own ? [{ value: "off", label: a.off ? "켜기" : "끄기" }] : []), ...(own ? [{ value: "remove", label: "제거", danger: true }] : [])];
   showMenu(anchor, items, { onPick: v => { if (v === "settings") appsSettings(a); else if (v === "off") appsToggle(a); else if (v === "remove") appsRemove(a); } });
 }
 async function appsToggle(a) {

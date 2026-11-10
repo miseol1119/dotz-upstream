@@ -222,7 +222,7 @@ function pmMenuButton(q, cls = "pmv-more") {
   b.addEventListener("click", () => {
     const p = typeof q === "function" ? q() : q;
     if (!p) return toast("이 프로젝트를 찾을 수 없어요");
-    showMenu(b, [{ value: "edit", label: "프로젝트 수정" }, { value: "delete", label: "프로젝트 삭제" }], { onPick: v => {
+    showMenu(b, [{ value: "edit", label: "프로젝트 수정" }, { value: "delete", label: "프로젝트 삭제", danger: true }], { onPick: v => {
       if (v === "delete") return pmDeleteAsk(p);
       if (current === "project" && PM.key === p.key) { const t = $("#v-project .pmv-title"); if (t) t.click(); } else go("project", p.key);
     } });

@@ -46,3 +46,30 @@ test("on a screen with the tab bar the toast stays above the tab bar", async () 
 	await toastAt(`go("home")`, `current === "home" && document.querySelector("#nav").getBoundingClientRect().height > 0`);
 	expect(await apart("#nav")).toBe(true);
 });
+
+// A toast speaks about the screen it was raised on (go, 05-command-palette.js).
+const SNACK = `(() => { const n = document.querySelector(".snack"); return !n ? "none" : n.style.pointerEvents === "none" ? "leaving" : "up"; })()`;
+test("moving to another screen takes the toast down; one raised together with the move, or one that offers 되돌리기, stays", async () => {
+	await toastAt(`go("home")`, `current === "home"`);
+	expect(await view.evaluate(`(go("settings"), ${SNACK})`)).toBe("leaving");
+	await waitFor(`current === "settings" && !document.querySelector(".snack")`);
+	expect(await view.evaluate(`(toast("프로젝트를 지웠어요"), go("home"), ${SNACK})`)).toBe("up");
+	await waitFor(`current === "home"`);
+	await view.evaluate(`(toast("삭제했어요", false, { label: "되돌리기", onclick() {} }), 0)`);
+	expect(await view.evaluate(`(go("settings"), ${SNACK})`)).toBe("up");
+	await view.evaluate(`(document.querySelectorAll(".snack").forEach(n => n.remove()), go("home"), 0)`);
+});
+
+// el() holds a .btn whose handler returns a promise (01-core.js holdWhileSending).
+test("a button that sends a request is off until the answer comes, so a second press sends nothing", async () => {
+	const r = await view.evaluate(`(async () => {
+		let n = 0, done;
+		const b = el("button", { class: "btn pri", type: "button", onclick: () => { n++; return new Promise(res => { done = res; }); } }, "보내기");
+		document.body.append(b);
+		b.click(); const off = b.disabled; b.click(); const sent = n;
+		done(); await Promise.resolve(); await Promise.resolve();
+		const on = !b.disabled; b.remove();
+		return JSON.stringify({ off, sent, on });
+	})()`);
+	expect(JSON.parse(r as string)).toEqual({ off: true, sent: 1, on: true });
+});

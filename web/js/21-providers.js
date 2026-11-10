@@ -45,7 +45,7 @@ function provRow(p, g, own) {
 // provider is the group: a login provider has its own section with its accounts, and the rest (keys, not set up) share one list.
 function renderAccounts() {
   const box = $("#accounts");
-  if (!P) { clear(box).append(emptyNode(provFail ? "계정을 불러오지 못했어요" : "불러오는 중…")); return; }
+  if (!P) { clear(box).append(emptyNode(provFail ? "계정을 불러오지 못했어요" : "불러오는 중…", provFail ? () => loadProviders() : null)); return; }
   const groupOf = p => ((ACC && ACC.providers) || []).find(x => x.id === p.id);
   const own = p => p.auth === "oauth" || (p.id === "anthropic" && ACC && ACC.accounts.length > 0) || (groupOf(p) || {}).multi;
   const list = P.providers, rest = list.filter(p => !own(p));
@@ -237,7 +237,7 @@ async function loadQuota(fresh) {
   let q;
   // the cards are titled by provider name (providerName reads P), so a direct open of 사용량 loads the providers too
   try { [q] = await Promise.all([api(fresh === true ? "/api/quota?fresh=1" : "/api/quota"), P ? null : loadProviderData().catch(() => null)]); }
-  catch (e) { clear(box).append(emptyNode("사용량을 불러오지 못했어요")); return; }
+  catch (e) { clear(box).append(emptyNode("사용량을 불러오지 못했어요", () => loadQuota(true))); return; }
   noteQuota(q);
   if (current === "usage") quotaTimer = setTimeout(loadQuota, 60000);
   clear(box);

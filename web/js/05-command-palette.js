@@ -88,7 +88,7 @@ function openPalette() {
       const g = it.kind === "nav" ? "도구" : it.kind === "act" ? "화면" : "명령";
       if (g !== last) { list.append(el("div", { class: "ph", role: "presentation", text: g })); last = g; }
       list.append(el("button", { type: "button", role: "option", tabindex: "-1", class: `pal-i${it.kind === "cmd" ? " cmd" : ""}`, onmouseenter: () => { idx = i; mark(); }, onclick: () => exec(it) },
-        icon(it.ic), el("span", { class: "nm", text: it.label }), it.desc ? el("span", { class: "pd", text: it.desc }) : null));
+        icon(it.ic), el("span", { class: "nm", text: it.label }), it.desc ? el("span", { class: it.kind === "nav" ? "pd key" : "pd", text: it.desc }) : null));
     });
     if (!items.length) list.append(el("div", { class: "a-div", text: "결과가 없어요" }));
     mark();
@@ -128,6 +128,9 @@ const alertAddr = (name, tgt) => (name === "chat" || name === "activity") && tgt
 const routeAlias = (name, tgt) => (alertAddr(name, tgt) ? ["notices", undefined] : name === "lanes" ? ["chat", "list"] : name === "providers" || name === "provider" ? ["accounts", tgt] : name === "settings" && tgt === "accounts" ? ["accounts", undefined] : [name, tgt]);
 function go(name, tgt) {
   closeMenu(false);
+  // A toast belongs to the screen it was raised on: moving on takes it down. One that offers 되돌리기 stays until its time is up, and so
+  // does one raised together with the move ("프로젝트를 지웠어요" and then the list).
+  document.querySelectorAll("body > .snack:not(.act)").forEach(n => { if (n !== toastNew) toastGone(n); });
   [name, tgt] = routeAlias(name, tgt);
   NSC.pass = 0;
   if (!PN.going) PN.app = false;   // 모니터링 is a pane's screen only while the pane machinery lends it (43-panes.js paneGoApp)
@@ -222,7 +225,8 @@ const limitKo = s => String(s).replace(/^Claude\s+/i, "").replace(/^7\s*Day\s*\(
 const limitLabel = (p, l, multi) => `${multi ? `${p.name || providerName(p.provider)} · ` : ""}${limitKo(l.label || l.id)}`;
 const isConnected = p => p.auth && p.auth !== "none";
 const needsAttention = p => p.in_use && !isConnected(p);
-const emptyNode = t => el("div", { class: "card empty", text: t });
+// A card that failed to load passes `retry`: its 다시 시도 button asks again (a load that gave no data is never a dead end).
+const emptyNode = (t, retry) => (retry ? el("div", { class: "card empty" }, el("div", { text: t }), el("button", { class: "btn tonal", type: "button", "data-k": "retry", text: "다시 시도", onclick: retry })) : el("div", { class: "card empty", text: t }));
 // The one 더 보기 of a list: the card's own last line, inside the card, never a control floating under it (.cv-more, 19-volume.css).
 const moreRow = (text, onclick) => el("button", { class: "cv-more", type: "button", "data-k": "more", onclick, text });
 

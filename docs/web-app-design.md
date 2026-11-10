@@ -1073,7 +1073,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
   - 로딩 `불러오는 중이에요`, 실패 `알림을 불러오지 못했어요`, 비었음 `새 알림이 없어요`, 묶음 더 보기 `N개 더 보기`.
   - 행 태그(`nscTag`): `카카오톡`/`답장 확인`/`결정`, `로그인`, `실패`, `질문`, `작업 완료`/`결과`, `가격 변경`, 앱별 `메일`/`카카오톡`/`댓글`, `일정`, `아침 점검`, `감시`, `경고`, 앱 이름, 기본 `새 소식`. 점 색은 처리할 것/로그인/주의는 warn, 실패는 err, 완료/결과는 ok. 반복이면 요약 앞에 `N번 · `. 가격 변경은 이전 값 취소선 → 새 값. 시각은 `방금`/`HH:MM`/`어제`/날짜.
   - `처리할 것`은 ✕ 대신 화살표(`nsc-tr`)를 보여 주는 경우가 있어요(실패 알림만 ✕ 유지).
-  - 지운 알림 토스트 `알림을 지웠어요`(버튼 `실행 취소`, 6초; `undismiss`). 답이 필요한 알림이 있는 필터에서 `모두 읽음` 뒤 토스트 `답이 필요한 알림은 그대로 뒀어요`.
+  - 지운 알림 토스트 `알림을 지웠어요`(버튼 `되돌리기`, 6초; `undismiss`). 답이 필요한 알림이 있는 필터에서 `모두 읽음` 뒤 토스트 `답이 필요한 알림은 그대로 뒀어요`.
   - 벨, 팔레트, 주소로 열면 필터와 펼침이 초기화되고, 행에서 돌아오면 유지(`NSC.keep`). 새 알림은 묶음 위로 슬라이드 인(`motionIn`).
   - 폰 vs 데스크톱: `09-notices-screen.css`에는 `@media` 규칙이 없어요(`grep ^@media` 결과 없음). 폭별 차이는 코드에서 확인 못 함.
 - 데이터: `GET /api/notices?limit=300`(`loadNotices`), `POST /api/notices/read {ids}`, `POST /api/notices/<id>/handled|dismiss|undismiss`. SSE `notice`, `notice_dismiss`, `notice_read`(`noticeLive`, `99-boot.js`로 라우팅된다고 주석에 적힘), `/api/state`의 `notices_unread`가 어긋나면 다시 읽음(`ntSync`).
@@ -1395,7 +1395,7 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 - 상태:
   - 선택 0개: 막대는 `메일 N개`(목록 개수, 0이면 빈 글) 표시, `.on` 클래스 없음. 목록에 메일 행이 없으면(확인 대기, 빈 폴더) 막대 자체를 그리지 않아요(`mbList`).
   - 선택 1개 이상: `N개 선택`(aria-live polite), 막대에 `.on`.
-  - `삭제하면 원본도 삭제`가 켜진 앱의 메일(`trashOriginal`)은 실행 취소 대신 확인 창이 떠요: `이 메일을 삭제할까요? 원본도 메일함 휴지통으로 옮겨요`, 여러 건이면 `메일 N개를 삭제할까요? 원본도 메일함 휴지통으로 옮겨요`. 원본을 지우지 못한 메일은 목록에 남고 토스트에 `다시 시도`가 붙어요.
+  - `삭제하면 원본도 삭제`가 켜진 앱의 메일(`trashOriginal`)은 되돌리기 대신 확인 창이 떠요: `이 메일을 삭제할까요? 원본도 메일함 휴지통으로 옮겨요`, 여러 건이면 `메일 N개를 삭제할까요? 원본도 메일함 휴지통으로 옮겨요`. 원본을 지우지 못한 메일은 목록에 남고 토스트에 `다시 시도`가 붙어요.
   - 별표 상태: on이면 aria-label/title `별표 빼기`, 아니면 `별표 달기`, `aria-pressed`.
   - 행 선택 시 `.mr-sel` 클래스.
   - 안 읽음 판단(`mailUnread`): 카드에 `read` 불리언이 있으면 그 값, 없으면 dotz 자체 읽음 위치(`ts(t).unread`). 보낸 메일(`dir:"out"`)은 안 읽음이 아니에요.
@@ -1405,18 +1405,18 @@ dotz 웹앱의 `views` 배열(`web/js/04-state.js:36`)은 23개예요. 설정 �
 - 근거: web/js/30-mail-box.js:191 `mbPaintBar`, :220 `mbList`, :176 `mbStar`, :183 `mbLead`, :73 `mbRun`, :58 `mbApply`, :51 `mbRowsOut`, :43 `mbFresh`; 호출처 web/js/30-monitoring.js:858, :456.
 - css: web/css/20-mail-box.css (`.mbox-*`, `.mr-star`, `.mr-lead`), 필터 줄은 web/css/15-reply-card.css 쪽 `.mr-filter` 계열과 20-monitoring.css도 같이 쓴다는 점은 코드에서 확인 못 함(rq grep 결과에 20-monitoring.css 포함). 폭 분기: 20-mail-box.css `@media (max-width: 639px)` (:101, :124, :130), `@media (min-width: 1100px)` (:180).
 
-### 메일 처리 동작 (삭제 실행 취소, 낙관적 반영, 답장 안 함)
+### 메일 처리 동작 (삭제 되돌리기, 낙관적 반영, 답장 안 함)
 - 목적: 메일 동작을 즉시 화면에 반영하고, 허브가 거부하면 되돌려요.
-- 구성: 토스트(`toast`) 한 줄과 선택 버튼(되돌리기/실행 취소), 확인 상자(`ask`).
+- 구성: 토스트(`toast`) 한 줄과 선택 버튼(되돌리기), 확인 상자(`ask`).
 - 기능:
   - `mbRun(keys, action, quiet, note)`: 바로 화면 반영 후 API 호출, 실패 항목만 원복(`mbApply`가 되돌리는 함수를 돌려줘요).
-  - `mbTrash(keys)`: 메일함이 삭제를 따라주면(모든 키가 `can`에 trash) 먼저 목록에서 빼고 6초(`MB_UNDO_MS`) 안에 `실행 취소`를 누를 수 있고, 시간이 끝나거나 `pagehide`면 실제 삭제를 보내요. 따라주지 않거나 옛 허브면 확인 상자가 먼저 떠요.
+  - `mbTrash(keys)`: 메일함이 삭제를 따라주면(모든 키가 `can`에 trash) 먼저 목록에서 빼고 6초(`MB_UNDO_MS`) 안에 `되돌리기`를 누를 수 있고, 시간이 끝나거나 `pagehide`면 실제 삭제를 보내요. 따라주지 않거나 옛 허브면 확인 상자가 먼저 떠요.
   - `mbFyi(keys, on)`: 답장 안 함 표시 또는 `되돌리기`(답장 필요로). 컴퓨터별로 묶어 `POST /api/mail/fyi {keys,on}`(다른 컴퓨터 메일은 `/api/peer/act` action fyi). 5개 초과(`MB_FYI_ASK`)면 먼저 확인.
   - `mbLeave`: 열려 있던 메일이 사라지면 모니터링 목록으로 돌아가요.
 - 상태(정확한 문구):
   - 완료 토스트(`MB_DONE`): `읽음으로 표시했어요`, `안 읽음으로 표시했어요`, `보관했어요`, `받은편지함으로 옮겼어요`, `삭제했어요`, `별표를 달았어요`, `별표를 뺐어요`. 여러 건이면 `N개를 ...`. 메일함에 닿지 않는 소스(웹메일, 플러그인이 지원하지 않는 소스)도 서버가 `{ok: true, synced: false}`만 돌려줘서 같은 토스트가 떠요. `dotz에서만 바뀌어요` 같은 안내는 없어요. 메일함 호출이 실제로 실패하면(`FAILED`) 그 `note`는 그대로 토스트로 보여요. 읽음/안 읽음/보관/받은편지함에는 `되돌리기` 버튼(별표와 삭제는 없음).
   - 실패: 허브 `note`가 있으면 그 글, 없으면 `처리하지 못했어요`. 서버가 모르는 경로(HTTP 404)면 `서버가 아직 이 작업을 지원하지 않아요`.
-  - 삭제 취소 토스트: `삭제했어요` 또는 `N개를 삭제했어요` + `실행 취소`. 실제 삭제가 일부 실패하면 `처리하지 못했어요`.
+  - 삭제 취소 토스트: `삭제했어요` 또는 `N개를 삭제했어요` + `되돌리기`. 실제 삭제가 일부 실패하면 `처리하지 못했어요`.
   - 삭제 확인 상자: 제목 `메일 삭제`, 본문 `이 메일을 목록에서 지울까요? 메일함엔 남을 수 있어요`(여러 건은 `메일 N개를 ...`), 버튼 `삭제`.
   - 답장 안 함 확인 상자: 제목 `답장 안 함`, 본문 `메일 N개를 답장 안 함으로 표시할까요? 메일을 보내지는 않아요`, 버튼 `N개 표시`.
   - 답장 안 함 결과: `답장 안 함으로 표시했어요`/`답장 필요로 표시했어요`(여러 건은 `N개를 `), 일부 실패 `N개 중 M개는 표시하지 못했어요`, 전부 실패 시 오류 글 또는 `표시하지 못했어요`.
@@ -2790,7 +2790,7 @@ CSS 쪽 반응(위 R001~R009에 속한 선언)은 C001, C002, C003 (전역), C02
 | 알림 화면 목록 (필터 바꿈) | nscFilter (31-notices-screen.js:144) | 제자리 | opacity .35→1 | 220 (M_MS.base = --m-base) | 0 | cubic-bezier(.2, .7, .2, 1) (M_EASE = --m-ease) | web/js/31-notices-screen.js:144 | J101 |
 | 알림 화면 접힌 반복 행 | nscFold: 접힘 시 이탈, 펼침 시 진입 (31-notices-screen.js:154, 159) | 이탈 / 진입 | 이탈: opacity 1→0 (fade, 끝나면 fill forwards); 진입: opacity 0→1, transform translateY(-8px)→none | 150 (M_MS.fast = --m-fast) (이탈), 220 (M_MS.base = --m-base) (진입) | 0 | cubic-bezier(.2, .7, .2, 1) (M_EASE = --m-ease) | web/js/31-notices-screen.js:154, web/js/31-notices-screen.js:159 | J102, J103 |
 | 알림 화면 행 (처리, 읽음) | nscLeave (31-notices-screen.js:183-187): 이탈 뒤 이동한 행이 진입 | 이탈 / 진입 | 이탈: opacity 1→0 (fade, 끝나면 fill forwards); 진입: opacity 0→1, transform translateY(-8px)→none | 150 (M_MS.fast = --m-fast) (이탈), 220 (M_MS.base = --m-base) (진입) | 0 | cubic-bezier(.2, .7, .2, 1) (M_EASE = --m-ease) | web/js/31-notices-screen.js:183, web/js/31-notices-screen.js:187 | J104, J105 |
-| 알림 화면 되돌린 행 (nscUndo) | 실행 취소 (31-notices-screen.js:224, rAF 두 번 뒤) | 진입 | opacity 0→1, transform translateY(-8px)→none | 220 (M_MS.base = --m-base) | 0 | cubic-bezier(.2, .7, .2, 1) (M_EASE = --m-ease); fill backwards | web/js/31-notices-screen.js:224 | J106, J107, J108 |
+| 알림 화면 되돌린 행 (nscUndo) | 되돌리기 (31-notices-screen.js:224, rAF 두 번 뒤) | 진입 | opacity 0→1, transform translateY(-8px)→none | 220 (M_MS.base = --m-base) | 0 | cubic-bezier(.2, .7, .2, 1) (M_EASE = --m-ease); fill backwards | web/js/31-notices-screen.js:224 | J106, J107, J108 |
 | 알림 화면 모두 읽음 | nscReadAll (31-notices-screen.js:233) | 이탈 | opacity 1→0 (fade, 끝나면 fill forwards) | 150 (M_MS.fast = --m-fast) | 0 | cubic-bezier(.2, .7, .2, 1) (M_EASE = --m-ease); fill forwards | web/js/31-notices-screen.js:233 | J109 |
 | 알림 접기 화살표 `.nsc-fold .ic` `.nsc-fold .ic` | 접기, 펼치기 | 제자리 | transform | 150 (--m-fast) | 0 | cubic-bezier(.2, .7, .2, 1) (--m-ease) | web/css/09-notices-screen.css:35 | C041 |
 | 알림 하이라이트 `.nt-hl::after` (JS 클래스는 30-notices.js:171에서 붙이고 2300ms 뒤 제거) `.nt-hl::after` | 알림에서 해당 메시지로 이동했을 때 1회 | 제자리 | nt-hl: opacity | 1800 | 200 | ease-in-out; 반복 1, fill both | web/css/09-notices.css:20, web/css/09-notices.css:25 | C042, K002 |

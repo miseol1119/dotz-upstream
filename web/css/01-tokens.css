@@ -253,6 +253,8 @@ button.conn:disabled { cursor: default; }
 @media (hover: hover) { .ib:hover { background: var(--hover); color: var(--fg); } }
 .ib.pri { background: var(--accent); color: var(--on-accent); border-radius: 50%; }
 @media (hover: hover) { .ib.pri:hover { background: var(--accent); opacity: .88; } }
+/* An empty text box with nothing attached has nothing to send: the arrow takes the switched-off look (the stop square of a running turn stays). */
+.sendrow:not(.has-att):has(textarea:placeholder-shown) > .ib.pri:not(.stop) { opacity: .4; pointer-events: none; }
 .menu .mi.more { color: var(--fg-2); }
 .menu .mi.more svg { margin-left: auto; width: 14px; height: 14px; }
 .btn, .dc-act, .dc-go, .dc-back, .dc-manual { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-15); height: var(--btn-h); padding: 0 var(--sp-4); border: 1px solid transparent; border-radius: var(--r-ctl); color: var(--fg-2); background: transparent; font: 600 14px/20px var(--font); text-decoration: none; white-space: nowrap; max-width: 100%; cursor: pointer; }
@@ -261,6 +263,7 @@ button.conn:disabled { cursor: default; }
 .btn.text, .dc-act, .dc-manual { background: transparent; color: var(--fg-2); padding: 0 var(--sp-3); }
 .btn.sm { height: var(--btn-h-sm); padding: 0 var(--sp-3); font-size: 13px; }
 .btn, .dc-act, .dc-go, .dc-back, .dc-manual { transition: opacity var(--m-fast) var(--m-ease); }
+.btn:active:not(:disabled), .dc-go:active:not(:disabled), .dc-back:active:not(:disabled) { opacity: .7; }
 @media (hover: hover) { .btn:hover, .dc-go:hover, .dc-back:hover, .dc-act:hover, .dc-manual:hover { opacity: .85; } }
 @media (hover: hover) { .btn.tonal:hover, .btn.outlined:hover, .dc-back:hover, .dc-act.alt:hover { background: var(--hover); opacity: 1; } }
 @media (hover: hover) { .btn.text:hover, .dc-act:not(.main):not(.alt):hover, .dc-manual:hover { background: var(--hover); color: var(--fg); opacity: 1; } }

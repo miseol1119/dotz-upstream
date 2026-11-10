@@ -116,7 +116,9 @@ function asFeatRow(app, f) {
 }
 async function asPatch(app, values) {
   const r = await api(asUrl(app), "PATCH", { values });
-  AS.by[app] = r.fields || [];
+  // The answer changes the rows it names; a row it does not name stays (a switch must not make sections vanish).
+  const got = new Map((r.fields || []).map(f => [f.key, f])), prev = AS.by[app] || [];
+  AS.by[app] = [...prev.map(f => got.get(f.key) || f), ...[...got.values()].filter(f => !prev.some(p => p.key === f.key))];
   asPaint();
   MON.sig = ""; monSchedule();
   if (app.includes("~") || pqPc(`settings:${app}`)) pqSoon(); else if (asOwn(app)) loadMonitors(); else loadIntegrations();   // a peer's app or monitor is read back from that computer
@@ -147,7 +149,7 @@ async function asWatchRmGo(app) {
 }
 function asWatchRmNode(app) {
   const what = asSched(app) ? "예약" : "감시";
-  if (!AS.rm[app]) return el("div", { class: "as-row" }, el("span", { class: "as-b" }, el("span", { class: "as-n", text: `${what} 삭제` }), el("span", { class: "as-h", text: `이 ${what}을 완전히 지워요` })), el("button", { class: "btn tonal inrow", type: "button", "data-as-rm": "ask", onclick: () => { AS.rm[app] = { watch: true }; asPaint(); } }, "삭제"));
+  if (!AS.rm[app]) return el("div", { class: "as-row" }, el("span", { class: "as-b" }, el("span", { class: "as-n", text: `${what} 삭제` }), el("span", { class: "as-h", text: `이 ${what}을 완전히 지워요` })), el("button", { class: "btn danger inrow", type: "button", "data-as-rm": "ask", onclick: () => { AS.rm[app] = { watch: true }; asPaint(); } }, "삭제"));
   const pc = pqPc(`settings:${app}`), name = monSettingsName(`settings:${app}`);
   const lines = asSched(app) ? ["다시 실행하지 않고 목록에서 빼요. 되돌릴 수 없어요", "잠깐 멈추려면 삭제 대신 예약 켜기를 끄세요"]
     : [`${pc ? `${pc.name}에서 ` : ""}확인을 멈추고 목록에서 빼요. 되돌릴 수 없어요`, "지금까지 온 감시 소식은 그대로 남아요", "잠깐 멈추려면 삭제 대신 감시 켜기를 끄세요"];

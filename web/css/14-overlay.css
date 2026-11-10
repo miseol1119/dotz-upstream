@@ -24,6 +24,8 @@ dialog.pal .pal-i .pd { flex: 0 1 auto; max-width: 45%; margin-left: auto; text-
 dialog.pal .pal-i.on, dialog.pal .pal-i:focus-visible { background: var(--row-sel); }
 dialog.pal .pal-out { flex: 1 1 auto; min-height: 0; }
 dialog.pal .pal-ft { flex: none; display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4); border-top: 1px solid var(--line); color: var(--fg-3); font: 400 12px/16px var(--font); }
+:root[data-pointer] dialog :focus-visible { outline: 0; }
+@media (hover: none) and (pointer: coarse) { dialog.pal .pal-ft, dialog.pal .pd.key { display: none; } }
 @media (max-width: 639px) {
   dialog.pal { margin-top: 12vh; }
   dialog.pal .pal-i { min-height: 44px; }

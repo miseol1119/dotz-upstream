@@ -112,7 +112,7 @@ describe("the 알림 screen", () => {
 		expect(calls).toEqual([]);   // switching a filter reads and writes nothing
 	}, 30_000);
 
-	test("the x has three meanings: 처리했어요 on a failure, 읽음으로 표시 on news, 지우기 on a past notice with 실행 취소; a login and a question have › instead", async () => {
+	test("the x has three meanings: 처리했어요 on a failure, 읽음으로 표시 on news, 지우기 on a past notice with 되돌리기; a login and a question have › instead", async () => {
 		const v = await shown(await open(390));
 		const { waitFor, ev } = on(v);
 		const cell = (id: string) => ev<string>(`(() => { const r = document.querySelector('#v-notices .nsc-r[data-nid="${id}"]'); const c = r.querySelector(".nsc-x") || r.querySelector(".nsc-tr, .nsc-fold"); return c.className.split(" ").find(k => k.startsWith("nsc-")) + "|" + (c.getAttribute("aria-label") || ""); })()`);
@@ -135,7 +135,7 @@ describe("the 알림 screen", () => {
 		await click(v, '#v-notices .nsc-r[data-nid="old"] .nsc-x');
 		await hubState(() => has("POST /api/notices/old/dismiss"));
 		await waitFor(`!document.querySelector('#v-notices .nsc-r[data-nid="old"]') && document.querySelector(".snack")`);
-		expect(await ev(`document.querySelector(".snack").textContent`)).toContain("실행 취소");
+		expect(await ev(`document.querySelector(".snack").textContent`)).toContain("되돌리기");
 		await click(v, ".snack button");
 		await hubState(() => has("POST /api/notices/old/undismiss"));
 		await waitFor(`document.querySelector('#v-notices .nsc-r[data-nid="old"]')`);

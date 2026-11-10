@@ -184,11 +184,11 @@ function cmPaintRooms() {
   const list = el("section", { class: "kk-watch", "aria-label": "댓글이 있는 글" });
   if (CM.loaded) {
     list.append(el("div", { class: "cv-gh", role: "presentation", text: "글" }));
-    if (CM.error) list.append(el("div", { class: "kk-note", role: "status", text: CM.error }));
+    if (CM.error) list.append(el("div", { class: "kk-note", role: "status", text: CM.error }), el("button", { class: "btn tonal sm", type: "button", "data-k": "retry", text: "다시 시도", onclick: () => cmLoad() }));
     else if (CM.threads.length) list.append(...CM.threads.map(cmRow));
     else if (!srcs.length) list.append(el("div", { class: "kk-note", id: "cm-empty", text: "켜 둔 곳이 없어요. 채팅에서 켜 달라고 해 주세요." }));
     else list.append(el("div", { class: "kk-note", id: "cm-empty", text: "아직 받은 댓글이 없어요" }), el("button", { class: "btn tonal sm", type: "button", "data-k": "pick-open", text: "지켜볼 글 고르기", onclick: () => cmPickOpen(CM.pc ? pqApp(CM.app, CM.pc) : CM.app) }));
-  }
+  } else list.append(el("div", { class: "kk-note", role: "status", text: "불러오는 중…" }));
   const tabs = cmTabs();
   clear(cmRooms).append(...(tabs ? [tabs] : []), list);
   cmRooms.scrollTop = top;

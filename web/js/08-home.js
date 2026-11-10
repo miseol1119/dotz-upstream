@@ -53,7 +53,7 @@ function homeMenu(anchor, id, inChat) {
     } else {
       const n = laneOf(id);
       add("중단", () => busy(null, async () => { await api(`/api/lanes/${enc(n)}/abort`, "POST", {}); toast("작업을 중단했어요"); refreshState(); }));
-      add("재시작", () => busy(null, async () => { if (!await ask(`${n} 재시작`, "이 세션을 다시 시작할까요?", "재시작", true)) return; await api(`/api/lanes/${enc(n)}/restart`, "POST", {}); toast("재시작했어요"); refreshState(); }));
+      add("재시작", () => busy(null, async () => { if (!await ask(`${n} 재시작`, "작업 중인 내용이 있으면 멈추고 세션을 다시 시작해요.", "재시작")) return; await api(`/api/lanes/${enc(n)}/restart`, "POST", {}); toast("재시작했어요"); refreshState(); }));
     }
   } else if (id.startsWith("prov:")) {
     const p = ((P && P.providers) || []).find(x => x.id === id.slice(5));

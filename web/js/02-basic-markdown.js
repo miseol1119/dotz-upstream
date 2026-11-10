@@ -216,7 +216,7 @@ async function busy(btn, fn) {
 /* ---------- snackbar ---------- */
 // How notification text names things (01-notice-ko.js): a session by its title, never its code name.
 const NK = { lane: name => { try { const l = S && S.lanes.find(x => x.name === name); return (l && l.title) || undefined; } catch { return undefined; } } };
-let toastTimer;
+let toastTimer, toastNew = null;   // toastNew: the toast raised in this very run; it tells of the move that follows it, so go() leaves it up
 // A toast that times out or whose 되돌리기 was pressed fades out (150ms) and is then removed; a new toast replaces the old one at once.
 function toastGone(n) {
   if (!n.isConnected) return;
@@ -231,6 +231,7 @@ function toast(msg, bad, action, ms) {
   const tops = ["#composer"].map(s => document.querySelector(s)).map(x => x && x.getBoundingClientRect()).filter(r => r && r.height > 0 && r.top > innerHeight / 2).map(r => r.top);
   if (tops.length) n.style.setProperty("--snack-b", `${Math.round(innerHeight - Math.min(...tops) + parseFloat(getComputedStyle(n).getPropertyValue("--sp-2")))}px`);
   clearTimeout(toastTimer);
+  toastNew = n; queueMicrotask(() => { if (toastNew === n) toastNew = null; });
   motionIn(n, "rise");
   toastTimer = setTimeout(() => toastGone(n), ms || (bad || action ? 6000 : 3500));
 }
@@ -302,7 +303,9 @@ function notify(e) {
 // confirm: a short confirm (a title, a sentence or two, two buttons): on a PC a small box next to the click that opened it (centered when
 // nothing was clicked just before), a low bottom sheet on a phone (docs/ui-spec.md 확인 상자).
 let CF_PT = null;
-document.addEventListener("pointerdown", ev => { CF_PT = { x: ev.clientX, y: ev.clientY, t: Date.now() }; }, true);
+document.addEventListener("pointerdown", ev => { CF_PT = { x: ev.clientX, y: ev.clientY, t: Date.now() }; document.documentElement.dataset.pointer = "1"; }, true);
+// The ring on a window's first control (the ✕ or 취소, which a window takes focus on opening) shows only after a key was pressed (14-overlay.css).
+document.addEventListener("keydown", () => { delete document.documentElement.dataset.pointer; }, true);
 function cfPlace(d) {
   if (!CF_PT || Date.now() - CF_PT.t > 2000 || matchMedia("(max-width: 639px)").matches) return;
   const r = d.getBoundingClientRect(), vw = innerWidth, vh = innerHeight, gap = 12;

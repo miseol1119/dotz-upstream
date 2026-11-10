@@ -44,7 +44,7 @@ function dvOpen(d) {
   dialog({ title: d.name, body, actions: [
     { label: "해제", kind: "danger", onclick: async (c, b) => {
       const text = d.current
-        ? "지금 쓰고 있는 이 기기를 해제해요. 바로 로그아웃되고, 다시 쓰려면 메신저로 받은 코드로 새로 연결해야 해요."
+        ? "이 기기는 바로 로그아웃돼요. 다시 쓰려면 메신저로 받은 코드로 새로 연결해야 해요."
         : `${d.name}의 로그인이 바로 끊겨요. 다시 쓰려면 코드로 새로 연결해야 해요.`;
       if (!(await ask("기기 해제", text, "해제", true))) return;
       await busy(b, async () => {
@@ -56,7 +56,6 @@ function dvOpen(d) {
         await loadDevices();
       });
     } },
-    { label: "닫기", onclick: c => c() },
     { label: "저장", kind: "pri", onclick: async (c, b) => {
       const v = name.value.trim();
       if (!v) return toast("이름을 적어 주세요", true);

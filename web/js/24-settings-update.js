@@ -293,11 +293,13 @@ const notifyRows = (on, set, only) => NOTIFY_CLASSES.filter(([k]) => !only || on
   liEnd(el("button", { type: "button", class: "hs-sw", role: "switch", "aria-checked": String(on(k)), "aria-label": `${label} 알림`, "data-k": k, onclick: () => set(k, !on(k)) }))));
 const APPN = { v: null, asked: false };
 async function appNotifyLoad() { APPN.asked = true; try { APPN.v = (await api("/api/push/classes")).classes; } catch { APPN.v = null; } if (inSettings()) renderSettings(); }
+// Only the switches change: the page is not drawn again, so no section blinks away while the answer is on its way.
+const appNotifyFlip = v => { for (const [k] of NOTIFY_CLASSES) { const b = document.querySelector(`[data-notify="${k}"] .hs-sw`); if (b) b.setAttribute("aria-checked", String(v[k] === true)); } };
 async function appNotifySet(k, on) {
   const was = APPN.v[k];
-  APPN.v = { ...APPN.v, [k]: on }; renderSettings();
+  APPN.v = { ...APPN.v, [k]: on }; appNotifyFlip(APPN.v);
   try { APPN.v = (await api("/api/push/classes", "PUT", { classes: { [k]: on } })).classes; } catch (e) { APPN.v = { ...APPN.v, [k]: was }; toast(e.message, true); }
-  renderSettings();
+  appNotifyFlip(APPN.v);
 }
 function appNotifyRows() {
   if (!APPN.v && !APPN.asked) appNotifyLoad();

@@ -226,7 +226,7 @@ async function nscDismiss(n) {
     const r = await api(`/api/notices/${enc(n.id)}/dismiss`, "POST", {});
     if (!r || !r.ok) throw new Error("지우지 못했어요");
     if (typeof r.unread === "number") { NT.unread = r.unread; ntPaint(); }
-    toast("알림을 지웠어요", false, { label: "실행 취소", onclick: () => nscUndo(n) }, 6000);
+    toast("알림을 지웠어요", false, { label: "되돌리기", onclick: () => nscUndo(n) }, 6000);
   } catch (err) {
     NT.items.splice(Math.max(0, at), 0, n); NT.mut++; if (n.at) NT.gone.delete(n.at);
     ntPaint(); homeSoon(); toast(err.message, true);

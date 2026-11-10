@@ -1,6 +1,18 @@
 "use strict";
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+// A .btn whose click handler returns a promise (it sends a request) is disabled until the answer comes, so a second press sends nothing.
+function holdWhileSending(btn, fn) {
+  return ev => {
+    const r = fn.call(btn, ev);
+    if (r && typeof r.then === "function" && !btn.disabled) {
+      btn.disabled = true;
+      const free = () => { btn.disabled = false; };
+      r.then(free, e => { free(); throw e; });
+    }
+    return r;
+  };
+}
 // DOM builder: strings become text nodes; safeHtml is used only with already-escaped markup.
 function el(tag, props, ...kids) {
   const n = document.createElement(tag);
@@ -9,6 +21,7 @@ function el(tag, props, ...kids) {
     if (k === "class") n.className = v;
     else if (k === "text") n.textContent = v;
     else if (k === "safeHtml") n.innerHTML = v;
+    else if (k === "onclick" && tag === "button" && /(^| )btn( |$)/.test(props.class || "")) n.addEventListener("click", holdWhileSending(n, v));
     else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
     else n.setAttribute(k, v === true ? "" : v);
   }

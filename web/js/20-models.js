@@ -4,7 +4,7 @@ let providerFilter = "";
 const applyKo = { live: "적용했어요", restarted: "적용했어요 · 재시작됨", "next-start": "다음 시작부터 적용돼요", "next-turn": "다음 턴부터 적용돼요" };
 async function loadModels(quiet) {
   try { M = await api("/api/models"); }
-  catch (e) { if (!quiet && current === "models") clear($("#models")).append(emptyNode("모델 정보를 불러오지 못했어요")); return; }
+  catch (e) { if (!quiet && current === "models") clear($("#models")).append(emptyNode("모델 정보를 불러오지 못했어요", () => loadModels())); return; }
   if (current === "models") renderModels();
   if (current === "home") renderHome();
   if (current === "settings") renderSettings();

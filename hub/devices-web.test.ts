@@ -117,7 +117,9 @@ describe("연결된 기기 설정 화면", () => {
 		expect(await ev<string>(v, `${top}.textContent`)).toContain("로그아웃");
 		await press(v, "취소");
 		await waitFor(v, `document.querySelectorAll("dialog[open]").length === 1 && !${top}.textContent.includes("기기 해제")`);
-		await press(v, "닫기");
+		// the window closes by its ✕ alone: no second 닫기 button
+		expect(await ev<number>(v, `[...${top}.querySelectorAll(".btn")].filter(b => b.textContent === "닫기").length`)).toBe(0);
+		await run(v, `${top}.querySelector('[aria-label="닫기"]').click()`);
 		await waitFor(v, `document.querySelectorAll("dialog[open]").length === 0`);
 		expect(calls).toEqual([]);
 		await click(v, '#devices [data-dev="cred/old"]');

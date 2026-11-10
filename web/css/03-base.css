@@ -105,6 +105,7 @@
 .menu.msheet .mi { min-height: var(--menu-h-sheet); }
 .mi { display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-height: var(--menu-h); padding: var(--menu-py) var(--menu-px); border: 0; border-radius: var(--r-ctl); background: transparent; text-align: left; font-size: 13px; line-height: 20px; }
 .mi:focus-visible { background: var(--hover); outline: 0; } @media (hover: hover) { .mi:hover { background: var(--hover); outline: 0; } }
+.mi.danger, .mi.danger .ml { color: var(--err); }
 .mi.ind { padding-left: calc(var(--menu-px) + var(--sp-5)); }
 .mi .ck { flex: none; width: 14px; height: 14px; color: var(--accent); }
 .mi .ml { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--sp-2); overflow-wrap: anywhere; }
@@ -211,7 +212,8 @@ body:has(.upd-bar) .app { padding-top: 0; margin-top: var(--ubh); height: calc(1
 .ntf .x { flex: none; width: 24px; height: 24px; margin-top: calc(var(--sp-05) * -1); padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--fg-3); font-size: 16px; line-height: 24px; }
 @media (hover: hover) { .ntf .x:hover { background: var(--hover); color: var(--fg); } }
 @keyframes ntf-in { from { opacity: 0; transform: translateX(16px) scale(.98); } }
-@media (max-width: 639px) { .ntf-box { top: calc(8px + env(safe-area-inset-top)); right: 8px; width: calc(100vw - 16px); } }
+/* On a phone the cards come down under the app bar (60px), so the back arrow and the title stay in reach. */
+@media (max-width: 639px) { .ntf-box { top: calc(60px + var(--sp-2) + env(safe-area-inset-top)); right: 8px; width: calc(100vw - 16px); } }
 
 /* 채팅 uses the same app bar as every page (title, 돋보기, usage); it only adds the session switcher right after the title
    and one 대화/로그 icon button next to the 돋보기 (shared by both views) */
