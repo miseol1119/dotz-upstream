@@ -12,7 +12,7 @@
 .tr-tog .ic { width: 16px; height: 16px; }
 .tr-body { display: flex; flex-direction: column; gap: var(--sp-3); }
 .tr-body:focus { outline: 0; }
-.tr-q { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; font: 700 18px/26px var(--font); letter-spacing: -.01em; }
+.tr-q { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; font: 700 16px/24px var(--font); letter-spacing: -.01em; }
 .tr-meta { display: flex; flex-wrap: wrap; gap: var(--sp-15) var(--sp-3); color: var(--fg-2); font-size: 13px; line-height: 20px; }
 .tr-meta b { color: var(--fg-3); font-weight: 600; }
 .tr-rule { color: var(--fg-2); }
@@ -64,7 +64,6 @@
   .tr-b, .tr-go { height: 44px; padding: 0 var(--sp-4); }
   .tr-list .tr-seg { align-self: stretch; }
   .tr-sg { flex: 1; min-height: 44px; }
-  .tr-q { font-size: 17px; }
 }
 @media (pointer: coarse) { .tr-keys { display: none; } }
 .tr-post { color: var(--fg); font: 600 13px/20px var(--font); }

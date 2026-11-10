@@ -196,3 +196,55 @@ test("390px: the notices screen's 실패 tag has the dot too", async () => {
 	dots.forEach(hasDot);
 });
 
+/* 8. type sizes: 11-16 or 20-22px text, and a line at least 1.295 of its size */
+const typeBad = (v: View, sel: string) => q<{ n: number; bad: string[] }>(v, `
+	const els = [...document.querySelectorAll(${JSON.stringify(sel)})].filter(e => e.getClientRects().length);
+	const bad = els.map(e => { const c = getComputedStyle(e), fs = parseFloat(c.fontSize), ratio = c.lineHeight === "normal" ? 1.2 : parseFloat(c.lineHeight) / fs;
+		return ((fs >= 11 && fs <= 16) || (fs >= 20 && fs <= 22)) && ratio >= 1.295 ? "" : e.tagName + "." + e.className + " " + fs + "px x" + Math.round(ratio * 100) / 100; }).filter(Boolean);
+	return { n: els.length, bad };`);
+const typeOk = async (v: View, sel: string) => { const r = await typeBad(v, sel); expect(r.n).toBeGreaterThan(0); expect(r.bad).toEqual([]); };
+for (const w of [390, 1280]) {
+	test(`${w}px: the apps tab title is a 20px title line, not 18px`, async () => {
+		const v = await page(w, "light", `void (APPS_ON = true, go("apps", "memo"))`, `current === "apps" && !!document.querySelector("#v-apps .apps-n")`);
+		await shot(v, `8-apps-title-${w}`);
+		await typeOk(v, ".apps-n");
+	});
+}
+test("390px: the terminal's 더 보기 button uses a listed size and a readable line", async () => {
+	const v = await page(390, "light", `openShell()`, `!!document.querySelector(".sh-more")`);
+	await shot(v, "8-shell-more");
+	await typeOk(v, ".fs-hb .sh-more");
+});
+test("390px: the kakao hour and weekday axes use a listed size and a readable line", async () => {
+	const k = await page(390, "light", `go("monitoring", "i:kakao")`, `KK.loaded && KK.rooms.length > 0`);
+	await k.evaluate(`void (KK.open = "r1", KK.msgs = [{ authorId: "u1", sender: "정우", fromMe: false, text: "안녕" }], kkPerson("u1"))`);
+	await waitFor(k, `!!document.querySelector("dialog[open] .kk-hax")`);
+	await shot(k, "8-kakao-axis");
+	await typeOk(k, ".kk-hax span");
+});
+test("390px: the reply card's avatar letter and 초안 tag use a listed size and a readable line", async () => {
+	const v = await page(390, "light", `go("monitoring", "i:mail")`, `NM.loaded && MON.sel === "i:mail"`);
+	await waitFor(v, `!!document.querySelector(".rq-who .rq-av")`);
+	await shot(v, "8-reply-avatar");
+	await typeOk(v, ".rq-who .rq-av");
+	await typeOk(v, ".rq-who .dr-st");
+});
+test("390px: the models add button reads at a listed size and line", async () => {
+	const v = await page(390, "light", `go("models")`, `current === "models" && !!document.querySelector("#models .fb-add")`);
+	await typeOk(v, "#models .fb-add");
+});
+test("390px: the update bar's x reads at a listed size and line", async () => {
+	const v = await page(390, "light", `go("settings")`, `!!UPD.info`);
+	await v.evaluate(`void (UPD.info.flow = { phase: "failed", id: "f1", at: new Date().toISOString(), text: "업데이트하지 못했어요" }, paintUpdBar())`);
+	await waitFor(v, `!!document.querySelector("#upd-bar .x")`);
+	await typeOk(v, "#upd-bar .x");
+});
+for (const w of [390, 1280]) {
+	test(`${w}px: the triage sheet's question is a listed size`, async () => {
+		const v = await page(w, "light", `go("monitoring")`, `NM.loaded && TR.loaded`);
+		await v.evaluate(`void (TR.groups = [{ key: "g1", label: "뉴스레터", count: 3, cards: [1, 2, 3].map(i => ({ to: "mail:m" + i, ref: "r" + i, question: "답장할까요?", draft: { body: "네, 알겠습니다" } })) }], trOpen("g1"))`);
+		await waitFor(v, `!!document.querySelector(".fs-card .tr-q > span")`);
+		await shot(v, `8-triage-question-${w}`);
+		await typeOk(v, ".fs-card .tr-q > span");
+	});
+}

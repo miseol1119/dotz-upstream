@@ -137,7 +137,7 @@ ul.mr-sum.mr-pts { display: block; margin: 0; padding: 0; list-style: none; }
 #mon-tl > .bm.rc.dr { gap: var(--sp-3); }
 .dr-ic { flex: none; display: inline-flex; color: var(--fg-3); }
 .dr-ic .ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
-.dr-st { margin-left: auto; height: 24px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.dr-st { margin-left: auto; height: 24px; font-size: 13px; line-height: 20px; font-weight: 600; white-space: nowrap; }
 .dr-q { font-size: 15px; line-height: 22px; }
 .dr-orig { display: flex; flex-direction: column; gap: var(--sp-05); padding: var(--sp-05) 0 var(--sp-05) var(--sp-3); border-left: 3px solid var(--line-2); min-width: 0; }
 .dr-ok { color: var(--fg-3); font-size: 12px; line-height: 16px; font-weight: 600; }

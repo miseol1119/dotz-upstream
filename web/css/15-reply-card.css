@@ -52,7 +52,7 @@
 
 /* 댓글 답글 카드: 작은 아바타 + 이름과 출처가 한 줄, 댓글은 조용한 인용, 초안이 본문, 버튼은 작은 단계 하나 줄 (원칙 1·5·9) */
 .rq-who { gap: var(--sp-2); }
-.rq-av { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--layer); color: var(--fg-2); font: 600 var(--fs-tag)/1 var(--font); text-transform: uppercase; }
+.rq-av { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--layer); color: var(--fg-2); font: 600 var(--fs-tag)/var(--lh-tag) var(--font); text-transform: uppercase; }
 .rq.cm .rq-sub { margin-top: var(--sp-1); color: var(--fg-3); font: 400 var(--fs-meta)/var(--lh-meta) var(--font); }
 .rq.cm.dr .rq-sub { margin-top: var(--sp-2); color: var(--fg); font: 600 14px/20px var(--font); }   /* a mail draft: its reply subject heads the body */
 .rq.cm .rq-body, .rq.cm .rq-bodywrap { margin-top: var(--sp-2); }

@@ -69,7 +69,7 @@
 .fb-bar { height: 4px; border-radius: 2px; background: color-mix(in srgb, currentColor 18%, transparent); overflow: hidden; }
 .fb-bar i { display: block; height: 100%; border-radius: 2px; background: currentColor; }
 .fb-bar-l { font-size: 11px; line-height: 15px; }
-.fb-add { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--sp-15); height: var(--btn-h-sm); padding: 0 var(--sp-3) 0 var(--sp-2); border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--fg-2); font-size: 13px; font-weight: 500; }
+.fb-add { align-self: flex-start; display: inline-flex; align-items: center; gap: var(--sp-15); height: var(--btn-h-sm); padding: 0 var(--sp-3) 0 var(--sp-2); border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--fg-2); font-size: 13px; line-height: 20px; font-weight: 500; }
 @media (hover: hover) { .fb-add:hover:not(:disabled) { background: var(--hover); color: var(--fg); } }
 .fb-add:disabled { opacity: .5; }
 
@@ -177,7 +177,7 @@ body:has(.shell-chip) .app { --chip-h: 34px; padding-top: 0; margin-top: calc(va
 .upd-bar span.ub-tx { cursor: default; }
 .upd-bar.download .ub-tx::after, .upd-bar.waiting .ub-tx::after, .upd-bar.restarting .ub-tx::after { content: ""; display: inline-block; width: 6px; height: 6px; margin-left: var(--sp-2); border-radius: 50%; background: currentColor; vertical-align: 2px; }
 .upd-bar.failed { background: var(--fg); color: var(--bg); }
-.upd-bar .x { position: absolute; right: 8px; bottom: 4px; padding: 0 var(--sp-15); border: 0; background: transparent; color: inherit; font: inherit; font-size: 16px; cursor: pointer; }
+.upd-bar .x { position: absolute; right: 8px; bottom: 4px; padding: 0 var(--sp-15); border: 0; background: transparent; color: inherit; font: inherit; font-size: 16px; line-height: 22px; cursor: pointer; }
 body:has(.upd-bar) { --ubh: var(--upd-h, calc(32px + env(safe-area-inset-top, 0px))); }
 body:has(.upd-bar) .app { padding-top: 0; margin-top: var(--ubh); height: calc(100dvh - var(--ubh)); }
 .snack.bad::before { content: ""; display: inline-block; flex: none; width: 7px; height: 7px; margin-right: var(--sp-2); border-radius: 50%; background: var(--err); vertical-align: 1px; }

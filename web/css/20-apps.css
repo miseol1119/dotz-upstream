@@ -18,7 +18,7 @@
 .apps-hd { display: flex; flex: none; align-items: center; gap: var(--sp-2); min-height: 56px; padding: var(--sp-2) var(--sp-1) var(--sp-3); }
 .apps-hd .cv-av { width: 36px; height: 36px; }
 .apps-hb { flex: 1; min-width: 0; }
-.apps-n { margin: 0; font: 700 18px/24px var(--font); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apps-n { margin: 0; font: 700 20px/28px var(--font); letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .apps-p { display: flex; align-items: center; gap: var(--sp-15); margin: var(--sp-05) 0 0; color: var(--fg-3); font: 400 13px/18px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .apps-hd .ib { color: var(--fg-2); }
 
