@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { ev, fakeHub, run, waitFor, type View } from "./test-web.ts";
-import { cardHub } from "./pane-cards-fixture.ts";
+import { cardHub } from "./test-pane-cards.ts";
 
 // The cards of a conversation (web/css, @container tlcol) fold by the width of the column they are drawn in, not the window's: the same conversation
 // in a 390px window and in a 390px pane of a 1280px window lays each card kind out the same, and no pane width down to 280px pushes anything past the pane's edge.
