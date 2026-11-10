@@ -7,6 +7,7 @@ import { writeAtomic } from "../firstrun/atomic.ts"; // not hub/config.ts: it ne
 import { ownerAddress, releaseTerms, scrub, type Term } from "./public-scrub.ts";
 import { clearGate, gateStatus, realGateEnv, runGate, runSuiteIn, startGate, type GateEnv } from "./release-gate.ts";
 import { buildReleaseNote, NOTE_LOG_FORMAT, parseNoteCommits } from "./release-note.ts";
+import { keyMissing, pushAuthArgs, RELEASE_IDENTITY, signingKeyPath, signMode, signTag, verifyOwnTag, type SignMode } from "./release-sign.ts";
 
 export type Release = { readonly date: string; readonly n: number; readonly hotfix: number | null; readonly text: string };
 
@@ -187,6 +188,15 @@ export type PublishOptions = {
 	terms?: readonly Term[];
 	address?: string; // how the owner is addressed; this install's config when not given
 	buildDemo?: Exec; // rebuilds site/demo from web/ before the release commit (cmd is unused); `bun site/build-demo.ts` in the checkout when not given
+	signingKey?: string; // the release signing key file; $DOTZ_DIR/secrets/release-signing-key when not given
+	ci?: boolean; // running on a GitHub runner (the one unsigned transition release); GITHUB_ACTIONS when not given
+};
+
+const SIGN_LINES: Record<SignMode, (key: string) => string> = {
+	sign: key => `서명 키: ${key}`,
+	transition: key => `서명 키가 없고(${key}) 서명된 릴리스도 아직 없어서, 이번이 서명 없이 내는 마지막 전환 릴리스예요.`,
+	"no-key": key => `서명 키가 없어서 버전을 내지 않았어요 (${key}). 키가 있는 기기에서 실행해 주세요.`,
+	"ci-refused": key => `서명된 릴리스가 이미 있는데 서명 키가 없어서(${key}) 이 러너에서는 버전을 내지 않아요.`,
 };
 
 async function releaseNote(root: string, tag: string, base: string | null, rev: string, terms: readonly Term[], address: string): Promise<string> {
@@ -221,17 +231,17 @@ async function publishNote(root: string, tag: string, note: string, exec: Exec, 
 
 // A pinned release is the tested commit plus VERSION, tagged before this push. When main moved on while the suite ran, main is merged in
 // after the tag: the tag stays an ancestor of main (the updater moves forward only) and no untested commit is in it.
-async function pushPinned(root: string): Promise<{ code: number; out: string }> {
-	const pushed = await gitOutput(["push", "origin", "HEAD:main"], root);
+async function pushPinned(root: string, auth: readonly string[]): Promise<{ code: number; out: string }> {
+	const pushed = await gitOutput([...auth, "push", "origin", "HEAD:main"], root);
 	if (pushed.code === 0) return pushed;
 	const fetched = await gitOutput(["fetch", "--quiet", "origin", "main"], root);
 	if (fetched.code !== 0) return fetched;
-	const merged = await gitOutput(["merge", "--no-edit", "origin/main"], root);
+	const merged = await gitOutput([...RELEASE_IDENTITY, "merge", "--no-edit", "origin/main"], root);
 	if (merged.code !== 0) {
 		await gitOutput(["merge", "--abort"], root);
 		return merged;
 	}
-	return gitOutput(["push", "origin", "HEAD:main"], root);
+	return gitOutput([...auth, "push", "origin", "HEAD:main"], root);
 }
 
 // The public demo is a build of web/, so the release commit carries a fresh one. A build that fails is logged and the release goes out with the
@@ -309,11 +319,18 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 	print(`다음 ${opts.force ? "강제 " : ""}버전: ${tag}${previous ? ` (이전 ${base})` : " (첫 버전)"}`);
 	print(`변경 요약: ${summary}`);
 
+	const key = opts.signingKey ?? signingKeyPath(process.env);
+	const ci = opts.ci ?? process.env.GITHUB_ACTIONS === "true";
+	const mode = await signMode(root, key, ci);
+	print(SIGN_LINES[mode](key));
+	const refused = mode === "no-key" || mode === "ci-refused";
+
 	if (opts.dryRun) {
 		print(await releaseNote(root, tag, base, "HEAD", terms, address));
-		print(`[--dry-run] 아무것도 쓰지 않았어요. 실제로 내보내면 VERSION을 ${version.text}로 쓰고, 커밋하고, 태그 ${tag}까지 origin/main과 함께 푸시한 뒤 위 노트로 GitHub Release를 만들어요.`);
-		return 0;
+		print(`[--dry-run] 아무것도 쓰지 않았어요. 실제로 내보내면 VERSION을 ${version.text}로 쓰고, 커밋하고, 서명한 태그 ${tag}까지 origin/main과 함께 푸시한 뒤 위 노트로 GitHub Release를 만들어요.`);
+		return refused ? 1 : 0;
 	}
+	if (refused) return 1;
 
 	if (dirty.length) {
 		print("커밋되지 않은 변경이 있어서 버전을 내지 않았어요.");
@@ -343,12 +360,7 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 		print(`다시 만든 데모를 스테이징하지 못했어요: ${addedDemo.out}`);
 		return 1;
 	}
-	// CI has no git identity: set one in this checkout so the commit and the later pull --rebase both have a committer.
-	if ((await gitOutput(["config", "user.email"], root)).code !== 0) {
-		await gitOutput(["config", "user.name", "dotz-release"], root);
-		await gitOutput(["config", "user.email", "dotz-release@users.noreply.github.com"], root);
-	}
-	const committed = await gitOutput(["commit", "-m", `release: ${tag}\n\n${summary}`], root);
+	const committed = await gitOutput([...RELEASE_IDENTITY, "commit", "-m", `release: ${tag}\n\n${summary}`], root);
 	if (committed.code !== 0) {
 		print(`커밋하지 못했어요: ${committed.out}`);
 		print("VERSION 파일만 바뀐 상태로 남아 있어요.");
@@ -364,7 +376,7 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 			return 1;
 		}
 	}
-	const pulled = opts.sha ? { code: 0, out: "" } : await gitOutput(["pull", "--rebase", "--quiet", "origin", "main"], root);
+	const pulled = opts.sha ? { code: 0, out: "" } : await gitOutput([...RELEASE_IDENTITY, "pull", "--rebase", "--quiet", "origin", "main"], root);
 	if (pulled.code !== 0) {
 		await gitOutput(["rebase", "--abort"], root);
 		print(`origin/main과 동기화하지 못했어요: ${pulled.out}`);
@@ -372,14 +384,24 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 		return 1;
 	}
 
-	const tagged = await gitOutput(["tag", tag], root);
+	const tagged = mode === "sign" ? await signTag(root, tag, key) : await gitOutput(["tag", tag], root);
 	if (tagged.code !== 0) {
 		print(`태그 ${tag}를 달지 못했어요: ${tagged.out}`);
 		return 1;
 	}
-	print(`태그: ${tag}`);
+	if (mode === "sign") {
+		const verified = await verifyOwnTag(root, tag);
+		if (verified.code !== 0) {
+			await gitOutput(["tag", "-d", tag], root);
+			print(`태그 ${tag}의 서명이 저장소의 release-signers로 확인되지 않아서 푸시하지 않았어요: ${verified.out}`);
+			print("이 키는 release-signers에 없는 것 같아요. 커밋은 로컬에만 있어요.");
+			return 1;
+		}
+	}
+	print(`태그: ${tag}${mode === "sign" ? " (서명 확인됨)" : ""}`);
 
-	const pushedMain = opts.sha ? await pushPinned(root) : await gitOutput(["push", "origin", "main"], root);
+	const auth = await pushAuthArgs(root, ci);
+	const pushedMain = opts.sha ? await pushPinned(root, auth) : await gitOutput([...auth, "push", "origin", "main"], root);
 	if (pushedMain.code !== 0) {
 		print(`main을 푸시하지 못했어요: ${pushedMain.out}`);
 		print("커밋과 태그는 로컬에 남아 있어요. 원격 상태를 확인한 뒤 다시 푸시해 주세요.");
@@ -387,7 +409,7 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 	}
 	print("푸시: origin main");
 
-	const pushedTag = await gitOutput(["push", "origin", tag], root);
+	const pushedTag = await gitOutput([...auth, "push", "origin", tag], root);
 	if (pushedTag.code !== 0) {
 		print(`태그를 푸시하지 못했어요: ${pushedTag.out}`);
 		print("태그는 로컬에 남아 있어요. 원격 상태를 확인한 뒤 다시 푸시해 주세요.");
@@ -397,6 +419,13 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 	print(`내보냈어요: ${tag} (${sha.out})`);
 	// After the rebase above: the note covers what the tag really holds, commits that landed during the run included.
 	return (await publishNote(root, tag, await releaseNote(root, tag, base, tag, terms, address), opts.exec ?? run, print)) ? 0 : 1;
+}
+
+// What the gate runner does when the suite is green: the release of exactly that commit, from the worktree the suite ran in.
+async function releaseGreen(dir: string, sha: string): Promise<{ code: number; out: string }> {
+	const lines: string[] = [];
+	const code = await publishVersion({ auto: true, force: false, dryRun: false, cwd: dir, sha, print: line => lines.push(line) });
+	return { code, out: lines.join("\n") };
 }
 
 type Exec = (cmd: readonly string[]) => Promise<{ code: number; out: string }>;
@@ -414,17 +443,15 @@ export type DispatchOptions = {
 	exec?: Exec;
 	print?: (line: string) => void;
 	gate?: GateEnv; // where the gate clones from and how it runs its detached runner; GitHub and real processes when not given
+	signingKey?: string; // the release signing key file; $DOTZ_DIR/secrets/release-signing-key when not given
 };
 
-// What the watch knows of the run it started: "running" until GitHub reports it finished, then "failed" (with the line to show) for the rest of the
-// slot, so the watch keeps failing and its own failure alert reaches the owner. A run that finished green is forgotten.
+// What the watch knows of a release that failed: "failed" (with the line to show) for the rest of the slot, so the watch keeps failing and its own
+// failure alert reaches the owner. A release that went out is forgotten. "running" is what the GitHub-runner flow wrote; nothing writes it now.
 type RunState = { slot: string; startedAt: string; state: "running" | "failed"; message?: string };
-const RUN_GIVE_UP_MS = 6 * 3600_000;
-const RUN_CLOCK_SKEW_MS = 120_000;
-type RunInfo = { status: string; conclusion: string | null; createdAt: string; url: string };
 
-// A later tick reads the conclusion of the run an earlier tick started (gh run list, the first workflow_dispatch run since then). Returns the failure line, if any.
-async function settleRun(opts: DispatchOptions, exec: Exec, now: Date, slot: string): Promise<string | null> {
+// A later tick of the slot reads the failure an earlier tick left. Returns the failure line, if any.
+function settleRun(opts: DispatchOptions, slot: string): string | null {
 	const file = join(opts.stateDir, "release-run.json");
 	if (!existsSync(file)) return null;
 	let run_: RunState;
@@ -439,41 +466,22 @@ async function settleRun(opts: DispatchOptions, exec: Exec, now: Date, slot: str
 		rmSync(file, { force: true }); // a new slot: the owner has had the alert, the watch recovers and dispatches again
 		return null;
 	}
-	const listed = await exec(["gh", "run", "list", "--workflow", "release.yml", "--repo", RELEASE_REPO, "--event", "workflow_dispatch", "--limit", "10", "--json", "status,conclusion,createdAt,url"]).catch(() => ({ code: 1, out: "" }));
-	let runs: RunInfo[] = [];
-	if (listed.code === 0) {
-		try {
-			runs = JSON.parse(listed.out) as RunInfo[];
-		} catch {
-			// Not JSON: treated as no run seen yet, the next tick asks again.
-		}
-	}
-	const since = Date.parse(run_.startedAt) - RUN_CLOCK_SKEW_MS;
-	const ours = runs.filter(r => Date.parse(r.createdAt) >= since).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))[0];
-	if (!ours || ours.status !== "completed") {
-		if (now.getTime() - Date.parse(run_.startedAt) > RUN_GIVE_UP_MS) rmSync(file, { force: true });
-		return null;
-	}
-	if (ours.conclusion === "success") {
-		rmSync(file, { force: true });
-		return null;
-	}
-	const message = `릴리스 실행이 실패했어요 (${ours.conclusion ?? "결과 없음"}): ${ours.url} · 이 시간대의 수정은 아직 나가지 않았어요. 다음 시간대에 다시 시도해요.`;
-	writeAtomic(file, `${JSON.stringify({ ...run_, state: "failed", message } satisfies RunState)}\n`);
-	return message;
+	rmSync(file, { force: true }); // the old flow's "running": no run to wait for any more
+	return null;
 }
 
 // One tick of the owner's release-slot watch (docs/releases.md): once per slot, the full suite runs on the head of origin/main in a detached
-// runner (hub/release-gate.ts; a tick only starts it or reads its state, so it ends in seconds) and, when it is green, start release.yml for that commit, whose --auto run decides whether anything goes out. A red suite skips the slot.
-// Runs only for the repo owner's GitHub login, so a copy of the watch on another install dispatches nothing.
-// A later tick reads how that run ended; a failed run fails the tick (exit 1) until the next slot, which is how the owner hears of it.
+// runner (hub/release-gate.ts; a tick only starts it or reads its state, so it ends in seconds) and, when it is green, the same runner releases that
+// commit (signed tag, push, GitHub Release). A red suite skips the slot, and so does a release that failed.
+// Runs only for the repo owner's GitHub login, and only where the signing key is, so a copy of the watch on another install releases nothing.
+// A failed slot fails the tick (exit 1) until the next slot, which is how the owner hears of it.
 export async function dispatchSlot(opts: DispatchOptions): Promise<number> {
 	const print = opts.print ?? ((line: string) => console.log(line));
 	const exec = opts.exec ?? run;
 	const now = opts.now ?? new Date();
 	const slot = slotStart(now).toISOString();
 	const stateFile = join(opts.stateDir, "release-slot");
-	const failure = await settleRun(opts, exec, now, slot);
+	const failure = settleRun(opts, slot);
 	if (failure) {
 		print(failure);
 		return 1;
@@ -490,13 +498,18 @@ export async function dispatchSlot(opts: DispatchOptions): Promise<number> {
 		return 0;
 	}
 	if (opts.dryRun) {
-		print(`[--dry-run] ${slot} 시간대의 release.yml을 시작할 차례예요.`);
+		print(`[--dry-run] ${slot} 시간대의 시험과 릴리스를 시작할 차례예요.`);
 		return 0;
 	}
 	const env = opts.gate ?? realGateEnv(`https://github.com/${RELEASE_REPO}.git`);
 	const ctx = { ...env, stateDir: opts.stateDir, slot, now };
 	const gate = gateStatus(ctx);
 	if (gate.kind === "idle") {
+		const key = opts.signingKey ?? signingKeyPath(process.env);
+		if (keyMissing(key)) {
+			print(`서명 키가 없어서 시험과 릴리스를 시작하지 않아요 (${key}). 키가 있는 기기에서만 내요.`);
+			return 1;
+		}
 		startGate(ctx, [process.execPath, fileURLToPath(import.meta.url), "--gate-run", opts.stateDir, slot, env.origin]);
 		print(`전체 시험을 따로 돌리기 시작했어요 (${slot}). 다음 틱부터 결과를 읽어요.`);
 		return 0;
@@ -515,25 +528,26 @@ export async function dispatchSlot(opts: DispatchOptions): Promise<number> {
 		print(`릴리스 전 시험을 돌리지 못했어요: ${gate.reason} · 이 시간대는 그대로 두고 다음 틱에 다시 시도해요.`);
 		return 1;
 	}
-	if (gate.kind === "red") {
-		const shown = gate.failed.slice(0, 5).join(", ") + (gate.failed.length > 5 ? ` 외 ${gate.failed.length - 5}개` : "");
-		const message = `전체 시험이 빨개서 이 시간대의 릴리스를 건너뛰었어요 (${gate.sha.slice(0, 8)}): ${shown || "실패한 파일을 읽지 못했어요"} · 다음 시간대에 새 main으로 다시 시험해요.`;
+	if (gate.kind === "green" && gate.release?.code === 0) {
 		writeAtomic(stateFile, `${slot}\n`);
-		writeAtomic(join(opts.stateDir, "release-run.json"), `${JSON.stringify({ slot, startedAt: now.toISOString(), state: "failed", message } satisfies RunState)}\n`);
 		clearGate(opts.stateDir);
-		print(message);
-		return 1;
+		print(`시험이 초록이고 릴리스를 냈어요 (${gate.sha.slice(0, 8)}).`);
+		for (const line of gate.release.out.split("\n").slice(-3)) print(line);
+		return 0;
 	}
-	const started = await exec(["gh", "workflow", "run", "release.yml", "--repo", RELEASE_REPO, "--ref", "main", "-f", `sha=${gate.sha}`]);
-	if (started.code !== 0) {
-		print(`release.yml을 시작하지 못했어요: ${started.out}`);
-		return 1;
-	}
+	const message =
+		gate.kind === "red"
+			? `전체 시험이 빨개서 이 시간대의 릴리스를 건너뛰었어요 (${gate.sha.slice(0, 8)}): ${failedList(gate.failed) || "실패한 파일을 읽지 못했어요"} · 다음 시간대에 새 main으로 다시 시험해요.`
+			: `시험은 초록이지만 릴리스를 내지 못했어요 (${gate.sha.slice(0, 8)}, 코드 ${gate.release?.code ?? "없음"}): ${(gate.release?.out ?? "릴리스 결과가 없어요").split("\n").slice(-3).join(" / ")} · 다음 시간대에 다시 시도해요.`;
 	writeAtomic(stateFile, `${slot}\n`);
-	writeAtomic(join(opts.stateDir, "release-run.json"), `${JSON.stringify({ slot, startedAt: now.toISOString(), state: "running" } satisfies RunState)}\n`);
+	writeAtomic(join(opts.stateDir, "release-run.json"), `${JSON.stringify({ slot, startedAt: now.toISOString(), state: "failed", message } satisfies RunState)}\n`);
 	clearGate(opts.stateDir);
-	print(`release.yml을 시작했어요 (${slot}).`);
-	return 0;
+	print(message);
+	return 1;
+}
+
+function failedList(failed: readonly string[]): string {
+	return failed.slice(0, 5).join(", ") + (failed.length > 5 ? ` 외 ${failed.length - 5}개` : "");
 }
 
 if (import.meta.main) {
@@ -547,7 +561,7 @@ if (import.meta.main) {
 	if (gateRun >= 0) {
 		const [dir, slot, origin] = args.slice(gateRun + 1);
 		if (!dir || !slot || !origin) process.exit(2);
-		await runGate({ stateDir: dir, slot, origin, git: gitOutput, runSuite: runSuiteIn, hasNewCommits: async (repo, sha) => (await newCommitsSinceNewestTag(repo, sha)).any });
+		await runGate({ stateDir: dir, slot, origin, git: gitOutput, runSuite: runSuiteIn, hasNewCommits: async (repo, sha) => (await newCommitsSinceNewestTag(repo, sha)).any, release: releaseGreen });
 		process.exit(0);
 	}
 	if (unknown.length || (shaAt >= 0 && (!/^[0-9a-f]{40}$/.test(sha ?? "") || !args.includes("--auto"))) || (args.includes("--auto") && args.includes("--force")) || (dispatch && (args.includes("--auto") || args.includes("--force") || !stateDir))) {

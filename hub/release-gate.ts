@@ -23,12 +23,14 @@ export type GateOutcome =
 	| { kind: "idle" }
 	| { kind: "running" }
 	| { kind: "nothing"; sha: string } // nothing on main since the newest release tag: the suite was not run
-	| { kind: "green"; sha: string }
+	| { kind: "green"; sha: string; release?: ReleaseResult } // release: what releasing that commit did (a runner from before the release moved here has none)
 	| { kind: "red"; sha: string; failed: string[]; detail: string }
 	| { kind: "unrunnable"; reason: string };
 
+export type ReleaseResult = { code: number; out: string };
 type RunFile = { slot: string; pid: number; startedAt: string };
-type ResultFile = { slot: string; sha?: string; nothing?: boolean; green?: boolean; failed?: string[]; detail?: string; error?: string };
+type ResultFile = { slot: string; sha?: string; nothing?: boolean; green?: boolean; failed?: string[]; detail?: string; release?: ReleaseResult; error?: string };
+const RELEASE_OUT_CHARS = 1500;
 
 const RUN_FILE = "gate-run.json";
 const RESULT_FILE = "gate-result.json";
@@ -74,7 +76,7 @@ export function gateStatus(c: GateCtx): GateOutcome {
 			return { kind: "unrunnable", reason: result.error ?? "결과 파일이 비어 있어요" };
 		}
 		if (result.nothing) return { kind: "nothing", sha: result.sha };
-		if (result.green) return { kind: "green", sha: result.sha };
+		if (result.green) return { kind: "green", sha: result.sha, release: result.release };
 		return { kind: "red", sha: result.sha, failed: result.failed ?? [], detail: result.detail ?? "" };
 	}
 	if (c.now.getTime() - Date.parse(run.startedAt) > MAX_RUN_MS) {
@@ -127,7 +129,16 @@ export function realGateEnv(origin: string): GateEnv {
 }
 
 // hasNewCommits(repo, sha): whether `sha` has anything to release since the newest release tag in `repo`; release.ts passes the rule --auto uses.
-export type RunGateOptions = { stateDir: string; slot: string; origin: string; git: GitFn; runSuite: SuiteFn; hasNewCommits: (repo: string, sha: string) => Promise<boolean> };
+// release(dir, sha): releases the commit the suite was green on, from the worktree `dir`; its code and last output go into the result.
+export type RunGateOptions = {
+	stateDir: string;
+	slot: string;
+	origin: string;
+	git: GitFn;
+	runSuite: SuiteFn;
+	hasNewCommits: (repo: string, sha: string) => Promise<boolean>;
+	release?: (dir: string, sha: string) => Promise<ReleaseResult>;
+};
 
 // The detached runner. Clones origin once into the state dir, fetches main and the tags, leaves a "nothing" result when main has nothing to release
 // since the newest tag (no suite), otherwise runs the suite on a worktree of the fetched commit, removes the worktree
@@ -162,7 +173,12 @@ export async function runGate(o: RunGateOptions): Promise<void> {
 		if (added.code !== 0) throw new Error(`시험용 작업 폴더를 만들지 못했어요: ${added.out}`);
 		try {
 			const suite = await o.runSuite(tree);
-			writeAtomic(resultFile, `${JSON.stringify({ slot: o.slot, sha, ...suite } satisfies ResultFile)}\n`);
+			let release: ReleaseResult | undefined;
+			if (suite.green && o.release) {
+				const made = await o.release(tree, sha).catch((e: unknown): ReleaseResult => ({ code: 1, out: e instanceof Error ? e.message : String(e) }));
+				release = { code: made.code, out: made.out.slice(-RELEASE_OUT_CHARS) };
+			}
+			writeAtomic(resultFile, `${JSON.stringify({ slot: o.slot, sha, ...suite, ...(release ? { release } : {}) } satisfies ResultFile)}\n`);
 		} finally {
 			await o.git(["worktree", "remove", "--force", tree], repo);
 			rmSync(tree, { recursive: true, force: true });

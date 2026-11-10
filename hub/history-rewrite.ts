@@ -6,6 +6,7 @@
 // the same HEAD is the install's own work. selfupdate.ts moves such an install to the new history (the local commits saved first); the
 // guard below, run by .githooks/pre-push and pre-rebase, keeps old commits from going back up.
 import { FORMAT, parseCommits } from "./selfupdate-local.ts";
+import { gitCapture, keyMissing, signingKeyPath, signTag } from "./release-sign.ts";
 import type { Commit, Exec } from "./selfupdate.ts";
 
 const MARKER = /\srefs\/tags\/(history-rewrite-\d+)$/;
@@ -62,6 +63,14 @@ export async function guard(exec: Exec, dir: string, remote: string, revs: strin
 	return undefined;
 }
 
+// The marker: a blob with one key per old commit and a signed annotated tag history-rewrite-<n> on it (`git cat-file blob <tag>` peels the tag).
+export async function markRewrite(dir: string, n: string, shas: readonly string[], keyPath: string): Promise<{ code: number; out: string }> {
+	if (keyMissing(keyPath)) return { code: 1, out: `서명 키가 없어요 (${keyPath}). 키가 있는 기기에서 실행해 주세요.` };
+	const blob = await gitCapture(["hash-object", "-w", "--stdin"], dir, `${shas.map(commitKey).join("\n")}\n`);
+	if (blob.code !== 0) return blob;
+	return signTag(dir, `history-rewrite-${n}`, keyPath, blob.out);
+}
+
 if (import.meta.main) {
 	const [cmd, remote, ...revs] = process.argv.slice(2);
 	if (cmd === "--guard" && remote && revs.length) {
@@ -71,8 +80,15 @@ if (import.meta.main) {
 			process.exit(1);
 		}
 	} else if (cmd === "--keys") console.log((await Bun.stdin.text()).split("\n").filter(Boolean).map(commitKey).join("\n"));
-	else {
-		console.error("usage: bun hub/history-rewrite.ts --guard <remote> <rev>... | --keys < shas");
+	else if (cmd === "--mark" && remote && /^\d+$/.test(remote)) {
+		const made = await markRewrite(process.cwd(), remote, (await Bun.stdin.text()).split("\n").filter(Boolean), signingKeyPath(process.env));
+		if (made.code !== 0) {
+			console.error(`history-rewrite: ${made.out}`);
+			process.exit(1);
+		}
+		console.log(`history-rewrite-${remote}`);
+	} else {
+		console.error("usage: bun hub/history-rewrite.ts --guard <remote> <rev>... | --keys < shas | --mark <n> < shas");
 		process.exit(2);
 	}
 }

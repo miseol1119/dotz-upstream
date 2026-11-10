@@ -26,6 +26,8 @@ import {
 } from "./release.ts";
 
 const roots: string[] = [];
+// These tests are about notes and slots, not signing: the one unsigned transition release (a runner, no key anywhere) needs no key fixtures.
+const UNSIGNED = { ci: true, signingKey: join(tmpdir(), "dotz-release-no-such-key") };
 
 function tempRepo(): string {
 	const root = mkdtempSync(join(tmpdir(), "dotz-release-"));
@@ -199,7 +201,7 @@ describe("release note", () => {
 			calls.push({ cmd, body: readFileSync(cmd[cmd.length - 1], "utf8") });
 			return { code: 0, out: "https://github.com/ddotz/dotz/releases/tag/x" };
 		};
-		const code = await publishVersion({ auto: false, force, dryRun: false, cwd: root, now: kst("2026-11-06T13:00:00"), print: () => {}, exec, terms: [], address: "" });
+		const code = await publishVersion({ ...UNSIGNED, auto: false, force, dryRun: false, cwd: root, now: kst("2026-11-06T13:00:00"), print: () => {}, exec, terms: [], address: "" });
 		return { code, calls };
 	};
 
@@ -223,7 +225,7 @@ describe("release note", () => {
 		commit(root, "버튼 폭을 고칩니다");
 		const lines: string[] = [];
 		const exec = async () => { throw new Error("no exec in a dry run"); };
-		expect(await publishVersion({ auto: false, force: false, dryRun: true, cwd: root, now: kst("2026-11-06T13:00:00"), print: l => lines.push(l), exec, terms: [], address: "" })).toBe(0);
+		expect(await publishVersion({ ...UNSIGNED, auto: false, force: false, dryRun: true, cwd: root, now: kst("2026-11-06T13:00:00"), print: l => lines.push(l), exec, terms: [], address: "" })).toBe(0);
 		expect(lines.join("\n")).toContain("- 버튼 폭을 고칩니다");
 	});
 
@@ -233,7 +235,7 @@ describe("release note", () => {
 		for (const n of [1, 2, 3]) git(root, "tag", `v261106.${n}`);
 		git(root, "commit", "--allow-empty", "-q", "-m", "버튼 폭을 고칩니다", "-m", "왜: 글자가 잘렸어요.");
 		const lines: string[] = [];
-		expect(await publishVersion({ auto: false, force: false, dryRun: true, cwd: root, now: kst("2026-11-06T19:00:00"), print: l => lines.push(l), terms: [], address: "" })).toBe(1);
+		expect(await publishVersion({ ...UNSIGNED, auto: false, force: false, dryRun: true, cwd: root, now: kst("2026-11-06T19:00:00"), print: l => lines.push(l), terms: [], address: "" })).toBe(1);
 		const text = lines.join("\n");
 		expect(text).toContain("# dotz 다음 버전");
 		expect(text).toContain("- 버튼 폭을 고칩니다");
@@ -251,7 +253,7 @@ describe("release note", () => {
 		commit(root, "base");
 		git(root, "push", "-q", "origin", "main");
 		const lines: string[] = [];
-		const code = await publishVersion({ auto: false, force: false, dryRun: false, cwd: root, now: kst("2026-11-06T13:00:00"), print: l => lines.push(l), exec: async () => { throw new Error("gh is not installed"); }, terms: [], address: "" });
+		const code = await publishVersion({ ...UNSIGNED, auto: false, force: false, dryRun: false, cwd: root, now: kst("2026-11-06T13:00:00"), print: l => lines.push(l), exec: async () => { throw new Error("gh is not installed"); }, terms: [], address: "" });
 		expect(code).toBe(1);
 		expect(git(origin, "tag", "--list", "v*").trim()).toBe("v261106.1");
 		expect(lines.join("\n")).toContain("# dotz v261106.1");
@@ -273,7 +275,7 @@ describe("release note", () => {
 		commit(root, "base");
 		git(root, "push", "-q", "origin", "main");
 		const release = (buildDemo: (cmd: readonly string[]) => Promise<{ code: number; out: string }>, lines: string[] = []) =>
-			publishVersion({ auto: false, force: false, dryRun: false, cwd: root, now: kst("2026-11-06T13:00:00"), print: l => lines.push(l), exec: async () => ({ code: 0, out: "" }), buildDemo, terms: [], address: "" });
+			publishVersion({ ...UNSIGNED, auto: false, force: false, dryRun: false, cwd: root, now: kst("2026-11-06T13:00:00"), print: l => lines.push(l), exec: async () => ({ code: 0, out: "" }), buildDemo, terms: [], address: "" });
 		return { root, origin, release };
 	};
 
@@ -383,7 +385,7 @@ describe("release slots", () => {
 		const tagsOnOrigin = () => git(origin, "tag", "--list", "v*").split("\n").filter(Boolean);
 		const auto = (cwd: string, at: Date) => {
 			process.env.GIT_COMMITTER_DATE = at.toISOString();
-			return publishVersion({ auto: true, force: false, dryRun: false, cwd, now: at, print: () => {} });
+			return publishVersion({ ...UNSIGNED, auto: true, force: false, dryRun: false, cwd, now: at, print: () => {} });
 		};
 
 		try {
@@ -433,9 +435,9 @@ describe("release slots", () => {
 		const noon = kst("2026-11-05T12:00:30");
 		try {
 			process.env.GIT_COMMITTER_DATE = noon.toISOString();
-			expect(await publishVersion({ auto: true, force: false, dryRun: false, cwd: checkout, sha: "c".repeat(40), now: noon, print: () => {} })).toBe(1);
+			expect(await publishVersion({ ...UNSIGNED, auto: true, force: false, dryRun: false, cwd: checkout, sha: "c".repeat(40), now: noon, print: () => {} })).toBe(1);
 			expect(git(origin, "tag", "--list", "v*").trim()).toBe("");
-			expect(await publishVersion({ auto: true, force: false, dryRun: false, cwd: checkout, sha: tested, now: noon, print: () => {} })).toBe(0);
+			expect(await publishVersion({ ...UNSIGNED, auto: true, force: false, dryRun: false, cwd: checkout, sha: tested, now: noon, print: () => {} })).toBe(0);
 		} finally {
 			delete process.env.GIT_COMMITTER_DATE;
 		}
@@ -456,13 +458,12 @@ describe("release slots", () => {
 			roots.push(dir);
 			return dir;
 		};
-		const gh = (login: string, runCode = 0) => {
+		const gh = (login: string) => {
 			const calls: string[] = [];
 			const exec = async (cmd: readonly string[]) => {
 				if (cmd[1] === "api") return { code: 0, out: login };
-				if (cmd[1] === "run") return { code: 0, out: "[]" }; // gh run list: the started run has not shown up yet
 				calls.push(cmd.join(" "));
-				return { code: runCode, out: "" };
+				return { code: 0, out: "" };
 			};
 			return { calls, exec };
 		};
@@ -486,7 +487,7 @@ describe("release slots", () => {
 				git(seed, "tag", name);
 				git(seed, "push", "-q", "origin", name);
 			};
-			const state = { head: push("work"), suite, suites: 0, spawned: [] as string[][], alive: true, killed: [] as number[], pid: 100 };
+			const state = { head: push("work"), suite, suites: 0, spawned: [] as string[][], alive: true, killed: [] as number[], pid: 100, released: [] as string[], release: { code: 0, out: "released" } };
 			const env: GateEnv = {
 				origin: url,
 				spawn: cmd => {
@@ -510,11 +511,21 @@ describe("release slots", () => {
 						return state.suite;
 					},
 					hasNewCommits: async (repo, sha) => (await newCommitsSinceNewestTag(repo, sha)).any,
+					release: async (_dir, sha) => {
+						state.released.push(sha);
+						return state.release;
+					},
 				});
 			return { state, env, push, tag, finish };
 		};
 		type Kit = ReturnType<typeof gateKit>;
-		const tick = (kit: Kit, o: Omit<DispatchOptions, "gate">) => dispatchSlot({ gate: kit.env, ...o });
+		// The signing key is only looked for, never read: an empty file stands in for it.
+		const presentKey = () => {
+			const file = join(stateDir(), "release-signing-key");
+			writeFileSync(file, "");
+			return file;
+		};
+		const tick = (kit: Kit, o: Omit<DispatchOptions, "gate">) => dispatchSlot({ gate: kit.env, signingKey: presentKey(), ...o });
 		// The three ticks of one clean slot: the one that starts the runner, the runner finishing, the one that reads the result.
 		const launch = async (kit: Kit, o: Omit<DispatchOptions, "gate" | "now">, at: string) => {
 			const now = kst(at);
@@ -523,7 +534,7 @@ describe("release slots", () => {
 			return tick(kit, { ...o, now: new Date(now.getTime() + 30_000) });
 		};
 
-		test("start, running, then green: the workflow is started once for the commit the suite ran on", async () => {
+		test("start, running, then green: the commit the suite ran on is released once and the slot is used", async () => {
 			const dir = stateDir();
 			const kit = gateKit();
 			const { calls, exec } = gh("ddotz");
@@ -536,13 +547,15 @@ describe("release slots", () => {
 			expect(calls).toEqual([]);
 			await kit.finish(dir, kst("2026-11-05T12:00:10"));
 			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:02:10") })).toBe(0);
-			expect(calls).toEqual([`gh workflow run release.yml --repo ddotz/dotz --ref main -f sha=${kit.state.head}`]);
+			expect(kit.state.released).toEqual([kit.state.head]);
+			expect(existsSync(join(dir, "release-slot"))).toBe(true);
 			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:03:10") })).toBe(0);
-			expect(calls).toHaveLength(1);
+			expect(kit.state.released).toHaveLength(1);
+			expect(calls).toEqual([]);
 			expect(kit.state.suites).toBe(1);
 			expect(kit.state.spawned).toHaveLength(1);
 			expect(await launch(kit, { stateDir: dir, exec, print }, "2026-11-05T18:00:10")).toBe(0);
-			expect(calls).toHaveLength(2);
+			expect(kit.state.released).toHaveLength(2);
 		});
 
 		test("no commit after the newest tag: the suite does not run, nothing is released, and the slot is used without a failure", async () => {
@@ -566,7 +579,7 @@ describe("release slots", () => {
 			expect(kit.state.spawned).toHaveLength(1);
 		});
 
-		test("a commit after the newest tag: the suite runs and the workflow starts as before", async () => {
+		test("a commit after the newest tag: the suite runs and that commit is released", async () => {
 			const dir = stateDir();
 			const kit = gateKit();
 			kit.tag("v261105.1");
@@ -574,7 +587,8 @@ describe("release slots", () => {
 			const { calls, exec } = gh("ddotz");
 			await launch(kit, { stateDir: dir, exec, print }, "2026-11-05T18:00:10");
 			expect(kit.state.suites).toBe(1);
-			expect(calls).toEqual([`gh workflow run release.yml --repo ddotz/dotz --ref main -f sha=${head}`]);
+			expect(kit.state.released).toEqual([head]);
+			expect(calls).toEqual([]);
 		});
 
 		test("a non-owner install never gates or fires", async () => {
@@ -599,76 +613,58 @@ describe("release slots", () => {
 			expect(kit.state.spawned).toEqual([]);
 		});
 
-		test("a failed dispatch is retried on the next tick without running the suite again", async () => {
+		test("a missing signing key fails the tick before the gate starts and does not use the slot", async () => {
 			const dir = stateDir();
 			const kit = gateKit();
-			const now = kst("2026-11-05T12:00:10");
-			await tick(kit, { stateDir: dir, exec: gh("ddotz").exec, print, now });
-			await kit.finish(dir, now);
-			expect(await tick(kit, { stateDir: dir, exec: gh("ddotz", 1).exec, print, now })).toBe(1);
-			expect(existsSync(join(dir, "release-slot"))).toBe(false);
 			const { calls, exec } = gh("ddotz");
-			expect(await tick(kit, { stateDir: dir, exec, print, now })).toBe(0);
-			expect(calls).toHaveLength(1);
-			expect(kit.state.suites).toBe(1);
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:00:10"), signingKey: join(dir, "absent") })).toBe(1);
+			expect(kit.state.spawned).toEqual([]);
+			expect(existsSync(join(dir, "gate-run.json"))).toBe(false);
+			expect(existsSync(join(dir, "release-slot"))).toBe(false);
+			expect(calls).toEqual([]);
+			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(0);
+			expect(kit.state.spawned).toHaveLength(1);
 		});
 
-		describe("the run it started", () => {
-			// gh stubbed: no real gh or GitHub. `runs` is what `gh run list` answers; `lists` counts those questions.
-			const stub = (runs: () => unknown[]) => {
-				const calls: string[] = [];
-				let lists = 0;
-				const exec = async (cmd: readonly string[]) => {
-					if (cmd[1] === "api") return { code: 0, out: "ddotz" };
-					if (cmd[1] === "run") {
-						lists++;
-						return { code: 0, out: JSON.stringify(runs()) };
-					}
-					calls.push(cmd.join(" "));
-					return { code: 0, out: "" };
-				};
-				return { calls, exec, lists: () => lists };
-			};
-			const run = (createdAt: string, status: string, conclusion: string | null) => ({ createdAt: new Date(kst(createdAt)).toISOString(), status, conclusion, url: "https://example.test/runs/1" });
-
-			test("a finished red run fails the watch until the next slot, which dispatches again", async () => {
+		describe("a green suite whose release failed", () => {
+			test("is a red slot: the watch fails with the release output until the next slot, which tries again", async () => {
 				const dir = stateDir();
 				const kit = gateKit();
-				let runs: unknown[] = [];
-				const { calls, exec } = stub(() => runs);
+				const { exec } = gh("ddotz");
 				const lines: string[] = [];
 				const say = (l: string) => lines.push(l);
-				expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T12:00:10")).toBe(0);
-				runs = [run("2026-11-05T12:00:20", "in_progress", null)];
-				expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:01:10") })).toBe(0);
-				runs = [run("2026-11-05T12:00:20", "completed", "failure")];
-				expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:02:10") })).toBe(1);
-				expect(lines.at(-1)).toContain("https://example.test/runs/1");
+				kit.state.release = { code: 1, out: "first line\npush refused: remote hung up" };
+				expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T12:00:10")).toBe(1);
+				expect(lines.at(-1)).toContain("push refused: remote hung up");
+				expect(existsSync(join(dir, "release-slot"))).toBe(true);
+				expect(JSON.parse(readFileSync(join(dir, "release-run.json"), "utf8"))).toMatchObject({ state: "failed" });
 				expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T13:00:10") })).toBe(1);
-				expect(calls).toHaveLength(1);
-				runs = [run("2026-11-05T18:00:20", "completed", "success"), run("2026-11-05T12:00:20", "completed", "failure")];
+				expect(kit.state.suites).toBe(1);
+				expect(kit.state.released).toHaveLength(1);
+				kit.state.release = { code: 0, out: "released" };
 				expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T18:00:10")).toBe(0);
-				expect(calls).toHaveLength(2);
+				expect(kit.state.released).toHaveLength(2);
+				expect(existsSync(join(dir, "release-run.json"))).toBe(false);
 			});
 
-			test("a green run is forgotten and asked about no more", async () => {
+			test("a result with no release info at all counts as failed", async () => {
 				const dir = stateDir();
 				const kit = gateKit();
-				const { exec, lists } = stub(() => [run("2026-11-05T12:00:20", "completed", "success")]);
-				expect(await launch(kit, { stateDir: dir, exec, print }, "2026-11-05T12:00:10")).toBe(0);
-				expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(0);
-				expect(lists()).toBe(1);
-				expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:02:10") })).toBe(0);
-				expect(lists()).toBe(1);
+				const { exec } = gh("ddotz");
+				const now = kst("2026-11-05T12:00:10");
+				await tick(kit, { stateDir: dir, exec, print, now });
+				writeFileSync(join(dir, "gate-result.json"), JSON.stringify({ slot: slotStart(now).toISOString(), sha: kit.state.head, green: true, failed: [], detail: "" }));
+				expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(1);
+				expect(existsSync(join(dir, "release-slot"))).toBe(true);
 			});
+		});
 
-			test("a run from before the dispatch is not taken for it", async () => {
-				const dir = stateDir();
-				const kit = gateKit();
-				const { exec } = stub(() => [run("2026-11-05T09:00:00", "completed", "failure")]);
-				expect(await launch(kit, { stateDir: dir, exec, print }, "2026-11-05T12:00:10")).toBe(0);
-				expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T12:01:10") })).toBe(0);
-			});
+		test("a red suite releases nothing", async () => {
+			const dir = stateDir();
+			const kit = gateKit({ green: false, failed: ["hub/a.test.ts"], detail: "" });
+			expect(await launch(kit, { stateDir: dir, exec: gh("ddotz").exec, print }, "2026-11-05T12:00:10")).toBe(1);
+			expect(kit.state.released).toEqual([]);
+			expect(JSON.parse(readFileSync(join(dir, "release-run.json"), "utf8"))).toMatchObject({ state: "failed" });
 		});
 
 		test("start, then red: the slot is skipped and the watch fails with the failing files; the next slot tests the new head", async () => {
@@ -680,6 +676,7 @@ describe("release slots", () => {
 			expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T12:00:10")).toBe(1);
 			expect(lines.at(-1)).toContain("hub/a.test.ts, hub/b.test.ts");
 			expect(calls).toEqual([]);
+			expect(kit.state.released).toEqual([]);
 			// the rest of the slot: the watch keeps failing, the suite is not run again
 			expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:01:10") })).toBe(1);
 			expect(kit.state.suites).toBe(1);
@@ -690,7 +687,7 @@ describe("release slots", () => {
 			kit.state.suite = GREEN;
 			expect(await launch(kit, { stateDir: dir, exec, print: say }, "2026-11-05T18:00:10")).toBe(0);
 			expect(kit.state.suites).toBe(2);
-			expect(calls).toEqual([`gh workflow run release.yml --repo ddotz/dotz --ref main -f sha=${kit.state.head}`]);
+			expect(kit.state.released).toEqual([kit.state.head]);
 		});
 
 		test("a runner that died without a result fails the tick without using the slot, and the next tick starts it again", async () => {
@@ -710,7 +707,7 @@ describe("release slots", () => {
 			expect(kit.state.spawned).toHaveLength(2);
 			await kit.finish(dir, kst("2026-11-05T12:00:10"));
 			expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:03:10") })).toBe(0);
-			expect(calls).toHaveLength(1);
+			expect(kit.state.released).toHaveLength(1);
 		});
 
 		test("a run past 45 minutes is killed and started again at the next tick", async () => {
@@ -754,7 +751,7 @@ describe("release slots", () => {
 			expect(kit.state.spawned).toHaveLength(2);
 			await kit.finish(dir, kst("2026-11-05T18:00:10"));
 			expect(await tick(kit, { stateDir: dir, exec, print, now: kst("2026-11-05T18:01:10") })).toBe(0);
-			expect(calls).toHaveLength(1);
+			expect(kit.state.released).toHaveLength(1);
 		});
 
 		test("an install without .git still gates: the runner keeps its own clone in the state dir", async () => {
