@@ -104,11 +104,11 @@ for (const [width, height] of [[390, 844], [1280, 800]] as const) {
 
 	describe(`comments list at ${width}px`, async () => {
 		const v = await open(width, height);
-		test("the post row has the unread count and 미답장; the app header and the comment bubbles show the pill and 답장 안 함", async () => {
+		test("the post row has one marker, the 미답장 count, and no unread number; the app header and the comment bubbles show the pill and 답장 안 함", async () => {
 			await boot(v, "light", `go("monitoring", "i:youtube")`);
 			await waitFor(v, `!$("#cm").hidden && CM.loaded && document.querySelector("#cm .kk-row")`);
-			const row = await q<{ nb: string; unreplied: string }>(v, `const r = document.querySelector("#cm .kk-row"); return { nb: r.querySelector(".nb:not(.unreplied)").textContent, unreplied: r.querySelector(".nb.unreplied").textContent }`);
-			expect(row).toEqual({ nb: "2", unreplied: "미답장 2" });
+			const row = await q<{ marks: number; plain: number; unreplied: string }>(v, `const r = document.querySelector("#cm .kk-row"); return { marks: r.querySelectorAll("[data-mark]").length, plain: r.querySelectorAll(".nb:not(.unreplied)").length, unreplied: r.querySelector(".nb.unreplied").textContent }`);
+			expect(row).toEqual({ marks: 1, plain: 0, unreplied: "미답장 2" });
 			expect(await q<string>(v, `return document.querySelector("#mon-head .nb.unreplied").textContent`)).toBe("미답장 2");
 			await shot(v, `comments-list-${width}-light.png`);
 
@@ -127,13 +127,11 @@ for (const [width, height] of [[390, 844], [1280, 800]] as const) {
 			const read = `(() => { document.body.insertAdjacentHTML("beforeend", '<span class="hr"><i class="dot un"></i></span><div class="fr un"><span class="rc-src">x</span></div>'); return JSON.stringify([getComputedStyle(document.querySelector(".hr .dot.un")).backgroundColor, getComputedStyle(document.querySelector(".fr.un .rc-src"), "::before").backgroundColor]); })()`;
 			expect(JSON.parse((await v.evaluate(read)) as string)).toEqual(["rgb(255, 154, 77)", "rgb(255, 154, 77)"]);
 		});
-		test.each([["light", "rgb(49, 130, 246)"], ["dark", "rgb(255, 154, 77)"]] as const)("the unread count badge in %s: blue in light, orange in dark; a draft count stays blue", async (theme, unread) => {
+		test.each([["light", "rgb(194, 65, 12)"], ["dark", "rgb(255, 154, 77)"]] as const)("the post row's one marker keeps the 미답장 color in %s", async (theme, owed) => {
 			await boot(v, theme, `go("monitoring", "i:youtube")`);
 			await waitFor(v, `!$("#cm").hidden && CM.loaded && document.querySelector("#cm .kk-row")`);
-			const sel = "#cm .kk-row .nb:not(.unreplied)";
-			expect(await bg(v, sel)).toBe(unread);
-			await run(v, `document.querySelector(${JSON.stringify(sel)}).classList.add("drafted")`);
-			expect(await bg(v, sel)).toBe(theme === "dark" ? "rgb(108, 167, 255)" : "rgb(49, 130, 246)");
+			expect(await fg(v, "#cm .kk-row [data-mark]")).toBe(owed);
+			expect(await q<number>(v, `return document.querySelectorAll("#cm .kk-row .nb:not(.unreplied)").length`)).toBe(0);
 		});
 	});
 }
@@ -161,7 +159,7 @@ describe("home and the peer's mail", async () => {
 		expect(await look('#home-now .hr[data-k="owed"] .nb.unreplied')).toEqual(appOwed);
 		await run(v, `go("monitoring", "i:youtube")`);
 		await waitFor(v, `!$("#cm").hidden && CM.loaded && document.querySelector("#cm .kk-row .nb.unreplied")`);
-		expect(await look("#cm .kk-row .nb:not(.unreplied)")).toEqual(appUnread);
+		expect(await q<number>(v, `return document.querySelectorAll("#cm .kk-row .nb:not(.unreplied)").length`)).toBe(0);   // a post row shows no unread number
 		expect(await look("#cm .kk-row .nb.unreplied")).toEqual(appOwed);
 		// the app header is not laid out beside the comments list on a phone, so its look is compared without a height
 		expect({ ...(await look("#mon-head .nb.unreplied")), h: 0 }).toEqual({ ...appOwed, h: 0 });

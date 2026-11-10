@@ -79,6 +79,15 @@ describe("웹사이트 댓글 앱 인스턴스 at 390px", () => {
 		await shot(v, "01-site-apps-list.png");
 	}, 20_000);
 
+	test("the unanswered count on a post row is the same count as the app's head", async () => {
+		const v = await boot();
+		await run(v, `go("monitoring", "i:site-mapia")`);
+		await waitFor(v, `MON.sel === "i:site-mapia" && CM.app === "site-mapia" && CM.loaded && document.querySelector("#cm-rooms .kk-row [data-mark]")`);
+		const s = await q<{ head: number; rows: number; marks: string[] }>(v, `return { head: INTG.items.find(i => i.key === "site-mapia").unreplied, rows: CM.threads.reduce((n, t) => n + t.unreplied, 0), marks: [...document.querySelectorAll("#cm-rooms .kk-row [data-mark]")].map(m => m.dataset.mark + ":" + m.textContent.replace(/\\D/g, "")) }`);
+		expect(s.rows).toBe(s.head);
+		expect(s.marks).toEqual(["unreplied:" + s.head]);
+	}, 20_000);
+
 	test("each site app opens its own comment view with only its posts", async () => {
 		const v = await boot();
 		await run(v, `go("monitoring", "i:site-mapia")`);

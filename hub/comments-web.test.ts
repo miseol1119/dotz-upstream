@@ -20,8 +20,9 @@ const COMMENTS = [
 let drafts: { code: string; commentId: string; text: string; notes: string[]; clean: boolean; created: number }[] = [];
 let sends: { id: string; commentId: string; text: string; state: string; reason?: string; at: number }[] = [];
 let reqs: Req[] = [];
+let threadRows: Record<string, unknown>[] | null = null;
 let waiters: { pred: (r: Req) => boolean; res: (r: Req) => void }[] = [];
-const reset = () => { drafts = [{ code: "Dabc234", commentId: "cm:youtube:c1", text: "고마워요! 자막은 이번 주 안에 올릴게요.", notes: [], clean: true, created: at(22, 3, 0) }]; sends = []; reqs = []; waiters = []; };
+const reset = () => { drafts = [{ code: "Dabc234", commentId: "cm:youtube:c1", text: "고마워요! 자막은 이번 주 안에 올릴게요.", notes: [], clean: true, created: at(22, 3, 0) }]; sends = []; reqs = []; waiters = []; threadRows = null; };
 const record = (r: Req) => { reqs.push(r); waiters = waiters.filter(w => (w.pred(r) ? (w.res(r), false) : true)); };
 const expectReq = (pred: (r: Req) => boolean, ms = 3500): Promise<Req> => {
 	const have = reqs.find(pred);
@@ -44,7 +45,7 @@ const hub = fakeHub({
 		if (p === "/api/monitors") return json({ items: [] });
 		if (p === "/api/integrations") return json({ items: [{ key: "youtube", label: "유튜브", icon: "youtube", kind: "app", conv: [], notices: [], unread: 2, needs: { drafts: drafts.length, unread: 2, sentToday: 0 } }] });
 		if (p === "/api/comments/sources") return json({ on: true, sources: [{ key: "youtube", kind: "youtube", label: "유튜브 댓글", watch: ["*"], autoDraft: false, autoSend: false, error: null, ranAt: at(22, 3, 0) }] });
-		if (p === "/api/comments/threads") return json({ threads: [{ source: "youtube", thread: "v1", title: "첫 번째 영상", link: "https://video.example/v1", lastAt: at(22, 2, 0), lastText: "다음 주에 올릴게요", lastAuthor: "나", unread: 2, drafts: drafts.length }] });
+		if (p === "/api/comments/threads") return json({ threads: threadRows ?? [{ source: "youtube", thread: "v1", title: "첫 번째 영상", link: "https://video.example/v1", lastAt: at(22, 2, 0), lastText: "다음 주에 올릴게요", lastAuthor: "나", unread: 2, drafts: drafts.length }] });
 		if (p === "/api/integrations/youtube/settings") return json({ fields: [] });
 		const body = req.method === "GET" ? null : ((await req.json().catch(() => ({}))) as Record<string, unknown>);
 		if (p === "/api/comments/thread/youtube/v1" && req.method === "GET")
@@ -117,6 +118,25 @@ describe("댓글 on a phone (390x844)", async () => {
 		await shot(v, "comments-sent-390.png");
 	});
 
+	test("a post row is two lines with at most one marker: failed mail, then unanswered, then draft", async () => {
+		const row = (thread: string, extra: Record<string, unknown>) => ({ source: "youtube", thread, title: `글 ${thread}`, link: null, lastAt: at(22, 2, 0), lastText: "마지막 댓글", lastAuthor: "가나", unread: 0, drafts: 0, unreplied: 0, ...extra });
+		threadRows = [
+			row("a", { unread: 2, drafts: 2, unreplied: 3, mails: { failed: 1, drafted: 1, sent: 1 } }),
+			row("b", { unreplied: 2 }),
+			row("c", { drafts: 1 }),
+			row("d", {}),
+			row("e", { drafts: 1, unreplied: 1 }),
+		];
+		await boot(v);
+		const rows = await q<{ lines: number; marks: number; kind: string | null; text: string }[]>(v, `return [...document.querySelectorAll("#cm-rooms .kk-row")].map(r => ({ lines: r.querySelectorAll(".cv-b > *").length, marks: r.querySelectorAll(".kk-rmeta > *").length, kind: (r.querySelector("[data-mark]") || {dataset: {}}).dataset.mark || null, text: (r.querySelector("[data-mark]") || {}).textContent || "" }))`);
+		expect(rows.map(r => r.lines)).toEqual([2, 2, 2, 2, 2]);   // title and the last comment, no third line
+		expect(rows.map(r => r.marks)).toEqual([1, 1, 1, 0, 1]);
+		expect(rows.map(r => r.kind)).toEqual(["failed", "unreplied", "draft", null, "unreplied"]);   // failed > unanswered > draft
+		expect(rows.map(r => r.text)).toEqual(["실패 1", "미답장 2", "초안 1", "", "미답장 1"]);
+		expect(await q(v, `return document.querySelectorAll("#cm-rooms .cm-tr, #cm-rooms .cm-st").length`)).toBe(0);
+		await shot(v, "comments-markers-390.png");
+	});
+
 	test("replies stand under the comment they answer (his own marked), the draft sits under its comment, not pinned below, and each comment shows how far its follow-up got", async () => {
 		await boot(v);
 		await run(v, `document.querySelector("#cm .kk-row").click()`);
@@ -135,6 +155,9 @@ describe("댓글 on a phone (390x844)", async () => {
 		expect(s.steps).toEqual(["done:초안", "ask:확인 대기", "todo:보냄"]);   // a pending draft: written, waits for his OK, not sent yet
 		expect(s.owed).toEqual(["ask:초안 필요", "todo:확인", "todo:보냄"]);   // a comment that wants a reply and has no draft yet
 		expect(s.pinned).toBe(false);
+		// one bold lead per card (QA V11): per card (the conversation, the reply card inside it) at most one bold text; names, the "나 · 내 답글" mark and track names stay regular
+		const bold = await q<number[]>(v, `const by = new Map(); for (const e of document.querySelectorAll("#cm-chat *")) { if (![...e.childNodes].some(n => n.nodeType === 3 && n.nodeValue.trim()) || !e.getClientRects().length || parseInt(getComputedStyle(e).fontWeight) < 600 || e.closest("button, .btn, .tag, .cm-st, .kk-av, .rq-av")) continue; const k = e.closest(".rq") || document.querySelector("#cm-chat"); by.set(k, (by.get(k) || 0) + 1); } return [...by.values()]`);
+		expect(bold.every(n => n <= 1)).toBe(true);
 	});
 
 	test("고치기 asks what to change and shows the rewritten draft; 보내지 않기 removes it", async () => {

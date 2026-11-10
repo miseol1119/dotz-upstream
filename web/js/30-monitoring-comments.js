@@ -129,19 +129,20 @@ function cmPickOpen(app) {
   document.body.append(d); d.showModal(); dialogHist(d);
   d.addEventListener("close", () => { if (CM.pickD === d) CM.pickD = null; d.remove(); });
 }
-// What the post's comments set going in mail, at a glance on its row: how many failed, wait as drafts, went out (threads rows, hub/comments/engine.ts).
-function cmMailSum(t) {
-  const m = t.mails;
-  if (!m) return null;
-  const st = [[m.failed, "실패", "err"], [m.drafted, "초안", "ask"], [m.sent, "보냄", "done"]].filter(x => x[0]).map(([n, word, s]) => ({ text: `${word} ${n}`, s }));
-  return el("span", { class: "cm-tr sum", "data-track": "mail", role: "group", "aria-label": `메일: ${st.map(x => x.text).join(", ")}` }, el("span", { class: "cm-tn", text: "메일" }), ...st.map(x => el("span", { class: "cm-st", "data-s": x.s, text: x.text })));
+// A post's row carries one marker, the most urgent: a failed mail > comments nobody answered > drafts waiting. The rest is in the opened post, on each comment (cmProgress).
+function cmMark(t) {
+  const failed = t.mails ? t.mails.failed : 0;
+  if (failed) return el("span", { class: "tag err", "data-mark": "failed", "aria-label": `메일 실패 ${failed}건`, text: `실패 ${failed}` });
+  if (t.unreplied) { const m = unrepCount(t.unreplied); m.dataset.mark = "unreplied"; return m; }
+  if (t.drafts) return el("span", { class: "nb drafted", "data-mark": "draft", "aria-label": `답장 확인 ${t.drafts}건`, text: `초안 ${t.drafts}` });
+  return null;
 }
 function cmRow(t) {
-  const on = CM.open && CM.open.source === t.source && CM.open.thread === t.thread, n = t.unread + t.drafts;
+  const on = CM.open && CM.open.source === t.source && CM.open.thread === t.thread, n = t.unread + t.drafts, mark = cmMark(t);
   return el("button", { class: `cv-row pv kk-row${n ? " unread" : ""}${on ? " on" : ""}`, type: "button", "data-thread": t.thread, "aria-current": on ? "true" : null, onclick: () => cmOpen(t) },
     cmThumb(t.title, t.thumb),
-    el("span", { class: "cv-b" }, el("span", { class: "cv-n", title: t.title, text: t.title }), el("span", { class: "cv-p", text: `${t.lastAuthor}: ${t.lastText}` }), cmMailSum(t)),
-    el("span", { class: "cv-m" }, el("span", { class: "kk-t", text: kkListTime(t.lastAt) }), n || t.unreplied ? el("span", { class: "kk-rmeta" }, n ? el("span", { class: t.drafts ? "nb drafted" : "nb", "aria-label": t.drafts ? `답장 확인 ${t.drafts}건` : `읽지 않은 댓글 ${t.unread}개`, text: t.drafts ? `초안 ${t.drafts}` : String(t.unread > 99 ? "99+" : t.unread) }) : null, t.unreplied ? unrepCount(t.unreplied) : null) : null));
+    el("span", { class: "cv-b" }, el("span", { class: "cv-n", title: t.title, text: t.title }), el("span", { class: "cv-p", text: `${t.lastAuthor}: ${t.lastText}` })),
+    el("span", { class: "cv-m" }, el("span", { class: "kk-t", text: kkListTime(t.lastAt) }), mark ? el("span", { class: "kk-rmeta" }, mark) : null));
 }
 // The picture of a post: its thumbnail when the source gave one (it falls back to the title's initial when the picture does not load).
 function cmThumb(title, thumb) {
