@@ -88,12 +88,35 @@ describe("publicPostDeny", () => {
 		expect(publicPostDeny("cd /Users/somebody/code && gh pr comment 5 -R ddotz/dotz --body-file " + file, dir, dir)).toBeUndefined();
 	});
 
-	test("covers gh api writes and leaves reads and other repos alone", () => {
+	test("covers gh api writes and leaves reads alone", () => {
 		const dir = install();
 		expect(publicPostDeny("gh api repos/ddotz/dotz/issues -f title=x -f body=998877", dir, dir)).toBeDefined();
 		expect(publicPostDeny("gh api repos/ddotz/dotz/issues --jq .[0].body # 998877", dir, dir)).toBeUndefined();
-		expect(publicPostDeny("gh issue create --repo me/private --body 998877", dir, dir)).toBeUndefined();
 		expect(publicPostDeny("gh issue view 3 --repo ddotz/dotz # 998877", dir, dir)).toBeUndefined();
+	});
+
+	test("a gist and a post to any other repo get the same personal-value check, without the dotz rules", () => {
+		const dir = install();
+		const file = join(dir, "log.txt");
+		writeFileSync(file, "owner 998877 fails");
+		for (const command of [
+			"gh gist create --public " + file,
+			"gh gist create -d 'a log' " + file,
+			"gh gist edit abc123 " + file,
+			"gh gist create --public <<< 'owner 998877'",
+			"gh issue create --repo other/repo --body 998877",
+			"gh pr comment 5 -R other/repo --body-file " + file,
+			"gh api repos/other/repo/issues -f title=x -f body=998877",
+		]) {
+			const reason = publicPostDeny(command, dir, dir);
+			expect(reason, command).toContain("personal or sensitive");
+			expect(reason).not.toContain("998877");
+		}
+		writeFileSync(file, "일반화한 증상과 재현 순서");
+		for (const command of ["gh gist create --public " + file, "gh issue create --repo other/repo --body 'no value here'", "gh gist list", "gh gist view abc123"]) expect(publicPostDeny(command, dir, dir), command).toBeUndefined();
+		// the dotz-only rules stay with the dotz repo: no class line is demanded elsewhere
+		expect(publicPostDeny("gh issue create --repo other/repo --title t --body plain", dir, dir)).toBeUndefined();
+		expect(publicPostDeny("gh issue create --repo ddotz/dotz --title t --body plain", dir, dir)).toContain("분류");
 	});
 
 	test("every way of posting is seen", () => {
@@ -165,15 +188,17 @@ describe("publicPostDeny", () => {
 		expect(publicPostDeny(`cd ${repo} && gh pr create --body 998877`, dir, dir)).toBeDefined();
 	});
 
-	test("a checkout of ddotz/dotz counts without --repo; another checkout does not", () => {
+	test("a checkout of ddotz/dotz gets the dotz rules without --repo; another checkout only the personal-value check", () => {
 		const dir = install();
 		const repo = join(dir, "repo");
 		mkdirSync(repo);
 		execFileSync("git", ["init", "-q"], { cwd: repo });
 		execFileSync("git", ["remote", "add", "origin", "git@github.com:other/thing.git"], { cwd: repo });
-		expect(publicPostDeny("gh pr create --body 998877", dir, repo)).toBeUndefined();
+		expect(publicPostDeny("gh pr create --body 998877", dir, repo)).toContain("a public GitHub repo or gist");
+		expect(publicPostDeny("gh pr create --body plain", dir, repo)).toBeUndefined();
 		execFileSync("git", ["remote", "set-url", "origin", "https://github.com/ddotz/dotz.git"], { cwd: repo });
-		expect(publicPostDeny("gh pr create --body 998877", dir, repo)).toBeDefined();
+		expect(publicPostDeny("gh pr create --body 998877", dir, repo)).toContain("this post to ddotz/dotz");
+		expect(publicPostDeny("gh pr create --body plain", dir, repo)).toContain("분류");
 	});
 });
 

@@ -132,12 +132,15 @@ export function ownerAddress(env: Record<string, string | undefined> = process.e
 const FLAGS = String.raw`(?:-\S+(?:[ =]\S+)?\s+)*`;
 // A command's start: a line or a shell separator, or the opening quote of a shell string in eval code. A grep or a commit message that only mentions gh is no post.
 const START = String.raw`(?:^|[;&|(]|[:(=,$\[]\s*["'\x60]|\s-c\s+["'\x60])\s*(?:sudo\s+)?(?:(?:timeout\s+\S+|env|command|then|do|else|xargs(?:\s+-\S+)*|nohup|time|exec)\s+)*(?:[A-Za-z_]+=\S*\s+)*(?:[\w.~/-]*/)?`;
-const MAYBE_POST = /\bgh\s+(?:issue|pr|release|api)\b|\bgh\s+-|api\.github\.com/;
-const GH_POST = new RegExp(`${START}gh\\s+${FLAGS}(?:(?:issue|pr)\\s+${FLAGS}(?:create|comment|edit|review|close|merge)|release\\s+${FLAGS}(?:create|edit))\\b`, "m");
+const MAYBE_POST = /\bgh\s+(?:issue|pr|release|api|gist)\b|\bgh\s+-|api\.github\.com/;
+const GH_POST = new RegExp(`${START}gh\\s+${FLAGS}(?:(?:issue|pr)\\s+${FLAGS}(?:create|comment|edit|review|close|merge)|release\\s+${FLAGS}(?:create|edit)|gist\\s+${FLAGS}(?:create|edit))\\b`, "m");
 const GH_API = new RegExp(`${START}gh\\s+api\\b(?:[^\\n]*\\b(?:issues|pulls|releases|comments)\\b|[^\\n]*\\bgraphql\\b[\\s\\S]*?\\bmutation\\b)`, "m");
 const GH_API_WRITE = /\s-[fF]\s*\S|\s--(?:field|raw-field|input)\b|(?:\s-X\s*|\s--method[ =])(?:POST|PUT|PATCH)\b/i;
 const CURL_POST = new RegExp(`${START}curl\\b[^\\n]*api\\.github\\.com/(?:repos/\\S*(?:issues|pulls|releases|comments)|graphql)`, "m");
 const CURL_WRITE = /\s(?:-d|--data\S*|--json|-X\s*(?:POST|PUT|PATCH))\b/;
+// `gh gist create|edit f1 f2`: the files named on the line are the gist's body (a gist is public whatever repo the shell sits in).
+const GIST = /\bgh\s+gist\s+(?:create|edit)\b([^\n;&|]*)/;
+const GIST_VALUE_FLAGS = new Set(["-d", "--desc", "-f", "--filename"]);
 const OTHER_REPO = /(?:^|\s)(?:-R|--repo)[ =]|\brepos\/[\w.-]+\/[\w.-]+/;
 const VALUE = String.raw`("[^"]+"|'[^']+'|\x60[^\x60]+\x60|[^\s;&|)"'\x60]+)`;
 const BODY_FILE = new RegExp(`(?<=\\s)(?:(?:-F|--field|-d|--data(?:-binary)?|--json)[ =]*["']?(?:[\\w.-]+=)?@|(?:--body-file|--notes-file|--input|-F)[ =]*)${VALUE}|(?:\\bcat\\s+|(?<!<)<(?!<)\\s*)${VALUE}`, "g");
@@ -415,14 +418,26 @@ export function publicPostDeny(command: string, dataDir: string, cwd: string): s
 	const start = postStart(flat);
 	if (start < 0) return undefined;
 	const dir = postDir(flat, start, cwd);
-	if (!postsToDotz(flat.slice(start), dir)) return undefined;
+	// Every public GitHub post is checked for the install's personal values; only the dotz repo also gets its own rules (class line, sections, work text).
+	const gist = GIST.exec(flat);
+	const toDotz = !gist && postsToDotz(flat.slice(start), dir);
+	const target = toDotz ? PUBLIC_REPO : "a public GitHub repo or gist";
 	const bodies: { raw: string; file: string }[] = [];
+	let prev = "";
+	for (const raw of gist?.[1].match(/\S+/g) ?? []) {
+		const word = raw.replace(/^["'\x60]|["'\x60]$/g, "");
+		const isValue = GIST_VALUE_FLAGS.has(prev);
+		prev = raw;
+		if (isValue || word.startsWith("-")) continue;
+		const file = shellPath(raw, dir);
+		if (existsSync(file) && statSync(file).isFile()) bodies.push({ raw, file });
+	}
 	const redirects = flat.replace(/>\s*/g, ">");
 	for (const m of flat.matchAll(BODY_FILE)) {
 		const raw = m[1] ?? m[2];
 		if (raw === "-" || raw.includes("=")) continue;
 		const file = shellPath(raw, dir);
-		const refused = (why: string) => `this post to ${PUBLIC_REPO} names a body file ${why}; do not work around this check`;
+		const refused = (why: string) => `this post to ${target} names a body file ${why}; do not work around this check`;
 		if (existsSync(file) && statSync(file).size > MAX_NOTES_BYTES) return refused(`this check cannot read: it is too big, over ${MAX_NOTES_BYTES / 1024 / 1024} MB. Shorten it and post again`);
 		if (existsSync(file)) bodies.push({ raw, file });
 		else if (m[1] && !redirects.includes(`>${raw}`)) return refused(/[$\x60]/.test(file) ? "this check cannot read: its path holds a shell variable or command, which is not expanded yet when the check runs. Write the path out in full and post again" : "that does not exist yet: this check runs before the command does. Save the file first, then post in a separate call");
@@ -433,11 +448,12 @@ export function publicPostDeny(command: string, dataDir: string, cwd: string): s
 	const text = [shell, ...files].join("\n");
 	const { hits } = scrub(text, installTerms(dataDir));
 	if (!hits.length) {
+		if (!toDotz) return undefined;
 		const upstream = upstreamDeny(flat.slice(start), text);
 		if (upstream === MERGE_POST || upstream === PERSONAL_POST) return upstream;
 		return workTextDeny([withoutRoutes(shell), ...files].join("\n"), dataDir, dir) ?? upstream;
 	}
-	return `this post to ${PUBLIC_REPO} still carries personal or sensitive content (${hits.join(", ")}). Remove every such value, de-identify and generalise it, keep the detail (symptom, steps, expected, actual, version, generalised logs), and post again; do not work around this check`;
+	return `this post to ${target} still carries personal or sensitive content (${hits.join(", ")}). Remove every such value, de-identify and generalise it, keep the detail (symptom, steps, expected, actual, version, generalised logs), and post again; do not work around this check`;
 }
 
 // Secrets at rest: what an agent or the owner pasted stays in the OmO session files and the recall index copied from them. maskSecrets
