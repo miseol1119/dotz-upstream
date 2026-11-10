@@ -3,6 +3,7 @@ import { setupEnv } from "../features/reply-drafts/test/helpers.ts";
 import { cfg, HUB_TOKEN } from "./config.ts";
 import { conversationPage, type ConvRow } from "./conversations-page.ts";
 import { emit } from "./events.ts";
+import { allNotices, dropChannelNotices } from "./notices.ts";
 import * as mailModule from "./mail.ts";
 import { postMail, type MailDeps } from "./mail.ts";
 import { makeRoute } from "./routes.ts";
@@ -16,6 +17,8 @@ afterAll(async () => {
 	clock = Date.now();
 	await postMail({ source: "work", id: "cd-trim", subject: "정리", from: "Kim <kim@example.com>" }, deps);   // the hub trims to the keep setting when a mail is filed: the next test file starts without these mails
 	(cfg as unknown as { mail?: { keep: number } }).mail = mailCfg;
+	// Trimming the mailbox leaves the notice of each mail behind; the store is shared with the next test file and holds only NOTICE_CAP of the newest, so these would push out its own notices.
+	for (const src of new Set(allNotices().map(n => n.src).filter((s): s is string => !!s?.match(/^mail:(work|home)-cd/)))) dropChannelNotices(src);
 	env.cleanup();
 });
 const route = makeRoute({ busyNow: () => [], restartGateway: () => "", restartGatewayNow: () => "" });
