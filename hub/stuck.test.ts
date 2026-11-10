@@ -4,12 +4,12 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { appendFileSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cfg } from "./config.ts";
+import { cfg, paths } from "./config.ts";
 import { createPrompts } from "./prompts.ts";
 import type * as Orchestrator from "./orchestrator.ts";
 import { adapters } from "./runtime/index.ts";
 import { omp } from "./runtime/omp.ts";
-import { advance, flush } from "./runtime/test-clock.ts";
+import { advance, clock, flush } from "./runtime/test-clock.ts";
 import type { AgentEvent, AgentProcess, RuntimeAdapter, SendMode, SpawnOpts } from "./runtime/types.ts";
 import * as stuck from "./stuck.ts";
 
@@ -467,6 +467,42 @@ test("b) the owner abort the process ignores also takes the snapshot before TERM
 	await quiet(stuck.ABORT_GRACE_MS);
 	expect(order.indexOf("snap:ps")).toBeGreaterThanOrEqual(0);
 	expect(order.indexOf("snap:ps")).toBeLessThan(order.indexOf("term"));
+	s.o.stop();
+	await quiet(1000);
+});
+
+// C: the machine sleeps between two samples; that gap is not silence.
+test("c) sleep gap rule: a sample later than SLEEP_GAP_FACTOR periods moves both clocks by the gap, a merely late one does not", () => {
+	const every = 60_000;
+	const s: stuck.StuckState = { lastAt: 1000, abortedAt: 2000, sampledAt: 10_000, recoveries: [], capped: false };
+	expect(stuck.skipSleepGap(s, 10_000 + stuck.SLEEP_GAP_FACTOR * every, every)).toBe(0);
+	expect(s).toMatchObject({ lastAt: 1000, abortedAt: 2000 });
+	const sleep = 2 * 60 * 60_000;
+	expect(stuck.skipSleepGap(s, 10_000 + sleep, every)).toBe(sleep);
+	expect(s).toMatchObject({ lastAt: 1000 + sleep, abortedAt: 2000 + sleep });
+	// the first sample of a watch has nothing before it
+	const fresh: stuck.StuckState = { lastAt: 0, recoveries: [], capped: false };
+	expect(stuck.skipSleepGap(fresh, sleep, every)).toBe(0);
+	expect(fresh.lastAt).toBe(0);
+});
+
+test("c) a sleep gap between two samples is not silence: the turn lives, is told once in hub.log, and a turn already silent is still caught after its awake limit", async () => {
+	const s = session("main");
+	const first = await turn(s, "sleep over", chat("chat", "m40"));
+	await quiet(5 * 60_000);
+	expect(first.aborts).toBe(0);
+	const slept = 2 * 60 * 60_000;
+	clock.now += slept; // the machine slept: no sample ran meanwhile
+	const logBefore = readFileSync(paths.log, "utf8").length;
+	await quiet(60_000);
+	expect(first.aborts).toBe(0);
+	const added = readFileSync(paths.log, "utf8").slice(logBefore);
+	expect(added.match(/sleep gap of 120 min skipped/g)?.length).toBe(1);
+	// 6 of 10 minutes of awake silence are behind it: 3 more is not enough, the 4th is
+	await quiet(3 * 60_000);
+	expect(first.aborts).toBe(0);
+	await quiet(60_000);
+	expect(first.aborts).toBe(1);
 	s.o.stop();
 	await quiet(1000);
 });

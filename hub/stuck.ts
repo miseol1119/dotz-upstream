@@ -12,8 +12,10 @@ export const ABORT_GRACE_MS = 60_000;
 export const STUCK_CAP = 3;
 export const STUCK_WINDOW_MS = 60 * 60_000;
 const CPU_GROWTH_S = 2;
+// Two samples further apart than this many sampling periods mean the machine slept (a loaded or briefly blocked tick is late by one period, rarely two).
+export const SLEEP_GAP_FACTOR = 3;
 
-export type StuckState = { lastAt: number; abortedAt?: number; recoveries: number[]; capped: boolean };
+export type StuckState = { lastAt: number; abortedAt?: number; sampledAt?: number; recoveries: number[]; capped: boolean };
 export type StuckStep = "none" | "abort" | "restart" | "cap";
 
 export function stuckDecision(s: StuckState, now: number, stuckMs: number): StuckStep {
@@ -21,6 +23,18 @@ export function stuckDecision(s: StuckState, now: number, stuckMs: number): Stuc
 	if (now - s.lastAt < stuckMs) return "none";
 	if (s.recoveries.filter(at => now - at < STUCK_WINDOW_MS).length >= STUCK_CAP) return s.capped ? "none" : "cap";
 	return "abort";
+}
+
+/**
+ * Time that passed while the machine slept is not silence: when `now` is more than SLEEP_GAP_FACTOR periods after the previous sample, the
+ * last-progress and abort times move forward by the gap, so the awake silence is what it was before the sleep. Returns the skipped ms (0: none).
+ */
+export function skipSleepGap(s: StuckState, now: number, every: number): number {
+	const gap = s.sampledAt === undefined ? 0 : now - s.sampledAt;
+	if (gap <= SLEEP_GAP_FACTOR * every) return 0;
+	s.lastAt = Math.min(now, s.lastAt + gap);
+	if (s.abortedAt !== undefined) s.abortedAt = Math.min(now, s.abortedAt + gap);
+	return gap;
 }
 
 // `ps` TIME: [dd-][hh:]mm:ss[.cc]
@@ -314,6 +328,7 @@ export function createStuckWatch(o: StuckWatchOpts) {
 		stop();
 		info = undefined;
 		progress("turn start");
+		s.sampledAt = s.lastAt;
 		size = sizeOf(o.sessionFile());
 		every = Math.min(60_000, Math.max(250, stuckTurnMs() / 4));
 		timer = setInterval(() => void tick(), every);
@@ -331,6 +346,8 @@ export function createStuckWatch(o: StuckWatchOpts) {
 		busy = true;
 		try {
 			let now = Date.now();
+			const skipped = skipSleepGap(s, now, every);
+			if (skipped) log(`stuck: ${o.key} sleep gap of ${Math.round(skipped / 60_000)} min skipped`);
 			if (o.exempt()) {
 				s.lastAt = now;
 				if (s.abortedAt !== undefined) s.abortedAt = now;
@@ -381,6 +398,7 @@ export function createStuckWatch(o: StuckWatchOpts) {
 			log(`stuck: ${o.key} check failed: ${e}`);
 		} finally {
 			busy = false;
+			s.sampledAt = Date.now(); // after a slow sampler, so its own time is not taken for a sleep
 		}
 	}
 	/** What the last abort found: the open tool call's shape and the minutes of silence; kept until the next turn starts. */
