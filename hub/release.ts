@@ -150,11 +150,19 @@ export async function dirtyTracked(root: string): Promise<string[]> {
 	return r.out.split("\n").map(s => s.trim()).filter(Boolean);
 }
 
-export async function hasCommitsSince(root: string, since: string | null): Promise<boolean> {
+export async function hasCommitsSince(root: string, since: string | null, ref = "HEAD"): Promise<boolean> {
 	if (!since) return true;
-	const r = await gitOutput(["rev-list", "--count", `${since}..HEAD`], root);
+	const r = await gitOutput(["rev-list", "--count", `${since}..${ref}`], root);
 	if (r.code !== 0) throw new Error(`커밋을 세지 못했어요: ${r.out}`);
 	return Number(r.out) > 0;
+}
+
+// The one rule for "is there anything to release": a commit on `ref` after the newest release tag (no tag at all counts as yes). --auto and the
+// release gate both ask here, so the gate never runs the suite for a slot that --auto would answer with "nothing to release".
+export async function newCommitsSinceNewestTag(root: string, ref = "HEAD"): Promise<{ newest: Release | null; any: boolean; tags: string[] }> {
+	const tags = await localTags(root);
+	const newest = newestVersion(tags);
+	return { newest, any: await hasCommitsSince(root, newest ? `v${newest.text}` : null, ref), tags };
 }
 
 // The scheduled release already cut in the slot of `now`, if any. A forced .M does not take a slot. The tag's commit time is the
@@ -266,9 +274,8 @@ export async function publishVersion(opts: PublishOptions): Promise<number> {
 	}
 
 	if (opts.auto) {
-		const newTags = await localTags(root);
-		const newest = newestVersion(newTags);
-		if (!(await hasCommitsSince(root, newest ? `v${newest.text}` : null))) {
+		const { newest, any, tags: newTags } = await newCommitsSinceNewestTag(root);
+		if (!any) {
 			print(`새 커밋이 없어서 버전을 내지 않았어요 (최신 ${newest ? `v${newest.text}` : "태그 없음"}).`);
 			return 0;
 		}
@@ -498,6 +505,12 @@ export async function dispatchSlot(opts: DispatchOptions): Promise<number> {
 		print("전체 시험이 아직 돌고 있어요.");
 		return 0;
 	}
+	if (gate.kind === "nothing") {
+		writeAtomic(stateFile, `${slot}\n`); // not a failure: the slot is used, no alert, the next slot looks again
+		clearGate(opts.stateDir);
+		print(`릴리스할 새 커밋이 없어서 시험 없이 이 시간대를 건너뛰었어요 (${gate.sha.slice(0, 8)}).`);
+		return 0;
+	}
 	if (gate.kind === "unrunnable") {
 		print(`릴리스 전 시험을 돌리지 못했어요: ${gate.reason} · 이 시간대는 그대로 두고 다음 틱에 다시 시도해요.`);
 		return 1;
@@ -534,7 +547,7 @@ if (import.meta.main) {
 	if (gateRun >= 0) {
 		const [dir, slot, origin] = args.slice(gateRun + 1);
 		if (!dir || !slot || !origin) process.exit(2);
-		await runGate({ stateDir: dir, slot, origin, git: gitOutput, runSuite: runSuiteIn });
+		await runGate({ stateDir: dir, slot, origin, git: gitOutput, runSuite: runSuiteIn, hasNewCommits: async (repo, sha) => (await newCommitsSinceNewestTag(repo, sha)).any });
 		process.exit(0);
 	}
 	if (unknown.length || (shaAt >= 0 && (!/^[0-9a-f]{40}$/.test(sha ?? "") || !args.includes("--auto"))) || (args.includes("--auto") && args.includes("--force")) || (dispatch && (args.includes("--auto") || args.includes("--force") || !stateDir))) {

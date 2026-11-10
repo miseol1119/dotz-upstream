@@ -22,7 +22,7 @@ runner there never ran the suite, so the workflow has no cron and the owner's ma
 after its timeout (120 s by default) and the suite takes minutes, so the gate runs across ticks and each tick only reads files (a few seconds):
 at a new slot the tick starts the gate detached (its own process group, output in `gate.log` in the watch's state dir, its pid in `gate-run.json`)
 and ends. The detached run keeps its own clone of `https://github.com/ddotz/dotz.git` in the state dir (the install that runs the watch is usually
-a tarball with no `.git`), fetches `origin main` into it, makes a worktree of the fetched commit, runs `bun install --frozen-lockfile` and the
+a tarball with no `.git`), fetches `origin main` and the tags into it, writes a `nothing` result without running the suite when main has no commit after the newest release tag (the rule `--auto` uses for "nothing to release"; the tick then logs one line and uses the slot, no alert), otherwise makes a worktree of the fetched commit, runs `bun install --frozen-lockfile` and the
 full `bun run test` there (through the heavy slot like any full run, about 5 minutes of CPU), removes the worktree and writes `gate-result.json`.
 The next ticks: still running, nothing to do. Green: the tick starts the workflow through `gh workflow run` with that commit as the `sha` input, and
 `--auto --sha` releases exactly that commit plus `VERSION` (main is merged into the result afterwards when it moved on, so the tag stays an ancestor

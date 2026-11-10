@@ -13,6 +13,7 @@ import {
 	gitOutput,
 	hasCommitsSince,
 	localTags,
+	newCommitsSinceNewestTag,
 	newestVersion,
 	parseVersion,
 	planForcedNext,
@@ -481,6 +482,10 @@ describe("release slots", () => {
 				git(seed, "push", "-q", "origin", "main");
 				return git(seed, "rev-parse", "HEAD").trim();
 			};
+			const tag = (name: string) => {
+				git(seed, "tag", name);
+				git(seed, "push", "-q", "origin", name);
+			};
 			const state = { head: push("work"), suite, suites: 0, spawned: [] as string[][], alive: true, killed: [] as number[], pid: 100 };
 			const env: GateEnv = {
 				origin: url,
@@ -504,8 +509,9 @@ describe("release slots", () => {
 						state.suites++;
 						return state.suite;
 					},
+					hasNewCommits: async (repo, sha) => (await newCommitsSinceNewestTag(repo, sha)).any,
 				});
-			return { state, env, push, finish };
+			return { state, env, push, tag, finish };
 		};
 		type Kit = ReturnType<typeof gateKit>;
 		const tick = (kit: Kit, o: Omit<DispatchOptions, "gate">) => dispatchSlot({ gate: kit.env, ...o });
@@ -537,6 +543,38 @@ describe("release slots", () => {
 			expect(kit.state.spawned).toHaveLength(1);
 			expect(await launch(kit, { stateDir: dir, exec, print }, "2026-11-05T18:00:10")).toBe(0);
 			expect(calls).toHaveLength(2);
+		});
+
+		test("no commit after the newest tag: the suite does not run, nothing is released, and the slot is used without a failure", async () => {
+			const dir = stateDir();
+			const kit = gateKit();
+			kit.tag("v261105.1");
+			const { calls, exec } = gh("ddotz");
+			const lines: string[] = [];
+			const say = (l: string) => lines.push(l);
+			const noon = kst("2026-11-05T12:00:10");
+			expect(await tick(kit, { stateDir: dir, exec, print: say, now: noon })).toBe(0);
+			await kit.finish(dir, noon);
+			lines.length = 0;
+			expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:01:10") })).toBe(0);
+			expect(lines).toHaveLength(1);
+			expect(kit.state.suites).toBe(0);
+			expect(calls).toEqual([]);
+			expect(existsSync(join(dir, "release-slot"))).toBe(true);
+			expect(existsSync(join(dir, "release-run.json"))).toBe(false);
+			expect(await tick(kit, { stateDir: dir, exec, print: say, now: kst("2026-11-05T12:02:10") })).toBe(0);
+			expect(kit.state.spawned).toHaveLength(1);
+		});
+
+		test("a commit after the newest tag: the suite runs and the workflow starts as before", async () => {
+			const dir = stateDir();
+			const kit = gateKit();
+			kit.tag("v261105.1");
+			const head = kit.push("newer work");
+			const { calls, exec } = gh("ddotz");
+			await launch(kit, { stateDir: dir, exec, print }, "2026-11-05T18:00:10");
+			expect(kit.state.suites).toBe(1);
+			expect(calls).toEqual([`gh workflow run release.yml --repo ddotz/dotz --ref main -f sha=${head}`]);
 		});
 
 		test("a non-owner install never gates or fires", async () => {

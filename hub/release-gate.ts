@@ -22,12 +22,13 @@ export type GateCtx = GateEnv & { stateDir: string; slot: string; now: Date };
 export type GateOutcome =
 	| { kind: "idle" }
 	| { kind: "running" }
+	| { kind: "nothing"; sha: string } // nothing on main since the newest release tag: the suite was not run
 	| { kind: "green"; sha: string }
 	| { kind: "red"; sha: string; failed: string[]; detail: string }
 	| { kind: "unrunnable"; reason: string };
 
 type RunFile = { slot: string; pid: number; startedAt: string };
-type ResultFile = { slot: string; sha?: string; green?: boolean; failed?: string[]; detail?: string; error?: string };
+type ResultFile = { slot: string; sha?: string; nothing?: boolean; green?: boolean; failed?: string[]; detail?: string; error?: string };
 
 const RUN_FILE = "gate-run.json";
 const RESULT_FILE = "gate-result.json";
@@ -72,6 +73,7 @@ export function gateStatus(c: GateCtx): GateOutcome {
 			stopRun(c, run);
 			return { kind: "unrunnable", reason: result.error ?? "결과 파일이 비어 있어요" };
 		}
+		if (result.nothing) return { kind: "nothing", sha: result.sha };
 		if (result.green) return { kind: "green", sha: result.sha };
 		return { kind: "red", sha: result.sha, failed: result.failed ?? [], detail: result.detail ?? "" };
 	}
@@ -124,9 +126,11 @@ export function realGateEnv(origin: string): GateEnv {
 	};
 }
 
-export type RunGateOptions = { stateDir: string; slot: string; origin: string; git: GitFn; runSuite: SuiteFn };
+// hasNewCommits(repo, sha): whether `sha` has anything to release since the newest release tag in `repo`; release.ts passes the rule --auto uses.
+export type RunGateOptions = { stateDir: string; slot: string; origin: string; git: GitFn; runSuite: SuiteFn; hasNewCommits: (repo: string, sha: string) => Promise<boolean> };
 
-// The detached runner. Clones origin once into the state dir, fetches main, runs the suite on a worktree of the fetched commit, removes the worktree
+// The detached runner. Clones origin once into the state dir, fetches main and the tags, leaves a "nothing" result when main has nothing to release
+// since the newest tag (no suite), otherwise runs the suite on a worktree of the fetched commit, removes the worktree
 // and leaves the result file for the ticks. Any failure to get that far is written as an error result: the gate did not run, the slot stays open.
 export async function runGate(o: RunGateOptions): Promise<void> {
 	const resultFile = join(o.stateDir, RESULT_FILE);
@@ -141,11 +145,15 @@ export async function runGate(o: RunGateOptions): Promise<void> {
 			if (cloned.code !== 0) throw new Error(`저장소를 받지 못했어요: ${cloned.out}`);
 			renameSync(part, repo);
 		}
-		const fetched = await o.git(["fetch", "--quiet", "origin", "main"], repo);
+		const fetched = await o.git(["fetch", "--quiet", "--tags", "origin", "main"], repo);
 		if (fetched.code !== 0) throw new Error(`origin/main을 가져오지 못했어요: ${fetched.out}`);
 		const head = await o.git(["rev-parse", "origin/main"], repo);
 		if (head.code !== 0) throw new Error(`origin/main의 커밋을 읽지 못했어요: ${head.out}`);
 		const sha = head.out;
+		if (!(await o.hasNewCommits(repo, sha))) {
+			writeAtomic(resultFile, `${JSON.stringify({ slot: o.slot, sha, nothing: true } satisfies ResultFile)}\n`);
+			return;
+		}
 		// A runner killed in the middle of a run leaves its worktree behind: the fixed path is cleared before the next one.
 		if (existsSync(tree)) await o.git(["worktree", "remove", "--force", tree], repo);
 		rmSync(tree, { recursive: true, force: true });
