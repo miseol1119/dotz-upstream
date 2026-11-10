@@ -411,14 +411,17 @@ function ctxSession(t) {
 function renderCtxRing() {
   const mb = $("#c-model"), lane = isLaneT(target) && S ? S.lanes.find(x => x.name === laneOf(target)) : null;
   const orchT = target === MAIN || isProjT(target);
+  // A conversation with a session of its own but no model choice (작업내역, 알림, a mail thread, app settings) follows main's model: its chip reads that
+  // session's model from the context list, main's configured one while the session has no figure yet. The chips only show it; the model is main's to change.
+  const convOnly = isConvT(target) && !isProjT(target), cs = convOnly ? ctxSession(target) : null;
   // The model it answers on now, a fallback included (20-models.js liveModel), with 폴백 중 beside it when that is not the configured one.
-  const live = orchT ? liveModel(target) : lane ? liveModel(`lane:${lane.name}`) : null, sel = live && live.sel;
+  const live = orchT ? liveModel(target) : convOnly ? { sel: (cs && cs.model) || liveModel(MAIN).conf, conf: "", fallback: null } : lane ? liveModel(`lane:${lane.name}`) : null, sel = live && live.sel;
   // The chips say whose they are: the orchestrator and a lane often run the same model with a similar context, and
   // unlabeled they read as one (owner 2026-10-20: "오케스트레이터와 레인별로 구분 안되는거 같은데").
-  const owner = orchT ? botName : lane ? `세션 ${lane.title || lane.name}` : "";
+  const owner = orchT || convOnly ? botName : lane ? `세션 ${lane.title || lane.name}` : "";
   const ob = $("#c-own"), wb = $("#c-worker"), wsel = lane && lane.worker_model;
   // The row reads as in main; a project's own choice shows in the tooltips and in the menus' first row (inheritRow).
-  const chipOwner = isProjT(target) ? "이 프로젝트" : owner;
+  const chipOwner = isProjT(target) ? "이 프로젝트" : convOnly ? "이 대화" : owner;
   ob.hidden = !(sel && owner); ob.textContent = owner;
   wb.hidden = !wsel;
   if (wsel) { const [wbase, wlevel] = String(wsel).split(":"); wb.textContent = `서브에이전트 ${modelChipText(wbase)}${wlevel ? ` · ${thinkKo(wlevel)}` : ""}`; wb.title = `이 세션의 서브에이전트 모델`; }
@@ -487,7 +490,9 @@ async function targetChange(title, change, label, t = targetParam()) {
   TV.delete(body.target);
   await Promise.all([loadModels(true), loadContext(true), fetchTV(body.target).catch(() => {})]); refreshState();
 }
+const followsMain = () => isConvT(target) && !isProjT(target);
 $("#c-model").onclick = ev => busy(null, () => {
+  if (followsMain()) return;
   const anchor = ev.currentTarget;
   return chipMenu(anchor, T => {
     const name = targetName(target), items = [...inheritRow(T), ...modelPickItems(T.models, T.model), MODELS_LINK];
@@ -502,6 +507,7 @@ $("#c-worker").onclick = ev => busy(null, () => {
 });
 // Effort only: the levels this target's model accepts (04-state.js effortItems), the model is never touched.
 $("#c-effort").onclick = ev => busy(null, () => {
+  if (followsMain()) return;
   const anchor = ev.currentTarget;
   return chipMenu(anchor, T => {
     const name = targetName(target);
