@@ -232,9 +232,9 @@ details.work.live .wdot { display: block; }
 .runline.warn { color: var(--warn); }
 #working > .dot, #working-tx, #working > .sp, #working-stop { display: none !important; }
 
-#send-btn.stop { background: var(--fg); color: var(--bg); }
-#send-btn.stop > svg { display: none; }
-#send-btn.stop::before { content: ""; width: 12px; height: 12px; border: 2px solid currentColor; border-radius: 3px; }
+:is(#send-btn, .pane-chat [data-c="send-btn"]).stop { background: var(--fg); color: var(--bg); }
+:is(#send-btn, .pane-chat [data-c="send-btn"]).stop > svg { display: none; }
+:is(#send-btn, .pane-chat [data-c="send-btn"]).stop::before { content: ""; width: 12px; height: 12px; border: 2px solid currentColor; border-radius: 3px; }
 @media (pointer: coarse) { .working .btn { height: 36px; padding: 0 var(--sp-3); } }
 .qlist { display: flex; flex-direction: column; gap: var(--sp-15); margin-bottom: var(--sp-2); }
 .qitem { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-15) var(--sp-15) var(--sp-15) var(--sp-3); border: 0; border-radius: 12px; background: var(--layer); min-width: 0; }

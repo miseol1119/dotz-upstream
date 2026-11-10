@@ -1,7 +1,8 @@
 /* ---------- 분할 창: an inactive pane is a mirror (docs/split-panes.md) ----------
-   Head (same markup as the chat head), a copy of the timeline taken when the pane went inactive, the messages that came since (the one event stream,
-   99-boot.js calls paneEvent), and a composer stub that shows the draft. Nothing here exists with one pane. */
-const PNM = new Map();   // pane id -> its mirror {p, node, list, wrap, keys, q, dot, state}
+   A chat pane's mirror is the open chat's frame under .pane-chat (the same rules as #v-chat): the head, the conversation's own todo and subagent strips,
+   a copy of the timeline taken when the pane went inactive plus the messages that came since (the one event stream, 99-boot.js calls paneEvent),
+   and the composer's markup with the pane's draft, queue, run line and the model / effort / context line. Nothing here exists with one pane. */
+const PNM = new Map();   // pane id -> its mirror {p, node, list, wrap, keys, q, dot, state, todo, subs, k (the composer's parts)}
 const PNS = new Map();   // pane id -> what it showed when it went inactive {n, keys}
 const paneDirty = new Set();
 let paneRaf = 0;
@@ -58,22 +59,66 @@ function paneMirror(p) {
     m.wrap = el("div", { class: "timeline pane-tl" }, m.list);
     m.wrap.addEventListener("scroll", () => edgeFade(m.wrap), { passive: true });
     if (snap) m.keys = snap.keys; else paneFill(m);
-    const draft = String(ts(p.t).draft || "");
-    const stub = el("button", { class: "pane-cmp", type: "button", "aria-label": "이 창에서 메시지 쓰기", onclick: () => { paneFocus(p.id); $("#text").focus(); } },
-      el("span", { class: "pane-cmp-plus" }, icon("add")), el("span", { class: draft ? "pane-cmp-t" : "pane-cmp-t pane-cmp-ph" }, draft || "메시지 또는 /명령"));
-    m.node = el("div", { class: "pane-mir" }, head, m.wrap, stub);
+    m.todo = el("div", { class: "todo", hidden: true });
+    m.subs = el("div", { class: "subs", hidden: true });
+    m.node = el("div", { class: `pane-mir pane-chat${p.t === "alert" ? " no-composer" : ""}` }, head, m.todo, el("div", { class: "chatbox" }, m.wrap), m.subs, paneComposerEl(m));
+    if (!TD.by[p.t]) loadTodo(p.t);
   } else {
     m.node = el("div", { class: "pane-mir" }, head, el("div", { class: "pane-pj" }, snap ? paneBare(snap.n) : el("div", { class: "empty", text: p.kind === "app" ? "이 창을 누르면 모니터링이 열려요" : "이 창을 누르면 프로젝트가 열려요" })));
   }
   PNM.set(p.id, m);
+  if (m.k) paneStrip(m);
   return m.node;
 }
+// The composer of an inactive pane is the open composer's own markup (no id twice, nothing live in it), so the box, the line under it and the send button
+// sit where they sit in the open pane. A click on it activates the pane and puts the caret in the box (43-panes-view.js).
+function paneComposerEl(m) {
+  const c = PNV.cmp.cloneNode(true), id = x => c.querySelector(`#${x}`);
+  m.k = { own: id("c-own"), model: id("c-model"), effort: id("c-effort"), worker: id("c-worker"), ring: id("ctx-ring"), api: id("c-api"), fb: id("c-fb"), bar: id("cbar"),
+    queue: id("queue"), run: id("runline"), runTx: id("runline-tx"), send: id("send-btn"), ta: id("text") };
+  id("c-attach").dataset.c = "c-attach"; m.k.send.dataset.c = "send-btn";
+  for (const x of c.querySelectorAll("#qline, #dcard, #hints, #runstate, #pausenote, #relaynote, #atray, input[type=file], .ta-hl, .ta-tok")) x.remove();
+  id("send").className = "sendrow"; id("send").removeAttribute("style");
+  c.classList.remove("rs-on", "dropping");
+  m.k.ta.removeAttribute("style"); m.k.ta.value = String(ts(m.p.t).draft || ""); m.k.ta.readOnly = true;
+  // Inert but not `disabled` (that dims it): it looks as this conversation's button does in the open pane; the pane's pointerdown activates the pane.
+  m.k.send.removeAttribute("disabled"); m.k.send.type = "button"; m.k.send.setAttribute("aria-disabled", "true");
+  for (const b of c.querySelectorAll("button, textarea")) b.tabIndex = -1;
+  return paneBare(c);
+}
+// Everything the open pane draws from its own conversation, drawn from this pane's: strips, queue, run line, chips. Never from the open target.
+function paneStrip(m) {
+  const t = m.p.t, k = m.k, r = runLineOf(t), working = r.on && r.st !== "rate-limited";
+  paintTodo(m.todo, t);
+  paintSubs(m.subs, sourceOf(t));
+  paintQueue(k.queue, t);
+  k.run.hidden = !r.show; k.run.classList.toggle("warn", r.st === "rate-limited"); k.runTx.textContent = r.text;
+  const stop = (working || r.bg.length > 0) && !k.ta.value.trim();
+  k.send.classList.toggle("stop", stop); k.send.setAttribute("aria-label", stop ? "중단" : "보내기"); k.send.title = stop ? "지금 하는 일 중단" : "";
+  k.ta.placeholder = composerHint(t, false);
+  paintChips(t, k);
+  k.model.classList.toggle("run", working);
+}
+// All mirrors, or the ones of conversation t.
+function paneStrips(t) {
+  for (const m of PNM.values()) if (m.k && (t === undefined || m.p.t === t)) paneStrip(m);
+}
+// A todo tool call of conversation own finished: its mirror reloads the plan (debounced like the open one's, 11-todo-strip.js todoActivity).
+function paneTodoTouch(own) {
+  for (const m of PNM.values()) {
+    if (!m.k || !(own === m.p.t || (own === MAIN && isProjT(m.p.t)))) continue;
+    clearTimeout(m.todoTimer);
+    m.todoTimer = setTimeout(() => loadTodo(m.p.t), 250);
+  }
+}
 // The head of a mirror, and of the active pane when it holds a screen (which has no head of its own): name, state line, close.
+// A chat pane's head is the chat head (.cv-head) with its ⋯ in the same place; its close button sits on the pane itself, like the open pane's.
 function paneHeadEl(p) {
-  const name = paneName(p), s = paneState(p), dot = el("span", { class: `dot ${p.dot}` }), state = el("span", { class: "cv-hd-s", text: s });
+  const name = paneName(p), s = paneState(p), dot = el("span", { class: `dot ${p.dot}` }), state = el("span", { class: "cv-hd-s", text: s }), chat = p.kind === "chat";
   dot.hidden = !p.dot;
-  const x = el("button", { class: "ib pane-x", type: "button", "aria-label": "창 닫기", title: "창 닫기", onclick: () => paneClose(p.id) }, icon("close"));
-  return { head: el("div", { class: "pane-hd" }, el("span", { class: "cv-hd-b" }, el("span", { class: "cv-hd-t", title: name }, dot, name), s || p.kind !== "app" ? state : null), x), dot, state };
+  const x = chat ? null : el("button", { class: "ib pane-x", type: "button", "aria-label": "창 닫기", title: "창 닫기", onclick: () => paneClose(p.id) }, icon("close"));
+  const acts = chat && (isLaneT(p.t) || (isProjT(p.t) && pmOfTarget(p.t))) ? el("span", { class: "cv-hd-a" }, el("button", { class: "ib cvmenu", type: "button", tabindex: "-1", "aria-label": "세션 메뉴" }, icon("more"))) : null;
+  return { head: el("div", { class: chat ? "cv-head pane-hd" : "pane-hd" }, el("span", { class: "cv-hd-b" }, el("span", { class: "cv-hd-t", title: name }, dot, name), s || p.kind !== "app" ? state : null), acts, x), dot, state };
 }
 // A mirror without a copy (the page was reloaded, or the pane lost its screen to another pane): drawn from the messages the page holds.
 function paneFill(m) {
@@ -101,6 +146,8 @@ function paneAppend(m, e) {
 function paneMirrorsPlace() {
   for (const m of PNM.values()) {
     if (!m.wrap) continue;
+    const box = m.k && m.k.ta;
+    if (box) { box.style.height = "auto"; box.style.height = `${Math.max(taFloor(), Math.min(box.scrollHeight, 140))}px`; }   // autosize(), for the draft
     const at = m.p.stick ? null : m.p.at, n = at && [...m.list.querySelectorAll("[data-ts]")].find(x => x.dataset.ts === at.ts);
     m.wrap.scrollTop = n ? n.getBoundingClientRect().top - m.wrap.getBoundingClientRect().top + m.wrap.scrollTop - at.off : m.wrap.scrollHeight;
     edgeFade(m.wrap);

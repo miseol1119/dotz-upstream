@@ -6,22 +6,23 @@ async function loadTodo(t = target) {
   try { r = await api(`/api/todo?target=${enc(t)}`); } catch { TD.by[t] = TD.by[t] || []; r = null; }
   if (r) TD.by[t] = Array.isArray(r.phases) ? r.phases : [];
   if (t === target) { paintTodo(); paintRunState(); if (CV.key && !CV.placed) renderAll(); }   // the first paint of an opening waits for the plan (chatReady)
+  paneStrips(t);
 }
 const todoState = x => x.status === "in_progress" ? "act" : x.status === "completed" ? "done" : x.status === "abandoned" ? "drop" : "pend";
-function paintTodo() {
-  const box = $("#todo");
+// The strip of conversation t in box: the open conversation's #todo, or the one in an inactive pane (43-panes-mirror.js).
+function paintTodo(box = $("#todo"), t = target) {
   if (!box) return;
-  const phases = TD.by[target] || [], all = phases.flatMap(p => p.tasks || []);
+  const phases = TD.by[t] || [], all = phases.flatMap(p => p.tasks || []);
   if (!all.length || all.every(x => todoState(x) === "done" || todoState(x) === "drop")) { box.hidden = true; delete box.dataset.sig; delete box.dataset.ph; clear(box); return; }
-  const open = !!TD.open[target], sig = JSON.stringify([phases, open]);
+  const open = !!TD.open[t], sig = JSON.stringify([phases, open]);
   box.hidden = false;
   if (box.dataset.sig === sig) return;
   // A step finishing changes the strip in place (the new look fades up); opening the list or the first paint just draws.
-  const ph = JSON.stringify(phases), swap = box.dataset.ph !== undefined && box.dataset.ph !== ph;
-  box.dataset.sig = sig; box.dataset.ph = ph;
+  const ph = JSON.stringify(phases), swap = box.dataset.ph !== undefined && box.dataset.t === t && box.dataset.ph !== ph;   // another conversation's plan in the box (the pane changed hands) is no change of this one
+  box.dataset.sig = sig; box.dataset.ph = ph; box.dataset.t = t;
   const live = all.filter(x => todoState(x) !== "drop"), done = live.filter(x => todoState(x) === "done").length;
   const cur = all.find(x => todoState(x) === "act") || all.find(x => todoState(x) === "pend"), g = x => el("span", { class: `td-g tg-${todoState(x)}`, "aria-hidden": "true" });
-  const bar = el("button", { class: "td-bar", type: "button", "aria-expanded": String(open), onclick: () => { TD.open[target] = !open; paintTodo(); } },
+  const bar = el("button", { class: "td-bar", type: "button", "aria-expanded": String(open), onclick: () => { TD.open[t] = !open; paintTodo(box, t); } },
     g(cur), el("span", { class: "td-cur", text: cur.content }), el("span", { class: "td-n", text: `${done}/${live.length}` }), icon("drop", "td-ch"));
   const kids = [bar];
   if (open) kids.push(el("div", { class: "td-list" }, ...phases.flatMap(p => [
@@ -38,6 +39,7 @@ function todoActivity(a) {
   if (a.type !== "tool_result" || !(isTodo || (a.call_id && TD.calls.delete(a.call_id)))) return;
   const own = targetOfSource(a.source);
   if (own === target || (own === MAIN && isProjT(target))) { clearTimeout(TD.timer); TD.timer = setTimeout(() => loadTodo(target), 250); }
+  paneTodoTouch(own);
 }
 // The top of the timeline is the older-messages loader: it sits above the messages (the observer in 09-needs-you.js loads when it comes
 // into view) and holds the button for a click. Kept across redraws, never counted as a message or trimmed with the oldest ones.

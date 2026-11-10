@@ -291,13 +291,19 @@ async function sendChat(how) {
     toast(e.message, true); ta.value = text; MENTIONS = sentMentions.concat(MENTIONS); autosize(); ATT = sentAtt.concat(ATT); renderAtt(); pkRestore(sentPicks); rpRestore(reply);
   }
 }
+// The hint in the message box of conversation t. Only the open composer (open) has a pending decision card (DC.cur) or the activity view's term mode;
+// an inactive pane's mirror asks with open = false and gets its own conversation's hint (43-panes-mirror.js).
+function composerHint(t, open) {
+  const info = targetInfo(t), gone = isLaneT(t) && info.known && !info.alive, off = gone && !info.resumable;
+  return off ? "종료된 세션이에요" : open && DC.cur ? "번호를 누르거나 직접 입력해 주세요" : gone ? "재개하면서 보내기" : isWorking(t) ? "메시지 보내기" : open && modeOf() === "term" ? "메시지 또는 /명령" : isProjT(t) ? `${targetName(t)} 프로젝트의 ${botName}에게 메시지 · /명령` : isMailT(t) ? `이 메일 답장·전달은 ${botName}에게 · /명령` : `${targetName(t)}에게 메시지 · /명령`;
+}
 // The composer follows the selected target and the view mode.
 function updateComposerMeta() {
   const info = targetInfo(target), isTerm = modeOf() === "term";
   const gone = isLaneT(target) && info.known && !info.alive;
   const off = gone && !info.resumable;
   ta.disabled = off; $("#send-btn").disabled = off;
-  ta.placeholder = off ? "종료된 세션이에요" : DC.cur ? "번호를 누르거나 직접 입력해 주세요" : gone ? "재개하면서 보내기" : isWorking(target) ? "메시지 보내기" : isTerm ? "메시지 또는 /명령" : isProjT(target) ? `${targetName(target)} 프로젝트의 ${botName}에게 메시지 · /명령` : isMailT(target) ? `이 메일 답장·전달은 ${botName}에게 · /명령` : `${targetName(target)}에게 메시지 · /명령`;
+  ta.placeholder = composerHint(target, true);
   $("#composer").classList.toggle("tmode", isTerm);
   paintPause();
   rpPaint();
@@ -315,12 +321,17 @@ function tickWorking() {
   if (g && g.live) g.update();
 }
 setInterval(() => { if (!document.hidden) tickWorking(); }, 1000);
-function renderWorking() {
-  const info = targetInfo(target), box = $("#working");
-  const st = info.alive ? info.status : "";
+// What the bottom line says about conversation t (the open one's runline, or an inactive pane's): running, its words, background work left.
+function runLineOf(t) {
+  const info = targetInfo(t), st = info.alive ? info.status : "";
   const on = st === "working" || st === "starting" || st === "rate-limited";
   // A request answered with [later] has no running turn, but its background work is still going: the line stays with that work.
-  const bg = on ? [] : workOfTarget(target), show = on || bg.length > 0;
+  const bg = on ? [] : workOfTarget(t), subs = on ? runningSubs(sourceOf(t)).length : 0;
+  const text = bg.length ? workLine(bg) : `${st === "rate-limited" ? "사용량 한도로 대기 중" : "작업 중…"}${subs ? ` · 서브에이전트 ${subs}` : ""}`;
+  return { st, on, bg, text, show: on || bg.length > 0 };
+}
+function renderWorking() {
+  const box = $("#working"), { st, on, bg, show } = runLineOf(target);
   workingBg = bg;
   box.hidden = !show;
   // Only while the gateway reports this target running: status line, and stop in place of send
@@ -351,8 +362,10 @@ async function loadQueue() {
   try { QUEUE = (await api("/api/queue")).items || []; } catch { return; }
   renderQueue();
 }
-function renderQueue() {
-  const box = $("#queue"), mine = QUEUE.filter(i => i.target === target);
+function renderQueue() { paintQueue($("#queue"), target); paneStrips(); }
+// The queued messages of conversation t in box: the open one's #queue, or the list in an inactive pane.
+function paintQueue(box, t) {
+  const mine = QUEUE.filter(i => i.target === t);
   box.hidden = !mine.length;
   if (!mine.length) { clear(box); return; }
   clear(box).append(...mine.map(i => el("div", { class: "qitem" },
@@ -409,46 +422,49 @@ function ctxSession(t) {
   if (projOnMain(t)) return main();
   return ((C && C.conversations) || []).find(x => x.key === t);
 }
-function renderCtxRing() {
-  const mb = $("#c-model"), lane = isLaneT(target) && S ? S.lanes.find(x => x.name === laneOf(target)) : null;
-  const orchT = target === MAIN || isModelT(target);
+// The model / effort / context chips of conversation t in the chip set k: the open conversation's (renderCtxRing), or the line under an inactive pane's box.
+function paintChips(t, k) {
+  const mb = k.model, lane = isLaneT(t) && S ? S.lanes.find(x => x.name === laneOf(t)) : null;
+  const orchT = t === MAIN || isModelT(t);
   // A conversation with a session of its own but no model choice (작업내역, 알림, a mail thread, app settings) follows main's model: its chip reads that
   // session's model from the context list, main's configured one while the session has no figure yet. The chips only show it; the model is main's to change.
-  const convOnly = isConvT(target) && !isModelT(target), cs = convOnly ? ctxSession(target) : null;
+  const convOnly = isConvT(t) && !isModelT(t), cs = convOnly ? ctxSession(t) : null;
   // The model it answers on now, a fallback included (20-models.js liveModel), with 폴백 중 beside it when that is not the configured one.
-  const live = orchT ? liveModel(target) : convOnly ? { sel: (cs && cs.model) || liveModel(MAIN).conf, conf: "", fallback: null } : lane ? liveModel(`lane:${lane.name}`) : null, sel = live && live.sel;
+  const live = orchT ? liveModel(t) : convOnly ? { sel: (cs && cs.model) || liveModel(MAIN).conf, conf: "", fallback: null } : lane ? liveModel(`lane:${lane.name}`) : null, sel = live && live.sel;
   // The chips say whose they are: the orchestrator and a lane often run the same model with a similar context, and
   // unlabeled they read as one (owner 2026-10-20: "오케스트레이터와 레인별로 구분 안되는거 같은데").
   const owner = orchT || convOnly ? botName : lane ? `세션 ${lane.title || lane.name}` : "";
-  const ob = $("#c-own"), wb = $("#c-worker"), wsel = lane && lane.worker_model;
+  const ob = k.own, wb = k.worker, wsel = lane && lane.worker_model;
   // The row reads as in main; a project's own choice shows in the tooltips and in the menus' first row (inheritRow).
-  const chipOwner = isProjT(target) ? "이 프로젝트" : isModelT(target) ? "이 메일" : convOnly ? "이 대화" : owner;
+  const chipOwner = isProjT(t) ? "이 프로젝트" : isModelT(t) ? "이 메일" : convOnly ? "이 대화" : owner;
   ob.hidden = !(sel && owner); ob.textContent = owner;
   wb.hidden = !wsel;
   if (wsel) { const [wbase, wlevel] = String(wsel).split(":"); wb.textContent = `서브에이전트 ${modelChipText(wbase)}${wlevel ? ` · ${thinkKo(wlevel)}` : ""}`; wb.title = `이 세션의 서브에이전트 모델`; }
   // model and effort are separate chips, each with its own popover
-  const [base, level] = String(sel || "").split(":"), eb = $("#c-effort");
+  const [base, level] = String(sel || "").split(":"), eb = k.effort;
   mb.hidden = !sel; eb.hidden = !level;
   if (sel) prefetchTV();
-  if (sel) { const t = modelChipText(base); mb.textContent = t; mb.title = `${chipOwner} 모델 · ${t}${base && base !== t ? ` (${base})` : ""}`; }
+  if (sel) { const nm = modelChipText(base); mb.textContent = nm; mb.title = `${chipOwner} 모델 · ${nm}${base && base !== nm ? ` (${base})` : ""}`; }
   if (level) { eb.textContent = thinkKo(level); eb.title = `${chipOwner} 추론 강도 · ${thinkKo(level)}`; }
   const keyed = !!(orchT ? S && S.orchestrator && S.orchestrator.key_fallback : lane && lane.key_fallback);
-  $("#c-api").hidden = !keyed;
-  const fbc = $("#c-fb"), fb = live && live.fallback;
+  k.api.hidden = !keyed;
+  const fbc = k.fb, fb = live && live.fallback;
   fbc.hidden = !fb;
   if (fb) { fbc.textContent = fbTagText(fb); fbc.title = `${owner} 기본 모델 ${selText(live.conf)} 대신 쓰는 중`; }
-  $("#cbar").classList.toggle("api", keyed);
-  const b = $("#ctx-ring"), p = ctxSession(target);
+  k.bar.classList.toggle("api", keyed);
+  const b = k.ring, p = ctxSession(t);
   // A parked conversation keeps its last figure; a session with no figure yet has no chip.
   b.hidden = !(p && (p.kind === "conversation" ? p.tokens > 0 : p.running && p.tokens != null));
   if (b.hidden) return;
   const pct = p.percent != null ? Math.min(100, Math.max(0, p.percent)) : 0;
-  const who = isModelT(target) ? chipOwner : isConvT(target) ? "이 대화" : owner;
+  const who = isModelT(t) ? chipOwner : isConvT(t) ? "이 대화" : owner;
   const label = `${who} 컨텍스트 ${p.percent != null ? `${Math.round(p.percent)}% · ${kfmt(p.tokens)}/${kfmt(p.window)}` : `${kfmt(p.tokens)} 토큰`}${p.running ? "" : " · 쉬는 중이라 마지막 값이에요"}`;
   b.title = label; b.setAttribute("aria-label", label);
   b.textContent = p.percent != null ? `컨텍스트 ${Math.round(p.percent)}%` : `컨텍스트 ${kfmt(p.tokens)}`;
   b.classList.toggle("warn", pct >= 80);
 }
+function realChips() { return { own: $("#c-own"), model: $("#c-model"), effort: $("#c-effort"), worker: $("#c-worker"), ring: $("#ctx-ring"), api: $("#c-api"), fb: $("#c-fb"), bar: $("#cbar") }; }
+function renderCtxRing() { paintChips(target, realChips()); paneStrips(); }
 /* ---------- composer chips: model / effort / context of the current target (GET/PUT /api/target) ---------- */
 // The chips are quick switches; the last row of each opens the 모델 · 폴백 screen at this target (fallback order lives there).
 const MODELS_LINK = { value: "__models", label: "모델 설정", sub: "대체 모델 순서까지" };

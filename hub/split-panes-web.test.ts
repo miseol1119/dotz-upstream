@@ -110,3 +110,152 @@ test("the layout survives a reload; a narrow window shows the one section again"
 	await v.resize(1280, 800);
 	await waitFor(v, `document.querySelectorAll("#split .pane").length === 2`);
 });
+
+// A pane looks and measures the same whether it is the active one or not (docs/split-panes.md 비활성 칸): same head, timeline, composer frame and
+// model / effort / context line, each pane with its own conversation's strips, and no outline around the active pane.
+const todo = (text: string) => ({ phases: [{ name: "", tasks: [{ content: text, status: "in_progress" }] }] });
+const sub = (id: string) => ({ id, status: "running", started_at: 1, description: id });
+const long = (target: string) => Array.from({ length: 40 }, (_, i) => ({ ts: at(i), kind: "out", source: "orchestrator", target, text: `${target} 답변 ${i}` }));
+const frameHub = fakeHub({
+	stream: "fake",
+	state: () => idleState({ lanes: [{ ...lane("가나"), status: "working" }, lane("다라")] }),
+	api: (_req, url) => {
+		const p = url.pathname, t = url.searchParams.get("target") ?? "main";
+		if (p === "/api/history") return json({ target: t, events: long(t) });
+		if (p === "/api/activity") return json({ items: [], more: false, history: false });
+		if (p === "/api/conversations" || p === "/api/monitors") return json({ items: [] });
+		if (p === "/api/notices") return json({ unread: 0, items: [] });
+		if (p === "/api/todo") return json(todo(t === "main" ? "왼쪽 할 일" : "오른쪽 할 일"));
+		if (p === "/api/subagents") return json({ sources: { orchestrator: [sub("a1")], "lane:가나": [sub("b1"), sub("b2")] } });
+		if (p === "/api/queue") return json({ items: [{ id: "q1", target: "main", text: "왼쪽 대기" }, { id: "q2", target: "lane:가나", text: "오른쪽 대기" }] });
+		if (p === "/api/models") return json({ orchestrator: { model: "anthropic/claude-opus-5-5", thinking: "medium" }, lanes: [{ name: "가나", model: "anthropic/claude-sonnet-5-5", thinking: "high" }, { name: "다라", model: "anthropic/claude-sonnet-5-5", thinking: "low" }], pickable: [], available: [], thinking_levels: ["low", "medium", "high"] });
+		if (p === "/api/context") return json({ processes: [{ name: "orchestrator", kind: "orchestrator", running: true, tokens: 80000, window: 200000, percent: 40 }, { name: "가나", kind: "lane", running: true, tokens: 140000, window: 200000, percent: 70 }], conversations: [] });
+		return undefined;
+	},
+});
+afterAll(() => frameHub.stop());
+
+// What a pane measures, by its conversation: the rects (x, y, width, height; null while hidden) of the frame's parts, the timeline's scroll, the visible chips.
+const MEASURE = `(() => {
+	const r = n => { const b = n && n.getBoundingClientRect(); return b && (b.width || b.height) ? [b.x, b.y, b.width, b.height] : null; };
+	const out = {};
+	for (const p of paneList()) {
+		const pane = document.querySelector('#split .pane[data-id="' + p.id + '"]'), q = s => pane.querySelector(s), msgs = pane.querySelectorAll(".tl-in .bm");
+		out[p.t] = { active: pane.classList.contains("on"), scroll: q(".timeline").scrollTop, text: pane.textContent,
+			rect: { title: r(q(".cv-head .cv-hd-t")), head: r(q(".cv-head")), timeline: r(q(".timeline")), message: r(msgs[msgs.length - 1]), todo: r(q(".todo")), subs: r(q(".subs")), queue: r(q(".qlist")),
+				runline: r(q(".runline")), composer: r(q(".composer")), input: r(q(".sendrow")), send: r(q(".sendrow > .ib")), chips: r(q(".cbar")) },
+			chips: [...pane.querySelectorAll(".cbar .cchip")].filter(n => r(n)).map(n => n.textContent.trim()), strips: { todo: q(".todo").textContent, subs: q(".subs").textContent, queue: q(".qlist").textContent } };
+	}
+	return out; })()`;
+type Rect = number[] | null;
+type Frame = { active: boolean; scroll: number; text: string; rect: Record<string, Rect>; chips: string[]; strips: Record<string, string> };
+const measure = (v: Awaited<ReturnType<typeof open>>) => ev<Record<string, Frame>>(v, MEASURE);
+// Every rect of a pane that moved by more than half a pixel between two measurements, with how far.
+const moved = (a: Frame, b: Frame) => {
+	const out: Record<string, number> = {};
+	for (const k of Object.keys(a.rect)) {
+		const [x, y] = [a.rect[k], b.rect[k]];
+		const d = x && y ? Math.max(...x.map((n, i) => Math.abs(n - y[i]!))) : x === y ? 0 : 99999;
+		if (d > 0.5) out[k] = Math.round(d * 10) / 10;
+	}
+	if (Math.abs(a.scroll - b.scroll) > 0.5) out.scroll = Math.round(Math.abs(a.scroll - b.scroll));
+	return out;
+};
+const frameOpen = async () => {
+	const v = await frameHub.view({ width: 1280, height: 800 }, "/#chat");
+	await waitFor(v, `target === "main" && CV.placed && tl.querySelectorAll(".bm").length >= 40 && !!M && !!C && TD.by.main && Object.keys(SUBS).length === 2 && QUEUE.length === 2`);
+	await run(v, `paneSplit("lane:가나", "chat", "right")`);
+	await waitFor(v, `paneCount() === 2 && target === "lane:가나" && CV.placed && !!document.querySelector("#split .pane:not(.on) .pane-chat .cbar .cchip:not([hidden])") && TD.by["lane:가나"] && $("#split .pane.on .todo").textContent.includes("오른쪽") && $("#split .pane.on .cv-head .cv-hd-t").textContent.trim() === targetName(target)`);
+	return v;
+};
+const focusPane = async (v: Awaited<ReturnType<typeof open>>, t: string) => {
+	await run(v, `paneFocus(paneList().find(p => p.t === ${JSON.stringify(t)}).id)`);
+	await waitFor(v, `target === ${JSON.stringify(t)} && CV.placed && !!document.querySelector("#split .pane:not(.on) .pane-chat .cbar .cchip:not([hidden])") && $("#split .pane.on .todo").textContent.length > 0 && $("#split .pane.on .cv-head .cv-hd-t").textContent.trim() === targetName(target)`);
+};
+
+test("moving the active pane changes nothing in either pane: head, timeline, message, composer, info line and strips stay put", async () => {
+	const v = await frameOpen();
+	const right = await measure(v);
+	await focusPane(v, "main");
+	const left = await measure(v);
+	expect([right["main"]!.active, right["lane:가나"]!.active, left["main"]!.active, left["lane:가나"]!.active]).toEqual([false, true, true, false]);
+	expect(moved(right["main"]!, left["main"]!)).toEqual({});
+	expect(moved(right["lane:가나"]!, left["lane:가나"]!)).toEqual({});
+	// the model / effort / context line is there in both panes at once, with the pane's own conversation's values
+	for (const f of [right, left]) {
+		expect(f["main"]!.rect.chips).not.toBeNull();
+		expect(f["lane:가나"]!.rect.chips).not.toBeNull();
+		expect(f["main"]!.chips.some(c => c.includes("40%"))).toBe(true);
+		expect(f["lane:가나"]!.chips.some(c => c.includes("70%"))).toBe(true);
+		expect(f["main"]!.chips).not.toEqual(f["lane:가나"]!.chips);
+	}
+	expect(right["main"]!.chips).toEqual(left["main"]!.chips);
+	expect(right["lane:가나"]!.chips).toEqual(left["lane:가나"]!.chips);
+});
+
+test("each pane shows its own conversation's todo strip, subagent line and queue, active or not", async () => {
+	const v = await frameOpen();
+	for (const side of ["lane:가나", "main"]) {
+		if (side === "main") await focusPane(v, "main");
+		const f = await measure(v);
+		const [l, r] = [f["main"]!.strips, f["lane:가나"]!.strips];
+		expect([l.todo.includes("왼쪽 할 일"), l.todo.includes("오른쪽"), l.queue.includes("왼쪽 대기"), l.queue.includes("오른쪽"), l.subs.includes("1개"), l.subs.includes("2개")]).toEqual([true, false, true, false, true, false]);
+		expect([r.todo.includes("오른쪽 할 일"), r.todo.includes("왼쪽"), r.queue.includes("오른쪽 대기"), r.queue.includes("왼쪽"), r.subs.includes("2개"), r.subs.includes("1개")]).toEqual([true, false, true, false, true, false]);
+		expect(f["main"]!.text.includes("오른쪽 할 일")).toBe(false);
+		expect(f["lane:가나"]!.text.includes("왼쪽 할 일")).toBe(false);
+	}
+});
+
+// What each pane's message box and send button show, by its conversation (the same query for the active pane and the mirrors).
+const COMPOSER = `(() => {
+	const out = {};
+	for (const p of paneList()) {
+		const pane = document.querySelector('#split .pane[data-id="' + p.id + '"]'), ta = pane.querySelector("textarea"), b = pane.querySelector(".sendrow > .ib"), cs = getComputedStyle(b);
+		out[p.t] = { placeholder: ta.placeholder, look: [cs.backgroundColor, cs.color, cs.opacity], disabled: b.disabled, inert: b.getAttribute("aria-disabled"), tab: b.tabIndex };
+	}
+	return out; })()`;
+type Cmp = { placeholder: string; look: string[]; disabled: boolean; inert: string | null; tab: number };
+
+test("each pane's message box names its own conversation, and the same one whether its pane is active or not", async () => {
+	const v = await frameOpen();
+	const right = await ev<Record<string, Cmp>>(v, COMPOSER);
+	await focusPane(v, "main");
+	const left = await ev<Record<string, Cmp>>(v, COMPOSER);
+	expect(right["main"]!.placeholder).toContain(await ev(v, `targetName("main")`));
+	expect(right["lane:가나"]!.placeholder).not.toBe(right["main"]!.placeholder);
+	expect(right["main"]!.placeholder).toBe(left["main"]!.placeholder);
+	expect(right["lane:가나"]!.placeholder).toBe(left["lane:가나"]!.placeholder);
+});
+
+test("a pane's send button looks the same active or not (stop look included) and the inactive one is inert without `disabled`", async () => {
+	const v = await frameOpen();
+	const right = await ev<Record<string, Cmp>>(v, COMPOSER);
+	await focusPane(v, "main");
+	const left = await ev<Record<string, Cmp>>(v, COMPOSER);
+	expect(right["main"]!.look).toEqual(left["main"]!.look);
+	expect(right["lane:가나"]!.look).toEqual(left["lane:가나"]!.look);
+	// the working conversation has the stop look, the idle one does not: the comparison above is not between two identical buttons
+	expect(right["main"]!.look).not.toEqual(right["lane:가나"]!.look);
+	// the mirror's button (main on the right state, lane:가나 on the left state)
+	expect([right["main"]!.disabled, right["main"]!.inert, right["main"]!.tab]).toEqual([false, "true", -1]);
+	expect([left["lane:가나"]!.disabled, left["lane:가나"]!.inert, left["lane:가나"]!.tab]).toEqual([false, "true", -1]);
+});
+
+test("the active pane has no accent outline, border or shadow; the others' title is --fg-3; switching starts no animation", async () => {
+	const v = await frameOpen();
+	const look = `(() => {
+		const pane = $("#split .pane.on"), cs = getComputedStyle(pane), after = getComputedStyle(pane, "::after"), probe = document.body.appendChild(document.createElement("i")), c = v => (probe.style.color = v, getComputedStyle(probe).color);
+		const out = { shadow: cs.boxShadow, outline: cs.outlineStyle, border: [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth], after: [after.content, after.boxShadow],
+			quiet: getComputedStyle($("#split .pane:not(.on) .cv-hd-t")).color === c("var(--fg-3)"), strong: getComputedStyle($("#split .pane.on .cv-hd-t")).color === c("var(--fg)") };
+		probe.remove(); return out; })()`;
+	expect(await ev(v, look)).toEqual({ shadow: "none", outline: "none", border: ["0px", "0px", "0px", "0px"], after: ["none", "none"], quiet: true, strong: true });
+	await run(v, `paneFocus(paneList().find(p => p.t === "main").id)`);
+	// right after the switch, before any frame: no transition or animation that ends is running in the panes
+	expect(await ev(v, `document.getAnimations().filter(a => a.effect && a.effect.getTiming().iterations !== Infinity && a.effect.target && a.effect.target.closest("#split")).map(a => a.transitionProperty || a.animationName)`)).toEqual([]);
+});
+
+test("a click in an inactive pane's composer makes it the active one with the caret in the box", async () => {
+	const v = await frameOpen();
+	await run(v, `$("#split .pane:not(.on) .sendrow").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerId: 1 }))`);
+	await waitFor(v, `target === "main" && CV.placed && document.activeElement === $("#text") && $("#split .pane.on").contains($("#text"))`);
+});

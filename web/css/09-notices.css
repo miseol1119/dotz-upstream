@@ -136,4 +136,4 @@ button.nt-x:active { background: var(--active); color: var(--fg); }
 .dc-hb { flex: none; display: flex; align-items: center; gap: var(--sp-05); }
 
 /* 알림 conversation: the record behind the 알림 screen has no composer (31-conversations.js convPaint sets .no-composer) */
-#v-chat.no-composer > .composer { display: none; }
+:is(#v-chat, .pane-chat).no-composer > .composer { display: none; }

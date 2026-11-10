@@ -70,20 +70,22 @@ const spawnOrder = list => list.sort((a, b) => (a.started_at || 0) - (b.started_
 // Running ones only, in spawn order (oldest first, the newest added at the bottom); rows never reorder on progress.
 function renderSubs() {
   const src = sourceOf(target);
-  const list = spawnOrder(runningSubs(src));
-  const run = list.length;
-  const sig = JSON.stringify([src, list.length]);
-  for (const box of document.querySelectorAll(".subs")) {
-    box.hidden = !list.length;
-    if (box.dataset.sig === sig) continue;
-    box.dataset.sig = sig;
-    clear(box);
-    if (!list.length) continue;
-    box.append(el("button", { class: "subsum", type: "button", onclick: () => openSubs([src]) },
-      el("span", { class: `dot ${run ? "pri" : ""}` }),
-      el("span", { class: "nm", text: `서브에이전트 ${run}개 진행 중` }),
-      icon("chev", "chev")));
-  }
+  for (const box of document.querySelectorAll(".subs")) if (!box.closest(".pane-chat")) paintSubs(box, src);
+  paneStrips();
+}
+// The line of source src in box: the open conversation's, or the one in an inactive pane (43-panes-mirror.js).
+function paintSubs(box, src) {
+  const run = spawnOrder(runningSubs(src)).length;
+  const sig = JSON.stringify([src, run]);
+  box.hidden = !run;
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig;
+  clear(box);
+  if (!run) return;
+  box.append(el("button", { class: "subsum", type: "button", onclick: () => openSubs([src]) },
+    el("span", { class: "dot pri" }),
+    el("span", { class: "nm", text: `서브에이전트 ${run}개 진행 중` }),
+    icon("chev", "chev")));
 }
 let SUBD = null;
 const sheet = $("#sheet"), shBody = $("#sh-body");

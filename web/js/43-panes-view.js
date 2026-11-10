@@ -1,7 +1,7 @@
 /* ---------- 분할 창: the screen (docs/split-panes.md) ----------
    #split sits in #views from the second pane on, on a wide screen only: [list column][tree of panes]. The active pane holds the real #v-chat / #v-project
    (go() finds the sections by id), the list column holds convSide / #v-projects. Back to one pane or a narrow window: every node goes where it was and #split goes. */
-let PNV = { el: null, side: null, tree: null, sig: "", order: null, list: "chat" };
+let PNV = { el: null, side: null, tree: null, sig: "", order: null, list: "chat", cmp: null };
 
 function paneRoot() {
   if (PNV.el) return PNV.el;
@@ -79,6 +79,7 @@ function paneTeardown() {
 function paneDraw() {
   const chat = current === "chat", at = chat ? chatAnchor() : null, stick = chatStick;
   paneRelease();
+  PNV.cmp = $("#composer");   // the open pane's section leaves the document while its pane is built, so the mirrors take the composer from here
   const kind = paneFind(PN.active).kind, sec = $(kind === "project" ? "#v-project" : kind === "app" ? "#v-monitoring" : "#v-chat");
   sec.classList.add("in-pane");
   // 모니터링 keeps the list that was there, so focusing it does not move every pane sideways.
@@ -106,11 +107,11 @@ function paneShare(n, box) {
 function paneLeafEl(p, sec) {
   const on = p.id === PN.active;
   const x = el("button", { class: "ib pane-x", type: "button", "aria-label": "창 닫기", title: "창 닫기", onclick: () => paneClose(p.id) }, icon("close"));
-  const kids = !on ? [paneMirror(p)] : p.kind === "app" ? [paneHeadEl(p).head, sec] : [sec, x];
+  const kids = !on ? (p.kind === "chat" ? [paneMirror(p), x] : [paneMirror(p)]) : p.kind === "app" ? [paneHeadEl(p).head, sec] : [sec, x];
   const box = el("div", { class: `pane${on ? " on" : ""}`, "data-id": p.id, "data-kind": p.kind }, ...kids);
   box.addEventListener("pointerdown", ev => {
     if (ev.button !== 0 || p.id === PN.active || ev.target.closest(".pane-x")) return;
-    const stub = !!ev.target.closest(".pane-cmp");
+    const stub = !!ev.target.closest(".pane-chat .composer");
     paneFocus(p.id);
     if (stub) requestAnimationFrame(() => $("#text").focus());
   }, true);

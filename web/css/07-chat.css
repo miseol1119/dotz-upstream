@@ -16,20 +16,20 @@
 
 /* ---------- 채팅 대화 카드 안의 차례 (proto .cv: 머리 -> todo -> 타임라인 -> 진행 줄 -> 확인 카드 -> 컴포저) ---------- */
 /* todo 스트립: 대화 카드 안, 타임라인 바로 위, 카드와 같은 회색 면 (proto .todo) */
-#v-chat > .todo { background: var(--layer); }
+:is(#v-chat, .pane-chat) > .todo { background: var(--layer); }
 /* 서브에이전트 줄: 타임라인 아래 한 줄 (proto .run), 카드가 아니라 조용한 글줄 */
-#v-chat > .subs { flex: none; border-radius: 0; background: transparent; overflow: visible; }
-#v-chat > .subs .subsum { min-height: 28px; padding: var(--sp-1) var(--sp-3); border-radius: var(--r-ctl); color: var(--fg-2); font: 500 12px/16px var(--font); }
-#v-chat > .subs .subsum .dot { width: 6px; height: 6px; }
-#v-chat > .subs .subsum .chev { width: 14px; height: 14px; }
-#v-chat > .subs .sublist { padding: var(--sp-1); border-radius: var(--r-ctl); background: var(--layer); }
+:is(#v-chat, .pane-chat) > .subs { flex: none; border-radius: 0; background: transparent; overflow: visible; }
+:is(#v-chat, .pane-chat) > .subs .subsum { min-height: 28px; padding: var(--sp-1) var(--sp-3); border-radius: var(--r-ctl); color: var(--fg-2); font: 500 12px/16px var(--font); }
+:is(#v-chat, .pane-chat) > .subs .subsum .dot { width: 6px; height: 6px; }
+:is(#v-chat, .pane-chat) > .subs .subsum .chev { width: 14px; height: 14px; }
+:is(#v-chat, .pane-chat) > .subs .sublist { padding: var(--sp-1); border-radius: var(--r-ctl); background: var(--layer); }
 /* 타임라인 위아래 경계는 .kk-tl(17-kakao.css)과 같은 12px 마스크로 글자를 흐려요. 더 스크롤할 쪽에만 걸려요(edgeFade의 fade-t, fade-b).
    맨 아래에서는 마지막 줄이 그대로 보이고, 맨 아래로 버튼과 입력창은 .timeline 밖이라 흐려지지 않아요. 03-base의 덮개 페이드는 여기서 꺼요.
    메일을 열면 .mtop이 맨 위에 붙어 있어서 위쪽은 흐리지 않아요. */
-#v-chat .chatbox::before, #v-chat .chatbox::after { content: none; }
-#v-chat .timeline { --edge-t: 0px; --edge-b: 0px; -webkit-mask-image: linear-gradient(transparent, #000 var(--edge-t), #000 calc(100% - var(--edge-b)), transparent); mask-image: linear-gradient(transparent, #000 var(--edge-t), #000 calc(100% - var(--edge-b)), transparent); }
-#v-chat .chatbox.fade-t:not(:has(.mtop)) > .timeline { --edge-t: var(--sp-3); }
-#v-chat .chatbox.fade-b > .timeline { --edge-b: var(--sp-3); }
+:is(#v-chat, .pane-chat) .chatbox::before, :is(#v-chat, .pane-chat) .chatbox::after { content: none; transition: none; }
+:is(#v-chat, .pane-chat) .timeline { --edge-t: 0px; --edge-b: 0px; -webkit-mask-image: linear-gradient(transparent, #000 var(--edge-t), #000 calc(100% - var(--edge-b)), transparent); mask-image: linear-gradient(transparent, #000 var(--edge-t), #000 calc(100% - var(--edge-b)), transparent); }
+:is(#v-chat, .pane-chat) .chatbox.fade-t:not(:has(.mtop)) > .timeline { --edge-t: var(--sp-3); }
+:is(#v-chat, .pane-chat) .chatbox.fade-b > .timeline { --edge-b: var(--sp-3); }
 
 /* ---------- 컴포저: 시제품 .cmp — [첨부 · 글 · 원형 전송] 회색 18px 상자 (모든 입력 줄의 공통 기반) ----------
    .sendrow 자체가 기반이에요: 채팅 입력줄(#send)과 카카오톡 방 입력줄(#kk-form) 같은 어떤 입력줄도 .sendrow 안에 [.cmp-plus(첨부, 선택) · textarea · .ib(보내기)]와
@@ -39,20 +39,20 @@
 .sendrow:not(.ulw):focus-within { border-color: transparent !important; }
 .sendrow textarea { grid-area: ta; padding: 7px var(--sp-1); /* nudge: 22px line + 2 x 7px = 36px, the height of the send button beside it */ font-size: 15px; line-height: 22px; text-overflow: ellipsis; }
 .sendrow textarea::placeholder { white-space: nowrap; text-overflow: ellipsis; }   /* 폰에서 긴 안내 글이 두 줄로 접혀 상자를 키우지 않게 한 줄로 (시제품 .cmp는 한 줄) */
-#c-attach, .sendrow > .cmp-plus { grid-area: plus; display: inline-flex; align-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 0; justify-content: center; border-radius: 50%; background: transparent; color: var(--fg-2); font-size: 0; }
-#c-attach .ic, .sendrow > .cmp-plus .ic { width: 20px; height: 20px; }
-@media (hover: hover) { #c-attach:hover, .sendrow > .cmp-plus:hover { background: var(--hover); color: var(--fg); } }
+:is(#c-attach, .pane-chat [data-c="c-attach"]), .sendrow > .cmp-plus { grid-area: plus; display: inline-flex; align-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 0; justify-content: center; border-radius: 50%; background: transparent; color: var(--fg-2); font-size: 0; }
+:is(#c-attach, .pane-chat [data-c="c-attach"]) .ic, .sendrow > .cmp-plus .ic { width: 20px; height: 20px; }
+@media (hover: hover) { :is(#c-attach, .pane-chat [data-c="c-attach"]):hover, .sendrow > .cmp-plus:hover { background: var(--hover); color: var(--fg); } }
 .sendrow > .ib { grid-area: send; width: 36px; height: 36px; border-radius: 50%; }
 .sendrow > .cbar { grid-area: bar; margin: 0; padding: var(--sp-1) var(--sp-1) var(--sp-05); min-height: 0; }
-#cbar { display: flex; align-items: center; flex-wrap: nowrap; gap: var(--sp-15); min-height: 20px; margin: var(--sp-1) 0 0; padding: 0 var(--sp-05); overflow-x: auto; scrollbar-width: none; }
-#cbar::-webkit-scrollbar { display: none; }
-#cbar .cchip { height: auto; min-height: 20px; padding: 0 var(--sp-05); background: transparent; color: var(--fg-3); font-size: 12px; line-height: 16px; }
-#cbar button.cchip { cursor: pointer; }
-@media (hover: hover) { #cbar button.cchip:hover { background: transparent; color: var(--fg); } }
-#cbar .cchip.cown { opacity: 1; color: var(--fg-3); }
-@media (pointer: coarse) { #cbar { min-height: var(--btn-h-sm); margin-top: 0; } #cbar button.cchip { min-height: var(--btn-h-sm); padding: 0 var(--sp-15); } }
-#cbar .working { display: none !important; }
-@media (pointer: coarse) { #c-attach, .sendrow > .cmp-plus { width: 36px; height: 36px; } }
+:is(#cbar, .pane-chat .cbar) { display: flex; align-items: center; flex-wrap: nowrap; gap: var(--sp-15); min-height: 20px; margin: var(--sp-1) 0 0; padding: 0 var(--sp-05); overflow-x: auto; scrollbar-width: none; }
+:is(#cbar, .pane-chat .cbar)::-webkit-scrollbar { display: none; }
+:is(#cbar, .pane-chat .cbar) .cchip { height: auto; min-height: 20px; padding: 0 var(--sp-05); background: transparent; color: var(--fg-3); font-size: 12px; line-height: 16px; }
+:is(#cbar, .pane-chat .cbar) button.cchip { cursor: pointer; }
+@media (hover: hover) { :is(#cbar, .pane-chat .cbar) button.cchip:hover { background: transparent; color: var(--fg); } }
+:is(#cbar, .pane-chat .cbar) .cchip.cown { opacity: 1; color: var(--fg-3); }
+@media (pointer: coarse) { :is(#cbar, .pane-chat .cbar) { min-height: var(--btn-h-sm); margin-top: 0; } :is(#cbar, .pane-chat .cbar) button.cchip { min-height: var(--btn-h-sm); padding: 0 var(--sp-15); } }
+:is(#cbar, .pane-chat .cbar) .working { display: none !important; }
+@media (pointer: coarse) { :is(#c-attach, .pane-chat [data-c="c-attach"]), .sendrow > .cmp-plus { width: 36px; height: 36px; } }
 
 /* 실행 상태 줄 (41-runstate.js, 시제품 .run): 입력 상자 위 한 줄, 12/16 회색 글이에요. 경고·오류는 색만 바뀝니다 */
 .runstate { min-height: 20px; margin: 0 0 var(--sp-15) var(--sp-1); color: var(--fg-2); font-size: 12px; line-height: 16px; }
