@@ -143,7 +143,8 @@ function ntFind(at) {
   }
   return best;
 }
-// Older messages, 300 at a time (up to four rounds), until the loaded history reaches back to `at`.
+// Older messages, 300 at a time (up to four rounds), until the loaded history reaches back to `at`; a message further back comes in with the page around it
+// (GET /api/history?around=, joined by chatMerge as a quote's original is, rpJump). Only a message the gateway no longer holds is left to the caller's toast.
 async function ntReach(t, at) {
   const s = ts(t);
   for (let i = 0; i < 4 && s.msgs.length && s.msgs[0].ts > at; i++) {
@@ -156,6 +157,13 @@ async function ntReach(t, at) {
     if (isFixedT(t)) dedupKeyed(s);
     if (t === target) renderAll(true);
   }
+  if (!s.msgs.length || s.msgs.some(e => e.ts === at)) return;
+  try {
+    const r = await api(`/api/history?target=${enc(t)}&limit=150&around=${enc(at)}`);
+    if (!r.at || t !== target) return;
+    chatMerge(s, r);
+    renderAll(true);
+  } catch (e) { console.warn("history around", e); }
 }
 // The element that carries the highlight: the card or bubble inside the message when there is one, else the message itself. Anything that paints
 // its own fill keeps the glow on its own rounded shape; plain text gets the tint alone ("nt-bar"). ~2s soft fade (a brief still tint under reduced motion: 09-notices.css).
