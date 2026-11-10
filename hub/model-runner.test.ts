@@ -2,7 +2,7 @@
 // it answers `prompt` frames like OmO's rpc mode, answers `new_session`, or exits/hangs on request, and records every
 // spawn (argv, pinned account, commands) so reuse and restart are observable. No real model is ever called.
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, watch, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { modelDeps, callModel } from "./outlang.ts";
@@ -77,6 +77,22 @@ const commands = (): string[] => {
 		return [];
 	}
 };
+// Resolves when the fake has logged `n` commands of `type`. The fake is another process, so how many event-loop turns that takes depends on
+// machine load; the log file's change event is the signal, and the bound only turns a lost command into a clear failure.
+const commandsLogged = async (type: string, n: number, boundMs = 15_000): Promise<void> => {
+	const count = () => commands().filter(c => c === type).length;
+	let watcher: ReturnType<typeof watch> | undefined;
+	const arrived = new Promise<void>(resolve => {
+		watcher = watch(cmdFile, () => count() >= n && resolve());
+		if (count() >= n) resolve();
+	});
+	try {
+		const ok = await Promise.race([arrived.then(() => true), Bun.sleep(boundMs).then(() => false)]);
+		if (!ok) throw new Error(`the fake omo logged ${count()} of ${n} "${type}" commands within ${boundMs} ms`);
+	} finally {
+		watcher?.close();
+	}
+};
 const account = (name = "default", access = "a") => ({ name, access, refresh: "r", expires: 1 });
 const auth = (accounts: unknown[], pinned = "default") => writeFileSync(join(agent, "auth.json"), JSON.stringify({ "anthropic-subscription": { type: "oauth", pinned, accounts } }));
 const usage = (windows: { usedPercent: number; resetsAt: string }[], name = "default") => {
@@ -140,7 +156,7 @@ test("the first call starts one warm process and later calls reuse it", async ()
 	expect(spawns()[0].argv).toContain("--no-tools");
 	expect(runnerCountForTest()).toBe(1);
 	// each answer resets the session, so the next prompt starts without the one before it
-	await flush();
+	await commandsLogged("new_session", 2);
 	expect(commands().filter(c => c === "new_session")).toHaveLength(2);
 });
 
