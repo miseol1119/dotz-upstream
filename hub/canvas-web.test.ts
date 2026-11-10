@@ -79,7 +79,7 @@ describe("캔버스 at 1280px", () => {
 	for (const theme of ["light", "dark"] as const) test(`an HTML result opens beside the conversation under the 앱 header (${theme})`, async () => {
 		const v = await open(1280, 900, theme);
 		const h = await head(v);
-		expect({ ...h, box: undefined }).toEqual({ name: "report.html", sub: "화면 파일", hint: "⌘+클릭으로 요소 고르기", buttons: ["새 탭에서 열기", "캔버스 닫기"], font: "18px", box: undefined, ran: false });
+		expect({ ...h, box: undefined }).toEqual({ name: "report.html", sub: "화면 파일", hint: "⌘+클릭으로 요소 고르기", buttons: ["새 탭에서 열기", "캔버스 닫기"], font: "20px", box: undefined, ran: false });
 		const comp = await get(v, `const c = document.querySelector("#composer").getBoundingClientRect(); return { right: Math.round(c.right), shown: c.width > 300 };`);
 		expect(comp.shown).toBe(true);
 		expect(h.box[0]).toBeGreaterThanOrEqual(comp.right);
@@ -147,7 +147,7 @@ describe("캔버스 at 390px", () => {
 	for (const theme of ["light", "dark"] as const) test(`a full-screen sheet with the 앱 header and a back button (${theme})`, async () => {
 		const v = await open(390, 844, theme);
 		const h = await head(v);
-		expect({ name: h.name, buttons: h.buttons, font: h.font, box: h.box, ran: h.ran }).toEqual({ name: "report.html", buttons: ["캔버스 닫기", "새 탭에서 열기"], font: "18px", box: [0, 0, 390, 844], ran: false });
+		expect({ name: h.name, buttons: h.buttons, font: h.font, box: h.box, ran: h.ran }).toEqual({ name: "report.html", buttons: ["캔버스 닫기", "새 탭에서 열기"], font: "20px", box: [0, 0, 390, 844], ran: false });
 		const fr = await get(v, `const r = document.querySelector("#canvas .apps-frame").getBoundingClientRect(); return [Math.round(r.width), Math.round(r.bottom)];`);
 		expect(fr[0]).toBeGreaterThan(340);
 		expect(fr[1]).toBeLessThanOrEqual(844);
