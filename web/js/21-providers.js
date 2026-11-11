@@ -241,7 +241,7 @@ async function loadQuota(fresh) {
   noteQuota(q);
   if (current === "usage") quotaTimer = setTimeout(loadQuota, 60000);
   clear(box);
-  box.append(el("div", { class: "tools-bar" }, el("span", { class: "sup", text: q.fetched_at ? kstStamp(q.fetched_at) : "" }),
+  box.append(el("div", { class: "tools-bar" }, el("span", { class: "sup", text: q.fetched_at ? monTime(q.fetched_at) : "" }),
     el("button", { class: "btn text sm", type: "button", onclick: ev => busy(ev.currentTarget, () => loadQuota(true)) }, icon("refresh"), "새로고침")));
   const grid = el("div", { class: "grid" });
   for (const p of q.providers || []) {
@@ -273,7 +273,7 @@ async function loadQuota(fresh) {
     // the why is said once: the reason line, or the kind when there is no reason
     const row = s => el("div", { class: "li" }, el("span", { class: "tx" },
       el("div", { class: "hd", text: `${s.from ? `${s.from_label || s.from} → ` : ""}${s.to_label || s.to}` }),
-      el("div", { class: "sup", text: `${kstStamp(Date.parse(s.at))} · ${s.reason || s.kind_text || KIND[s.kind] || s.kind}` })),
+      el("div", { class: "sup", text: `${monTime(Date.parse(s.at))} · ${s.reason || s.kind_text || KIND[s.kind] || s.kind}` })),
       el("button", { class: "ib", type: "button", "aria-label": "이 기록 지우기", onclick: () => drop(s.at, "기록을 지웠어요") }, icon("close")));
     const older = all.slice(SHOWN).map(row);
     older.forEach(n => { n.hidden = true; });
@@ -282,7 +282,7 @@ async function loadQuota(fresh) {
       older.forEach(n => { n.hidden = !open; });
       ev.currentTarget.textContent = open ? "이전 기록 접기" : `이전 기록 ${older.length}개 더 보기`;
     } }) : null;
-    const cur = [A.since ? `${kstStamp(Date.parse(A.since))}부터` : "", A.pinned ? "고정한 계정이에요" : ""].filter(Boolean).join(" · ");
+    const cur = [A.since ? `${monTime(Date.parse(A.since))}부터` : "", A.pinned ? "고정한 계정이에요" : ""].filter(Boolean).join(" · ");
     box.append(el("div", { class: "list" },
       el("div", { class: "li", style: "display:block" }, el("div", { class: "hd", text: A.account_label || A.account }), cur ? el("div", { class: "sup", text: cur }) : null),
       ...all.slice(0, SHOWN).map(row), ...older));

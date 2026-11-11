@@ -62,6 +62,8 @@ test("the Codex card draws how many 리셋권 it holds and when the nearest one 
 	const r = await row();
 	expect(r).toMatchObject({ count: "2개", off: false });
 	expect(r?.sub).toContain("만료");
+	// one date shape on the screen: the read time in the bar is not the dotted "11. 9. 오전 07:00" shape beside the expiry's "11월 26일 (목)"
+	expect(await q<string>(`return document.querySelector("#usage .tools-bar .sup").textContent`)).not.toMatch(/\d+\. \d+\./);
 	expect(await q(`return document.querySelector("#usage .lim.rc").closest(".card").querySelector("h3").textContent`)).toBe("Codex · Plus");
 });
 

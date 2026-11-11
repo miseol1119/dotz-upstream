@@ -69,8 +69,8 @@ function mailPeople(m, raw, subject) {
 function mailHeadNode(m) {
   const src = m || {};
   const from = mailAddrList(src.from), to = mailAddrList(src.to), cc = mailAddrList(src.cc);
-  const row = (k, list) => el("div", { class: "mhd-r" }, el("span", { class: "mhd-k", text: k }), list.length ? mailAddrNode(list) : el("span", { class: "mhd-v mhd-none", text: "-" }));
-  return el("div", { class: "mhd", role: "group", "aria-label": "보낸 사람과 받는 사람" }, row("보낸 사람", from), row("받는 사람", to), cc.length ? row("참조", cc) : null);
+  const row = (k, list) => (list.length ? el("div", { class: "mhd-r" }, el("span", { class: "mhd-k", text: k }), mailAddrNode(list)) : null);   // a row with nobody in it is left out, not shown as "-"
+  return el("div", { class: "mhd", role: "group", "aria-label": "보낸 사람과 받는 사람" }, row("보낸 사람", from), row("받는 사람", to), row("참조", cc));
 }
 
 // A mail list row's one-line version: two names then 외 N명, no buttons inside the row (the whole row opens the mail).

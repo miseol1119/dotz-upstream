@@ -94,8 +94,8 @@ function dcChecked() {
     c.admin === true ? el("div", { class: "dcs-ok", text: "관리자 권한 확인됨" }) : c.invite_url ? el("div", {}, el("div", { text: "관리자 권한이 없어요." }), el("a", { class: "btn tonal", href: c.invite_url, target: "_blank", rel: "noopener noreferrer", text: "봇 권한 다시 승인" })) : null,
     c.intent_note ? el("div", { class: "sup", text: c.intent_note }) : null);
 }
-function dcConnect(btn) {
-  return obStart("discord", btn);
+function dcConnect() {
+  return obStart("discord");
 }
 function dcAdvanced(v) {
   const rows = [el("div", { class: "li dcs-form" }, textField("서버 ID", DCS.guild), textField("내 사용자 ID", DCS.owner),
@@ -124,6 +124,6 @@ function renderDiscord() {
   det.addEventListener("toggle", () => { DCS.advOpen = det.open; });
   clear(box).append(el("div", { class: "sec", text: "연결" }), el("div", { class: "list" },
     el("div", { class: "li", "data-ms-status": "discord" }, el("span", { class: "lead" }, icon("discord")), el("span", { class: "tx" }, el("div", { class: "hd", text: "Discord 봇" }), el("div", { class: "sup", text: line })),
-      liEnd(el("span", { class: `tag ${tone}`, text: tag }), el("button", { type: "button", class: "btn tonal inrow", "data-ms-connect": "discord", onclick: ev => dcConnect(ev.currentTarget) }, msConnectLabel(m))))),
+      liEnd(el("span", { class: `tag ${tone}`, text: tag }), el("button", { type: "button", class: "btn tonal inrow", "data-ms-connect": "discord", disabled: OB_WAIT.has("discord"), onclick: dcConnect }, OB_WAIT.has("discord") ? "연결하는 중" : msConnectLabel(m))))),
   ...obSection("discord", m ? m.state === "ok" : v.connected), ...dcSwitches(), ...guide, det);
 }

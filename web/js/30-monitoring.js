@@ -154,7 +154,9 @@ const monRowOf = id => [...$("#mon-tl").querySelectorAll("[data-nid], [data-nids
 // The words of a report without the monitor's name in front ("node security updates: 결과가 바뀌었어요" -> "결과가 바뀌었어요").
 function monStrip(s, names) {
   for (const x of names) if (s.startsWith(x)) { const r = s.slice(x.length).replace(/^\s*[:：]\s*/, ""); if (r !== s.slice(x.length)) return r; }
-  return s;
+  // A first line that is only the title (bold or not) says it a second time under the title: the row's line and the opened card start after it.
+  const nl = s.indexOf("\n"), first = nl < 0 ? "" : s.slice(0, nl).replace(/^[\s#*_]+|[\s*_]+$/g, "");
+  return first && names.includes(first) ? s.slice(nl + 1).replace(/^\s*\n/, "") : s;
 }
 // 마지막 정상 only says something after a failure, when it is not the last run: a monitor that is fine already reads 정상 with its last run's time.
 const monLastOk = m => (m.fails || m.last_result === "fail") && m.last_ok && m.last_ok !== m.last_run ? `마지막 정상 ${monTime(m.last_ok)}` : "";
@@ -455,6 +457,8 @@ function monSummary(n, names) {
   const s = lines.slice(0, 2).join(" · ");
   return (s.length > 140 ? `${s.slice(0, 139)}…` : s) || ntPlain(n.title) || "알림";
 }
+// The row's second line, only when it says something its first line (the source) does not: a report that is one sentence is said once.
+const monSumNode = (n, names, src) => { const s = monSummary(n, names); return s === src ? null : el("div", { class: "fr-sum", text: s }); };
 const monFoldKey = (n, names) => `${n.tone}|${monSummary(n, names)}`;
 // One source of the feed: the watch's name on one computer (a peer's report of the same name is its own row).
 const monSrcKey = n => `${n.pc ? n.pc.name : ""}|${ntPlain(n.title)}`;
@@ -508,7 +512,7 @@ function monRowNode(n, names) {
   const need = monNeed(n);
   return el("div", { class: `bm alert rc fr${n.read ? "" : " un"}`, "data-nid": n.id, role: "button", tabindex: "0", "aria-expanded": "false", "aria-label": `${src} 소식 펼치기`, onclick: () => monToggle(key), onkeydown: ev => monKey(ev, () => monToggle(key)) },
     el("div", { class: "rc-hd" }, el("span", { class: "rc-src", text: src }), n.pc ? el("span", { class: "tag", text: n.pc.name }) : null, need ? monTag("ask") : monTag(n.tone), el("span", { class: "rc-time", text: monWhen(n) })),
-    el("div", { class: "fr-sum", text: monSummary(n, names) }),
+    monSumNode(n, names, src),
     need ? el("div", { class: "btns cc-act" }, el("button", { class: "btn tonal", type: "button", onclick: ev => { ev.stopPropagation(); noticeOpen(n); }, text: "답하러 가기" })) : null);
 }
 // A monitor's 확인 기록 is the prototype's detail list (#watch/price): ONE card of compact rows - a dot for the result, the report's first line (a price
@@ -558,7 +562,7 @@ function monGroupNode(g, names) {
   const open = MON.open.has(key), unread = g.filter(n => !n.read).length, src = ntPlain(names[0] || n0.title) || "알림";
   const head = el("div", { class: `bm alert rc fr grp${unread ? " un" : ""}${open ? " open" : ""}`, "data-nid": open ? null : n0.id, "data-group": key, role: "button", tabindex: "0", "aria-expanded": String(open), "aria-label": `${src} 소식 ${g.length}건 ${open ? "접기" : "펼치기"}`, onclick: () => monToggle(key), onkeydown: ev => monKey(ev, () => monToggle(key)) },
     el("div", { class: "rc-hd" }, el("span", { class: "rc-src", text: src }), n0.pc ? el("span", { class: "tag", text: n0.pc.name }) : null, need ? monTag("ask") : monTag(n0.tone), el("span", { class: "tag fr-n", text: need ? `같은 질문 ${g.length}번` : `${g.length}건` }), unread ? el("span", { class: "nb", "aria-label": `안 읽음 ${unread}개`, text: unread > 99 ? "99+" : String(unread) }) : null, el("span", { class: "rc-time", text: monWhen(n0) }), el("span", { class: "fr-chev", "aria-hidden": "true" }, icon("drop"))),
-    open ? null : el("div", { class: "fr-sum", text: monSummary(n0, names) }),
+    open ? null : monSumNode(n0, names, src),
     // the same question asked again: answered once from its newest one, the earlier ones listed when unfolded
     need && !open ? el("div", { class: "btns cc-act" }, el("button", { class: "btn tonal", type: "button", onclick: ev => { ev.stopPropagation(); noticeOpen(n0); }, text: "답하러 가기" })) : null);
   if (!open) return [head];

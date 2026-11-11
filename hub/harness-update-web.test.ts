@@ -42,6 +42,7 @@ const harness = (available: boolean, extra: object = {}) => ({
 	...extra,
 });
 let state = { dotzIncoming: 0, harnesses: [harness(true)] };
+let checkGate: Promise<void> | null = null;   // holds the answer of POST /api/update/check until a test lets it go
 
 const json = (v: unknown, status = 200) => Response.json(v, { status });
 const server = Bun.serve({
@@ -82,6 +83,10 @@ const server = Bun.serve({
 				script: { path: null, timeout_ms: 5000, every_minutes: 5, last: null },
 			});
 		if (p === "/api/update") return json(dotz(state.dotzIncoming));
+		if (p === "/api/update/check" && req.method === "POST") {
+			if (checkGate) await checkGate;
+			return json(dotz(state.dotzIncoming).lastCheck);
+		}
 		if (p === "/api/harness/update" && req.method === "GET") return json({ harnesses: state.harnesses, busy: [], checking: false });
 		if (p === "/api/harness/update/check" && req.method === "POST") {
 			calls.push("POST check");
@@ -197,4 +202,21 @@ test("settings: an OmO update marks only 작업 프로그램, a dotz update only
 		await waitFor(v, `document.getAnimations().every(a => a.playState !== "running")`);
 		await shot(v, `settings-${c.dotzIncoming}${c.omo ? 1 : 0}-390.png`);
 	}
+}, 30_000);
+
+test("update screen: 확인 turns the pressed row into 확인하는 중 and the card stays, then the result comes back into it", async () => {
+	state = { dotzIncoming: 0, harnesses: [harness(false)] };
+	const v = await open(390, 844);
+	await run(v, `go("update")`);
+	const ROWBTN = `document.querySelector("#update #upd-sec .li button")`;
+	await waitFor(v, ROWBTN);
+	let free = () => {};
+	checkGate = new Promise<void>(r => { free = r; });
+	await run(v, `${ROWBTN}.click()`);
+	await waitFor(v, `document.querySelector("#update #upd-sec .li .sup").textContent === "확인하는 중…"`);
+	expect(await q(v, `return [${ROWBTN}.disabled, !!document.querySelector("#update #upd-sec")]`)).toEqual([true, true]);
+	checkGate = null;
+	free();
+	await waitFor(v, `document.querySelector("#update #upd-sec .li .sup").textContent.startsWith("실행 중") && !${ROWBTN}.disabled`);
+	expect(await q<number>(v, `return document.querySelectorAll("#update #upd-sec .li").length`)).toBeGreaterThan(1);
 }, 30_000);

@@ -332,6 +332,8 @@ describe("카카오톡 at desktop width (1280x800)", async () => {
 	test("a message in another room adds to its unread badge", async () => {
 		emit({ kind: "kakao", chatId: "300", logId: "9" });
 		await waitFor(v, `(document.querySelector('.kk-row[data-chat="300"] .nb') || {}).textContent === "1"`);
+		// the unread count is the same badge as every other list's (blue in light), not the 확인 필요 orange
+		expect(await q<boolean>(v, `const b = document.querySelector('.kk-row[data-chat="300"] .nb'), ref = document.body.appendChild(Object.assign(document.createElement("span"), { className: "nb" })), same = getComputedStyle(b).backgroundColor === getComputedStyle(ref).backgroundColor; ref.remove(); return same && !b.classList.contains("warn")`)).toBe(true);
 	});
 
 	test("read counters: a small bold yellow number on the time side of a bubble, above the time, own and incoming alike, none at 0", async () => {

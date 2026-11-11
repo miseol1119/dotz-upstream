@@ -65,10 +65,19 @@ async function loadOnboarding(key) {
   try { obApply(key, await api(`/api/onboarding/${enc(key)}`)); }
   catch { obPaint(key); }
 }
-async function obStart(key, btn) {
+// The keys whose start is on its way: the pressed row says 연결하는 중 until the answer comes (the start can take a while), and a failure says what to do.
+const OB_WAIT = new Set();
+async function obStart(key) {
+  if (OB_WAIT.has(key)) return;
   if (OB[key]) obAutoStop(OB[key]);
   delete OB[key];
-  await busy(btn, async () => { obApply(key, await api(`/api/onboarding/${enc(key)}/start`, "POST")); });
+  OB_WAIT.add(key); obPaint(key);
+  try {
+    await busy(null, async () => {
+      try { obApply(key, await api(`/api/onboarding/${enc(key)}/start`, "POST")); }
+      catch (e) { throw new Error(`연결을 시작하지 못했어요 · ${e.message}. 잠시 뒤에 다시 눌러 주세요`); }
+    });
+  } finally { OB_WAIT.delete(key); obPaint(key); }
 }
 async function obPick(key, choice, btn) {
   await busy(btn, async () => { obApply(key, await api(`/api/onboarding/${enc(key)}/continue`, "POST", { choice })); });
@@ -95,14 +104,15 @@ const obSection = (key, live) => {
 };
 // The panel: state, current step, error (only when the API sent one), the single owner line, and its actions.
 function onboardingPanel(key) {
-  const v = OB[key] || { state: "idle", step: null, owner: null, error: null, url: null };
+  const pend = OB_WAIT.has(key) && !OB[key];   // start pressed, no answer yet: shown as running, without a cancel (nothing to cancel yet)
+  const v = OB[key] || { state: pend ? "running" : "idle", step: null, owner: null, error: null, url: null };
   const waiting = v.state === "waiting", failed = v.state === "failed", running = v.state === "running";
   // One state row: the dot (blue running, orange waiting, green done, red failed; never pulsing), the line, and the actions in .li-end.
   // A state change swaps in this same row.
   const acts = [
     ...((waiting && !v.choices) || failed ? [el("button", { type: "button", class: "btn inrow", "data-onb-continue": "1", onclick: ev => obAct(key, "continue", ev.currentTarget) }, "계속")] : []),
-    ...(failed ? [el("button", { type: "button", class: "btn tonal inrow", "data-onb-start": "1", onclick: ev => obStart(key, ev.currentTarget) }, "다시 시작")] : []),
-    ...(running || waiting ? [el("button", { type: "button", class: "btn text inrow", "data-onb-cancel": "1", onclick: ev => obAct(key, "cancel", ev.currentTarget) }, "취소")] : []),
+    ...(failed ? [el("button", { type: "button", class: "btn tonal inrow", "data-onb-start": "1", onclick: () => obStart(key) }, "다시 시작")] : []),
+    ...((running && !pend) || waiting ? [el("button", { type: "button", class: "btn text inrow", "data-onb-cancel": "1", onclick: ev => obAct(key, "cancel", ev.currentTarget) }, "취소")] : []),
   ];
   const head = el("div", { class: "li" }, el("span", { class: "lead" }, el("span", { class: `dot ${OB_TONE[v.state] || ""}`, "aria-hidden": "true" })), el("span", { class: "tx" },
     el("div", { class: "hd", text: "자동 연결" }), el("div", { class: "sup", "data-onb-line": "1", text: obLine(v) })), acts.length ? liEnd(...acts) : null);

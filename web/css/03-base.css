@@ -108,8 +108,8 @@
 .mi.danger, .mi.danger .ml { color: var(--err); }
 .mi.ind { padding-left: calc(var(--menu-px) + var(--sp-5)); }
 .mi .ck { flex: none; width: 14px; height: 14px; color: var(--accent); }
-.mi .ml { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--sp-2); overflow-wrap: anywhere; }
-.mi .ml small { flex: 0 1 auto; min-width: 0; margin-left: auto; color: var(--fg-3); font-size: 11px; line-height: 16px; }
+.mi .ml { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; column-gap: var(--sp-2); overflow-wrap: anywhere; }   /* space-between: the secondary text ends the label's line, and starts at the left when it drops under the label */
+.mi .ml small { flex: 0 1 auto; min-width: 0; color: var(--fg-3); font-size: 11px; line-height: 16px; }
 :root[data-theme="dark"] .mi .ml small { color: var(--fg-2); }
 .mi.sel-on { font-weight: 500; }
 @media (pointer: coarse) { .mi { min-height: var(--menu-h-sheet); font-size: 14px; } }

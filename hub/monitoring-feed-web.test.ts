@@ -44,3 +44,25 @@ for (const width of [390, 1440]) {
 		expect(got.top).toBe(0);
 	});
 }
+
+test("a report's first line that only repeats its title is not repeated under it (row line and opened card)", async () => {
+	const v = await hub.view({ width: 390, height: 900 });
+	await v.navigate(`${hub.origin}/?light#monitoring/notice`);
+	const got = JSON.parse((await v.evaluate(`new Promise((res, rej) => {
+		const t = setTimeout(() => rej(new Error("feed not drawn")), 10000);
+		const tick = () => {
+			if (typeof monLines !== "function") { requestAnimationFrame(tick); return; }
+			clearTimeout(t);
+			const names = ["샘플 라 감시"], plain = { title: "샘플 라 감시", text: "샘플 라 감시\\n가격이 내렸어요" }, bold = { title: "샘플 라 감시", text: "**샘플 라 감시**\\n가격이 내렸어요" }, only = { title: "샘플 라 감시", text: "샘플 라 감시" };
+			const one = monRowNode({ id: "t-one", title: "샘플 라 감시: 확인했어요.", text: "샘플 라 감시: 확인했어요.", tone: "ok", read: true, ts: new Date().toISOString() }, []), two = monRowNode({ id: "t-two", title: "샘플 라 감시", text: "가격이 내렸어요", tone: "ok", read: true, ts: new Date().toISOString() }, []);
+			res(JSON.stringify({ plain: monLines(plain, names), bold: monLines(bold, names), sum: monSummary(only, names), card: monStrip(bold.text, names), rows: [one, two].map(r => [r.querySelector(".rc-src").textContent, [...r.querySelectorAll(".fr-sum")].map(x => x.textContent)]) }));
+		};
+		tick();
+	})`)) as string) as { plain: string[]; bold: string[]; sum: string; card: string; rows: [string, string[]][] };
+	expect(got.plain).toEqual(["가격이 내렸어요"]);
+	expect(got.bold).toEqual(["가격이 내렸어요"]);
+	expect(got.sum).toBe("샘플 라 감시");
+	expect(got.card).toBe("가격이 내렸어요");
+	// a report that is one sentence is said once: the row has no second line that equals its first
+	expect(got.rows).toEqual([["샘플 라 감시: 확인했어요.", []], ["샘플 라 감시", ["가격이 내렸어요"]]]);
+});

@@ -1,7 +1,7 @@
 /* ---------- settings: 업데이트 (hub/selfupdate.ts, /api/update*) ---------- */
 // Version on disk vs the version this gateway runs, the last check, the running/finished update job, and the restart that
 // applies it. After a restart request the page polls until the gateway answers with a new boot id.
-const UPD = { info: null, wait: null, timer: 0, at: 0 };
+const UPD = { info: null, wait: null, timer: 0, at: 0, checking: false };
 // Opening settings reads both again only when the last read (boot, the 5 min tick, an update_available event) is older than that tick.
 const UPD_FRESH_MS = 5 * 60000;
 const updFresh = () => !!UPD.info && !UPD.info.error && !!HV.info && Date.now() - UPD.at < UPD_FRESH_MS;
@@ -145,13 +145,18 @@ async function hvApply(btn, id) {
   await busy(btn, async () => { await api("/api/harness/update/apply", "POST", { id }); });
   loadUpdate();
 }
+// The pressed row says 확인하는 중… and keeps its card while the check runs; the result comes back into the same row.
 async function updCheck(btn) {
+  if (UPD.checking) return;
+  UPD.checking = true;
+  renderSettings();
   await busy(btn, async () => {
     const c = await api("/api/update/check", "POST");
     UPD.info = { ...UPD.info, lastCheck: c };
     paintUpdBadge();
     if (c.ok) toast(c.rewrite ? "저장소 기록이 바뀌어서 새 기록으로 옮겨요" : c.available && updRelNewer(c.version && c.version.release, c.available) ? `새 버전 ${c.available}이 있어요` : c.incomingTotal ? `새 커밋 ${c.incomingTotal}개가 있어요` : "최신 버전이에요");
   });
+  UPD.checking = false;
   renderSettings();
 }
 // Local work the update carries as a local patch (hub/selfupdate.ts apply): one Korean line and what was saved; the update itself goes on.
@@ -257,8 +262,8 @@ function updateSection() {
   const { running: run, disk, job, settings: s } = i;
   const jobRunning = job && job.status === "running";
   const { pending, c } = updState(i);
-  const off = jobRunning || UPD.wait ? { disabled: true } : {};
-  const rows = [li("앱 버전", `실행 중 ${updVer(run)}`, el("button", { class: "btn tonal inrow", type: "button", ...off, onclick: ev => updCheck(ev.currentTarget) }, "확인"))];
+  const off = jobRunning || UPD.wait || UPD.checking ? { disabled: true } : {};
+  const rows = [li("앱 버전", UPD.checking ? "확인하는 중…" : `실행 중 ${updVer(run)}`, el("button", { class: "btn tonal inrow", type: "button", ...off, onclick: ev => updCheck(ev.currentTarget) }, "확인"))];
   if (c && !c.ok) rows.push(el("div", { class: "upd-box err" }, el("div", { class: "hd", text: c.error.reason }), el("div", { class: "sup" }, ...updCode(c.error.fix)), c.error.detail ? el("div", { class: "upd-detail", text: c.error.detail }) : null));
   else if (c && !updAvailable()) rows.push(li("최신 버전이에요", `${c.version && c.version.release ? `v${c.version.release} · ` : ""}${c.upstream} · 확인 ${updWhen(c.at)}${c.ahead.length ? ` · ${c.upstream}에 없는 로컬 커밋 ${c.ahead.length}개 (아직 올리지 않음)` : ""}${c.dirty.length ? ` · 커밋 안 한 변경 ${c.dirty.length}개` : ""}`));
   else if (c) {

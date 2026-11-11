@@ -40,16 +40,17 @@ const page = async (width: number, theme: "light" | "dark", open: string, ready:
 /* 1. menu item secondary text (.mi .ml small) */
 const MENU_ITEMS = JSON.stringify([{ value: "a", label: NAME, sub: NAME }, { value: "b", label: TOKEN, sub: "설명" }, { value: "c", label: "셋째 항목", sub: TOKEN }, { value: "d", label: "넷째 항목" }]);
 const openMenu = (w: number, theme: "light" | "dark") => page(w, theme, `showMenu($("#title"), ${MENU_ITEMS}, { onPick() {} })`, `document.querySelectorAll(".menu .mi").length === 4`);
-type MenuGeo = { items: { label: number; smallIn: boolean; overlap: boolean }[] };
+type MenuGeo = { items: { label: number; smallIn: boolean; overlap: boolean; under: boolean; left: boolean }[] };
 const menuGeo = (v: View) => q<MenuGeo>(v, `
 	const menu = document.querySelector(".menu"), mr = menu.getBoundingClientRect();
 	const items = [...menu.querySelectorAll(".mi")].map(mi => {
 		const ml = mi.querySelector(".ml"), small = ml.querySelector("small");
 		const rng = document.createRange(); rng.selectNodeContents(ml.firstChild);
 		const lines = [...rng.getClientRects()], widest = Math.max(...lines.map(r => r.width));
-		if (!small) return { label: widest, smallIn: true, overlap: false };
+		if (!small) return { label: widest, smallIn: true, overlap: false, under: false, left: true };
 		const s = small.getBoundingClientRect();
-		return { label: widest, smallIn: s.left >= mr.left - 1 && s.right <= mr.right + 1 && s.right <= innerWidth + 1,
+		const under = s.top >= Math.max(...lines.map(r => r.bottom)) - 1;   // pushed to a line of its own under the label
+		return { label: widest, under, left: !under || Math.abs(s.left - lines[0].left) <= 1, smallIn: s.left >= mr.left - 1 && s.right <= mr.right + 1 && s.right <= innerWidth + 1,
 			overlap: lines.some(r => r.left < s.right - 1 && r.right > s.left + 1 && r.top < s.bottom - 1 && r.bottom > s.top + 1) };
 	});
 	return { items };`);
@@ -60,6 +61,9 @@ test("390px: a menu item with long secondary text keeps its label readable, clea
 	expect(g.items.map(i => i.smallIn)).toEqual([true, true, true, true]);
 	expect(g.items.map(i => i.overlap)).toEqual([false, false, false, false]);
 	expect(g.items.map(i => i.label >= 48)).toEqual([true, true, true, true]);
+	// secondary text that drops under its label starts where the label starts, not at the far right edge
+	expect(g.items.some(i => i.under)).toBe(true);
+	expect(g.items.map(i => i.left)).toEqual([true, true, true, true]);
 });
 const ratio = (v: View) => q<{ small: number; hover: number }>(v, `
 	const probe = document.createElement("i"); document.body.append(probe);

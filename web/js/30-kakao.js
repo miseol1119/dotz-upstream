@@ -580,7 +580,7 @@ function kkRow(r) {
       // The row end like every list: the time on top, 미답장 and the unread count under it.
       time || r.unread || r.unreplied ? el("span", { class: "cv-m" }, time, r.unread || r.unreplied ? el("span", { class: "kk-rmeta" },
         r.unreplied ? unrepPill() : null,
-        r.unread ? el("span", { class: "nb warn", "aria-label": `읽지 않은 메시지 ${r.unread}개`, text: r.unread > 99 ? "99+" : String(r.unread) }) : null) : null) : null);
+        r.unread ? el("span", { class: "nb", "aria-label": `읽지 않은 메시지 ${r.unread}개`, text: r.unread > 99 ? "99+" : String(r.unread) }) : null) : null) : null);
 }
 function kkPaintRooms() {
   const top = kkRooms.scrollTop, watched = KK.rooms.filter(r => r.watched).sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0));

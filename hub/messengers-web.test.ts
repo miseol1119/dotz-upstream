@@ -56,6 +56,8 @@ let secretSet = false;
 let allow: string[];
 let onboard: string[] = [];
 let picks: string[] = [];
+let startGate: Promise<void> | null = null;   // holds the answer of /start until a test lets it go
+let startFail = false;
 const puts = inbox<any>();
 let ob: Record<string, any>;
 const idle = key => ({ key, state: "idle", step: null, owner: null, error: null, url: null, updated_at: new Date(0).toISOString() });
@@ -68,6 +70,8 @@ function reset() {
 	allow = ["boss@corp.test"];
 	puts.length = 0;
 	onboard = [];
+	startGate = null;
+	startFail = false;
 	ob = Object.fromEntries(["discord", "jandi", "slack", "telegram"].map(k => [k, idle(k)]));
 }
 reset();
@@ -103,6 +107,8 @@ const hub = fakeHub({
 			const key = o[1]!, action = o[2];
 			if (!action) return json(ob[key]);
 			onboard.push(`${key}/${action}`);
+			if (action === "start" && startGate) await startGate;
+			if (action === "start" && startFail) return json({ error: "게이트웨이가 답하지 않아요" }, 502);
 			if (action === "start") ob[key] = waiting(key, key === "discord" ? "Discord 열기" : "관리자로 로그인", key === "telegram" ? "Telegram에서 시작을 눌러 주세요." : "브라우저에서 남은 한 가지를 마쳐 주세요.");
 			else if (action === "continue") {
 				const b = (await req.clone().json().catch(() => ({}))) as { choice?: string };
@@ -282,6 +288,19 @@ describe("메신저 설정", () => {
 		await waitFor(v, `document.querySelector('#jandi [data-onb-state="done"]')`);
 		expect(picks).toEqual(["12"]);
 		expect(await ev<number>(v, `document.querySelectorAll("#jandi [data-onb-choice]").length`)).toBe(0);
+	}, 30_000);
+
+	test("연결 says 연결하는 중 on the pressed row until the start answers, and a failed start gives the button back", async () => {
+		const v = await open(390, 844, "light", "slack");
+		let free = () => {};
+		startGate = new Promise<void>(r => { free = r; });
+		await click(v, "#slack [data-ms-connect]");
+		await waitFor(v, `document.querySelector('#slack [data-onb-state="running"]')`);
+		expect(await ev<number[]>(v, `[document.querySelector("#slack [data-ms-connect]").disabled, document.querySelectorAll("#slack [data-onb-cancel]").length]`)).toEqual([true, 0]);
+		startFail = true;
+		free();
+		await waitFor(v, `document.querySelector('#slack [data-onb-state="idle"]') && !document.querySelector("#slack [data-ms-connect]").disabled`);
+		expect(await ev<number>(v, `document.querySelectorAll("#slack [data-onb-error], #slack [data-onb-owner]").length`)).toBe(0);
 	}, 30_000);
 
 	test("연결 starts onboarding; waiting shows one owner line and continue posts /continue", async () => {

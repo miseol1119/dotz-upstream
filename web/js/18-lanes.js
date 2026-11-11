@@ -194,7 +194,7 @@ function prjState(p) {
   if (stuck) return { k: "need", tone: stuck.st[1], word: stuck.st[0], lane: stuck.l };
   const queued = open.find(x => x.st[0] === "순서 대기");
   if (queued) return { k: "run", tone: "", word: queued.st[0], lane: queued.l };
-  return { k: "idle", tone: "", word: ls.length ? "쉬는 중" : "아직 세션이 없어요" };
+  return { k: "idle", tone: "", word: ls.length ? "쉬는 중" : "세션 없음" };
 }
 // The newest thing that happened in the project: a session's report or start, or the record's last save.
 function prjLastAt(p) {

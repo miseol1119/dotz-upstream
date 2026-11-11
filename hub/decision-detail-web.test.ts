@@ -122,6 +122,8 @@ describe("decision options that need detail", () => {
 		expect(posted[0]!.body).toEqual({ n: 2, label: "고치기", note: "3시 말고 4시로" });
 		// the sheet stays open saying 고치는 중… with the old draft; the rewritten draft (a newer open one of the same conversation) replaces it
 		expect(await view.evaluate(`document.querySelector(".fs-ft .dc-st").textContent`)).toBeTruthy();
+		// until the new draft lands the old one cannot be sent, sent back again or dropped: every choice is locked
+		expect(await view.evaluate(`[...document.querySelectorAll(".fs-ft .rq-acts .btn")].every(b => b.disabled)`)).toBe(true);
 		await view.evaluate(`(() => {
 			const old = ntById(DK.nid); old.decision.state = "answered"; old.decision.answer = "2) 고치기 - 3시 말고 4시로";
 			const fresh = JSON.parse(JSON.stringify(old)); fresh.id = "redrafted"; fresh.ts = new Date(Date.now() + 1000).toISOString(); fresh.decision.state = "open"; delete fresh.decision.answer;

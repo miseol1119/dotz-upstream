@@ -72,7 +72,6 @@
 #kk-rooms .kk-row.on { background: var(--row-sel); }
 #kk-rooms .kk-row .cv-m { align-self: flex-start; gap: var(--sp-05); padding-top: var(--sp-05); }
 #kk-rooms .kk-av { width: 36px; height: 36px; font-size: 15px; }
-#kk-rooms .kk-row .nb.warn { min-width: 18px; height: 18px; padding: 0 var(--sp-15); background: var(--warn); color: var(--bg); font: 600 11px/18px var(--font); text-align: center; }
 #kk-chat { gap: var(--sp-3); }
 /* the room's bar sits on the page, not on a card like the main chat's: it is the card itself, or it vanishes into the light page */
 #kk-chat .kk-composer .sendrow:not(.ulw) { background: var(--card) !important; }

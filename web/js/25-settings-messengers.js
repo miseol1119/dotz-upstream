@@ -82,7 +82,7 @@ function msSelfChatRow(id, s) {
   const lost = c.state === "lost";
   return el("div", { class: "li", "data-ms-selfchat": c.state }, el("span", { class: "lead" }, icon("chat")),
     el("span", { class: "tx" }, el("div", { class: "hd", text: c.label }), el("div", { class: lost ? "dcs-err" : "sup", text: c.hint })),
-    liEnd(el("button", { type: "button", class: lost ? "btn inrow" : "btn tonal inrow", "data-ms-selfchat-connect": id, onclick: ev => obStart(id, ev.currentTarget), text: c.connect })));
+    liEnd(el("button", { type: "button", class: lost ? "btn inrow" : "btn tonal inrow", "data-ms-selfchat-connect": id, disabled: OB_WAIT.has(id), onclick: () => obStart(id), text: OB_WAIT.has(id) ? "연결하는 중" : c.connect })));
 }
 function msConnect(id, btn) {
   const m = msItem(id);
@@ -95,7 +95,7 @@ function msConnect(id, btn) {
       if (current === id) renderMessenger(id);
     });
   }
-  return obStart(id, btn);
+  return obStart(id);
 }
 // 알림 switches save at once (PUT { notify }): they need no restart and no other field.
 async function msNotifySet(id, k, on) {
@@ -196,7 +196,7 @@ function renderMessenger(id) {
     el("div", { class: "list" },
       loginOnly ? null : el("div", { class: "li", "data-ms-status": id }, el("span", { class: "lead" }, icon("chat")),
         el("span", { class: "tx" }, el("div", { class: "hd", text: (m && m.label) || MS_LABELS[id] }), el("div", { class: "sup", text: msLine(id, m, s) })),
-        liEnd(tag ? el("span", { class: `tag ${tone}`, text: tag, title: (m && m.error) || "" }) : null, c && !turnOn ? null : el("button", { type: "button", class: "btn tonal inrow", "data-ms-connect": id, onclick: ev => msConnect(id, ev.currentTarget) }, msConnectLabel(m)))),
+        liEnd(tag ? el("span", { class: `tag ${tone}`, text: tag, title: (m && m.error) || "" }) : null, c && !turnOn ? null : el("button", { type: "button", class: "btn tonal inrow", "data-ms-connect": id, disabled: OB_WAIT.has(id), onclick: ev => msConnect(id, ev.currentTarget) }, OB_WAIT.has(id) ? "연결하는 중" : msConnectLabel(m)))),
       msSelfChatRow(id, s)),
     ...obSection(id, !!m && m.state === "ok")];
   if (s.notify) nodes.push(el("div", { class: "sec", text: "알림" }), el("div", { class: "list" },

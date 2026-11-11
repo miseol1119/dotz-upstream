@@ -150,7 +150,7 @@ test("the list pages 12 projects at a time, filters by need/running and searches
 	await waitFor(v, `document.querySelectorAll("#pl-list .pl-row:not(.sub):not([data-k='sessions'])").length === 1`);
 	expect(await q(v, `return document.querySelector("#pl-list .pl-row .pl-n").textContent`)).toBe("프로젝트 17");
 	// every milestone of this stored record is ticked, and that no longer makes the project finished
-	expect(await q(v, `return document.querySelector("#pl-list .pl-row .li-end .tag").textContent`)).toBe("아직 세션이 없어요");
+	expect(await q(v, `return document.querySelector("#pl-list .pl-row .li-end .tag").textContent`)).toBe("세션 없음");
 	// the built-in 커스텀 page stays reachable at the end of 전체
 	await run(v, `const i = document.querySelector("#pl-q"); i.value = ""; i.dispatchEvent(new Event("input", { bubbles: true }))`);
 	await waitFor(v, `document.querySelector("#pl-list .pl-row.sub")`);
